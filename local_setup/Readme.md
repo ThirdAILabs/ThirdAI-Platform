@@ -32,7 +32,9 @@ Without this process, it is cumbersome to test out platform changes. We would ha
      bash launch_traefik.sh
      ```
 4. **Set Up PostgreSQL:**
-   - Install PostgreSQL([https://www.postgresql.org/download/](https://www.postgresql.org/download/)) if not already installed, then configure it to allow any inbound connections and run the following SQL commands:
+   - Install PostgreSQL([https://www.postgresql.org/download/](https://www.postgresql.org/download/)) if not already installed. On mac, you can just run `brew install postgresql`.
+   - Start the service. On mac, you can run `brew services start postgresql`.
+   - Run `psql postgresql` inside the command line, then run the following SQL commands to configure the service:
      ```
      CREATE ROLE postgres WITH LOGIN SUPERUSER;
      ALTER ROLE postgres WITH PASSWORD 'yourpassword';
