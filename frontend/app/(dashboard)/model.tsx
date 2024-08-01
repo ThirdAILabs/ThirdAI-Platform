@@ -14,53 +14,57 @@ import { MoreHorizontal } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { SelectModel } from '@/lib/db';
 import { deleteModel } from './actions';
-import { deployModel, getDeployStatus } from '@/lib/backend';
+import { deployModel, getDeployStatus, stopDeploy } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
-
-interface DeploymentData {
-  deployment_id: string;
-  deployment_name: string;
-  model_identifier: string;
-  status: string;
-}
-
-interface DeploymentResponse {
-  data: DeploymentData;
-  message: string;
-  status: string;
-}
-
 
 export function Model({ model }: { model: SelectModel }) {
   const router = useRouter();
-  const [isDeployed, setIsDeployed] = useState<boolean>(false);
+  const [deployStatus, setDeployStatus] = useState<string>('');
   const [deploymentId, setDeploymentId] = useState<string | null>(null);
+  const [deploymentIdentifier, setDeploymentIdentifier] = useState<string | null>(null);
 
   useEffect(() => {
-    const deployment_identifier = `${model.name}:${model.name}`;
-    getDeployStatus({ deployment_identifier })
-      .then((response) => {
-        console.log('Deployment status response:', response);
-        if (response.data.deployment_id) {
-          setIsDeployed(true);
-          setDeploymentId(response.data.deployment_id);
-        } else {
-          setIsDeployed(false);
-        }
-      })
-      .catch((error) => {
-        if (error.response && error.response.status === 400) {
-          console.log('Model is not deployed.');
-          setIsDeployed(false);
-        } else {
-          console.error('Error fetching deployment status:', error);
-        }
-      });
+    const username = 'peter'; // TODO: Retrieve the username dynamically if needed
+    const modelIdentifier = `${username}/${model.model_name}`;
+    setDeploymentIdentifier(`${modelIdentifier}:${username}/${model.model_name}`)
+  }, [])
 
-  }, []);
+  useEffect(() => {
+    if (deploymentIdentifier) {
+      const fetchDeployStatus = () => {
+        getDeployStatus({ deployment_identifier: deploymentIdentifier })
+          .then((response) => {
+            console.log('Deployment status response:', response);
+            if (response.data.deployment_id && response.data.status === 'complete') {
+              setDeployStatus('Deployed');
+              setDeploymentId(response.data.deployment_id);
+            } else if (response.data.status === 'in_progress') {
+              setDeployStatus('Deploying');
+            } else {
+              setDeployStatus('Ready to Deploy');
+            }
+          })
+          .catch((error) => {
+            if (error.response && error.response.status === 400) {
+              console.log('Model is not deployed.');
+              setDeployStatus('Ready to Deploy');
+            } else {
+              console.error('Error fetching deployment status:', error);
+            }
+          });
+      };
+
+      fetchDeployStatus(); // Initial fetch
+
+      const intervalId = setInterval(fetchDeployStatus, 2000); // Fetch every 2 seconds
+
+      // Cleanup interval on component unmount
+      return () => clearInterval(intervalId);
+    }
+  }, [deploymentIdentifier]);
 
   function goToEndpoint() {
-    switch (model.modelType) {
+    switch (model.type) {
       case "semantic search model":
         const baseUrl = 'http://localhost:3000';
         const newUrl = `${baseUrl}/search?id=${deploymentId}`;
@@ -69,7 +73,7 @@ export function Model({ model }: { model: SelectModel }) {
       case "ner model":
         router.push(`/token-classification/${deploymentId}`);
       default:
-        throw new Error(`Invalid model type ${model.modelType}`);
+        throw new Error(`Invalid model type ${model.type}`);
     }
   }
 
@@ -80,28 +84,30 @@ export function Model({ model }: { model: SelectModel }) {
           alt="Model image"
           className="aspect-square rounded-md object-cover"
           height="64"
-          src={model.imageUrl}
+          src={'/thirdai-small.png'}
           width="64"
         />
       </TableCell>
-      <TableCell className="font-medium">{model.name}</TableCell>
+      <TableCell className="font-medium">{model.model_name}</TableCell>
       <TableCell>
         <Badge variant="outline" className="capitalize">
-          {
-          isDeployed
-          ?
-          'Deployed'
-          :
-          model.status
-          }
+          {deployStatus}
           
         </Badge>
       </TableCell>
-      <TableCell className="hidden md:table-cell">{model.modelType}</TableCell>
+      <TableCell className="hidden md:table-cell">{model.type}</TableCell>
       <TableCell className="hidden md:table-cell">
-        {model.trainedAt.toLocaleDateString()}
+        {
+          model.publish_date
+          ? new Date(model.publish_date).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })
+          : 'N/A'
+      }
       </TableCell>
-      <TableCell className="hidden md:table-cell">{model.description}</TableCell>
+      <TableCell className="hidden md:table-cell">'N\A'</TableCell>
       <TableCell className="hidden md:table-cell">
         <button type="button" 
                 onClick={goToEndpoint}
@@ -115,13 +121,22 @@ export function Model({ model }: { model: SelectModel }) {
       <TableCell className="hidden md:table-cell">
         <button type="button" 
                 onClick={()=>{
-                  const modelName = model.name.split("/")[1];
+                  const username = 'peter'; // Retrieve the username dynamically if needed
+                  const modelIdentifier = `${username}/${model.model_name}`;
 
-                  deployModel({ deployment_name: modelName, model_identifier: model.name })
+                  deployModel({ deployment_name: model.model_name, model_identifier: modelIdentifier })
                     .then((response) => {
-                      // const baseUrl = `${window.location.protocol}//${window.location.host}`;
-                      // const newUrl = `${baseUrl}/search?id=${deploymentId}`;
-                      // window.open(newUrl, '_blank');
+                      if(response.status === 'success') {
+                        console.log('deployment success')
+
+                        setDeployStatus('Deployed')
+                        setDeploymentId(response.data.deployment_id)
+  
+                        const username = 'peter'; // TODO: Retrieve the username dynamically if needed
+                        const modelIdentifier = `${username}/${model.model_name}`;
+                        setDeploymentIdentifier(`${modelIdentifier}:${username}/${model.model_name}`)
+                      }
+
                     })
                     .catch((error) => {
                       console.error('Error deploying model:', error);
@@ -146,11 +161,34 @@ export function Model({ model }: { model: SelectModel }) {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuItem>Edit</DropdownMenuItem>
-            <DropdownMenuItem>
-              <form action={deleteModel}>
-                <button type="submit">Delete</button>
-              </form>
-            </DropdownMenuItem>
+            {
+              deployStatus === 'Deployed' && deploymentIdentifier
+              &&
+              <DropdownMenuItem>
+                <form action={deleteModel}>
+                  <button type="button"
+                  onClick={()=>{
+                    stopDeploy({ deployment_identifier: deploymentIdentifier })
+                      .then((response) => {
+                        // Handle success, e.g., display a message or update the UI
+                        console.log("Deployment stopped successfully:", response);
+                        // Add any additional success handling logic here
+                        if (response.status === 'success') {
+                          setDeployStatus('Read to Deploy')
+                          setDeploymentId(null)
+                          setDeploymentIdentifier(null)
+                        }
+                      })
+                      .catch((error) => {
+                        // Handle error, e.g., display an error message
+                        console.error("Failed to stop deployment:", error);
+                        // Add any additional error handling logic here
+                      });
+                  }}
+                  >Undeploy</button>
+                </form>
+              </DropdownMenuItem>
+            }
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>

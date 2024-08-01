@@ -6,7 +6,6 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import ChooseProblem from './choose-model';
-import { getModels } from '@/lib/db';
 
 export default async function NewModelPage({
   searchParams
@@ -16,10 +15,6 @@ export default async function NewModelPage({
 
   const search = searchParams.q ?? '';
   const offset = searchParams.offset ?? 0;
-  const { models, newOffset, totalModels } = await getModels(
-    search,
-    Number(offset)
-  );
 
   return (
     <Card>
@@ -28,7 +23,7 @@ export default async function NewModelPage({
         <CardDescription>Create a new model with a few simple steps.</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChooseProblem models = {models} />
+        <ChooseProblem />
       </CardContent>
     </Card>
   );

@@ -1,17 +1,44 @@
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SelectModel } from '@/lib/db';
 import RAGQuestions from './rag-questions';
 import NLPQuestions from './nlp-questions/nlp-questions';
 import SemanticSearchQuestions from './semantic-search-questions';
+import { fetchPublicModels, fetchPrivateModels, fetchPendingModels } from "@/lib/backend"
 
-export default function ChooseProblem({
-  models,
-}: {
-  models: SelectModel[];
-}) {
+export default function ChooseProblem() {
   const [modelType, setModelType] = useState('');
+
+  const [privateModels, setPrivateModels] = useState<SelectModel[]>([])
+  const [pendingModels, setPendingModels] = useState<SelectModel[]>([]);
+
+  useEffect(() => {
+    async function getModels() {
+        try {
+          let response = await fetchPublicModels('');
+          const publicModels = response.data;
+          console.log('publicModels', publicModels)
+
+          response = await fetchPrivateModels('');
+          const privateModels: SelectModel[] = response.data;
+          setPrivateModels(privateModels)
+
+          response = await fetchPendingModels();
+          const pendingModels = response.data; // Extract the data field
+          console.log('pendingModels', pendingModels)
+
+        } catch (err) {
+          if (err instanceof Error) {
+              console.log(err.message);
+          } else {
+              console.log('An unknown error occurred');
+          }
+      }
+    }
+
+    getModels();
+  }, []);
 
   return (
     <>
@@ -33,7 +60,7 @@ export default function ChooseProblem({
 
         {modelType && (
           <div>
-            {modelType === 'RAG' && <RAGQuestions models = {models}/>}
+            {modelType === 'RAG' && <RAGQuestions models = {privateModels}/>}
             {modelType === 'NLP' && <NLPQuestions />}
             {modelType === 'semantic-search' && <SemanticSearchQuestions />}
           </div>

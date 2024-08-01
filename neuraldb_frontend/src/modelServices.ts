@@ -289,14 +289,23 @@ export class GlobalModelService implements ModelService {
         queryId?: string,
     ): Promise<SearchResult | null> {
         const url = new URL(this.url + "/predict");
-        url.searchParams.append("query_text", queryText);
-        url.searchParams.append("top_k", topK.toString());
 
         // TODO(Geordie): Accept a "timeout" / "longer than expected" callback.
         // E.g. if the query takes too long, then we can display a message
         // saying that they should check the url, or maybe it's just taking a
         // while.
-        return fetch(url, { method: "POST", headers: this.authHeader() })
+
+        const baseParams = { query: queryText, top_k: topK };
+        const ndbParams = { constraints: {} };
+
+        return fetch(url, { 
+                method: "POST", 
+                headers: {
+                    ...this.authHeader(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ base_params: baseParams, ndb_params: ndbParams })
+            })
             .then(handleInvalidAuth(this))
             .then((response) => {
                 if (response.ok) {
@@ -624,11 +633,9 @@ export class GlobalModelService implements ModelService {
 export class UserModelService extends GlobalModelService {
     authToken: string;
 
-    constructor(url: string, sessionId: string) {
+    constructor(url: string, sessionId: string, authToken: string) {
         super(url, sessionId);
-        this.authToken = window.localStorage.getItem(
-            "thirdai_model_bazaar_access_token",
-        );
+        this.authToken = authToken;
     }
 
     authHeader(): Record<string, string> {

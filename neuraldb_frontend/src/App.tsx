@@ -141,9 +141,11 @@ function App() {
     useEffect(() => {
         const queryParameters = new URLSearchParams(window.location.search);
         const userModelUrl = queryParameters.get("id");
-        if (userModelUrl) {
+        const accessToken = queryParameters.get("token");
+
+        if (userModelUrl && accessToken) {
             const serviceUrl = createDeploymentUrl(userModelUrl);
-            const newModelService = new UserModelService(serviceUrl, uuidv4());
+            const newModelService = new UserModelService(serviceUrl, uuidv4(), accessToken);
             setModelService(newModelService);
             newModelService.sources().then(setSources);
         }
@@ -406,10 +408,10 @@ function App() {
                                                     $right="30%"
                                                 >
                                                     <Pad $left="5px">
-                                                        <Spacer $height="30px" />
+                                                        {/* <Spacer $height="30px" />
                                                         <GeneratedAnswer
                                                             answer={answer}
-                                                        />
+                                                        /> */}
                                                         <Spacer $height="50px" />
                                                         {checkedIds.size >
                                                             0 && (
