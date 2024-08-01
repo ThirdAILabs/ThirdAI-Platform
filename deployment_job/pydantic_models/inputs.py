@@ -81,6 +81,7 @@ class SearchResultsTextClassification(BaseModel):
 
 class SearchResultsTokenClassification(BaseModel):
     query_text: str
+    tokens: List[str]
     predicted_tags: List[List[str]]
 
 

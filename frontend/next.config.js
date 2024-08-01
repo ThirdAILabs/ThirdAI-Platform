@@ -11,6 +11,9 @@ const nextConfig = {
         hostname: '*.public.blob.vercel-storage.com'
       }
     ]
+  },
+  env: {
+    DEPLOYMENT_BASE_URL: process.env.DEPLOYMENT_BASE_URL,
   }
 };
 

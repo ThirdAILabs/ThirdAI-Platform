@@ -53,5 +53,6 @@ class TokenClassificationModel(ClassificationModel):
 
         return inputs.SearchResultsTokenClassification(
             query_text=query,
+            tokens=query.split(),
             predicted_tags=predictions,
         )

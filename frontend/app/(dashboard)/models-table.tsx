@@ -60,7 +60,7 @@ const mapPrivateModelToSelectModel = (privateModel: PrivateModel, index: number)
   return {
     id: index + 1, // Use index as a unique identifier for demonstration
     imageUrl: '/thirdai-small.png', // Provide a default or dummy image URL
-    name: privateModel.model_name,
+    name: `${privateModel.username}/${privateModel.model_name}`,
     status: 'active', // Assuming all fetched models are active, replace with appropriate status if available
     trainedAt: new Date(privateModel.publish_date),
     description: `Model by ${privateModel.username}`,
@@ -77,7 +77,7 @@ const mapPrivateModelToSelectModel = (privateModel: PrivateModel, index: number)
 const mapPendingModelToSelectModel = (pendingModel: PendingModel, index: number): SelectModel => ({
   id: index + 1000, // Use a different range for pending models to avoid id conflicts
   imageUrl: '/thirdai-small.png', // Provide a default or dummy image URL
-  name: pendingModel.model_name,
+  name: `${pendingModel.username}/${pendingModel.model_name}`,
   status: 'training', // Set status to "training"
   trainedAt: new Date(), // Use the current date as a placeholder
   description: `Model by ${pendingModel.username}`,
