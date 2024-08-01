@@ -285,3 +285,65 @@ export function useTokenClassificationEndpoints() {
     getAvailableTags
   };
 }
+
+
+export interface DeploymentStatsTable {
+  header: string[];
+  rows: string[][];
+}
+
+export interface DeploymentStats {
+  system: DeploymentStatsTable;
+  throughput: DeploymentStatsTable;
+}
+
+export function useDeploymentStats() {
+  const accessToken = useAccessToken();
+  const params = useParams();
+  const deploymentId = params.deploymentId as string;
+  const currentDeploymentBaseUrl = `${deploymentBaseUrl}/${deploymentId}`;
+
+  const getStats = async (): Promise<DeploymentStats> => {
+    try {
+      // TODO: Build stats endpoint for nomad jobs and use it
+      const response = await axios.get("http://localhost:8001/stats");
+      console.log(response.data);
+      const data = response.data;
+
+      return {
+        system: {
+          header: ['Component', 'Description'],
+          rows: [
+            ['CPU', '12 vCPUs'],
+            ['CPU Model', 'Intel(R) Xeon(R) CPU E5-2680 v3 @ 2.50GHz'],
+            ['Memory', '64 GB RAM'],
+            ['System Uptime', '0 hours 0 minutes 0 seconds'],
+          ]
+        },
+        throughput: {
+          header: ["Time Period", "Tokens Identified (million)", "Chunks Parsed (million)", "Files Processed (GB)"],
+          rows: [
+            [
+              'Past hour',
+              Math.floor(data.tokens_per_hour / 1000000).toLocaleString() + ' M',
+              Math.floor(data.lines_per_hour / 1000000).toLocaleString() + ' M',
+              data.throughput_gb_per_hour.toLocaleString() + ' GB'
+            ],
+            [
+              'Total',
+              Math.floor(data.total_tokens_parsed / 1000000).toLocaleString() + ' M',
+              Math.floor(data.lines_parsed / 1000000).toLocaleString() + ' M',
+              data.total_text_size_gb.toLocaleString() + ' GB'
+            ],
+          ]
+        }
+      };
+
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+      throw new Error("Error fetching stats.");
+    }
+  };
+
+  return { getStats };
+};

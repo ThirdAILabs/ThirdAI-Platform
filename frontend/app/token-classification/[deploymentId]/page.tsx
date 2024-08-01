@@ -127,9 +127,10 @@ export default function Page() {
   };
 
   return (
-    <>
-      <div style={{position: 'fixed', top: '20px', left: '20px', fontWeight: 'bold', fontSize: '20px'}}>
-        {deploymentName}
+    <div className="bg-muted" style={{width: "100%", display: "flex", justifyContent: "center", height: "100vh"}}>
+      <div style={{position: 'fixed', top: '20px', left: '20px'}}>
+        <div className='text-muted-foreground' style={{fontSize: '16px'}}>Token Classification</div>
+        <div style={{fontWeight: 'bold', fontSize: '24px'}}>{deploymentName}</div>
       </div>
       <Container
         style={{
@@ -150,9 +151,9 @@ export default function Page() {
             variant="outlined"
             value={inputText}
             onChange={handleInputChange}
-            style={{ width: '100%' }}
+            style={{ width: '100%', backgroundColor: "white", borderRadius: "5px", border: "none" }}
             placeholder="Enter your text"
-            InputProps={{ style: { height: '3rem' } }} // Adjust the height as needed
+            InputProps={{ style: { height: '3rem' }, disableUnderline: true }} // Adjust the height as needed
           />
           <Button
             variant="contained"
@@ -188,6 +189,6 @@ export default function Page() {
           </Box>
         )}
       </Container>
-    </>
+    </div>
   );
 }

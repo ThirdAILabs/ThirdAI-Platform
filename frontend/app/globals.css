@@ -66,10 +66,15 @@
   }
 }
 
-@layer base {
+@layer base {  
+  html, body, #__next {
+    height: 100%;
+  }
+
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
