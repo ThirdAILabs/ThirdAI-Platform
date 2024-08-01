@@ -14,6 +14,7 @@ const nextConfig = {
   },
   env: {
     DEPLOYMENT_BASE_URL: process.env.DEPLOYMENT_BASE_URL,
+    THIRDAI_PLATFORM_BASE_URL: process.env.THIRDAI_PLATFORM_BASE_URL,
   }
 };
 

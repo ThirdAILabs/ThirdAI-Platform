@@ -190,15 +190,8 @@ function useAccessToken() {
   return accessToken;
 }
 
-// deploymentIdParam is the dynamic routing parameter name
-// E.g. if called in /app/pagename/[deploymentidparamname]/page.tsx,
-// deploymentIdParam should be "deploymentidparamname".
-function useDeploymentBaseUrl(deploymentIdParam = "deploymentId") {
-  const params = useParams();
-  let baseUrl = _.trim(process.env.DEPLOYMENT_BASE_URL!, '/');
-  baseUrl += '/' + params[deploymentIdParam];
-  return baseUrl;
-}
+const thirdaiPlatformBaseUrl = _.trim(process.env.THIRDAI_PLATFORM_BASE_URL!, '/');
+const deploymentBaseUrl = _.trim(process.env.DEPLOYMENT_BASE_URL!, '/');
 
 export interface TokenClassificationResult {
   query_text: string;
@@ -208,14 +201,31 @@ export interface TokenClassificationResult {
 
 export function useTokenClassificationEndpoints() {
   const accessToken = useAccessToken();
-  const baseUrl = useDeploymentBaseUrl();
+  const params = useParams();
+  const deploymentId = params.deploymentId as string;
+  const currentDeploymentBaseUrl = `${deploymentBaseUrl}/${deploymentId}`;
+  
+  const getName = async (): Promise<string> => {
+    // Set the default authorization header for axios
+    axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+  
+    try {
+      const response = await axios.get(`${thirdaiPlatformBaseUrl}/api/deploy/model-name`, {
+        params: { deployment_id: deploymentId },
+      });
+      return response.data.data.name;
+    } catch (error) {
+      console.error('Error getting deployment name:', error);
+      throw new Error('Failed to get deployment name');
+    }
+  };
 
   const predict = async (query: string): Promise<TokenClassificationResult> => {
     // Set the default authorization header for axios
     axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
     try {
-      const response = await axios.get(`${baseUrl}/predict`, {
+      const response = await axios.get(`${currentDeploymentBaseUrl}/predict`, {
         params: { query, top_k: 1 },
       });
       return response.data;
@@ -223,15 +233,16 @@ export function useTokenClassificationEndpoints() {
       console.error('Error predicting tokens:', error);
       throw new Error('Failed to predict tokens');
     }
-  }
+  };
 
   const getAvailableTags = async (): Promise<string[]> => {
     // TODO: Create backend endpoint + connect.
     return ["NAME", "CREDITCARDNUMBER", "SSN", "PHONENUMBER", "LOCATION"];
-  }
+  };
 
   return {
+    getName,
     predict,
     getAvailableTags
-  }
+  };
 }

@@ -86,8 +86,9 @@ function generateColors(N: number) {
 }
 
 export default function Page() {
-  const { predict, getAvailableTags } = useTokenClassificationEndpoints();
+  const { getName, predict, getAvailableTags } = useTokenClassificationEndpoints();
 
+  const [deploymentName, setDeploymentName] = useState("");
   const [inputText, setInputText] = useState<string>('');
   const [annotations, setAnnotations] = useState<Token[]>([]);
   const [tagColors, setTagColors] = useState<Record<string, HighlightColor>>(
@@ -95,7 +96,8 @@ export default function Page() {
   );
 
   useEffect(() => {
-    // TODO: Get list of tags from backend
+    getName().then(setDeploymentName);
+    
     getAvailableTags().then((tags) => {
       const colors = generateColors(tags.length);
       setTagColors(
@@ -125,62 +127,67 @@ export default function Page() {
   };
 
   return (
-    <Container
-      style={{
-        textAlign: 'center',
-        paddingTop: '20vh',
-        width: '70%',
-        minWidth: '400px',
-        maxWidth: '800px'
-      }}
-    >
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        width="100%"
+    <>
+      <div style={{position: 'fixed', top: '20px', left: '20px', fontWeight: 'bold', fontSize: '20px'}}>
+        {deploymentName}
+      </div>
+      <Container
+        style={{
+          textAlign: 'center',
+          paddingTop: '20vh',
+          width: '70%',
+          minWidth: '400px',
+          maxWidth: '800px'
+        }}
       >
-        <TextField
-          variant="outlined"
-          value={inputText}
-          onChange={handleInputChange}
-          style={{ width: '100%' }}
-          placeholder="Enter your text"
-          InputProps={{ style: { height: '3rem' } }} // Adjust the height as needed
-        />
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleRun}
-          style={{
-            height: '3rem',
-            marginLeft: '1rem',
-            backgroundColor: 'black'
-          }}
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          width="100%"
         >
-          Run
-        </Button>
-      </Box>
-      {annotations.length > 0 && (
-        <Box mt={4}>
-          <Card className="p-7 text-start" style={{ lineHeight: 2 }}>
-            {annotations.map((token, index) => {
-              const nextToken =
-                index === annotations.length - 1
-                  ? null
-                  : annotations[index + 1];
-              return (
-                <Highlight
-                  key={index}
-                  currentToken={token}
-                  nextToken={nextToken}
-                  tagColors={tagColors}
-                />
-              );
-            })}
-          </Card>
+          <TextField
+            variant="outlined"
+            value={inputText}
+            onChange={handleInputChange}
+            style={{ width: '100%' }}
+            placeholder="Enter your text"
+            InputProps={{ style: { height: '3rem' } }} // Adjust the height as needed
+          />
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleRun}
+            style={{
+              height: '3rem',
+              marginLeft: '1rem',
+              backgroundColor: 'black'
+            }}
+          >
+            Run
+          </Button>
         </Box>
-      )}
-    </Container>
+        {annotations.length > 0 && (
+          <Box mt={4}>
+            <Card className="p-7 text-start" style={{ lineHeight: 2 }}>
+              {annotations.map((token, index) => {
+                const nextToken =
+                  index === annotations.length - 1
+                    ? null
+                    : annotations[index + 1];
+                return (
+                  <Highlight
+                    key={index}
+                    currentToken={token}
+                    nextToken={nextToken}
+                    tagColors={tagColors}
+                  />
+                );
+              })}
+            </Card>
+          </Box>
+        )}
+      </Container>
+    </>
   );
 }

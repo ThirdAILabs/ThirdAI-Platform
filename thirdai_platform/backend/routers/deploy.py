@@ -328,6 +328,30 @@ def deployment_status(
     return {"message": "successfully updated"}
 
 
+@deploy_router.get("/model-name")
+def deployment_model_Name(
+    deployment_id: str,
+    session: Session = Depends(get_session),
+):
+    deployment: schema.Deployment = (
+        session.query(schema.Deployment)
+        .filter(schema.Deployment.id == deployment_id)
+        .first()
+    )
+
+    if not deployment:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"No deployment with id {deployment_id}.",
+        )
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Successfully got the deployment name",
+        data={"name": deployment.name, "deployment_id": str(deployment.id)},
+    )
+
+
 @deploy_router.post("/stop")
 def undeploy_model(
     deployment_identifier: str,
