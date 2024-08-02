@@ -1,8 +1,6 @@
 "use client"
 
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-import "./page.css";
 import {
     TableHead,
     TableRow,
@@ -11,7 +9,6 @@ import {
     Table,
     TableCell
 } from '@/components/ui/table';
-import Paper from '@mui/material/Paper';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeploymentStatsTable, useDeploymentStats } from "@/lib/backend";
 
