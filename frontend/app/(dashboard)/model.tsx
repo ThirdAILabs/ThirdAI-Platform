@@ -65,15 +65,17 @@ export function Model({ model }: { model: SelectModel }) {
 
   function goToEndpoint() {
     switch (model.type) {
-      case "semantic search model":
+      case "ndb":
         const baseUrl = 'http://localhost:3000';
         const newUrl = `${baseUrl}/search?id=${deploymentId}`;
         window.open(newUrl, '_blank');
         break;
-      case "ner model":
+      case "udt":
         router.push(`/token-classification/${deploymentId}`);
+        break;
       default:
         throw new Error(`Invalid model type ${model.type}`);
+        break;
     }
   }
 

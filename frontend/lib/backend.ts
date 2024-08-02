@@ -5,6 +5,9 @@ import _ from 'lodash';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+const thirdaiPlatformBaseUrl = _.trim(process.env.THIRDAI_PLATFORM_BASE_URL!, '/');
+const deploymentBaseUrl = _.trim(process.env.DEPLOYMENT_BASE_URL!, '/');
+
 export function getAccessToken(): string {
   const accessToken = localStorage.getItem('accessToken');
   if (!accessToken) {
@@ -228,9 +231,6 @@ function useAccessToken() {
 
   return accessToken;
 }
-
-const thirdaiPlatformBaseUrl = _.trim(process.env.THIRDAI_PLATFORM_BASE_URL!, '/');
-const deploymentBaseUrl = _.trim(process.env.DEPLOYMENT_BASE_URL!, '/');
 
 export interface TokenClassificationResult {
   query_text: string;
