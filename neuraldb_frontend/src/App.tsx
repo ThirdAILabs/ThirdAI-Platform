@@ -1,3 +1,4 @@
+import axios from 'axios';
 import "./App.css";
 import styled from "styled-components";
 import React, { useEffect, useRef, useState } from "react";
@@ -138,6 +139,8 @@ function App() {
             return newCheckedIds;
         });
 
+    const [deploymentId, setDeploymentId] = useState('');
+    const [accessToken, setAccessToken] = useState('');
     const [ifGenerationOn, setIfGenerationOn] = useState(false);
     const [ifGuardRailOn, setIfGuardRailOn] = useState(false);
     const [guardRailEndpoint, setGuardRailEndpoint] = useState('');
@@ -154,6 +157,8 @@ function App() {
         console.log('ifGuardRailOn', ifGuardRailOn)
         console.log('guardRailEndpoint', guardRailEndpoint)
 
+        setAccessToken(accessToken)
+        setDeploymentId(userModelUrl)
         setIfGenerationOn(generationOn);
         setIfGuardRailOn(guardRailOn);
         setGuardRailEndpoint(guardRailEp || '');
@@ -165,6 +170,12 @@ function App() {
             newModelService.sources().then(setSources);
         }
     }, []);
+
+    useEffect(() => {
+        if (modelService) {
+            modelService.piiDetect('hi Peter')
+        }
+      }, [modelService]);
 
     useEffect(() => {
         if (modelService) {

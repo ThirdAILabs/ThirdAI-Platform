@@ -82,6 +82,7 @@ export interface ModelService {
     handleInvalidAuth: () => void;
     getChatHistory: () => Promise<ChatMessage[]>;
     chat: (textInput: string) => Promise<ChatResponse>;
+    piiDetect(query: string): Promise<any>;
 }
 
 function sourceName(ref: ReferenceJson) {
@@ -138,7 +139,7 @@ export class GlobalModelService implements ModelService {
 
     constructor(url: string, sessionId: string) {
         this.url = url;
-        this.wsUrl = url.replace("http", "ws");
+        this.wsUrl = `${window.location.protocol}//${window.location.host}`.replace("http", "ws");
         this.sessionId = sessionId;
     }
 
@@ -166,6 +167,38 @@ export class GlobalModelService implements ModelService {
                 return data;
             })
             .catch((e) => {
+                return [];
+            });
+    }
+
+    async piiDetect(query: string): Promise<any> {
+        const url = new URL(this.url + "/pii-detect");
+        url.searchParams.append('query', query);
+        
+        return fetch(url, {
+            method: "POST",
+            headers: {
+                ...this.authHeader(),
+                "Content-Type": "application/json",
+            }
+        })
+            .then(handleInvalidAuth(this))
+            .then((response) => {
+                console.log('response', response)
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    return response.json().then((err) => {
+                        throw new Error(err.detail || "Unknown error occurred");
+                    });
+                }
+            })
+            .then(({ data }) => {
+                console.log(data);
+                return data;
+            })
+            .catch((e) => {
+                console.error(e);
                 return [];
             });
     }
@@ -559,6 +592,7 @@ export class GlobalModelService implements ModelService {
     ) {
         const args = {
             query: genaiQuery(question, references, genaiPrompt),
+            key: '' // fill in openai key
         };
 
         const uri = this.wsUrl + "/generate";
