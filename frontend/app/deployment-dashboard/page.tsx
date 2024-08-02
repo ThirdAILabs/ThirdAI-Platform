@@ -15,14 +15,6 @@ import Paper from '@mui/material/Paper';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeploymentStatsTable, useDeploymentStats } from "@/lib/backend";
 
-function createData(name: string, throughput_token: string, throughput_text_chunk: string, throughput_files: string) {
-  return { name,  throughput_token, throughput_text_chunk, throughput_files};
-}
-
-function createSystemData(name: string, desc: string) {
-  return { name,  desc};
-}
-
 export default function Page() {
   const [system, setSystem] = useState<DeploymentStatsTable>({
     header: ['--', '--'],
