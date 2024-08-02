@@ -12,7 +12,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeploymentStatsTable, useDeploymentStats } from "@/lib/backend";
 
-export default function Page() {
+export default function Dashboard() {
   const [system, setSystem] = useState<DeploymentStatsTable>({
     header: ['--', '--'],
     rows: [['--', '--'], ['--', '--'], ['--', '--'], ['--', '--']]
