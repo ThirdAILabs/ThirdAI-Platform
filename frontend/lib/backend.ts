@@ -368,7 +368,7 @@ export function useDeploymentStats() {
             ['CPU', '12 vCPUs'],
             ['CPU Model', 'Intel(R) Xeon(R) CPU E5-2680 v3 @ 2.50GHz'],
             ['Memory', '64 GB RAM'],
-            ['System Uptime', '0 hours 0 minutes 0 seconds'],
+            ['System Uptime', data.uptime],
           ]
         },
         throughput: {
