@@ -74,7 +74,9 @@ class MultipleMach(NDBModel):
         total_model_size *= 1.25  # approximation
 
         doc_size = sum(
-            2 * os.path.getsize(doc_path) for doc_path in documents
+            2 * os.path.getsize(doc_path)
+            for doc_path in documents
+            if os.path.exists(doc_path)
         )  # documents and documents.pkl stored in ndb
         total_ndb_size = total_model_size + doc_size
 
@@ -83,18 +85,16 @@ class MultipleMach(NDBModel):
         )
         return total_ndb_size, total_model_size, doc_size, model_params_total
 
-    def load_db(self) -> ndb.NeuralDB:
+    def load_db(self, model_id: str) -> ndb.NeuralDB:
         """
         Load the NeuralDB from a checkpoint.
         Returns:
             ndb.NeuralDB: The loaded NeuralDB instance.
         """
         self.logger.info(
-            f"Loading NeuralDB from checkpoint: {self.get_ndb_path(self.general_variables.base_model_id)}"
+            f"Loading NeuralDB from checkpoint: {self.get_ndb_path(model_id)}"
         )
-        db = ndb.NeuralDB.from_checkpoint(
-            self.get_ndb_path(self.general_variables.base_model_id)
-        )
+        db = ndb.NeuralDB.from_checkpoint(self.get_ndb_path(model_id))
 
         mixture: MachMixture = db._savable_state.model
         if self.ndb_variables.num_shards != mixture.num_shards:
@@ -189,7 +189,7 @@ class MultipleMach(NDBModel):
         )
         extra_options["allocation_memory"] = extra_options["model_memory"]
         extra_options["allocation_cores"] = extra_options["model_cores"]
-        extra_options.pop("base_model_id")
+        extra_options.pop("type")
 
         self.logger.info(f"Extra options created: {extra_options}")
         return extra_options

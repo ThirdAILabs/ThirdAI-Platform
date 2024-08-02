@@ -81,15 +81,20 @@ class S3FileHandler:
 
         aws_access_key = os.getenv("AWS_ACCESS_KEY")
         aws_secret_access_key = os.getenv("AWS_ACCESS_SECRET")
-        config = Config(
-            retries={"max_attempts": 10, "mode": "standard"},
-            connect_timeout=5,
-            read_timeout=60,
-        )
         if not aws_access_key or not aws_secret_access_key:
-            config.signature_version = Config(signature_version=UNSIGNED)
+            config = Config(
+                retries={"max_attempts": 10, "mode": "standard"},
+                connect_timeout=5,
+                read_timeout=60,
+                signature_version=UNSIGNED,
+            )
             s3_client = boto3.client("s3", config=config)
         else:
+            config = Config(
+                retries={"max_attempts": 10, "mode": "standard"},
+                connect_timeout=5,
+                read_timeout=60,
+            )
             s3_client = boto3.client(
                 "s3",
                 aws_access_key_id=aws_access_key,
@@ -114,6 +119,13 @@ class S3FileHandler:
         if os.path.exists(file_path):
             os.remove(file_path)
         return ndb_doc
+
+    def download_file(self, s3_url: str, file_path: str):
+        bucket, object = s3_url.replace("s3://", "").split("/", 1)
+        try:
+            self.s3_client.download_file(bucket, object, file_path)
+        except Exception as error:
+            raise Exception(f"There was an error downloading the file from S3: {error}")
 
 
 def validate_files(

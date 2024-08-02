@@ -3,18 +3,16 @@ import logging
 import os
 import re
 import socket
-from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 from urllib.parse import urljoin
 
 import bcrypt
 import requests
 from database import schema
-from fastapi import UploadFile
 from fastapi.responses import JSONResponse
 from jinja2 import Template
-from pydantic import BaseModel, Field, root_validator, validator
+from pydantic import BaseModel, Field, root_validator
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger("ThirdAI_Platform")
@@ -23,6 +21,13 @@ logger = logging.getLogger("ThirdAI_Platform")
 def setup_logger(
     level=logging.DEBUG, format="%(asctime)s | [%(name)s] [%(levelname)s] %(message)s"
 ):
+    """
+    Set up the logger with the specified logging level and format.
+
+    Parameters:
+    - level: Logging level (e.g., logging.DEBUG).
+    - format: Logging format string.
+    """
     console_handler = logging.StreamHandler()
     console_handler.setLevel(level)
 
@@ -37,6 +42,18 @@ def setup_logger(
 
 
 def response(status_code: int, message: str, data={}, success: bool = None):
+    """
+    Create a JSON response.
+
+    Parameters:
+    - status_code: HTTP status code for the response.
+    - message: Message to include in the response.
+    - data: Optional data to include in the response (default is an empty dictionary).
+    - success: Optional boolean indicating success or failure (default is None).
+
+    Returns:
+    - JSONResponse: FastAPI JSONResponse object.
+    """
     if success is not None:
         status = "success" if success else "failed"
     else:
@@ -48,12 +65,30 @@ def response(status_code: int, message: str, data={}, success: bool = None):
 
 
 def hash_password(password: str):
+    """
+    Hash a password using bcrypt.
+
+    Parameters:
+    - password: The plaintext password to hash.
+
+    Returns:
+    - str: The hashed password.
+    """
     byte_password = password.encode("utf-8")
     salt = bcrypt.gensalt()
     return bcrypt.hashpw(byte_password, salt).decode()
 
 
 def get_high_level_model_info(result: schema.Model):
+    """
+    Get high-level information about a model.
+
+    Parameters:
+    - result: The model object.
+
+    Returns:
+    - dict: Dictionary containing high-level model information.
+    """
     info = {
         "model_name": result.name,
         "publish_date": str(result.published_date),
@@ -76,12 +111,41 @@ def get_high_level_model_info(result: schema.Model):
 
 
 def validate_name(name):
+    """
+    Validate a name using a regex pattern.
+
+    Parameters:
+    - name: The name to validate.
+
+    Raises:
+    - ValueError: If the name is not valid.
+    """
     regex_pattern = "^[\w-]+$"
     if not re.match(regex_pattern, name):
         raise ValueError("name is not valid")
 
 
 class UDTExtraOptions(BaseModel):
+    """
+    Model for User Defined Type (UDT) extra options.
+
+    Attributes:
+    - allocation_cores: Optional number of cores to allocate.
+    - allocation_memory: Optional amount of memory to allocate.
+    - sub_type: Optional subtype of the UDT.
+    - target_labels: List of target labels.
+    - source_column: Optional source column name.
+    - target_column: Optional target column name.
+    - default_tag: Optional default tag.
+    - delimiter: Optional delimiter (default is ',').
+    - text_column: Optional text column name (default is 'text').
+    - label_column: Optional label column name (default is 'label').
+    - n_target_classes: Optional number of target classes.
+
+    Validators:
+    - set_fields_based_on_type: Sets default values based on the subtype.
+    """
+
     allocation_cores: Optional[int] = None
     allocation_memory: Optional[int] = None
 
@@ -112,6 +176,50 @@ class UDTExtraOptions(BaseModel):
 
 
 class NDBExtraOptions(BaseModel):
+    """
+    Model for Neural Database (NDB) extra options.
+
+    Attributes:
+    - num_models_per_shard: Optional number of models per shard (default is 1).
+    - num_shards: Optional number of shards (default is 1).
+    - allocation_cores: Optional number of cores to allocate.
+    - allocation_memory: Optional amount of memory to allocate.
+    - model_cores: Optional number of cores for the model.
+    - model_memory: Optional amount of memory for the model.
+    - priority: Optional priority of the job.
+    - csv_id_column: Optional CSV ID column name.
+    - csv_strong_columns: Optional list of strong columns.
+    - csv_weak_columns: Optional list of weak columns.
+    - csv_reference_columns: Optional list of reference columns.
+    - fhr: Optional FHR value.
+    - embedding_dim: Optional embedding dimension.
+    - output_dim: Optional output dimension.
+    - max_in_memory_batches: Optional maximum number of in-memory batches.
+    - extreme_num_hashes: Optional number of extreme hashes.
+    - num_classes: Optional number of classes.
+    - csv_query_column: Optional CSV query column name.
+    - csv_id_delimiter: Optional CSV ID delimiter.
+    - learning_rate: Optional learning rate.
+    - batch_size: Optional batch size.
+    - unsupervised_epochs: Optional number of unsupervised epochs.
+    - supervised_epochs: Optional number of supervised epochs.
+    - tokenizer: Optional tokenizer.
+    - hidden_bias: Optional boolean indicating hidden bias.
+    - retriever: Optional retriever to use.
+    - unsupervised_train: Optional boolean indicating unsupervised training.
+    - disable_finetunable_retriever: Optional boolean to disable finetunable retriever.
+    - checkpoint_interval: Optional checkpoint interval.
+    - fast_approximation: Optional boolean indicating fast approximation.
+    - num_buckets_to_sample: Optional number of buckets to sample.
+    - metrics: Optional list of metrics.
+    - validation_metrics: Optional list of validation metrics.
+    - on_disk: Optional boolean indicating on-disk storage.
+    - docs_on_disk: Optional boolean indicating documents on-disk storage.
+
+    Config:
+    - extra: Forbid extra attributes.
+    """
+
     # ----shard specific training params----
     num_models_per_shard: Optional[int] = Field(1, gt=0)
     num_shards: Optional[int] = Field(1, gt=0)
@@ -123,9 +231,9 @@ class NDBExtraOptions(BaseModel):
     model_memory: Optional[int] = None
     priority: Optional[int] = None
     csv_id_column: Optional[str] = None
-    csv_strong_columns: Optional[list[str]] = None
-    csv_weak_columns: Optional[list[str]] = None
-    csv_reference_columns: Optional[list[str]] = None
+    csv_strong_columns: Optional[List[str]] = None
+    csv_weak_columns: Optional[List[str]] = None
+    csv_reference_columns: Optional[List[str]] = None
     fhr: Optional[int] = None
     embedding_dim: Optional[int] = None
     output_dim: Optional[int] = None
@@ -151,7 +259,8 @@ class NDBExtraOptions(BaseModel):
     checkpoint_interval: Optional[int] = None
     fast_approximation: Optional[bool] = None
     num_buckets_to_sample: Optional[int] = None
-    metrics: Optional[list[str]] = None
+    metrics: Optional[List[str]] = None
+    validation_metrics: Optional[List[str]] = None
     on_disk: Optional[bool] = None
     docs_on_disk: Optional[bool] = None
 
@@ -160,6 +269,17 @@ class NDBExtraOptions(BaseModel):
 
 
 def get_model(session: Session, username: str, model_name: str):
+    """
+    Get a model by username and model name.
+
+    Parameters:
+    - session: SQLAlchemy session.
+    - username: Username of the model owner.
+    - model_name: Name of the model.
+
+    Returns:
+    - schema.Model: The model object if found, otherwise None.
+    """
     return (
         session.query(schema.Model)
         .join(schema.User)
@@ -169,6 +289,18 @@ def get_model(session: Session, username: str, model_name: str):
 
 
 def parse_model_identifier(model_identifier):
+    """
+    Parse a model identifier into username and model name.
+
+    Parameters:
+    - model_identifier: The model identifier in the format 'username/model_name'.
+
+    Returns:
+    - tuple: A tuple containing the username and model name.
+
+    Raises:
+    - ValueError: If the model identifier is not valid.
+    """
     regex_pattern = "^[\w-]+\/[\w-]+$"
     if re.match(regex_pattern, model_identifier):
         username, model_name = model_identifier.split("/")
@@ -178,6 +310,19 @@ def parse_model_identifier(model_identifier):
 
 
 def get_model_from_identifier(model_identifier, session):
+    """
+    Get a model from a model identifier.
+
+    Parameters:
+    - model_identifier: The model identifier in the format 'username/model_name'.
+    - session: SQLAlchemy session.
+
+    Returns:
+    - schema.Model: The model object.
+
+    Raises:
+    - ValueError: If there is no model with the given name.
+    """
     try:
         model_username, model_name = parse_model_identifier(model_identifier)
     except Exception as error:
@@ -194,6 +339,17 @@ TASK_RUNNER_TOKEN = os.getenv("TASK_RUNNER_TOKEN")
 
 
 def get_hcl_payload(filepath, is_jinja, **kwargs):
+    """
+    Get the HCL payload from a file.
+
+    Parameters:
+    - filepath: Path to the HCL file.
+    - is_jinja: Boolean indicating if the file is a Jinja template.
+    - kwargs: Additional keyword arguments to render the Jinja template.
+
+    Returns:
+    - dict: Dictionary containing the HCL payload.
+    """
     with open(filepath, "r") as file:
         content = file.read()
 
@@ -209,6 +365,16 @@ def get_hcl_payload(filepath, is_jinja, **kwargs):
 
 
 def nomad_job_exists(job_id, nomad_endpoint):
+    """
+    Check if a Nomad job exists.
+
+    Parameters:
+    - job_id: The ID of the Nomad job.
+    - nomad_endpoint: The Nomad endpoint.
+
+    Returns:
+    - bool: True if the job exists, otherwise False.
+    """
     headers = {"X-Nomad-Token": TASK_RUNNER_TOKEN}
     response = requests.get(
         urljoin(nomad_endpoint, f"v1/job/{job_id}"), headers=headers
@@ -218,9 +384,16 @@ def nomad_job_exists(job_id, nomad_endpoint):
 
 def submit_nomad_job(filepath, nomad_endpoint, **kwargs):
     """
-    This function submits an generated HCL job file from a jinja file to nomad
-    """
+    Submit a generated HCL job file from a Jinja file to Nomad.
 
+    Parameters:
+    - filepath: Path to the HCL or Jinja file.
+    - nomad_endpoint: The Nomad endpoint.
+    - kwargs: Additional keyword arguments for rendering the Jinja template.
+
+    Returns:
+    - Response: The response from the Nomad API.
+    """
     json_payload_url = urljoin(nomad_endpoint, "v1/jobs/parse")
     submit_url = urljoin(nomad_endpoint, "v1/jobs")
     headers = {"Content-Type": "application/json", "X-Nomad-Token": TASK_RUNNER_TOKEN}
@@ -242,6 +415,16 @@ def submit_nomad_job(filepath, nomad_endpoint, **kwargs):
 
 
 def delete_nomad_job(job_id, nomad_endpoint):
+    """
+    Delete a Nomad job.
+
+    Parameters:
+    - job_id: The ID of the Nomad job.
+    - nomad_endpoint: The Nomad endpoint.
+
+    Returns:
+    - Response: The response from the Nomad API.
+    """
     job_url = urljoin(nomad_endpoint, f"v1/job/{job_id}")
     headers = {"X-Nomad-Token": TASK_RUNNER_TOKEN}
     response = requests.delete(job_url, headers=headers)
@@ -257,6 +440,16 @@ def delete_nomad_job(job_id, nomad_endpoint):
 
 
 def get_platform():
+    """
+    Get the platform identifier.
+
+    Returns:
+    - str: The platform identifier (default is 'docker').
+
+    Options:
+    - docker: Docker platform.
+    - local: Local platform.
+    """
     platform = os.getenv("PLATFORM", "docker")
     options = ["docker", "local"]
     if platform not in options:
@@ -267,6 +460,15 @@ def get_platform():
 
 
 def get_python_path():
+    """
+    Get the Python path based on the platform.
+
+    Returns:
+    - str: The Python path.
+
+    Raises:
+    - ValueError: If the PYTHON_PATH environment variable is not set for local development.
+    """
     python_path = "python3"
     if get_platform() == "local":
         python_path = os.getenv("PYTHON_PATH")
@@ -279,10 +481,26 @@ def get_python_path():
 
 
 def get_root_absolute_path():
+    """
+    Get the absolute path to the root directory.
+
+    Returns:
+    - Path: The absolute path to the root directory.
+    """
     return Path(__file__).parent.parent.parent.absolute()
 
 
 def update_json(current_json, new_dict):
+    """
+    Update a JSON object with a new dictionary.
+
+    Parameters:
+    - current_json: The current JSON object (as a string).
+    - new_dict: The new dictionary to update the JSON object with.
+
+    Returns:
+    - str: The updated JSON object (as a string).
+    """
     if current_json is None:
         current_dict = {}
     else:
@@ -292,6 +510,16 @@ def update_json(current_json, new_dict):
 
 
 def update_json_list(current_list, new_dict):
+    """
+    Update a JSON list with a new dictionary.
+
+    Parameters:
+    - current_list: The current JSON list (as a string).
+    - new_dict: The new dictionary to add to the list.
+
+    Returns:
+    - str: The updated JSON list (as a string).
+    """
     if current_list is None:
         current_list = []
     else:
@@ -302,6 +530,18 @@ def update_json_list(current_list, new_dict):
 
 
 def get_deployment(session: Session, deployment_name, deployment_user_id, model_id):
+    """
+    Get a deployment by name, user ID, and model ID.
+
+    Parameters:
+    - session: SQLAlchemy session.
+    - deployment_name: The name of the deployment.
+    - deployment_user_id: The user ID of the deployment owner.
+    - model_id: The model ID.
+
+    Returns:
+    - schema.Deployment: The deployment object if found, otherwise None.
+    """
     return (
         session.query(schema.Deployment)
         .filter(
@@ -314,6 +554,16 @@ def get_deployment(session: Session, deployment_name, deployment_user_id, model_
 
 
 def model_accessible(model: schema.Model, user: schema.User) -> bool:
+    """
+    Check if a model is accessible to a user.
+
+    Parameters:
+    - model: The model object.
+    - user: The user object.
+
+    Returns:
+    - bool: True if the model is accessible, otherwise False.
+    """
     if model.access_level == "private":
         if model.user.id == user.id:
             return True
@@ -328,6 +578,12 @@ def model_accessible(model: schema.Model, user: schema.User) -> bool:
 
 
 def get_empty_port():
+    """
+    Get an empty port.
+
+    Returns:
+    - int: The empty port number.
+    """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind(("", 0))  # Bind to an empty
     port = sock.getsockname()[1]
@@ -336,6 +592,18 @@ def get_empty_port():
 
 
 def parse_deployment_identifier(deployment_identifier):
+    """
+    Parse a deployment identifier.
+
+    Parameters:
+    - deployment_identifier: The deployment identifier in the format 'username/model_name:username/deployment_name'.
+
+    Returns:
+    - tuple: A tuple containing model username, model name, deployment username, and deployment name.
+
+    Raises:
+    - ValueError: If the deployment identifier is not valid.
+    """
     regex_pattern = "^[\w-]+\/[\w-]+\:[\w-]+\/[\w-]+$"
     if re.match(regex_pattern, deployment_identifier):
         model_identifier, deployment_tag = deployment_identifier.split(":")
@@ -347,6 +615,16 @@ def parse_deployment_identifier(deployment_identifier):
 
 
 def delete_nomad_job(job_id, nomad_endpoint):
+    """
+    Delete a Nomad job.
+
+    Parameters:
+    - job_id: The ID of the Nomad job.
+    - nomad_endpoint: The Nomad endpoint.
+
+    Returns:
+    - Response: The response from the Nomad API.
+    """
     job_url = urljoin(nomad_endpoint, f"v1/job/{job_id}")
     headers = {"X-Nomad-Token": TASK_RUNNER_TOKEN}
     response = requests.delete(job_url, headers=headers)
@@ -365,6 +643,12 @@ GENERATE_JOB_ID = "llm-generation"
 
 
 async def restart_generate_job():
+    """
+    Restart the LLM generation job.
+
+    Returns:
+    - Response: The response from the Nomad API.
+    """
     nomad_endpoint = os.getenv("NOMAD_ENDPOINT")
     if nomad_job_exists(GENERATE_JOB_ID, nomad_endpoint):
         delete_nomad_job(GENERATE_JOB_ID, nomad_endpoint)

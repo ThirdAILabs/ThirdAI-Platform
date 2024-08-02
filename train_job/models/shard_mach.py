@@ -363,7 +363,7 @@ class ShardMach(NDBModel):
         """
         self.logger.info(f"Evaluating model with file {file}")
         metrics = model.model.evaluate(
-            file,
+            str(file),
             metrics=self.train_variables.metrics,
         )
         self.logger.info(f"For file {file} the metrics are {metrics}")

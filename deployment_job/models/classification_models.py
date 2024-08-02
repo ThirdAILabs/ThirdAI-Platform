@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from typing import Optional
 
 from models.model import Model
 from pydantic_models import inputs
@@ -6,13 +7,19 @@ from thirdai import bolt
 
 
 class ClassificationModel(Model):
-    def __init__(self):
+    def __init__(
+        self, model_id: Optional[str] = None, model_path: Optional[str] = None
+    ):
         super().__init__()
-        self.model_path = self.get_udt_path()
+        if model_path:
+            self.model_path = model_path
+        else:
+            self.model_path = self.get_udt_path(model_id)
         self.model: bolt.UniversalDeepTransformer = self.load_model()
 
-    def get_udt_path(self):
-        return str(self.get_model_dir(self.general_variables.model_id) / "model.udt")
+    def get_udt_path(self, model_id: Optional[str] = None) -> str:
+        model_id = model_id or self.general_variables.model_id
+        return str(self.get_model_dir(model_id) / "model.udt")
 
     def load_model(self):
         return bolt.UniversalDeepTransformer.load(self.model_path)
@@ -23,8 +30,10 @@ class ClassificationModel(Model):
 
 
 class TextClassificationModel(ClassificationModel):
-    def __init__(self):
-        super().__init__()
+    def __init__(
+        self, model_id: Optional[str] = None, model_path: Optional[str] = None
+    ):
+        super().__init__(model_id, model_path)
 
     def predict(self, **kwargs):
         query = kwargs["query"]
@@ -39,18 +48,17 @@ class TextClassificationModel(ClassificationModel):
 
 
 class TokenClassificationModel(ClassificationModel):
-    def __init__(self):
-        super().__init__()
+    def __init__(
+        self, model_id: Optional[str] = None, model_path: Optional[str] = None
+    ):
+        super().__init__(model_id, model_path)
 
     def predict(self, **kwargs):
         query = kwargs["query"]
         top_k = kwargs["top_k"]
 
         predicted_tags = self.model.predict({"source": query}, top_k=top_k)
-        predictions = []
-        for predicted_tag in predicted_tags:
-            predictions.append([x[0] for x in predicted_tag])
-
+        predictions = [[x[0] for x in tag] for tag in predicted_tags]
         return inputs.SearchResultsTokenClassification(
             query_text=query,
             tokens=query.split(),

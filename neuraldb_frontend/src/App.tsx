@@ -138,10 +138,25 @@ function App() {
             return newCheckedIds;
         });
 
+    const [ifGenerationOn, setIfGenerationOn] = useState(false);
+    const [ifGuardRailOn, setIfGuardRailOn] = useState(false);
+    const [guardRailEndpoint, setGuardRailEndpoint] = useState('');
+
     useEffect(() => {
         const queryParameters = new URLSearchParams(window.location.search);
         const userModelUrl = queryParameters.get("id");
         const accessToken = queryParameters.get("token");
+        const generationOn = queryParameters.get('ifGenerationOn') === 'true';
+        const guardRailOn = queryParameters.get('ifGuardRailOn') === 'true';
+        const guardRailEp = queryParameters.get('guardRailEndpoint');
+
+        console.log('ifGenerationOn', ifGenerationOn)
+        console.log('ifGuardRailOn', ifGuardRailOn)
+        console.log('guardRailEndpoint', guardRailEndpoint)
+
+        setIfGenerationOn(generationOn);
+        setIfGuardRailOn(guardRailOn);
+        setGuardRailEndpoint(guardRailEp || '');
 
         if (userModelUrl && accessToken) {
             const serviceUrl = createDeploymentUrl(userModelUrl);
@@ -408,10 +423,15 @@ function App() {
                                                     $right="30%"
                                                 >
                                                     <Pad $left="5px">
-                                                        {/* <Spacer $height="30px" />
-                                                        <GeneratedAnswer
-                                                            answer={answer}
-                                                        /> */}
+                                                        {
+                                                            ifGenerationOn &&
+                                                            <>
+                                                                <Spacer $height="30px" />
+                                                                <GeneratedAnswer
+                                                                    answer={answer}
+                                                                />
+                                                            </>
+                                                        }
                                                         <Spacer $height="50px" />
                                                         {checkedIds.size >
                                                             0 && (

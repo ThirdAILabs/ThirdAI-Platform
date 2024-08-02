@@ -29,13 +29,21 @@ class AccountSignupBody(BaseModel):
 
 
 def send_verification_mail(email: str, verification_token: str, username: str):
+    """
+    Send a verification email to the user.
+
+    Parameters:
+    - email: The email address of the user.
+    - verification_token: The verification token for the user.
+    - username: The username of the user.
+
+    Sends an email with a verification link to the provided email address.
+    """
     subject = "Verify Your Email Address"
-    # TODO(anyone) Get the base path using request.url rather than hard coding.
     base_url = os.getenv("PUBLIC_MODEL_BAZAAR_ENDPOINT")
     args = {"verification_token": verification_token}
     verify_link = urljoin(base_url, f"api/user/redirect-verify?{urlencode(args)}")
-    # TODO(anyone) Do we also need to send the link?
-    body = "<p> Please click the following link to verify your email address: <a href={}> verify</a> </p>".format(
+    body = "<p>Please click the following link to verify your email address: <a href={}>verify</a></p>".format(
         verify_link
     )
 
@@ -52,9 +60,22 @@ def email_signup(
     session: Session = Depends(get_session),
 ):
     """
-    The user sign-up endpoint is designed to ensure a seamless registration process by avoiding
-    duplicate accounts and enforcing unique preferred names for each user. As an additional
-    layer of security, it initiates a verification mail to authenticate user identities effectively.
+    Sign up a new user with email and password.
+
+    Parameters:
+    - body: The body of the request containing username, email, and password.
+        - Example:
+        ```json
+        {
+            "username": "johndoe",
+            "email": "johndoe@example.com",
+            "password": "securepassword"
+        }
+        ```
+    - session: The database session (dependency).
+
+    Returns:
+    - A JSON response indicating the signup status.
     """
     user = session.query(schema.User).filter(schema.User.email == body.email).first()
     if user:
@@ -108,10 +129,14 @@ def email_signup(
 @user_router.get("/redirect-verify")
 def redirect_email_verify(verification_token: str, request: Request):
     """
-    To verify user emails successfully, we require redirection to the "/email-verify" endpoint.
-    However, direct redirection isn't feasible since browsers generally utilize HTTP GET requests
-    for redirection. To overcome this, a temporary page is employed to redirect to "/email-verify"
-    through an HTTP POST request, ensuring seamless and secure email verification for users.
+    Redirect to email verification endpoint.
+
+    Parameters:
+    - verification_token: The verification token for the user.
+    - request: The HTTP request object (dependency).
+
+    Returns:
+    - A HTML response with the redirection page.
     """
     base_url = os.getenv("PUBLIC_MODEL_BAZAAR_ENDPOINT")
     args = {"verification_token": verification_token}
@@ -124,7 +149,14 @@ def redirect_email_verify(verification_token: str, request: Request):
 @user_router.post("/email-verify")
 def email_verify(verification_token: str, session: Session = Depends(get_session)):
     """
-    Verifies the email with the verification token we send to the mail.
+    Verify the user's email with the provided token.
+
+    Parameters:
+    - verification_token: The verification token for the user.
+    - session: The database session (dependency).
+
+    Returns:
+    - A JSON response indicating the verification status.
     """
     user: schema.User = (
         session.query(schema.User)
@@ -151,8 +183,21 @@ def email_login(
     session: Session = Depends(get_session),
 ):
     """
-    The user login process verifies the email-password association and requires email verification.
-    Access is granted with an access token only to verified users, ensuring secure platform usage.
+    Log in a user with email and password.
+
+    Parameters:
+    - credentials: The HTTP basic credentials (dependency).
+        - Example:
+        ```json
+        {
+            "username": "johndoe@example.com",
+            "password": "securepassword"
+        }
+        ```
+    - session: The database session (dependency).
+
+    Returns:
+    - A JSON response indicating the login status and user details along with an access token.
     """
     user: schema.User = (
         session.query(schema.User)

@@ -77,6 +77,8 @@ EOF
         SUB_TYPE = "{{ sub_type }}"
         AWS_ACCESS_KEY = "{{ aws_access_key }}"
         AWS_ACCESS_SECRET = "{{ aws_access_secret }}"
+        LLM_GUARDRAIL = "{{ llm_guardrail }}"
+        TOKEN_MODEL_ID = "{{ token_model_id }}"
         {% if platform == "local" %}
           MODEL_BAZAAR_DIR = "{{ share_dir }}"
         {% elif platform == "docker" %}  

@@ -13,4 +13,5 @@ export type SelectModel = {
   parent_id?: string | null; // Optional field, can be null
   parent_deployment_id?: string | null; // Optional field, can be null
   user_id: string;
+  username: string;
 };

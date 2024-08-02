@@ -10,19 +10,49 @@ from pydantic import BaseModel, validator
 
 
 class FileType(str, Enum):
+    """
+    Enum to represent the type of the file.
+
+    Supported values:
+    - unsupervised: Unsupervised file type.
+    - supervised: Supervised file type.
+    - test: Test file type.
+    """
+
     unsupervised = "unsupervised"
     supervised = "supervised"
     test = "test"
 
 
 class FileLocation(str, Enum):
+    """
+    Enum to represent the location of the file.
+
+    Supported values:
+    - local: Local file location.
+    - nfs: Network File System (NFS) location.
+    - s3: Amazon S3 location.
+    """
+
     local = "local"
     nfs = "nfs"
     s3 = "s3"
 
 
-# BaseModel with validations
 class BasicFileDetails(BaseModel):
+    """
+    Base model for file details with validations.
+
+    Attributes:
+    - mode: The mode of the file (unsupervised, supervised, test).
+    - location: The location of the file (local, nfs, s3).
+    - is_folder: Optional boolean indicating if the file is a folder (default is False).
+
+    Validators:
+    - check_location: Validates the location value.
+    - check_is_folder: Validates the is_folder value based on the location.
+    """
+
     mode: FileType
     location: FileLocation
     is_folder: Optional[bool] = False
@@ -42,6 +72,15 @@ class BasicFileDetails(BaseModel):
         return v
 
     def validate_csv_extension(self, filename: str):
+        """
+        Validates if the file has a .csv extension for supervised and test modes.
+
+        Parameters:
+        - filename: The name of the file.
+
+        Raises:
+        - ValueError: If the file does not have a .csv extension.
+        """
         if self.mode in {FileType.supervised, FileType.test}:
             _, ext = os.path.splitext(filename)
             if ext != ".csv":
@@ -51,10 +90,33 @@ class BasicFileDetails(BaseModel):
         return True
 
     def save_relations(self, supervised_filenames, data_id, source_ids):
-        pass  # Default implementation does nothing
+        """
+        Saves the relations for supervised files.
+
+        Parameters:
+        - supervised_filenames: List of supervised filenames.
+        - data_id: The data ID.
+        - source_ids: List of source IDs.
+
+        Default implementation does nothing.
+        """
+        pass
 
 
 class NDBFileDetails(BasicFileDetails):
+    """
+    Model for Neural Database (NDB) file details.
+
+    Attributes:
+    - source_id: Optional source ID for the file.
+    - metadata: Optional metadata dictionary for the file.
+
+    Validators:
+    - check_source_id: Validates the source ID based on the mode.
+    - check_metadata: Validates the metadata based on the mode and is_folder.
+    - check_is_folder: Validates the is_folder value based on the mode.
+    """
+
     source_id: Optional[str] = None
     metadata: Optional[Dict[str, str]] = None
 
@@ -85,6 +147,17 @@ class NDBFileDetails(BasicFileDetails):
         return v
 
     def save_relations(self, supervised_filenames, data_id, source_ids):
+        """
+        Saves the relations for supervised files.
+
+        Parameters:
+        - supervised_filenames: List of supervised filenames.
+        - data_id: The data ID.
+        - source_ids: List of source IDs.
+
+        Raises:
+        - ValueError: If source IDs are not provided for all supervised files.
+        """
         if len(supervised_filenames) != len(source_ids):
             raise ValueError("Source ids have not been given for all supervised files.")
 
@@ -110,6 +183,13 @@ class NDBFileDetails(BasicFileDetails):
 
 
 class UDTFileDetails(BasicFileDetails):
+    """
+    Model for User Defined Type (UDT) file details.
+
+    Validators:
+    - check_mode: Ensures UDT files are not in 'unsupervised' mode.
+    """
+
     @validator("mode")
     def check_mode(cls, v):
         if v == FileType.unsupervised:
@@ -118,6 +198,16 @@ class UDTFileDetails(BasicFileDetails):
 
 
 class NDBFileDetailsList(BaseModel):
+    """
+    Model for a list of NDB file details.
+
+    Attributes:
+    - file_details: List of NDB file details.
+
+    Validators:
+    - check_file_counts: Validates the counts of test and unsupervised files.
+    """
+
     file_details: List[NDBFileDetails]
 
     @validator("file_details")
@@ -142,6 +232,16 @@ class NDBFileDetailsList(BaseModel):
 
 
 class UDTFileDetailsList(BaseModel):
+    """
+    Model for a list of UDT file details.
+
+    Attributes:
+    - file_details: List of UDT file details.
+
+    Validators:
+    - check_file_counts: Validates the counts of test files.
+    """
+
     file_details: List[UDTFileDetails]
 
     @validator("file_details")
@@ -155,6 +255,17 @@ class UDTFileDetailsList(BaseModel):
 
 
 def get_files(files: List[UploadFile], data_id, files_info: List[BasicFileDetails]):
+    """
+    Process and get the list of filenames for the provided files and their details.
+
+    Parameters:
+    - files: List of UploadFile objects.
+    - data_id: The data ID.
+    - files_info: List of BasicFileDetails objects.
+
+    Returns:
+    - A list of processed filenames.
+    """
     filenames = []
     supervised_filenames = []
     source_ids = []
@@ -188,7 +299,6 @@ def get_files(files: List[UploadFile], data_id, files_info: List[BasicFileDetail
                 json.dump(file_info.metadata, json_file)
 
     if supervised_filenames and source_ids:
-        # Call save_relations method on the specific class
         for file_info in files_info:
             if isinstance(file_info, NDBFileDetails):
                 file_info.save_relations(supervised_filenames, data_id, source_ids)
@@ -196,8 +306,15 @@ def get_files(files: List[UploadFile], data_id, files_info: List[BasicFileDetail
     return filenames
 
 
-# Base storage handler
 class StorageHandler(ABC):
+    """
+    Abstract base class for storage handlers.
+
+    Methods:
+    - process_files: Abstract method to process files.
+    - validate_file: Abstract method to validate files.
+    """
+
     @abstractmethod
     def process_files(
         self, file_info: BasicFileDetails, file: UploadFile, destination_dir: str
@@ -209,8 +326,15 @@ class StorageHandler(ABC):
         pass
 
 
-# Local storage handler
 class LocalStorageHandler(StorageHandler):
+    """
+    Local storage handler for processing and validating local files.
+
+    Methods:
+    - process_files: Processes and saves the local file.
+    - validate_file: Validates the local file.
+    """
+
     def process_files(
         self, file_info: BasicFileDetails, file: UploadFile, destination_dir: str
     ):
@@ -226,8 +350,15 @@ class LocalStorageHandler(StorageHandler):
         file_info.validate_csv_extension(filename)
 
 
-# NFS storage handler
 class NFSStorageHandler(StorageHandler):
+    """
+    NFS storage handler for processing and validating NFS files.
+
+    Methods:
+    - process_files: Processes and saves the NFS file.
+    - validate_file: Validates the NFS file.
+    """
+
     def process_files(
         self, file_info: BasicFileDetails, file: UploadFile, destination_dir: str
     ):
@@ -253,8 +384,17 @@ class NFSStorageHandler(StorageHandler):
         file_info.validate_csv_extension(filename)
 
 
-# S3 storage handler
 class S3StorageHandler(StorageHandler):
+    """
+    S3 storage handler for processing and validating S3 files.
+
+    Methods:
+    - create_s3_client: Creates an S3 client.
+    - process_files: Processes and saves the S3 file.
+    - list_s3_files: Lists files in the specified S3 location.
+    - validate_file: Validates the S3 file.
+    """
+
     def create_s3_client(self):
         from botocore import UNSIGNED
         from botocore.client import Config
@@ -314,8 +454,17 @@ class S3StorageHandler(StorageHandler):
         file_info.validate_csv_extension(filename)
 
 
-# Factory to get the correct handler
 class StorageHandlerFactory:
+    """
+    Factory class to get the correct storage handler based on location.
+
+    Attributes:
+    - handlers: Dictionary mapping FileLocation to handler classes.
+
+    Methods:
+    - get_handler: Returns the handler class for the specified location.
+    """
+
     handlers = {
         FileLocation.local: LocalStorageHandler,
         FileLocation.nfs: NFSStorageHandler,

@@ -20,6 +20,91 @@ app.add_middleware(
 
 @app.websocket("/generate")
 async def generate(websocket: WebSocket):
+    """
+    WebSocket endpoint to generate text using a specified generative AI model.
+
+    Parameters:
+    - WebSocket connection.
+
+    Expected Message Format:
+    ```
+    {
+        "query": "Your input text",
+        "model": "Model name",
+        "provider": "AI provider",
+        "key": "Optional API key"
+    }
+    ```
+
+    Response Messages:
+    - Success message with generated content:
+    ```
+    {
+        "status": "success",
+        "content": "Generated text",
+        "end_of_stream": False
+    }
+    ```
+    - Error message in case of invalid arguments:
+    ```
+    {
+        "status": "error",
+        "detail": "Invalid arguments",
+        "errors": [{"loc": ["field"], "msg": "Error message", "type": "error type"}],
+        "end_of_stream": True
+    }
+    ```
+    - Error message in case of missing API key:
+    ```
+    {
+        "status": "error",
+        "detail": "No generative AI key provided",
+        "end_of_stream": True
+    }
+    ```
+    - Error message in case of unsupported provider:
+    ```
+    {
+        "status": "error",
+        "detail": "Unsupported provider",
+        "end_of_stream": True
+    }
+    ```
+    - Error message in case of an unexpected error:
+    ```
+    {
+        "status": "error",
+        "detail": "Unexpected error",
+        "end_of_stream": True
+    }
+    ```
+
+    Example:
+    1. Client sends:
+    ```
+    {
+        "query": "Tell me a story",
+        "model": "gpt-3",
+        "provider": "openai",
+        "key": "your-api-key"
+    }
+    ```
+
+    2. Server sends (multiple messages as content is generated):
+    ```
+    {
+        "status": "success",
+        "content": "Once upon a time, ",
+        "end_of_stream": False
+    }
+    ...
+    {
+        "status": "success",
+        "content": "they lived happily ever after.",
+        "end_of_stream": True
+    }
+    ```
+    """
     await websocket.accept()
     while True:
         data = await websocket.receive_text()

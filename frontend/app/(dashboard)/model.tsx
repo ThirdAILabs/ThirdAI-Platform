@@ -14,7 +14,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { SelectModel } from '@/lib/db';
 import { deleteModel } from './actions';
-import { deployModel, getDeployStatus, stopDeploy } from '@/lib/backend';
+import { deployModel, getDeployStatus, stopDeploy, getAccessToken, thirdaiPlatformBaseUrl } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
 
 export function Model({ model }: { model: SelectModel }) {
@@ -24,7 +24,7 @@ export function Model({ model }: { model: SelectModel }) {
   const [deploymentIdentifier, setDeploymentIdentifier] = useState<string | null>(null);
 
   useEffect(() => {
-    const username = 'peter'; // TODO: Retrieve the username dynamically if needed
+    const username = model.username;
     const modelIdentifier = `${username}/${model.model_name}`;
     setDeploymentIdentifier(`${modelIdentifier}:${username}/${model.model_name}`)
   }, [])
@@ -66,8 +66,11 @@ export function Model({ model }: { model: SelectModel }) {
   function goToEndpoint() {
     switch (model.type) {
       case "ndb":
-        const baseUrl = 'http://localhost:3000';
-        const newUrl = `${baseUrl}/search?id=${deploymentId}`;
+        const accessToken = getAccessToken();
+        let ifGenerationOn = false; // false if semantic search, true if RAG
+        let ifGuardRailOn = false; // enable based on actual config
+        let guardRailEndpoint = '...' // change based on actual config
+        const newUrl = `${thirdaiPlatformBaseUrl}/search?id=${deploymentId}&token=${accessToken}&ifGenerationOn=${ifGenerationOn}&ifGuardRailOn=${ifGuardRailOn}&guardRailEndpoint=${guardRailEndpoint}`;
         window.open(newUrl, '_blank');
         break;
       case "udt":
@@ -123,10 +126,12 @@ export function Model({ model }: { model: SelectModel }) {
       <TableCell className="hidden md:table-cell">
         <button type="button" 
                 onClick={()=>{
-                  const username = 'peter'; // Retrieve the username dynamically if needed
+                  const username = model.username;
                   const modelIdentifier = `${username}/${model.model_name}`;
 
-                  deployModel({ deployment_name: model.model_name, model_identifier: modelIdentifier })
+                  deployModel({ deployment_name: model.model_name, model_identifier: modelIdentifier, 
+                    use_llm_guardrail: true,
+                   })
                     .then((response) => {
                       if(response.status === 'success') {
                         console.log('deployment success')
@@ -134,7 +139,6 @@ export function Model({ model }: { model: SelectModel }) {
                         setDeployStatus('Deployed')
                         setDeploymentId(response.data.deployment_id)
   
-                        const username = 'peter'; // TODO: Retrieve the username dynamically if needed
                         const modelIdentifier = `${username}/${model.model_name}`;
                         setDeploymentIdentifier(`${modelIdentifier}:${username}/${model.model_name}`)
                       }

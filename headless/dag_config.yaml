@@ -17,6 +17,7 @@ NDB:
     params:
       model: check_unsupervised_supervised
       run_name: variable
+      use_llm_guardrail: True
 
   await_deploy:
     dependencies: [deploy_ndb]

@@ -132,6 +132,12 @@ class GeneralVariables(EnvLoader):
         return permissions
 
 
+@dataclass
+class NDBTokenVariables(EnvLoader):
+    llm_guardrail: bool = False
+    token_model_id: Optional[str] = None
+
+
 def merge_dataclasses_to_dict(*instances) -> dict:
     result = {}
     for instance in instances:

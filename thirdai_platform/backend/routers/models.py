@@ -21,7 +21,16 @@ def list_public_models(
     session: Session = Depends(get_session),
 ):
     """
-    lists models which are public, for this endpoint we dont need login.
+    List public models.
+
+    Parameters:
+    - name: The name to filter models.
+    - domain: Optional domain to filter models.
+    - username: Optional username to filter models.
+    - session: The database session (dependency).
+
+    Returns:
+    - A JSON response with the list of public models.
     """
     results = (
         session.query(schema.Model)
@@ -58,12 +67,22 @@ def list_models(
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
+    """
+    List models based on the given name, domain, username, and access level.
+
+    Parameters:
+    - name: The name to filter models.
+    - domain: Optional domain to filter models.
+    - username: Optional username to filter models.
+    - access_level: Optional access level to filter models.
+    - session: The database session (dependency).
+    - authenticated_user: The authenticated user (dependency).
+
+    Returns:
+    - A JSON response with the list of models.
+    """
     user: schema.User = authenticated_user.user
 
-    """
-    The list requests gets all the models available based on the given name by doing a fuzzy search.
-    and models which are accessible for the user.
-    """
     results = (
         session.query(schema.Model)
         .options(joinedload(schema.Model.user))
@@ -119,6 +138,17 @@ def check_model(
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
+    """
+    Check if a model with the given name exists for the authenticated user.
+
+    Parameters:
+    - name: The name of the model to check.
+    - session: The database session (dependency).
+    - authenticated_user: The authenticated user (dependency).
+
+    Returns:
+    - A JSON response indicating if the model is present.
+    """
     user: schema.User = authenticated_user.user
     model: schema.Model = (
         session.query(schema.Model)
@@ -128,7 +158,7 @@ def check_model(
 
     return response(
         status_code=status.HTTP_200_OK,
-        message="Sucessfully checked for model name",
+        message="Successfully checked for model name",
         data={"model_present": True if model else False},
     )
 
@@ -147,6 +177,17 @@ def save_deployed_model(
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
+    """
+    Save a deployed model.
+
+    Parameters:
+    - body: The body of the request containing deployment details.
+    - session: The database session (dependency).
+    - authenticated_user: The authenticated user (dependency).
+
+    Returns:
+    - A JSON response indicating the status of saving the model.
+    """
     user: schema.User = authenticated_user.user
     base_model: schema.Model = session.query(schema.Model).get(body.base_model_id)
     user: schema.User = session.query(schema.User).get(user.id)
