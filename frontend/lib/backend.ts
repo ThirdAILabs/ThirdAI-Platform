@@ -331,15 +331,9 @@ export function useTokenClassificationEndpoints() {
     }
   };
 
-  const getAvailableTags = async (): Promise<string[]> => {
-    // TODO: Create backend endpoint + connect.
-    return ["NAME", "CREDITCARDNUMBER", "SSN", "PHONENUMBER", "LOCATION"];
-  };
-
   return {
     getName,
-    predict,
-    getAvailableTags
+    predict
   };
 }
 
