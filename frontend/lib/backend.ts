@@ -5,8 +5,8 @@ import _ from 'lodash';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-const thirdaiPlatformBaseUrl = _.trim(process.env.THIRDAI_PLATFORM_BASE_URL!, '/');
-const deploymentBaseUrl = _.trim(process.env.DEPLOYMENT_BASE_URL!, '/');
+export const thirdaiPlatformBaseUrl = _.trim(process.env.THIRDAI_PLATFORM_BASE_URL!, '/');
+export const deploymentBaseUrl = _.trim(process.env.DEPLOYMENT_BASE_URL!, '/');
 
 export function getAccessToken(): string {
   const accessToken = localStorage.getItem('accessToken');
@@ -224,6 +224,59 @@ export function userRegister(email: string, password: string, username: string) 
     });
 }
 
+interface TokenClassificationSample {
+  nerData: string[];
+  sentence: string;
+}
+
+function samplesToFile(samples: TokenClassificationSample[], sourceColumn: string, targetColumn: string) {
+  const rows: string[] = [`${sourceColumn},${targetColumn}`];
+  for (const { nerData, sentence } of samples) {
+    rows.push('"' + sentence.replace('"', '""') + '",' + nerData.join(' '));
+  }
+  const csvContent = rows.join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv" });
+  return new File([blob], "data.csv", { type: "text/csv" });
+}
+
+export function trainTokenClassifier(modelName: string, samples: TokenClassificationSample[], tags: string[]) {
+  // Retrieve the access token from local storage
+  const accessToken = getAccessToken()
+
+  // Set the default authorization header for axios
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  const sourceColumn = "source";
+  const targetColumn = "target";
+
+  const formData = new FormData();
+  formData.append("files", samplesToFile(samples, sourceColumn, targetColumn));
+  formData.append("files_details_list", JSON.stringify({
+    file_details: [{ mode: 'supervised', location: 'local', is_folder: false }]
+  }));
+  formData.append("extra_options_form", JSON.stringify({
+    sub_type: "token",
+    source_column: sourceColumn, 
+    target_column: targetColumn,
+    target_labels: tags,
+  }))
+
+  return new Promise((resolve, reject) => {
+      axios
+          .post(`http://localhost:8000/api/train/udt?model_name=${modelName}`, formData)
+          .then((res) => {
+              resolve(res.data);
+          })
+          .catch((err) => {
+              if (err.response && err.response.data) {
+                  reject(new Error(err.response.data.detail || 'Failed to run model'));
+              } else {
+                  reject(new Error('Failed to run model'));
+              }
+          });
+  });
+};
+
 function useAccessToken() {
   const [accessToken, setAccessToken] = useState<string | undefined>();
   useEffect(() => {
@@ -267,12 +320,11 @@ export function useTokenClassificationEndpoints() {
   const predict = async (query: string): Promise<TokenClassificationResult> => {
     // Set the default authorization header for axios
     axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-
     try {
-      const response = await axios.get(`${currentDeploymentBaseUrl}/predict`, {
-        params: { query, top_k: 1 },
+      const response = await axios.post(`${currentDeploymentBaseUrl}/predict`, {
+        query, top_k: 1
       });
-      return response.data;
+      return response.data.data;
     } catch (error) {
       console.error('Error predicting tokens:', error);
       throw new Error('Failed to predict tokens');

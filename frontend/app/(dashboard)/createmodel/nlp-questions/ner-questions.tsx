@@ -1,7 +1,7 @@
 // app/NERQuestions.js
-import Link from 'next/link';
 import React, { useState } from 'react';
-import { SelectModel } from '@/lib/db';
+import { trainTokenClassifier } from '@/lib/backend';
+import { useRouter } from 'next/navigation';
 
 type Category = {
   name: string;
@@ -18,11 +18,14 @@ const predefinedChoices = [
 ];
 
 const NERQuestions = () => {
+  const [modelName, setModelName] = useState("");
   const [categories, setCategories] = useState([{ name: '', example: '', description: '' }]);
   const [showReview, setShowReview] = useState(false);
   const [isDataGenerating, setIsDataGenerating] = useState(false);
   const [generatedData, setGeneratedData] = useState([]);
   const [generateDataPrompt, setGenerateDataPrompt] = useState('');
+  
+  const router = useRouter();
 
   const handleCategoryChange = (index: number, field: keyof Category, value: string) => {
     const updatedCategories = [...categories];
@@ -97,6 +100,14 @@ const NERQuestions = () => {
 
   return (
     <div className='p-5'>
+      <h3 className='mb-3 text-lg font-semibold'>Model Name</h3>
+      <input
+        type="text"
+        className="form-input w-full px-3 py-2 border rounded-md"
+        placeholder="Model Name"
+        value={modelName}
+        onChange={(e) => setModelName(e.target.value)}
+      />
       <h3 className='mb-3 text-lg font-semibold'>Specify Tokens</h3>
       <form onSubmit={handleSubmit}>
         {categories.map((category, index) => (
@@ -183,51 +194,26 @@ const NERQuestions = () => {
           </div>
 
           <div className="flex justify-center">
-            <Link href="/">
             <button
               type="button"
               className="mb-4 bg-blue-500 text-white px-4 py-2 rounded-md"
-              onClick={async () => {
-
-                const modelData: Omit<SelectModel, 'id'> = {
-                  imageUrl: '/thirdai-small.png',
-                  name: 'my pii detector model',
-                  status: 'training',
-                  trainedAt: new Date(), // Use current date and time
-                  description: 'This is a PII model',
-                  deployEndpointUrl: 'http://70.233.60.118:3001/',
-                  onDiskSizeKb: (300 * 1024).toString(),  // 300 MB converted to KB as string
-                  ramSizeKb: (300 * 1024 * 2).toString(),  // 300 * 2 MB converted to KB as string
-                  numberParameters: 51203077,
-                  rlhfCounts: 0,
-                  modelType: 'ner model'
-                };
-  
-                try {
-                  const response = await fetch('/api/insertModel', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(modelData)
-                  });
-            
-                  if (response.ok) {
-                    const result = await response.json();
-                    console.log('Model inserted:', result);
-                  } else {
-                    const error = await response.json();
-                    console.error('Failed to insert model:', error);
-                  }
-                } catch (error) {
-                  console.error('Error inserting model:', error);
+              onClick={() => {
+                if (!modelName) {
+                  alert("Please enter a model name.");
+                  return;
                 }
+                const tags = Array.from(new Set(categories.map(cat => cat.name)));
+                // TODO: We need a better naming scheme, or add a place to enter the model name.
+                trainTokenClassifier(modelName, generatedData, tags).then(() => {
+                  router.push("/");
+                }).catch(e => {
+                  alert(e);
+                });
 
               }}
             >
               Create
             </button>
-            </Link>
           </div>
         </div>
       )}
