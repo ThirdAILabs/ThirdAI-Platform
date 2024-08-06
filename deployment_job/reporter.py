@@ -1,4 +1,5 @@
 import json
+from typing import Dict
 from urllib.parse import urljoin
 
 import requests
@@ -175,6 +176,34 @@ class Reporter:
                 "train_samples": train_samples,
                 "used": used,
             },
+            headers=self.auth_header(access_token=access_token),
+        )
+        print(content)
+
+    def pii_models(
+        self,
+        access_token: str,
+    ):
+        content = self._request(
+            "post",
+            "api/models/list",
+            json={"name": "", "type": "udt", "sub_type": "token"},
+            headers=self.auth_header(access_token=access_token),
+        )
+        print(content)
+
+        return content["data"]
+
+    def update_pii_metadata(
+        self,
+        deployment_id: str,
+        metadata: Dict[str, str],
+        access_token: str,
+    ):
+        content = self._request(
+            "post",
+            "api/deploy/update-metadata",
+            json={"deployment": deployment_id, "metadata": metadata},
             headers=self.auth_header(access_token=access_token),
         )
         print(content)

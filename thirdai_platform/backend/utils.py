@@ -1,5 +1,6 @@
 import json
 import logging
+import math
 import os
 import re
 import socket
@@ -97,14 +98,29 @@ def get_high_level_model_info(result: schema.Model):
         "access_level": result.access_level,
         "domain": result.domain,
         "type": result.type,
+        "id": str(result.id),
     }
 
     # Include metadata if it exists
     if result.meta_data:
         metadata = result.meta_data
         if metadata.train:
+            # Ensure metadata.train is a dictionary
+            if isinstance(metadata.train, str):
+                try:
+                    metadata.train = json.loads(metadata.train)
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding JSON for train: {e}")
+                    metadata.train = {}
             info.update(metadata.train)
         if metadata.general:
+            # Ensure metadata.general is a dictionary
+            if isinstance(metadata.general, str):
+                try:
+                    metadata.general = json.loads(metadata.general)
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding JSON for general: {e}")
+                    metadata.general = {}
             info.update(metadata.general)
 
     return info
@@ -691,3 +707,12 @@ async def restart_neuraldb_deployment_ui():
         # but app_dir is only used if platform == local.
         app_dir=str(get_root_absolute_path() / "neuraldb_frontend"),
     )
+
+
+def get_expiry_min(size: int):
+    """
+    This is a helper function to calculate the expiry time for the signed
+    url for azure blob, which is required to push a model to model bazaar.
+    Taking an average speed of 300 to 400 KB/s we give an extra 60 min for every 1.5GB.
+    """
+    return 60 * (1 + math.floor(size / 1500))

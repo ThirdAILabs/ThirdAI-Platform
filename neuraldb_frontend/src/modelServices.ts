@@ -43,6 +43,11 @@ export interface Source {
     source_id: string;
 }
 
+export interface PIIDetectionResult {
+    tokens: string[];
+    predicted_tags: string[];
+}
+
 export interface ModelService {
     isUserModel: () => boolean;
     sources: () => Promise<Source[]>;
@@ -82,7 +87,8 @@ export interface ModelService {
     handleInvalidAuth: () => void;
     getChatHistory: () => Promise<ChatMessage[]>;
     chat: (textInput: string) => Promise<ChatResponse>;
-    piiDetect(query: string): Promise<any>;
+    piiDetect(query: string): Promise<PIIDetectionResult>;
+    updatePiiSettings(token_model_id: string, llm_guardrail: boolean): Promise<any>
 }
 
 function sourceName(ref: ReferenceJson) {
@@ -171,6 +177,27 @@ export class GlobalModelService implements ModelService {
             });
     }
 
+    async updatePiiSettings( token_model_id: string, llm_guardrail: boolean ): Promise<any> {
+        const url = new URL(this.url + "/update-pii-settings");
+        url.searchParams.append('token_model_id', token_model_id);
+        url.searchParams.append('llm_guardrail', String(llm_guardrail));
+
+        const response = await fetch(url.toString(), {
+            method: "POST",
+            headers: {
+                ...this.authHeader(),
+                "Content-Type": "application/json",
+            }
+        });
+    
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || "Unknown error occurred");
+        }
+    
+        return response.json();
+    }
+
     async piiDetect(query: string): Promise<any> {
         const url = new URL(this.url + "/pii-detect");
         url.searchParams.append('query', query);
@@ -195,11 +222,11 @@ export class GlobalModelService implements ModelService {
             })
             .then(({ data }) => {
                 console.log(data);
-                return data;
+                return data as PIIDetectionResult;
             })
             .catch((e) => {
                 console.error(e);
-                return [];
+                throw new Error('Failed to detect PII');
             });
     }
 
@@ -592,7 +619,7 @@ export class GlobalModelService implements ModelService {
     ) {
         const args = {
             query: genaiQuery(question, references, genaiPrompt),
-            key: '' // fill in openai key
+            key: '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' // fill in openai key
         };
 
         const uri = this.wsUrl + "/generate";

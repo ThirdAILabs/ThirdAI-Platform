@@ -107,11 +107,11 @@ async def startup_event() -> None:
     try:
         time.sleep(10)
         reporter.update_deploy_status(general_variables.deployment_id, "complete")
-        if general_variables.type == TypeEnum.NDB:
-            process = Process(
-                target=process_tasks, args=(task_queue, task_lock, tasks), daemon=True
-            )
-            process.start()
+        # if general_variables.type == TypeEnum.NDB:
+        #     process = Process(
+        #         target=process_tasks, args=(task_queue, task_lock, tasks), daemon=True
+        #     )
+        #     process.start()
     except Exception as e:
         reporter.update_deploy_status(general_variables.deployment_id, "failed")
         raise e  # Re-raise the exception to propagate it to the main block

@@ -54,17 +54,13 @@ export function ModelsTable() {
           const privateModels: SelectModel[] = response.data;
           console.log('privateModels', privateModels)
 
-          // const mappedModels = privateModels.map(mapPrivateModelToSelectModel);
-          // console.log('mappedModels', mappedModels)
           setPrivateModels(privateModels)
 
           response = await fetchPendingModels();
-          const pendingModels = response.data; // Extract the data field
+          const pendingModels: SelectModel[] = response.data; // Extract the data field
           console.log('pendingModels', pendingModels)
 
-          // const mappedPendingModels = pendingModels.map(mapPendingModelToSelectModel);
-          // console.log('mappedPendingModels', mappedPendingModels);
-          // setPendingModels(mappedPendingModels);
+          setPendingModels(pendingModels)
 
         } catch (err) {
           if (err instanceof Error) {
@@ -75,7 +71,10 @@ export function ModelsTable() {
       }
     }
 
-    getModels();
+    const intervalId = setInterval(getModels, 3000);
+
+    // Cleanup function to clear the interval when the component unmounts
+    return () => clearInterval(intervalId);
   }, []);
 
   return (
@@ -110,8 +109,8 @@ export function ModelsTable() {
                 <Model key={index} model={model} />
             ))}
 
-            {pendingModels.map((model) => (
-                <Model key={model.id} model={model} />
+            {pendingModels.map((model, index) => (
+                <Model key={index + 100} model={model} pending = {true} />
             ))}
           </TableBody>
         </Table>

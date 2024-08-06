@@ -18,7 +18,7 @@ import CopyButton from "./buttons/CopyButton";
 import { Spacer } from "./Layout";
 import { DownvoteButton, UpvoteButton } from "./buttons/VoteButtons";
 import { ModelServiceContext } from "../Context";
-import { ModelService, ReferenceInfo } from "../modelServices";
+import { ModelService, ReferenceInfo, PIIDetectionResult } from "../modelServices";
 
 const Card = styled.section<{ $opacity: string }>`
     background: white;
@@ -117,6 +117,8 @@ interface ReferenceProps {
     onDownvote: MouseEventHandler<any>;
     checked: boolean;
     onCheck: () => void;
+    modelService: ModelService;
+    ifGuardRailOn: boolean;
 }
 
 export default function Reference({
@@ -126,6 +128,8 @@ export default function Reference({
     onDownvote,
     checked,
     onCheck,
+    modelService,
+    ifGuardRailOn
 }: ReferenceProps) {
     const [opacity, setOpacity] = useState("0");
     useEffect(() => setOpacity("100%"), []);
@@ -134,6 +138,77 @@ export default function Reference({
         const lowerSource = source.toLowerCase();
         return lowerSource.endsWith(".pdf") || lowerSource.endsWith(".docx");
     };
+
+    const labels = [
+        {  id: 1, name: "PHONENUMBER", color: "blue", amount: "217,323", checked: true, description: 'The format of a US phone number is (XXX) XXX-XXXX, where "X" represents a digit from 0 to 9. It consists of a three-digit area code, followed by a three-digit exchange code, and a four-digit line number.' },
+        {  id: 2, name: "SSN", color: "orange", amount: "8,979", checked: true, description: 'The format of a US Social Security Number (SSN) is XXX-XX-XXXX, where "X" represents a digit from 0 to 9. It consists of three parts: area, group, and serial numbers.' },
+        {
+          id: 3,
+          name: "CREDITCARDNUMBER",
+          color: "red",
+          amount: "13,272",
+          checked: true,
+          description: 'A US credit card number is a 16-digit number typically formatted as XXXX XXXX XXXX XXXX, where "X" represents a digit from 0 to 9. It includes the Issuer Identifier, account number, and a check digit.'
+        },
+        { id: 4, name: "LOCATION", color: "green", amount: "2,576,904", checked: true, description: `A US address format includes the recipient's name, street address (number and name), city, state abbreviation, and ZIP code, for example: John Doe 123 Main St Springfield, IL 62701` },
+        { id: 5, name: "NAME", color: "purple", amount: "1,758,131", checked: true, description: `An English name format typically consists of a first name, middle name(s), and last name (surname), for example: John Michael Smith. Titles and suffixes, like Mr. or Jr., may also be included.` },
+      ];
+
+    const [prediction, setPrediction] = useState<PIIDetectionResult>({tokens: [], predicted_tags: []});
+    const [transformedPrediction, setTransformedPrediction] = useState<string[][]>([]);
+
+    useEffect(()=>{
+        console.log('info.content', info.content)
+
+        // Call piiDetect and handle the promise with .then
+        modelService.piiDetect(info.content)
+        .then(result => {
+            console.log('result', result);
+            setPrediction(result);
+        })
+        .catch(error => {
+            console.error('Error detecting PII:', error);
+        });
+    },[info])
+
+    useEffect(() => {
+        const { tokens, predicted_tags } = prediction;
+        let result = [];
+        let currentSentence = '';
+        let currentTag = '';
+
+        for (let i = 0; i < tokens.length; i++) {
+            const word = tokens[i];
+            if (! (predicted_tags && predicted_tags[i])) {
+                continue
+            }
+            const tag = predicted_tags[i][0]; // Extract the tag from the tuple
+
+            if (tag === currentTag) {
+                // If the tag is the same as the current tag, append the word to the current sentence
+                currentSentence += ` ${word}`;
+            } else {
+                // If the tag is different, push the current sentence and tag to the result
+                if (currentSentence) {
+                    result.push([currentSentence.trim(), currentTag]);
+                }
+                // Start a new sentence with the current word and tag
+                currentSentence = word;
+                currentTag = tag;
+            }
+        }
+
+        // Push the last sentence and tag to the result
+        if (currentSentence) {
+            result.push([currentSentence.trim(), currentTag]);
+        }
+
+        console.log('trans result', result)
+
+        // console.log('newtransformedPrediction', result);
+        // setTransformedPrediction(result);
+        setTransformedPrediction(result)
+    }, [prediction]);
 
     return (
         <Card $opacity={opacity}>
@@ -148,7 +223,40 @@ export default function Reference({
                         </ReadSourceButton>
                     )}
                 </Header>
-                <Content> {info.content} </Content>
+                <Content>
+                    {
+                        ifGuardRailOn
+                        ?
+                        <div className="ner-block">
+                        {transformedPrediction &&
+                            transformedPrediction.map(([sentence, tag], sentenceIndex) => 
+                                {
+                                    const label = labels.find((label) => label.name === tag);
+                                        return (
+                                            <span
+                                                key={sentenceIndex}
+                                                // data-paragraph-index={paragraphIndex}
+                                                // data-sentence-index={sentenceIndex}
+                                                // onClick={() => {
+                                                //     if (label && label.checked) {
+                                                //         handleSpanClick(paragraphIndex, sentenceIndex);
+                                                //     }
+                                                // }}
+                                                style={{
+                                                    color: label && label.checked ? label.color : 'inherit',
+                                                    cursor: label && label.checked ? 'pointer' : 'auto',
+                                                }}
+                                            >
+                                                {label && label.checked ? `${sentence} (${tag})` : `${sentence} `}
+                                            </span>
+                                        );
+                                }                            
+                        )}
+                        </div>
+                        :
+                        <Content> {info.content} </Content>
+                    }
+                </Content>
             </TextContainer>
             <ButtonsContainer>
                 <VoteButtonsContainer>

@@ -4,7 +4,7 @@ import { Spacer } from "./Layout";
 import Reference from "./Reference";
 import PillButton from "./buttons/PillButton";
 import { fontSizes } from "../stylingConstants";
-import { ReferenceInfo } from "../modelServices";
+import { ModelService, ReferenceInfo } from "../modelServices";
 
 interface ReferenceListProps {
     references: ReferenceInfo[];
@@ -15,6 +15,8 @@ interface ReferenceListProps {
     showMoreButton: boolean;
     checkedIds: Set<number>;
     onCheck: (ref: number) => void;
+    modelService: ModelService;
+    ifGuardRailOn: boolean
 }
 
 const Container = styled.section`
@@ -45,6 +47,8 @@ export default function ReferenceList({
     showMoreButton: canRequestMore,
     checkedIds,
     onCheck,
+    modelService,
+    ifGuardRailOn
 }: ReferenceListProps) {
     const buttonRef = useRef<HTMLButtonElement>();
     function handleMore() {
@@ -64,6 +68,8 @@ export default function ReferenceList({
                         onDownvote={() => onDownvote(ref.id, ref.content)}
                         checked={checkedIds.has(ref.id)}
                         onCheck={() => onCheck(ref.id)}
+                        modelService = {modelService}
+                        ifGuardRailOn = {ifGuardRailOn}
                     />
                     <Spacer $height="20px" />
                 </Fragment>

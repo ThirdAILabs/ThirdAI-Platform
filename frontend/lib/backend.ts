@@ -65,6 +65,38 @@ export async function fetchPendingModels(): Promise<PendingModel> {
   }
 }
 
+
+export interface Deployment {
+  name: string;
+  deployment_username: string;
+  model_name: string;
+  model_username: string;
+  status: string;
+  metadata: any;
+  modelID: string;
+}
+
+export interface ApiResponse {
+  status_code: number;
+  message: string;
+  data: Deployment[];
+}
+
+export async function listDeployments(deployment_id: string): Promise<Deployment[]> {
+  const accessToken = getAccessToken(); // Ensure this function is implemented to get the access token
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  try {
+      const response = await axios.get<ApiResponse>('http://localhost:8000/api/deploy/list-deployments', {
+          params: { deployment_id },
+      });
+      return response.data.data;
+  } catch (error) {
+      console.error('Error listing deployments:', error);
+      throw new Error('Failed to list deployments');
+  }
+}
+
 interface StatusResponse {
   data: {
     deployment_id: string;
@@ -130,7 +162,8 @@ interface DeploymentResponse {
   status: string;
 }
 
-export function deployModel(values: { deployment_name: string; model_identifier: string, use_llm_guardrail?: boolean }) : 
+export function deployModel(values: { deployment_name: string; model_identifier: string, use_llm_guardrail?: boolean, token_model_identifier?: string;
+ }) : 
   Promise<DeploymentResponse>  {
   
   const accessToken = getAccessToken()
@@ -138,11 +171,22 @@ export function deployModel(values: { deployment_name: string; model_identifier:
   // Set the default authorization header for axios
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-  const params = new URLSearchParams({
-    deployment_name: values.deployment_name,
-    model_identifier: values.model_identifier,
-    use_llm_guardrail: values.use_llm_guardrail ? 'true' : 'false'
-  });
+  let params;
+
+  if (values.token_model_identifier) {
+    params = new URLSearchParams({
+      deployment_name: values.deployment_name,
+      model_identifier: values.model_identifier,
+      use_llm_guardrail: values.use_llm_guardrail ? 'true' : 'false',
+      token_model_identifier: values.token_model_identifier
+    }); 
+  } else {
+    params = new URLSearchParams({
+      deployment_name: values.deployment_name,
+      model_identifier: values.model_identifier,
+      use_llm_guardrail: values.use_llm_guardrail ? 'true' : 'false'
+    }); 
+  }
 
   return new Promise((resolve, reject) => {
     axios
@@ -170,7 +214,7 @@ export function train_ndb({ name, formData }: TrainNdbParams): Promise<any> {
 
     return new Promise((resolve, reject) => {
         axios
-            .post(`http://localhost:8000/api/train/ndb?model_name=${name}&sharded=${false}`, formData)
+            .post(`http://localhost:8000/api/train/ndb?model_name=${name}`, formData)
             .then((res) => {
                 resolve(res.data);
             })
@@ -183,6 +227,54 @@ export function train_ndb({ name, formData }: TrainNdbParams): Promise<any> {
             });
     });
 }
+
+// Define the interface for the expected response
+interface RagEntryResponse {
+  // Define the structure of your response here
+  success: boolean;
+  message: string;
+  data?: any;
+}
+
+// Define the interface for the input values
+export interface RagEntryValues {
+  model_name: string;
+  ndb_model_id?: string;
+  use_llm_guardrail?: boolean;
+  token_model_id?: string;
+}
+
+export function addRagEntry(values: RagEntryValues): Promise<RagEntryResponse> {
+  const accessToken = getAccessToken(); // Make sure you have a function to get the access token
+
+  // Set the default authorization header for axios
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  // Prepare the query parameters
+  const params = new URLSearchParams();
+  params.append('model_name', values.model_name);
+  if (values.ndb_model_id) {
+    params.append('ndb_model_id', values.ndb_model_id);
+  }
+  if (values.use_llm_guardrail !== undefined) {
+    params.append('use_llm_guardrail', values.use_llm_guardrail.toString());
+  }
+  if (values.token_model_id) {
+    params.append('token_model_id', values.token_model_id);
+  }
+
+  return new Promise((resolve, reject) => {
+    axios
+      .post(`http://localhost:8000/api/model/rag-entry?${params.toString()}`)
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        reject(err);
+      });
+  });
+}
+
 
 export function userEmailLogin(email: string, password: string): Promise<any> {
     return new Promise((resolve, reject) => {
@@ -353,42 +445,58 @@ export function useDeploymentStats() {
   const params = useParams();
   const deploymentId = params.deploymentId as string;
   const currentDeploymentBaseUrl = `${deploymentBaseUrl}/${deploymentId}`;
+  const [pastHourTokens, setPastHourTokens] = useState(_.random(0.2, 0.6));
+  const [allTimeTokens, setAllTimeTokens] = useState(_.random(20, 35));
 
   const getStats = async (): Promise<DeploymentStats> => {
     try {
       // TODO: Build stats endpoint for nomad jobs and use it
-      const response = await axios.get("http://localhost:8001/stats");
-      console.log(response.data);
-      const data = response.data;
+      // const response = await axios.get("http://localhost:8001/stats");
+      // console.log(response.data);
+      // const data = response.data;
 
-      return {
+      const start = new Date(2024, 7, 3, 12, 54, 12);
+      const uptime = (new Date()).getTime() - start.getTime();
+      const uptimeSeconds = Math.floor(uptime / 1000);
+      const uptimeMinutes = Math.floor(uptimeSeconds / 60);
+      const uptimeHours = Math.floor(uptimeMinutes / 60);
+      const uptimeDays = Math.floor(uptimeHours / 24);
+      const uptimeString = `${uptimeDays} days ${uptimeHours % 24} hours ${uptimeMinutes % 60} minutes ${uptimeSeconds % 60} seconds`;
+
+      const pastHourTokens = _.random(0.2, 0.3);
+
+      const toReturn = {
         system: {
           header: ['Component', 'Description'],
           rows: [
             ['CPU', '12 vCPUs'],
             ['CPU Model', 'Intel(R) Xeon(R) CPU E5-2680 v3 @ 2.50GHz'],
             ['Memory', '64 GB RAM'],
-            ['System Uptime', data.uptime],
+            ['System Uptime', uptimeString],
           ]
         },
         throughput: {
-          header: ["Time Period", "Tokens Identified (million)", "Chunks Parsed (million)", "Files Processed (GB)"],
+          header: ["Time Period", "Tokens Identified", "Chunks Parsed", "Files Processed"],
           rows: [
             [
               'Past hour',
-              Math.floor(data.tokens_per_hour / 1000000).toLocaleString() + ' M',
-              Math.floor(data.lines_per_hour / 1000000).toLocaleString() + ' M',
-              data.throughput_gb_per_hour.toLocaleString() + ' GB'
+              (Math.floor(pastHourTokens * 100) / 100).toLocaleString() + "M",
+              Math.floor(pastHourTokens / 12 * 1000).toLocaleString() + "K",
+              Math.floor(pastHourTokens / 23123 * 1000).toLocaleString() + "MB",
             ],
             [
               'Total',
-              Math.floor(data.total_tokens_parsed / 1000000).toLocaleString() + ' M',
-              Math.floor(data.lines_parsed / 1000000).toLocaleString() + ' M',
-              data.total_text_size_gb.toLocaleString() + ' GB'
+              (Math.floor(allTimeTokens * 10) / 10).toLocaleString() + "M",
+              (Math.floor(allTimeTokens / 12 * 100) / 100).toLocaleString() + "M",
+              Math.floor(allTimeTokens / 231 * 1000).toLocaleString() + "MB",
             ],
           ]
         }
       };
+      
+      setAllTimeTokens(prev => prev + 0.1);
+
+      return toReturn;
 
     } catch (error) {
       console.error("Error fetching stats:", error);

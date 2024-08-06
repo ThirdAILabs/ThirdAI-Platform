@@ -172,10 +172,24 @@ function App() {
     }, []);
 
     useEffect(() => {
-        if (modelService) {
-            modelService.piiDetect('hi Peter')
-        }
-      }, [modelService]);
+
+        const updateSettings = async () => {
+            if (ifGuardRailOn && guardRailEndpoint && modelService) {
+                try {
+                    console.log('passing guardRailEndpoint', guardRailEndpoint)
+                    console.log('passing ifGuardRailOn', ifGuardRailOn)
+
+                    await modelService.updatePiiSettings(guardRailEndpoint, ifGuardRailOn);
+                    console.log('PII settings updated successfully');
+                    modelService.piiDetect('hi Peter');
+                } catch (error) {
+                    console.error('Error updating PII settings:', error);
+                }
+            }
+        };
+
+        updateSettings()
+      }, [modelService, guardRailEndpoint, ifGuardRailOn]);
 
     useEffect(() => {
         if (modelService) {
@@ -475,6 +489,8 @@ function App() {
                                                                 checkedIds
                                                             }
                                                             onCheck={onCheck}
+                                                            modelService = {modelService}
+                                                            ifGuardRailOn = {ifGuardRailOn}
                                                         />
                                                     </Pad>
                                                 </Pad>

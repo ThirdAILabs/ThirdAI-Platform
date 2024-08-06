@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { SelectModel } from '@/lib/db';
 import NERQuestions from './nlp-questions/ner-questions';
 import SemanticSearchQuestions from './semantic-search-questions';
+import { addRagEntry, RagEntryValues } from '@/lib/backend';
 
 const RAGQuestions = ({
   models,
@@ -14,28 +15,28 @@ const RAGQuestions = ({
 
   // Begin state variables & func for source
   const [ifUseExistingSS, setUseExistingSS] = useState<string|null>(null);
-  const [existingSSModelToUse, setExistingSSModelToUse] = useState<string|null>(null);
   const [existingSSmodels, setExistingSSmodels] = useState<SelectModel[]>([]);
-  const [newSSModelCreated, setNewSSModelCreated] = useState<boolean>(false);
-
+  const [ssIdentifier, setSsIdentifier] = useState<string | null>(null);
+  const [createdSS, setCreatedSS] = useState<boolean>(false);
+  
   useEffect(() => {
     setExistingSSmodels(models.filter(model => model.type === 'ndb'));
   }, [models]);
-
+  
   console.log('Existing Semantic Search Models:', existingSSmodels);
-
+  
   // End state variables & func for source
-
+  
   // Begin state variables & func for LLM guardrail
-
+  
   const [ifUseLGR, setIfUseLGR] = useState('');
   const [ifUseExistingLGR, setIfUseExistingLGR] = useState<string|null>(null);
   const [existingNERModels, setExistingNERModels] = useState<SelectModel[]>([]);
-  const [existingNERModelToUse, setExistingNERModelToUse] = useState<string|null>(null);
-  const [newNERModelCreated, setNewNERModelCreated] = useState<boolean>(false);
+  const [grIdentifier, setGrIdentifier] = useState<string | null>(null);
+  const [createdGR, setCreatedGR] = useState<boolean>(false);
 
   useEffect(() => {
-    setExistingNERModels(models.filter(model => model.type === 'ner model'));
+    setExistingNERModels(models.filter(model => model.type === 'udt'));
   }, [models]);
 
   console.log('Existing NER Models:', existingNERModels);
@@ -50,6 +51,22 @@ const RAGQuestions = ({
 
   // End state variables & func for LLM
 
+  const handleSubmit = async () => {
+    const values: RagEntryValues = {
+      model_name: modelName,
+      ndb_model_id: ssIdentifier ? ssIdentifier : '',
+      use_llm_guardrail: grIdentifier ? true : false,
+      token_model_id: grIdentifier ? grIdentifier : ''
+    };
+
+    try {
+      const response = await addRagEntry(values);
+      console.log('Success:', response);
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
   return (
     <div>
       {/* Begin Semantic Search Model */}
@@ -61,7 +78,10 @@ const RAGQuestions = ({
                 id="useExistingSemanticSearch"
                 className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                 value={ifUseExistingSS ? ifUseExistingSS : ''}
-                onChange={(e) => setUseExistingSS(e.target.value)}
+                onChange={(e) => {
+                  setUseExistingSS(e.target.value);
+                  setCreatedSS(false);
+                }}
               >
                 <option value="">-- Please choose an option --</option>
                 <option value="Yes">Yes</option>
@@ -79,13 +99,15 @@ const RAGQuestions = ({
                 <select
                   id="semanticSearchModels"
                   className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                  value={existingSSModelToUse || ''}
-                  onChange={(e) => setExistingSSModelToUse(e.target.value)}
+                  value={ssIdentifier || ''}
+                  onChange={(e) => {
+                    setSsIdentifier(e.target.value);
+                  }}
                 >
                   <option value="">-- Please choose a model --</option>
                   {existingSSmodels.map((model, index) => (
-                    <option key={index} value={index}>
-                      {`${model.model_name}`}
+                    <option key={index} value={`${model.username}/${model.model_name}`}>
+                      {`${model.username}/${model.model_name}`}
                     </option>
                   ))}
                 </select>
@@ -98,7 +120,21 @@ const RAGQuestions = ({
 
       {
         ifUseExistingSS === 'No' &&
-        <SemanticSearchQuestions/>
+        <>
+          <div style={{visibility: createdSS ? 'hidden' : 'visible'}}>
+            <SemanticSearchQuestions 
+              onCreateModel={(username, modelName) => {
+                // TODO: SOMEHOW GET CURRENT USERNAME
+                setSsIdentifier(`${username}/${modelName}`);
+                setCreatedSS(true);
+              }}
+              stayOnPage
+              />
+          </div>
+          <div style={{visibility: createdSS ? 'visible' : 'hidden'}}>
+            Semantic search model created.
+          </div>
+        </>
       }
               {/* End Create new Semantic Search Model */}
 
@@ -116,7 +152,13 @@ const RAGQuestions = ({
                 id="llmGuardrail"
                 className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                 value={ifUseLGR}
-                onChange={(e)=>setIfUseLGR(e.target.value)}
+                onChange={(e)=>{
+                  if (e.target.value === "No") {
+                    setGrIdentifier(null);
+                  }
+                  setIfUseLGR(e.target.value);
+                  setCreatedGR(false);
+                }}
               >
                 <option value="">-- Please choose an option --</option>
                 <option value="Yes">Yes</option>
@@ -133,7 +175,10 @@ const RAGQuestions = ({
                   id="useExistingGuardrail"
                   className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                   value={ifUseExistingLGR ? ifUseExistingLGR : ''}
-                  onChange={(e) => setIfUseExistingLGR(e.target.value)}
+                  onChange={(e) => {
+                    setIfUseExistingLGR(e.target.value);
+                    setCreatedGR(false);
+                  }}
                 >
                   <option value="">-- Please choose an option --</option>
                   <option value="Yes">Yes</option>
@@ -147,7 +192,21 @@ const RAGQuestions = ({
             {/* Begin creating a new NER model */}
 
             {ifUseLGR === 'Yes' && ifUseExistingLGR === 'No' && (
-              <NERQuestions />
+              <>
+                <div style={{visibility: createdGR ? 'hidden' : 'visible'}}>
+                  <NERQuestions 
+                    onCreateModel={(username, modelName) => {
+                      // TODO: SOMEHOW GET USERNAME
+                      setGrIdentifier(`${username}/${modelName}`);
+                      setCreatedGR(true);
+                    }} 
+                    stayOnPage
+                  />
+                </div>
+                <div style={{visibility: createdGR ? 'visible' : 'hidden'}}>
+                  Guardrail model created.
+                </div>
+              </>
             )}
 
             {/* Begin creating a new NER model */}
@@ -161,13 +220,13 @@ const RAGQuestions = ({
                 <select
                   id="nerModels"
                   className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                  value={existingNERModelToUse || ''}
-                  onChange={(e) => setExistingNERModelToUse(e.target.value)}
+                  value={grIdentifier ? grIdentifier : ''}
+                  onChange={(e) => setGrIdentifier(e.target.value)}
                 >
                   <option value="">-- Please choose a model --</option>
                   {existingNERModels.map(model => (
-                    <option key={model.id} value={model.id}>
-                      {`${model.model_name}`}
+                    <option key={model.id} value={`${model.username}/${model.model_name}`}>
+                      {`${model.username}/${model.model_name}`}
                     </option>
                   ))}
                 </select>
@@ -222,9 +281,9 @@ const RAGQuestions = ({
 
       {/* Begin create and deploy */}
             {
-              (existingSSModelToUse || newSSModelCreated) 
+              (ssIdentifier) 
               && 
-              (ifUseLGR === 'No' || (ifUseLGR === 'Yes' && (existingNERModelToUse || newNERModelCreated) )) 
+              (ifUseLGR === 'No' || grIdentifier) 
               && 
               llmType 
               && 
@@ -235,6 +294,7 @@ const RAGQuestions = ({
                 <button
                   type="button"
                   className="mb-4 bg-blue-500 text-white px-4 py-2 rounded-md"
+                  onClick={handleSubmit}
                 >
                   {`${ifUseExistingSS === 'No' || (ifUseLGR === 'Yes' && ifUseExistingLGR === 'No') ? 'Create' : 'Create and Deploy'}`}
                 </button>

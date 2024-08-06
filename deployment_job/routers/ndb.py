@@ -1,10 +1,14 @@
+import io
 import logging
+import os
 import traceback
 import uuid
+from pathlib import Path
 from typing import List, Optional
 
+import fitz
 import thirdai
-from fastapi import APIRouter, Depends, Form, UploadFile, status
+from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from file_handler import validate_files
 from permissions import Permissions
@@ -12,8 +16,17 @@ from pydantic import ValidationError
 from pydantic_models import inputs
 from pydantic_models.documents import DocumentList
 from pydantic_models.inputs import BaseQueryParams, NDBExtraParams
-from routers.model import get_model, get_token_model
-from utils import Status, now, propagate_error, response, validate_name
+from utils import (
+    Status,
+    highlighted_pdf_bytes,
+    new_pdf_chunks,
+    now,
+    old_pdf_chunks,
+    propagate_error,
+    response,
+    validate_name,
+)
+from routers.model import TokenModelManager, get_model, get_token_model
 from variables import GeneralVariables, TypeEnum
 
 permissions = Permissions()
@@ -482,8 +495,24 @@ def create_ndb_router(task_queue, task_lock, tasks) -> APIRouter:
     @propagate_error
     def pii_detection(
         query: str,
-        _: str = Depends(permissions.verify_read_permission),
+        _: str = Depends(permissions.verify_write_permission),
     ):
+        """
+        Detect PII in the given query.
+
+        Parameters:
+        - query: str - The query text for PII detection.
+
+        Returns:
+        - JSONResponse: The PII detection results.
+
+        Example Request Body:
+        ```
+        {
+            "query": "My credit card number is 1234-5678-9101-1121."
+        }
+        ```
+        """
         token_model = get_token_model()
 
         results = token_model.predict(query=query, top_k=1)
@@ -492,6 +521,121 @@ def create_ndb_router(task_queue, task_lock, tasks) -> APIRouter:
             status_code=status.HTTP_200_OK,
             message="Successfully detected PII.",
             data=jsonable_encoder(results),
+        )
+
+    @ndb_router.get("/highlighted-pdf", include_in_schema=False)
+    @propagate_error
+    def highlighted_pdf(
+        reference_id: int, _=Depends(permissions.verify_read_permission)
+    ):
+        model = get_model()
+        reference = model.db._savable_state.documents.reference(reference_id)
+        buffer = io.BytesIO(highlighted_pdf_bytes(reference))
+        headers = {
+            "Content-Disposition": f'inline; filename="{Path(reference.source).name}"'
+        }
+        return Response(
+            buffer.getvalue(), headers=headers, media_type="application/pdf"
+        )
+
+    @ndb_router.get("/pdf-blob", include_in_schema=False)
+    @propagate_error
+    def pdf_blob(source: str, _=Depends(permissions.verify_read_permission)):
+        buffer = io.BytesIO(fitz.open(source).tobytes())
+        headers = {"Content-Disposition": f'inline; filename="{Path(source).name}"'}
+        return Response(
+            buffer.getvalue(), headers=headers, media_type="application/pdf"
+        )
+
+    @ndb_router.get("/pdf-chunks", include_in_schema=False)
+    def pdf_chunks(reference_id: int, _=Depends(permissions.verify_read_permission)):
+        model = get_model()
+        reference = model.db.reference(reference_id)
+        chunks = new_pdf_chunks(model.db, reference)
+        if not chunks:
+            chunks = old_pdf_chunks(model.db, reference)
+        if chunks:
+            return response(
+                status_code=status.HTTP_200_OK,
+                message="Successful",
+                data=chunks,
+            )
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"Reference with id ${reference_id} is not a PDF.",
+            data={},
+        )
+
+    @ndb_router.post("/pii-models")
+    @propagate_error
+    def pii_models(
+        token: str = Depends(permissions.verify_read_permission),
+    ):
+        """
+        Get the list of available PII models.
+
+        Returns:
+        - JSONResponse: The list of PII models.
+        """
+        model = get_model()
+
+        results = model.reporter.pii_models(access_token=token)
+
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successfully got PII models.",
+            data=jsonable_encoder(results),
+        )
+
+    @ndb_router.post("/update-pii-settings")
+    @propagate_error
+    def update_pii_model(
+        token_model_id: Optional[str] = None,
+        llm_guardrail: Optional[bool] = None,
+        token: str = Depends(permissions.verify_write_permission),
+    ):
+        """
+        Update the PII model settings.
+
+        Parameters:
+        - token_model_id: Optional[str] - The ID of the token model to update.
+        - llm_guardrail: Optional[bool] - Whether to enable or disable LLM guardrail.
+
+        Returns:
+        - JSONResponse: Update success message.
+
+        Example Request Body:
+        ```
+        {
+            "token_model_id": "model_id",
+            "llm_guardrail": true
+        }
+        ```
+        """
+        metadata_updated = False
+        metadata = {}
+
+        if token_model_id:
+            TokenModelManager().update_instance(token_model_id=token_model_id)
+            metadata["token_model_id"] = token_model_id
+            metadata_updated = True
+
+        if llm_guardrail is not None:
+            os.environ["LLM_GUARDRAIL"] = str(llm_guardrail)
+            metadata["llm_guardrail"] = llm_guardrail
+            metadata_updated = True
+
+        if metadata_updated:
+            model = get_model()
+            # model.reporter.update_pii_metadata(
+            #     deployment_id=general_variables.deployment_id,
+            #     metadata=metadata,
+            #     access_token=token,
+            # )
+
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successfully Updated the PII settings.",
         )
 
     return ndb_router

@@ -25,14 +25,17 @@ from backend.utils import (
     parse_deployment_identifier,
     response,
     submit_nomad_job,
+    update_json,
     update_json_list,
     validate_name,
 )
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.encoders import jsonable_encoder
 from licensing.verify.verify_license import valid_job_allocation, verify_license
 from pydantic import BaseModel
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 deploy_router = APIRouter()
@@ -156,8 +159,9 @@ def deploy_model(
     autoscaling_enabled: bool = False,
     autoscaler_max_count: int = 1,
     genai_key: Optional[str] = None,
-    use_llm_guardrail: bool = False,
+    use_llm_guardrail: Optional[bool] = None,
     token_model_identifier: Optional[str] = None,
+    type: Optional[str] = None,
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
@@ -165,17 +169,19 @@ def deploy_model(
     Deploy a model.
 
     Parameters:
-    - deployment_name: The name of the deployment.
-    - model_identifier: The identifier of the model to deploy.
-    - memory: Optional memory allocation for the deployment.
-    - autoscaling_enabled: Whether autoscaling is enabled.
-    - autoscaler_max_count: The maximum count for the autoscaler.
-    - genai_key: Optional GenAI key.
-    - session: The database session (dependency).
-    - authenticated_user: The authenticated user (dependency).
+    - deployment_name: str - The name of the deployment.
+    - model_identifier: str - The identifier of the model to deploy.
+    - memory: Optional[int] - Optional memory allocation for the deployment.
+    - autoscaling_enabled: bool - Whether autoscaling is enabled.
+    - autoscaler_max_count: int - The maximum count for the autoscaler.
+    - genai_key: Optional[str] - Optional GenAI key.
+    - use_llm_guardrail: bool - Whether to enable or disable LLM guardrail.
+    - token_model_identifier: Optional[str] - The identifier of the token model to use for PII detection.
+    - session: Session - The database session (dependency).
+    - authenticated_user: AuthenticatedUser - The authenticated user (dependency).
 
     Returns:
-    - A JSON response indicating the status of the deployment.
+    - JSONResponse: A JSON response indicating the status of the deployment.
     """
     user: schema.User = authenticated_user.user
 
@@ -271,8 +277,36 @@ def deploy_model(
         if token_model.type != "udt" or token_model.sub_type != "token":
             return response(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                message=f"You cannot use this model for PII detection.",
+                message="You cannot use this model for PII detection.",
             )
+
+    # Update or retain metadata fields with defaults
+    metadata = deployment.metadata_json or {}
+    metadata["deploy_type"] = type if type is not None else metadata.get("type", "")
+    metadata["use_llm_guardrail"] = (
+        use_llm_guardrail
+        if use_llm_guardrail is not None
+        else metadata.get("use_llm_guardrail", False)
+    )
+
+    if token_model_identifier:
+        metadata["token_model_id"] = str(token_model.id)
+    elif "token_model_id" not in metadata:
+        metadata["token_model_id"] = None
+
+    deployment.metadata_json = metadata
+
+    model_metadata: schema.MetaData = model.meta_data
+    if model_metadata:
+        model_metadata.general = update_json(model_metadata.general, metadata)
+    else:
+        new_metadata = schema.MetaData(
+            model_id=model.id,
+            general=metadata,
+        )
+        session.add(new_metadata)
+
+    session.commit()
 
     try:
         work_dir = os.getcwd()
@@ -303,10 +337,8 @@ def deploy_model(
             python_path=get_python_path(),
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
-            llm_guardrail=("true" if use_llm_guardrail else "false"),
-            token_model_id=(
-                "NONE" if not token_model_identifier else str(token_model.id)
-            ),
+            llm_guardrail=("true" if metadata.get("use_llm_guardrail") else "false"),
+            token_model_id=(metadata.get("token_model_id") or "NONE"),
         )
 
         deployment.status = schema.Status.in_progress
@@ -587,3 +619,111 @@ def log_results(
     session.commit()
 
     return {"message": "Log entry added successfully"}
+
+
+@deploy_router.get("/list-deployments")
+def list_deployments(
+    deployment_id: Optional[str] = None,
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
+    """
+    List existing deployments or fetch a specific deployment by ID.
+
+    Returns deployment information.
+    """
+    user: schema.User = authenticated_user.user
+
+    query = session.query(schema.Deployment).join(
+        schema.Model, schema.Deployment.model_id == schema.Model.id
+    )
+
+    if deployment_id:
+        query = query.filter(
+            schema.Deployment.id == deployment_id,
+            or_(
+                schema.Deployment.user_id == user.id,
+                schema.Model.access_level == schema.Access.public,
+            ),
+        )
+        deployment = query.first()
+
+        if not deployment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Deployment not found"
+            )
+
+        results = [
+            {
+                "name": deployment.name,
+                "deployment_username": deployment.user.username,
+                "model_name": deployment.model.name,
+                "model_username": deployment.model.user.username,
+                "status": deployment.status,
+                "metadata": deployment.metadata_json,
+                "modelID": str(deployment.model_id),
+            }
+        ]
+    else:
+        deployments: List[schema.Deployment] = query.filter(
+            or_(
+                schema.Deployment.user_id == user.id,
+                schema.Model.access_level == schema.Access.public,
+            )
+        ).all()
+
+        results = [
+            {
+                "name": deployment.name,
+                "deployment_username": deployment.user.username,
+                "model_name": deployment.model.name,
+                "model_username": deployment.model.user.username,
+                "status": deployment.status,
+                "metadata": deployment.metadata_json,
+            }
+            for deployment in deployments
+        ]
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Successfully fetched deployments",
+        data=jsonable_encoder(results),
+    )
+
+
+@deploy_router.post("/update-metadata")
+def update_metadata(
+    deployment_id: str,
+    metadata: Dict[str, str],
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
+    """
+    Update the metadata of a deployment.
+
+    Parameters:
+    - deployment_id: str - The ID of the deployment to update.
+    - metadata: Dict[str, str] - The new metadata to set.
+    - session: Session - The database session (dependency).
+    - authenticated_user: AuthenticatedUser - The authenticated user (dependency).
+
+    Returns:
+    - JSONResponse: A JSON response indicating the status of the update.
+    """
+    # Fetch the deployment by ID
+    deployment = session.query(schema.Deployment).filter_by(id=deployment_id).first()
+
+    # Check if deployment exists
+    if not deployment:
+        return response(
+            status_code=status.HTTP_404_NOT_FOUND, message="Deployment not found."
+        )
+
+    deployment.metadata_json = update_json(deployment.metadata_json, metadata)
+    session.commit()
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Deployment metadata updated successfully.",
+        data={"deployment_id": deployment_id, "metadata": deployment.metadata_json},
+    )

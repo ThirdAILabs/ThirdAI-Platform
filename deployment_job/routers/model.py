@@ -47,6 +47,7 @@ class ModelManager:
             ValueError: If the model type is invalid.
         """
         if cls._model_instance is None:
+            print('hahahah')
             if general_variables.type == TypeEnum.NDB:
                 if general_variables.sub_type == NDBSubtype.sharded:
                     cls._model_instance = ShardedNDB()
@@ -59,6 +60,8 @@ class ModelManager:
                     cls._model_instance = TokenClassificationModel()
             else:
                 raise ValueError("Invalid model type")
+        
+        print(cls._model_instance, type(cls._model_instance))
         return cls._model_instance
 
 
@@ -89,6 +92,10 @@ class TokenModelManager:
                     model_path=str(model_file_path)
                 )
         return cls._token_model_instance
+
+    @classmethod
+    def update_instance(cls, token_model_id):
+        cls._token_model_instance = TokenClassificationModel(model_id=token_model_id)
 
 
 def get_model():
