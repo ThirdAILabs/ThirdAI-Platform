@@ -65,6 +65,26 @@ def udt_query(_=Depends(permissions.verify_read_permission)):
     """
     Returns statistics about the deployment such as the number of tokens identified, number of
     queries ingested, and total size of queries ingested. 
+    
+    Parameters:
+    - token: str - Authorization token (inferred from permissions dependency).
+
+    Returns:
+    - JSONResponse: Statistics about deployment usage. Example response:
+    {
+        "past_hour": {
+            "tokens_identified": 125,
+            "queries_ingested": 12,
+            "queries_ingested_bytes": 7223,
+        },
+        "total": {
+            "tokens_identified": 1125,
+            "queries_ingested": 102,
+            "queries_ingested_bytes": 88101,
+        },
+        "uptime": 35991
+    }
+    uptime is given in seconds.
     """
     return response(
         status_code=status.HTTP_200_OK,
