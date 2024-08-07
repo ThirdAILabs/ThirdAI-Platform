@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
     TableHead,
     TableRow,
@@ -10,7 +10,7 @@ import {
     TableCell
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DeploymentStatsTable, useDeploymentStats } from "@/lib/backend";
+import { DeploymentStatsTable, useTokenClassificationEndpoints } from "@/lib/backend";
 
 export default function Dashboard() {
   const [system, setSystem] = useState<DeploymentStatsTable>({
@@ -23,7 +23,7 @@ export default function Dashboard() {
     rows: [['--', '--', '--', '--'], ['--', '--', '--', '--']]
   });
 
-  const { getStats } = useDeploymentStats();
+  const { getStats } = useTokenClassificationEndpoints();
 
   useEffect(() => {
     const fetchStats = () => {
@@ -39,7 +39,9 @@ export default function Dashboard() {
     const intervalId = setInterval(fetchStats, 2000);
 
     // Clean up the interval on component unmount
-    return () => clearInterval(intervalId);
+    return () => {
+      clearInterval(intervalId);
+    }
   }, []);
 
   const table = (tableInfo: DeploymentStatsTable, title: string) => {

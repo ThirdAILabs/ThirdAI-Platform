@@ -376,7 +376,7 @@ function useAccessToken() {
     if (!accessToken) {
       throw new Error('Access token is not available');
     }
-    return setAccessToken(accessToken);
+    setAccessToken(accessToken);
   }, []);
 
   return accessToken;
@@ -423,9 +423,80 @@ export function useTokenClassificationEndpoints() {
     }
   };
 
+  const formatTime = (timeSeconds: number) => {
+    const timeMinutes = Math.floor(timeSeconds / 60);
+    const timeHours = Math.floor(timeMinutes / 60);
+    const timeDays = Math.floor(timeHours / 24);
+    return `${timeDays} days ${timeHours % 24} hours ${timeMinutes % 60} minutes ${timeSeconds % 60} seconds`;
+  }
+
+  const formatAmount = (amount: number) => {
+    if (amount < 1000) {
+      return amount.toString();
+    }
+    let suffix = "";
+    if (amount >= 1000000000) {
+      amount /= 1000000000;
+      suffix = " B"
+    } else if (amount >= 1000000) {
+      amount /= 1000000;
+      suffix = " M"
+    } else {
+      amount /= 1000;
+      suffix = " K"
+    }
+    let amountstr = amount.toString();
+    if (amountstr.includes(".")) {
+      const [wholes, decimals] = amountstr.split(".");
+      const decimalsLength = 3 - Math.min(3, wholes.length);
+      amountstr = decimalsLength
+        ? wholes + "." + decimals.substring(0, decimalsLength)
+        : wholes;
+    }
+    return amountstr + suffix;
+  }
+
+  const getStats = async (): Promise<DeploymentStats> => {
+    axios.defaults.headers.common.Authorization = `Bearer ${getAccessToken()}`;
+    try {
+      const response = await axios.get(`${currentDeploymentBaseUrl}/stats`);
+      return {
+        system: {
+          header: ['Name', 'Description'],
+          rows: [
+            ['CPU', '12 vCPUs'],
+            ['CPU Model', 'Intel(R) Xeon(R) CPU E5-2680 v3 @ 2.50GHz'],
+            ['Memory', '64 GB RAM'],
+            ['System Uptime', formatTime(response.data.data.uptime)],
+          ]
+        },
+        throughput: {
+          header: ["Time Period", "Tokens Identified", "Queries Ingested", "Queries Ingested Size"],
+          rows: [
+            [
+              'Past hour',
+              formatAmount(response.data.data.past_hour.tokens_identified),
+              formatAmount(response.data.data.past_hour.queries_ingested),
+              formatAmount(response.data.data.past_hour.queries_ingested_bytes) + "B",
+            ],
+            [
+              'Total',
+              formatAmount(response.data.data.total.tokens_identified),
+              formatAmount(response.data.data.total.queries_ingested),
+              formatAmount(response.data.data.total.queries_ingested_bytes) + "B",
+            ],
+          ]
+        }
+      };
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+      throw new Error("Error fetching stats.");
+    }
+  };
   return {
     getName,
-    predict
+    predict,
+    getStats,
   };
 }
 
@@ -439,70 +510,3 @@ export interface DeploymentStats {
   system: DeploymentStatsTable;
   throughput: DeploymentStatsTable;
 }
-
-export function useDeploymentStats() {
-  const accessToken = useAccessToken();
-  const params = useParams();
-  const deploymentId = params.deploymentId as string;
-  const currentDeploymentBaseUrl = `${deploymentBaseUrl}/${deploymentId}`;
-  const [pastHourTokens, setPastHourTokens] = useState(_.random(0.2, 0.6));
-  const [allTimeTokens, setAllTimeTokens] = useState(_.random(20, 35));
-
-  const getStats = async (): Promise<DeploymentStats> => {
-    try {
-      // TODO: Build stats endpoint for nomad jobs and use it
-      // const response = await axios.get("http://localhost:8001/stats");
-      // console.log(response.data);
-      // const data = response.data;
-
-      const start = new Date(2024, 7, 3, 12, 54, 12);
-      const uptime = (new Date()).getTime() - start.getTime();
-      const uptimeSeconds = Math.floor(uptime / 1000);
-      const uptimeMinutes = Math.floor(uptimeSeconds / 60);
-      const uptimeHours = Math.floor(uptimeMinutes / 60);
-      const uptimeDays = Math.floor(uptimeHours / 24);
-      const uptimeString = `${uptimeDays} days ${uptimeHours % 24} hours ${uptimeMinutes % 60} minutes ${uptimeSeconds % 60} seconds`;
-
-      const pastHourTokens = _.random(0.2, 0.3);
-
-      const toReturn = {
-        system: {
-          header: ['Component', 'Description'],
-          rows: [
-            ['CPU', '12 vCPUs'],
-            ['CPU Model', 'Intel(R) Xeon(R) CPU E5-2680 v3 @ 2.50GHz'],
-            ['Memory', '64 GB RAM'],
-            ['System Uptime', uptimeString],
-          ]
-        },
-        throughput: {
-          header: ["Time Period", "Tokens Identified", "Chunks Parsed", "Files Processed"],
-          rows: [
-            [
-              'Past hour',
-              (Math.floor(pastHourTokens * 100) / 100).toLocaleString() + "M",
-              Math.floor(pastHourTokens / 12 * 1000).toLocaleString() + "K",
-              Math.floor(pastHourTokens / 23123 * 1000).toLocaleString() + "MB",
-            ],
-            [
-              'Total',
-              (Math.floor(allTimeTokens * 10) / 10).toLocaleString() + "M",
-              (Math.floor(allTimeTokens / 12 * 100) / 100).toLocaleString() + "M",
-              Math.floor(allTimeTokens / 231 * 1000).toLocaleString() + "MB",
-            ],
-          ]
-        }
-      };
-      
-      setAllTimeTokens(prev => prev + 0.1);
-
-      return toReturn;
-
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-      throw new Error("Error fetching stats.");
-    }
-  };
-
-  return { getStats };
-};

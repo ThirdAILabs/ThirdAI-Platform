@@ -5,10 +5,18 @@ from pydantic_models.inputs import BaseQueryParams
 from routers.model import get_model
 from utils import propagate_error, response
 from variables import GeneralVariables
+from throughput import Throughput
+import time
 
 udt_router = APIRouter()
 permissions = Permissions()
 general_variables = GeneralVariables.load_from_env()
+
+
+start_time = time.time()
+tokens_identified = Throughput()
+queries_ingested = Throughput()
+queries_ingested_bytes = Throughput()
 
 
 @udt_router.post("/predict")
@@ -40,8 +48,38 @@ def udt_query(
 
     results = model.predict(**params)
 
+    tokens_identified.log(len([tags[0] for tags in results.predicted_tags if tags[0] != "O"]))
+    queries_ingested.log(1)
+    queries_ingested_bytes.log(len(params['query']))
+
     return response(
         status_code=status.HTTP_200_OK,
         message="Successful",
         data=jsonable_encoder(results),
+    )
+
+
+@udt_router.get("/stats")
+@propagate_error
+def udt_query(_=Depends(permissions.verify_read_permission)):
+    """
+    Returns statistics about the deployment such as the number of tokens identified, number of
+    queries ingested, and total size of queries ingested. 
+    """
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Successful",
+        data={
+            "past_hour": {
+                "tokens_identified": tokens_identified.past_hour(),
+                "queries_ingested": queries_ingested.past_hour(),
+                "queries_ingested_bytes": queries_ingested_bytes.past_hour(),
+            },
+            "total": {
+                "tokens_identified": tokens_identified.past_hour(),
+                "queries_ingested": queries_ingested.past_hour(),
+                "queries_ingested_bytes": queries_ingested_bytes.past_hour(),
+            },
+            "uptime": int(time.time() - start_time)
+        }
     )
