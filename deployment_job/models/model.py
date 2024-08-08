@@ -3,6 +3,7 @@ Defines the abstract base class for models.
 """
 
 from abc import ABC, abstractmethod
+import json
 from pathlib import Path
 
 from reporter import Reporter
@@ -30,6 +31,12 @@ class Model(ABC):
             / "data"
         )
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        
+        self.telemetry_path = self.data_dir / "telemetry_logs.json"
+        
+        if not self.telemetry_path.exists():
+            with open(self.telemetry_path, 'w') as f:
+                json.dump([], f)
 
     @abstractmethod
     def predict(self, **kwargs):

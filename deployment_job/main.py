@@ -1,7 +1,8 @@
 import asyncio
 import time
 from functools import wraps
-from multiprocessing import Lock, Manager, Process, Queue
+from queue import Queue
+from threading import Lock, Thread
 from typing import Any
 
 import uvicorn
@@ -11,6 +12,7 @@ from fastapi.responses import JSONResponse
 from reporter import Reporter
 from routers.ndb import create_ndb_router, process_tasks
 from routers.udt import udt_router
+from routers.telemetry import telemetry_router  # Import the telemetry router
 from utils import delete_job
 from variables import GeneralVariables, TypeEnum
 
@@ -74,10 +76,11 @@ async def async_timer() -> None:
 
 
 task_queue = Queue()
-manager = Manager()
-tasks = manager.dict()
+tasks = {}
 task_lock = Lock()
 
+# Include the telemetry router for all deployments
+app.include_router(telemetry_router, prefix=f"/{general_variables.deployment_id}/telemetry")
 
 if general_variables.type == TypeEnum.NDB:
     ndb_router = create_ndb_router(task_queue, task_lock, tasks)
@@ -107,11 +110,13 @@ async def startup_event() -> None:
     try:
         time.sleep(10)
         reporter.update_deploy_status(general_variables.deployment_id, "complete")
-        # if general_variables.type == TypeEnum.NDB:
-        #     process = Process(
-        #         target=process_tasks, args=(task_queue, task_lock, tasks), daemon=True
-        #     )
-        #     process.start()
+        if general_variables.type == TypeEnum.NDB:
+            # TODO(Yash/Kartik): Separate Job for write modifications for NDB.
+            # As we are going with on-disk index we could only have one instance of model with write mode.
+            thread = Thread(
+                target=process_tasks, args=(task_queue, task_lock, tasks), daemon=True
+            )
+            thread.start()
     except Exception as e:
         reporter.update_deploy_status(general_variables.deployment_id, "failed")
         raise e  # Re-raise the exception to propagate it to the main block

@@ -88,7 +88,8 @@ export interface ModelService {
     getChatHistory: () => Promise<ChatMessage[]>;
     chat: (textInput: string) => Promise<ChatResponse>;
     piiDetect(query: string): Promise<PIIDetectionResult>;
-    updatePiiSettings(token_model_id: string, llm_guardrail: boolean): Promise<any>
+    updatePiiSettings(token_model_id: string, llm_guardrail: boolean): Promise<any>;
+    recordEvent(event: TelemetryEvent): Promise<any>;
 }
 
 function sourceName(ref: ReferenceJson) {
@@ -137,6 +138,21 @@ function handleInvalidAuth(modelService: ModelService) {
         return response;
     };
 }
+
+type TelemetryEvent = {
+    UserAction: string // e.g., 'click', 'hover', 'input', etc.
+    UIComponent: string // 'search button' 'model card', etc.
+    UI: string // e.g., 'SelectFileButton', 'SearchBar', etc.
+    data?: any // Additional data for the event, e.g., input value, details about the event, etc.
+}
+
+export type TelemetryEventPackage = {
+    UserName: string // Consistent pseudoname
+    timestamp: string
+    UserMachine: string
+    event: TelemetryEvent
+}
+
 
 export class GlobalModelService implements ModelService {
     url: string;
@@ -689,6 +705,43 @@ export class GlobalModelService implements ModelService {
             .then((res) => res.json())
             .then((response) => response["data"] as ChatResponse);
     }
+
+    async recordEvent(event: TelemetryEvent) {
+        const userName = 'PSEUDONAME UNSET';
+        const timestamp = new Date().toISOString();
+        const userAgent = navigator.userAgent;
+        const machineType = userAgent;
+    
+        const telemetryPackage: TelemetryEventPackage = {
+            UserName: userName,
+            timestamp: timestamp,
+            UserMachine: machineType,
+            event: event
+        };
+    
+        const serializedData = JSON.stringify(telemetryPackage);
+    
+        try {
+            const response = await fetch(this.url + '/telemetry/record-event', {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: serializedData,
+            });
+    
+            if (response.ok) {
+                return response.json();
+            } else {
+                const error = await response.json();
+                throw new Error(error.detail || "Unknown error occurred");
+            }
+        } catch (e) {
+            console.error(e);
+            throw new Error('Failed to record event');
+        }
+    }
+    
 }
 
 export class UserModelService extends GlobalModelService {

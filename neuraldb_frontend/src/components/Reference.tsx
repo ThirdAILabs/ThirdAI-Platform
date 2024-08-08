@@ -214,7 +214,32 @@ export default function Reference({
         <Card $opacity={opacity}>
             <Stripe />
             <TextContainer>
-                <Header onClick={onOpen} target={"_blank"}>
+                <Header onClick={(e)=>{
+                    onOpen(e)
+
+                    // Create a telemetry event
+                    const event = {
+                        UserAction: 'Open Reference Source',
+                        UIComponent: 'Header',
+                        UI: 'Reference',
+                        data: {
+                            id: info.id,
+                            sourceURL: info.sourceURL,
+                            sourceName: info.sourceName,
+                            content: info.content,
+                            metadata: info.metadata
+                        }
+                    };
+
+                    // Record the event
+                    modelService.recordEvent(event)
+                        .then(data => {
+                            console.log("Event recorded successfully:", data);
+                        })
+                        .catch(error => {
+                            console.error("Error recording event:", error);
+                        });
+                }} target={"_blank"}>
                     {info.sourceName}
                     <Spacer $width="10px" />
                     {isReadableSource(info.sourceName) && (

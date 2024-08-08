@@ -245,7 +245,29 @@ export default function SearchBar({
             <SearchArea>
                 <SearchTextInput
                     placeholder="Ask anything..."
-                    onSubmit={() => onSubmit(query, prompt)}
+                    onSubmit={() => {
+                        onSubmit(query, prompt)
+
+                        // Create a telemetry event
+                        const event = {
+                            UserAction: 'Searched query',
+                            UIComponent: 'SearchTextInput',
+                            UI: 'SearchBar',
+                            data: {
+                                query: query
+                            }
+                        };
+
+                        // Record the event
+                        modelService.recordEvent(event)
+                            .then(data => {
+                                console.log("Event recorded successfully:", data);
+                            })
+                            .catch(error => {
+                                console.error("Error recording event:", error);
+                            });
+
+                    }}
                     value={query}
                     setValue={setQuery}
                 />

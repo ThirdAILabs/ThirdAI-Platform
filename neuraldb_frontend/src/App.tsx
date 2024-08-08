@@ -189,7 +189,7 @@ function App() {
         };
 
         updateSettings()
-      }, [modelService, guardRailEndpoint, ifGuardRailOn]);
+    }, [modelService, guardRailEndpoint, ifGuardRailOn]);
 
     useEffect(() => {
         if (modelService) {
