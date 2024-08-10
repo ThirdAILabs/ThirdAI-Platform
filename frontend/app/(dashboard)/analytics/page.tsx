@@ -14,8 +14,20 @@ import {
   UsageFrequencyChart,
   ReformulatedQueriesChart,
 } from './charts';
+import { useEffect, useState } from 'react';
 
 export default function AnalyticsPage() {
+  const [isClient, setIsClient] = useState(false);
+
+  // Ensure that the component only runs on the client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return null;  // Return null on the first render to avoid hydration mismatch
+  }
+
   const usageDurationData = {
     labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
     datasets: [
@@ -69,7 +81,7 @@ export default function AnalyticsPage() {
     datasets: [
       {
         label: 'Reformulated Queries',
-        data: [18, 15, 17, 14, 13, 12, 10],  // Fluctuating but overall downward trend
+        data: [18, 15, 17, 14, 13, 12, 10],
         borderColor: 'rgb(255, 205, 86)',
         backgroundColor: 'rgba(255, 205, 86, 0.2)',
       },
