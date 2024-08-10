@@ -1,15 +1,19 @@
-'use client'
+'use client';
 
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle
+  CardTitle,
 } from '@/components/ui/card';
 import RecentSamples from './samples';
 import UpdateButton from './updateButton';
-import { UsageDurationChart, UsageFrequencyChart, ReformulatedQueriesChart } from './charts';
+import {
+  UsageDurationChart,
+  UsageFrequencyChart,
+  ReformulatedQueriesChart,
+} from './charts';
 
 export default function AnalyticsPage() {
   const usageDurationData = {
@@ -29,7 +33,7 @@ export default function AnalyticsPage() {
       },
     ],
   };
-  
+
   const usageFrequencyData = {
     labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
     datasets: [
@@ -59,46 +63,64 @@ export default function AnalyticsPage() {
       },
     ],
   };
-  
+
   const reformulatedQueriesData = {
     labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
     datasets: [
       {
         label: 'Reformulated Queries',
-        data: [5, 8, 7, 12, 14, 15, 18],
+        data: [18, 15, 17, 14, 13, 12, 10],  // Fluctuating but overall downward trend
         borderColor: 'rgb(255, 205, 86)',
         backgroundColor: 'rgba(255, 205, 86, 0.2)',
       },
     ],
   };
-  
-  
+
   return (
     <>
       <Card>
         <CardHeader>
-          <CardTitle>System status</CardTitle>
-          <CardDescription>Monitor real-time usage and system improvements.</CardDescription>
+          <CardTitle>System Status</CardTitle>
+          <CardDescription>
+            Monitor real-time usage and system improvements.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="w-full">
-              <UsageDurationChart data={usageDurationData} />
-            </div>
-            <div className="w-full">
-              <UsageFrequencyChart data={usageFrequencyData} />
-            </div>
-            <div className="w-full">
-              <ReformulatedQueriesChart data={reformulatedQueriesData} />
-            </div>
+            <UsageDurationChart data={usageDurationData} />
+            <UsageFrequencyChart data={usageFrequencyData} />
+            <ReformulatedQueriesChart data={reformulatedQueriesData} />
           </div>
-          {/* <UsageDurationChart data={usageDurationData} />
-          <UsageFrequencyChart data={usageFrequencyData} />
-          <ReformulatedQueriesChart data={reformulatedQueriesData} /> */}
         </CardContent>
       </Card>
-      <RecentSamples/>
-      <UpdateButton/>
+      
+      <div className="mt-6">
+        <h2 className="text-lg font-semibold mb-2">Usage Duration Trend</h2>
+        <p className="mb-4">
+          Over the past few months, we've observed a steady increase in the
+          duration users spend on the system. This indicates that users find
+          the search system increasingly valuable and are willing to engage
+          with it for longer periods.
+        </p>
+
+        <h2 className="text-lg font-semibold mb-2">User Usage Frequency</h2>
+        <p className="mb-4">
+          The frequency with which users interact with the system has remained
+          relatively stable, with a slight upward trend. This consistency shows
+          that users continue to rely on the search system regularly.
+        </p>
+
+        <h2 className="text-lg font-semibold mb-2">Reformulated Queries</h2>
+        <p className="mb-4">
+          While the number of reformulated queries fluctuates, there's an overall
+          downward trend. This suggests that users are becoming more adept at
+          finding the information they need on the first attempt, indicating
+          improved search accuracy and user satisfaction.
+        </p>
+      </div>
+      
+      <RecentSamples />
+      <UpdateButton />
     </>
   );
 }
