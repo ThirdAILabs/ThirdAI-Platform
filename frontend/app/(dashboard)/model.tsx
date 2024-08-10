@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import Image from 'next/image';
@@ -447,6 +448,7 @@ export function Model({ model, pending }: { model: SelectModel, pending?: boolea
             {
               deployStatus === 'Deployed' && deploymentIdentifier
               &&
+              <>
               <DropdownMenuItem>
                 <form action={deleteModel}>
                   <button type="button"
@@ -471,6 +473,13 @@ export function Model({ model, pending }: { model: SelectModel, pending?: boolea
                   >Undeploy</button>
                 </form>
               </DropdownMenuItem>
+
+              <Link href="/analytics">
+                <DropdownMenuItem>
+                    <button type="button">Usage stats</button>
+                </DropdownMenuItem>
+              </Link>
+              </>
             }
           </DropdownMenuContent>
         </DropdownMenu>
