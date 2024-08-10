@@ -7,6 +7,8 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
+import { associations, reformulations, upvotes } from './mock_samples';
+import useRollingSamples from './rolling';
 
 interface TextPairsProps {
   timestamp: string;
@@ -81,6 +83,10 @@ function Reformulation({
 }
 
 export default function RecentSamples() {
+  const recentUpvotes = useRollingSamples(upvotes, 7, 3);
+  const recentAssociations = useRollingSamples(associations, 7, 3);
+  const recentReformulations = useRollingSamples(reformulations, 4, 2);
+
   return (
     <div
       style={{
@@ -96,43 +102,7 @@ export default function RecentSamples() {
           <CardDescription>The latest user-provided upvotes</CardDescription>
         </CardHeader>
         <CardContent>
-          {[
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              query: 'A nice pair of shoes',
-              upvote: "New Balance Men's 574 Core Sneakers"
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              query: 'A nice pair of shoes',
-              upvote: "New Balance Men's 574 Core Sneakers"
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              query: 'A nice pair of shoes',
-              upvote: "New Balance Men's 574 Core Sneakers"
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              query: 'A nice pair of shoes',
-              upvote: "New Balance Men's 574 Core Sneakers"
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              query: 'A nice pair of shoes',
-              upvote: "New Balance Men's 574 Core Sneakers"
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              query: 'A nice pair of shoes',
-              upvote: "New Balance Men's 574 Core Sneakers"
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              query: 'A nice pair of shoes',
-              upvote: "New Balance Men's 574 Core Sneakers"
-            }
-          ].map(({ timestamp, query, upvote }, idx) => (
+          {recentUpvotes.map(({ timestamp, query, upvote }, idx) => (
             <TextPairs
               key={idx}
               timestamp={timestamp}
@@ -152,43 +122,7 @@ export default function RecentSamples() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {[
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              source: 'A nice pair of shoes',
-              target: "New Balance Men's 574 Core Sneakers"
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              source: 'A nice pair of shoes',
-              target: "New Balance Men's 574 Core Sneakers"
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              source: 'A nice pair of shoes',
-              target: "New Balance Men's 574 Core Sneakers"
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              source: 'A nice pair of shoes',
-              target: "New Balance Men's 574 Core Sneakers"
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              source: 'A nice pair of shoes',
-              target: "New Balance Men's 574 Core Sneakers"
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              source: 'A nice pair of shoes',
-              target: "New Balance Men's 574 Core Sneakers"
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              source: 'A nice pair of shoes',
-              target: "New Balance Men's 574 Core Sneakers"
-            }
-          ].map(({ timestamp, source, target }, idx) => (
+          {recentAssociations.map(({ timestamp, source, target }, idx) => (
             <TextPairs
               key={idx}
               timestamp={timestamp}
@@ -208,55 +142,16 @@ export default function RecentSamples() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {[
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              original: 'A nice pair of shoes',
-              reformulations: [
-                'Shoes that are trendy',
-                'Shoes that people like',
-                'Great shoes for running',
-                'Shoes that look good'
-              ]
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              original: 'A nice pair of shoes',
-              reformulations: [
-                'Shoes that are trendy',
-                'Shoes that people like',
-                'Great shoes for running',
-                'Shoes that look good'
-              ]
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              original: 'A nice pair of shoes',
-              reformulations: [
-                'Shoes that are trendy',
-                'Shoes that people like',
-                'Great shoes for running',
-                'Shoes that look good'
-              ]
-            },
-            {
-              timestamp: 'Aug 9, 2024 at 12:31 AM',
-              original: 'A nice pair of shoes',
-              reformulations: [
-                'Shoes that are trendy',
-                'Shoes that people like',
-                'Great shoes for running',
-                'Shoes that look good'
-              ]
-            }
-          ].map(({ timestamp, original, reformulations }, idx) => (
-            <Reformulation
-              key={idx}
-              timestamp={timestamp}
-              original={original}
-              reformulations={reformulations}
-            />
-          ))}
+          {recentReformulations.map(
+            ({ timestamp, original, reformulations }, idx) => (
+              <Reformulation
+                key={idx}
+                timestamp={timestamp}
+                original={original}
+                reformulations={reformulations}
+              />
+            )
+          )}
         </CardContent>
       </Card>
     </div>
