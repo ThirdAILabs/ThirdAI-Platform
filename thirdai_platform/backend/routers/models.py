@@ -1,6 +1,7 @@
 import os
 import uuid
 from typing import Annotated, Dict, Optional, Union
+from datetime import datetime
 
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import (
@@ -16,6 +17,7 @@ from backend.utils import (
     get_model_from_identifier,
     response,
     validate_name,
+    get_deployment,
 )
 from database import schema
 from database.session import get_session
@@ -1068,11 +1070,13 @@ def update_model(
         published_date=model.published_date,
         default_permission=model.default_permission,
         parent_id=model.parent_id,
-        parent_deployment_id=model.parent_deployment_id,
         user_id=model.user_id,
         team_id=model.team_id
     )
+    model.published_date = datetime.utcnow().isoformat()
     session.add(new_model)
+    deployment = get_deployment(session, old_model_name, model.user_id, model.id)
+    deployment.name = f"{deployment.name}-updated"
     session.commit()
 
     

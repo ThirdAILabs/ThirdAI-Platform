@@ -474,7 +474,7 @@ export function Model({ model, pending }: { model: SelectModel, pending?: boolea
                 </form>
               </DropdownMenuItem>
 
-              <Link href="/analytics">
+              <Link href={`/analytics?id=${encodeURIComponent(`${model.username}/${model.model_name}`)}`}>
                 <DropdownMenuItem>
                     <button type="button">Usage stats</button>
                 </DropdownMenuItem>

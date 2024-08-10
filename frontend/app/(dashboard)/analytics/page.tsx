@@ -8,11 +8,9 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import RecentSamples from './samples';
-import { Button } from '@/components/ui/button';
 import UpdateButton from './updateButton';
 
 export default function AnalyticsPage() {
-
   return (
     <>
       <Card>

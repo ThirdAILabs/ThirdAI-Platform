@@ -95,7 +95,7 @@ export function ModelsTable() {
               <TableHead>Name</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="hidden md:table-cell">Type</TableHead>
-              <TableHead className="hidden md:table-cell">Published at</TableHead>
+              <TableHead className="hidden md:table-cell">Published on</TableHead>
               <TableHead className="hidden md:table-cell">Description</TableHead>
               <TableHead className="hidden md:table-cell">Endpoint</TableHead>
               <TableHead className="hidden md:table-cell">Deploy</TableHead>
