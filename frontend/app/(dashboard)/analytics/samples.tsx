@@ -83,9 +83,26 @@ function Reformulation({
 }
 
 export default function RecentSamples() {
-  const recentUpvotes = useRollingSamples(upvotes, 7, 3);
-  const recentAssociations = useRollingSamples(associations, 7, 3);
-  const recentReformulations = useRollingSamples(reformulations, 4, 2);
+  const recentUpvotes = useRollingSamples(
+    /* samples= */ upvotes,
+    /* numSamples= */ 7,
+    /* maxNewSamples= */ 3,
+    /* probabilityNewSamples= */ 0.2,
+    /* intervalSeconds= */ 2);
+  
+  const recentAssociations = useRollingSamples(
+    /* samples= */ associations,
+    /* numSamples= */ 7,
+    /* maxNewSamples= */ 3,
+    /* probabilityNewSamples= */ 0.1,
+    /* intervalSeconds= */ 3);
+  
+  const recentReformulations = useRollingSamples(
+    /* samples= */ reformulations,
+    /* numSamples= */ 4,
+    /* maxNewSamples= */ 2,
+    /* probabilityNewSamples= */ 0.4,
+    /* intervalSeconds= */ 2);
 
   return (
     <div

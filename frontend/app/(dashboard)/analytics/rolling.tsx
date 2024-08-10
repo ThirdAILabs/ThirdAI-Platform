@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react';
 export default function useRollingSamples<T>(
   samples: T[],
   numSamples: number,
-  numNewSamples: number,
+  maxNewSamples: number,
+  probabilityNewSamples: number,
+  intervalSeconds: number,
 ): (T & { timestamp: string })[] {
   const randomSamples = (sampleSize: number): T[] => {
     const result: T[] = [];
@@ -44,9 +46,14 @@ export default function useRollingSamples<T>(
   };
 
   const rollSamples = () => {
+    const randomNum = Math.random();
+    let numNewSamples = 0;
+    if (randomNum < probabilityNewSamples) {
+      numNewSamples = Math.ceil((maxNewSamples / probabilityNewSamples) * randomNum);
+    }
     setRollingSamples((prev) =>
       [
-        ...addTimes(randomSamples(numNewSamples), 1),
+        ...addTimes(randomSamples(numNewSamples), intervalSeconds - 1),
         ...prev
       ].slice(0, numSamples)
     );
@@ -54,10 +61,10 @@ export default function useRollingSamples<T>(
 
   const [rollingSamples, setRollingSamples] = useState<
     (T & { timestamp: string })[]
-  >(addTimes(randomSamples(numSamples), 10));
+  >(addTimes(randomSamples(numSamples), 100));
 
   useEffect(() => {
-    const intervalId = setInterval(rollSamples, 2000);
+    const intervalId = setInterval(rollSamples, intervalSeconds * 1000);
 
     // Cleanup function to clear the interval when the component unmounts
     return () => clearInterval(intervalId);
