@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
-from .utils import login, auth_header, create_user, global_admin_token
+
+from .utils import auth_header, create_user, global_admin_token, login
 
 pytestmark = [pytest.mark.unit]
 

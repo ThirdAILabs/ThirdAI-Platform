@@ -1,7 +1,8 @@
-from sqlalchemy import create_engine, text, NullPool
 import os
 import random
+
 import pytest
+from sqlalchemy import NullPool, create_engine, text
 
 
 @pytest.fixture(autouse=True, scope="session")
