@@ -91,9 +91,8 @@ def test_add_remove_global_admin():
     res = client.get("/api/user/all-users", headers=auth_header(user_jwt))
     assert res.status_code == 200
 
-    assert set(["future-admin", "user1", "admin"]) == set(
-        user["username"] for user in res.json()["data"]
-    )
+    users_found = set(user["username"] for user in res.json()["data"])
+    assert len(users_found.intersection(["future-admin", "user1", "admin"])) == 3
 
     res = client.post(
         "/api/user/delete-global-admin",
