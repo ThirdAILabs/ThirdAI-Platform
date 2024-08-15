@@ -1,6 +1,5 @@
 import json
 import os
-import subprocess
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -13,7 +12,6 @@ from auth.jwt import (
     verify_access_token_no_throw,
 )
 from backend.auth_dependencies import is_model_owner
-from backend.file_handler import S3StorageHandler
 from backend.utils import (
     delete_nomad_job,
     get_empty_port,
@@ -33,7 +31,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from licensing.verify.verify_license import valid_job_allocation, verify_license
 from pydantic import BaseModel
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 deploy_router = APIRouter()
 

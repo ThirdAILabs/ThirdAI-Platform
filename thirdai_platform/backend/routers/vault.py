@@ -2,7 +2,7 @@ import hvac
 from auth.jwt import verify_access_token
 from backend.auth_dependencies import get_vault_client, global_admin_only
 from backend.utils import response
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 vault_router = APIRouter()

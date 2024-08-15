@@ -548,30 +548,6 @@ def update_json_list(current_list, new_dict):
     return json.dumps(current_list)
 
 
-def get_deployment(session: Session, deployment_name, deployment_user_id, model_id):
-    """
-    Get a deployment by name, user ID, and model ID.
-
-    Parameters:
-    - session: SQLAlchemy session.
-    - deployment_name: The name of the deployment.
-    - deployment_user_id: The user ID of the deployment owner.
-    - model_id: The model ID.
-
-    Returns:
-    - schema.Deployment: The deployment object if found, otherwise None.
-    """
-    return (
-        session.query(schema.Deployment)
-        .filter(
-            schema.Deployment.name == deployment_name,
-            schema.Deployment.user_id == deployment_user_id,
-            schema.Deployment.model_id == model_id,
-        )
-        .first()
-    )
-
-
 def model_accessible(model: schema.Model, user: schema.User) -> bool:
     """
     Check if a model is accessible to a user.
@@ -672,3 +648,12 @@ def get_expiry_min(size: int):
     Taking an average speed of 300 to 400 KB/s we give an extra 60 min for every 1.5GB.
     """
     return 60 * (1 + math.floor(size / 1500))
+
+
+def list_workflow_models(workflow: schema.Workflow):
+    models_info = []
+    for workflow_model in workflow.workflow_models:
+        model_info = get_high_level_model_info(workflow_model.model)
+        model_info["component"] = workflow_model.component  # Append the component info
+        models_info.append(model_info)
+    return models_info

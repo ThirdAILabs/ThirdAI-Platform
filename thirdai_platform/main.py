@@ -13,7 +13,10 @@ from backend.routers.team import team_router as team
 from backend.routers.train import train_router as train
 from backend.routers.user import user_router as user
 from backend.routers.vault import vault_router as vault
+from backend.routers.workflow import workflow_router as workflow
 from backend.utils import restart_generate_job
+from database.session import get_session
+from database.utils import initialize_default_workflow_types
 from fastapi.middleware.cors import CORSMiddleware
 
 app = fastapi.FastAPI()
@@ -30,6 +33,7 @@ app.include_router(user, prefix="/api/user", tags=["user"])
 app.include_router(train, prefix="/api/train", tags=["train"])
 app.include_router(model, prefix="/api/model", tags=["model"])
 app.include_router(deploy, prefix="/api/deploy", tags=["deploy"])
+app.include_router(workflow, prefix="/api/workflow", tags=["workflow"])
 app.include_router(vault, prefix="/api/vault", tags=["vault"])
 app.include_router(team, prefix="/api/team", tags=["team"])
 app.include_router(recovery, prefix="/api/recovery", tags=["recovery"])
@@ -41,6 +45,10 @@ async def startup_event():
         print("Starting Generation Job...")
         await restart_generate_job()
         print("Successfully started Generation Job!")
+        print("Adding default workflow types")
+        with next(get_session()) as session:
+            initialize_default_workflow_types(session)
+        print("Added workflow types")
     except Exception as error:
         print(f"Failed to start the Generation Job : {error}", file=sys.stderr)
 

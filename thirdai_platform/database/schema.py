@@ -40,10 +40,18 @@ class Access(enum.Enum):
     protected = "protected"
     public = "public"
 
+    def restrictiveness(self):
+        order = {"public": 0, "protected": 1, "private": 2}
+        return order[self.value]
+
 
 class Permission(enum.Enum):
     read = "read"
     write = "write"
+
+    def restrictiveness(self):
+        order = {"read": 0, "write": 1}
+        return order[self.value]
 
 
 class Team(SQLDeclarativeBase):
@@ -84,6 +92,9 @@ class User(SQLDeclarativeBase):
     )
     models = relationship("Model", back_populates="user", cascade="all, delete-orphan")
     logs = relationship("Log", back_populates="user", cascade="all, delete-orphan")
+    workflows = relationship(
+        "Workflow", back_populates="user", cascade="all, delete-orphan"
+    )
     model_permissions = relationship(
         "ModelPermission", back_populates="user", cascade="all, delete-orphan"
     )
@@ -292,5 +303,117 @@ class Log(SQLDeclarativeBase):
         Index("log_user_index", "user_id"),
         UniqueConstraint(
             "model_id", "user_id", "action", name="unique_model_user_action"
+        ),
+    )
+
+
+class WorkflowType(SQLDeclarativeBase):
+    __tablename__ = "workflow_types"
+
+    id = Column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    name = Column(String(256), nullable=False, unique=True)
+    description = Column(String(512), nullable=True)
+    model_requirements = Column(JSON, nullable=False)
+
+
+class Workflow(SQLDeclarativeBase):
+    __tablename__ = "workflows"
+
+    id = Column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    name = Column(String(256), nullable=False)
+    type_id = Column(
+        UUID(as_uuid=True), ForeignKey("workflow_types.id"), nullable=False
+    )
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    status = Column(ENUM(Status), nullable=False, default=Status.not_started)
+
+    user = relationship("User", back_populates="workflows")
+    workflow_models = relationship(
+        "WorkflowModel", back_populates="workflow", cascade="all, delete-orphan"
+    )
+    workflow_type = relationship("WorkflowType")
+
+    __table_args__ = (
+        UniqueConstraint("name", "user_id", name="unique_workflow_name_user"),
+    )
+
+    def can_access(self, user) -> bool:
+        """
+        Determines if the given user can access this workflow based on the most restrictive model.
+
+        Args:
+            user (User): The user whose access is to be checked.
+
+        Returns:
+            bool: True if the user can access the workflow, False otherwise.
+        """
+        most_restrictive_access = Access.public  # Start with the least restrictive
+        required_teams = set()  # To track teams associated with protected models
+
+        for workflow_model in self.workflow_models:
+            model = workflow_model.model
+            model_access = model.access_level
+
+            if (
+                model_access.restrictiveness()
+                > most_restrictive_access.restrictiveness()
+            ):
+                most_restrictive_access = model_access
+                required_teams.clear()  # Clear teams as we're now dealing with a new, more restrictive level
+
+            if model_access == Access.protected:
+                required_teams.add(model.team_id)
+
+        # Based on the most restrictive access, check if the user can access
+        if most_restrictive_access == Access.public:
+            return True
+        elif most_restrictive_access == Access.protected:
+            # Check if the user is part of all required teams or is a global admin
+            return (
+                all(
+                    any(ut.team_id == team_id for ut in user.teams)
+                    for team_id in required_teams
+                )
+                or user.is_global_admin()
+            )
+        elif most_restrictive_access == Access.private:
+            return model.user_id == user.id or user.is_global_admin()
+
+        return False
+
+
+# Many to Many relationship for workflow and models.
+class WorkflowModel(SQLDeclarativeBase):
+    __tablename__ = "workflow_models"
+
+    workflow_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("workflows.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    model_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("models.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    component = Column(String(256), nullable=False, primary_key=True)
+
+    workflow = relationship("Workflow", back_populates="workflow_models")
+    model = relationship("Model")
+
+    __table_args__ = (
+        Index("workflow_model_index", "workflow_id"),
+        Index("model_workflow_index", "model_id"),
+        UniqueConstraint(
+            "workflow_id",
+            "model_id",
+            "component",
+            name="unique_workflow_model_component",
         ),
     )

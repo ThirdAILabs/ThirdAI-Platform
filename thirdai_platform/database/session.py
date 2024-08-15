@@ -1,12 +1,10 @@
 import os
 from contextlib import contextmanager
 
-import bcrypt
 from backend.utils import hash_password
 from database import schema
 from database.schema import SQLDeclarativeBase as Base
 from sqlalchemy import create_engine
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 db_uri = os.getenv("DATABASE_URI")

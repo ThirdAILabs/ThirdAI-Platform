@@ -204,4 +204,4 @@ def main() -> None:
 ### Example Command
 
 ```sh
-python main.py --branch test --config config.yaml --version 1.0.0
+python push.py --branch test --config config.yaml --version 1.0.0

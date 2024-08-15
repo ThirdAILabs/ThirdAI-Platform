@@ -178,6 +178,8 @@ class DAGExecutor:
             for param, source in task_params.items():
                 if source == "variable":
                     inputs[param] = self.variables[dag_name][config_name][param]
+                elif param == "config":
+                    inputs[param] = get_configs(Config, source)[0]
                 elif source in self.outputs[dag_name][config_name]:
                     inputs[param] = self.outputs[dag_name][config_name][source]
                 else:

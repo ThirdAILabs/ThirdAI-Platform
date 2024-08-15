@@ -61,7 +61,7 @@ Without this process, it is cumbersome to test out platform changes. We would ha
 10. **Configure Environment:**
    - Navigate back to the `thirdai_platform` directory. Modify `.env.example` to match your local setup for the   following values and save it as `.env`.
       - Change `DATABASE_URI` to be your local postgresql database connection string
-      - Change `PUBLIC_MODEL_BAZAAR_ENDPOINT` and `PRIVATE_MODEL_BAZAAR_ENDPOINT` to be "http://localhost:80/" (make sure to include the trailing /)
+      - Change `PUBLIC_MODEL_BAZAAR_ENDPOINT` and `PRIVATE_MODEL_BAZAAR_ENDPOINT` to be "http://localhost:8000/" (make sure to include the trailing /)
       - Change `NOMAD_ENDPOINT` to "http://localhost:4646/"
       - Change `LICENSE_PATH` to point to your Rag on Rails license (look below for how to create a license file)
       - Change `SHARE_DIR` to point to an empty directory where all models and files will be saved

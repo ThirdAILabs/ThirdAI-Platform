@@ -115,21 +115,30 @@ def list_models(
     )
 
     if not user.is_global_admin():
-        access_conditions = [schema.Model.access_level == schema.Access.public]
-        if schema.Access.protected in access_level:
-            access_conditions.append(
-                and_(
-                    schema.Model.access_level == schema.Access.protected,
-                    schema.Model.team_id.in_(user_teams),
-                )
-            )
-        if schema.Access.private in access_level:
-            access_conditions.append(
-                and_(
-                    schema.Model.access_level == schema.Access.private,
-                    schema.Model.user_id == user.id,
-                )
-            )
+        access_conditions = []
+
+        def add_access_condition(access, condition):
+            if not access_level or access in access_level:
+                access_conditions.append(condition)
+
+        # Adding access conditions based on the user's role and teams
+        add_access_condition(
+            schema.Access.public, schema.Model.access_level == schema.Access.public
+        )
+        add_access_condition(
+            schema.Access.protected,
+            and_(
+                schema.Model.access_level == schema.Access.protected,
+                schema.Model.team_id.in_(user_teams),
+            ),
+        )
+        add_access_condition(
+            schema.Access.private,
+            and_(
+                schema.Model.access_level == schema.Access.private,
+                schema.Model.user_id == user.id,
+            ),
+        )
 
         query = query.filter(or_(*access_conditions))
 
