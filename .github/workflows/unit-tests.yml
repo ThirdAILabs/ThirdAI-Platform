@@ -22,26 +22,92 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+
       - name: install dependencies
         run: |
           pip3 install -r thirdai_platform/requirements.txt
           pip3 install pytest
-      - name: setup environment
-        run: cp thirdai_platform/tests/.env thirdai_platform
-      - name: install nomad and vault
+
+      - name: Install Nomad
         run: |
-          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          sudo apt-get update && sudo apt-get install -y wget gpg
+          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor > /usr/share/keyrings/hashicorp-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt update && sudo apt install nomad vault
-          sudo nomad agent -dev -config="local_setup/agent.hcl" &
-      - name: setup traefik
+          sudo apt-get update && sudo apt-get install -y nomad
+
+
+      - name: Start Nomad in Development Mode
+        run: |
+          nohup sudo nomad agent -dev -config="local_setup/agent.hcl" > nomad.log 2>&1 &
+          echo "NOMAD_ENDPOINT=http://localhost:4646/" >> $GITHUB_ENV
+      
+      - name: Verify Nomad Cluster
+        run: sleep 10 && nomad node status
+
+      - name: Install Traefik
         run: |
           wget https://github.com/traefik/traefik/releases/download/v3.1.2/traefik_v3.1.2_linux_amd64.tar.gz
-          tar -xf traefik_v3.1.2_linux_amd64.tar.gz
-          bash local_setup/launch_traefik.sh &
-      - name: setup postgresql 
+          sudo tar -xf traefik_v3.1.2_linux_amd64.tar.gz -C /usr/local/bin
+
+      - name: Run Traefik
         run: |
-          sudo apt install postgresql
+          cd local_setup
+          nohup sudo bash launch_traefik.sh > traefik.log 2>&1 &
+          cd ..
+          echo "PUBLIC_MODEL_BAZAAR_ENDPOINT=http://localhost:80/" >> $GITHUB_ENV
+          echo "PRIVATE_MODEL_BAZAAR_ENDPOINT=http://localhost:80/" >> $GITHUB_ENV
+
+      - name: Install PostgreSQL
+        run: |
+          sudo apt install curl ca-certificates
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          sudo apt update
+          sudo apt -y install postgresql
+
+      - name: Start PostgreSQL Service
+        run: sudo systemctl start postgresql
+
+      - name: Setup PostgreSQL Database
+        run: |
+          sleep 30 #TODO(pratik): check status here
+          sudo -u postgres psql -c "SELECT 1"
+          sudo -u postgres psql -c "CREATE ROLE postgres WITH LOGIN SUPERUSER;" || true
+          sudo -u postgres psql -c "ALTER ROLE postgres WITH PASSWORD 'password';"
+          sudo -u postgres psql -c "CREATE DATABASE model_bazaar;"
+          sudo -u postgres psql -d model_bazaar -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+          echo "DATABASE_URI=postgresql://postgres:password@localhost:5432/model_bazaar" >> $GITHUB_ENV
+
+      - name: Install Vault
+        run: |
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+          sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+          sudo apt-get update
+          sudo apt-get install -y vault
+          echo "HASHICORP_VAULT_ENDPOINT=http://127.0.0.1:8200" >> $GITHUB_ENV
+          echo "HASHICORP_VAULT_TOKEN=00000000-0000-0000-0000-000000000000" >> $GITHUB_ENV
+
+      - name: Start Vault Server
+        run: nohup vault server --dev --dev-root-token-id="00000000-0000-0000-0000-000000000000" > vault.log 2>&1 &
+
+      - name: Create Directories for Share and Test
+        run: |
+          mkdir -p $HOME/nfs/dir
+          echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_ENV
+
+      - name: Setup additional environment variables
+        run: |
+          echo "LICENSE_PATH=${{ github.workspace }}/thirdai_platform/tests/ndb_enterprise_license.json" >> $GITHUB_ENV
+          echo "JWT_SECRET=CsnCr3lebs9eJQ" >> $GITHUB_ENV
+          echo "SENDGRID_KEY=sendgrid-key" >> $GITHUB_ENV
+          echo "GENAI_KEY=your-openai-key" >> $GITHUB_ENV
+          echo "ADMIN_USERNAME=admin" >> $GITHUB_ENV
+          echo "ADMIN_MAIL=admin@mail.com" >> $GITHUB_ENV
+          echo "ADMIN_PASSWORD=password" >> $GITHUB_ENV
+          echo "PLATFORM=local" >> $GITHUB_ENV
+          echo "TEST_ENVIRONMENT=True" >> $GITHUB_ENV
+
       - name: run unit tests
         run: |
           python3 -m pytest ./thirdai_platform/tests -v
