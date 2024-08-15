@@ -6,7 +6,7 @@ import pytest
 
 @pytest.fixture(autouse=True, scope="session")
 def initialize_database():
-    db_uri = "postgresql://postgres:password@localhost:5432"
+    db_uri = os.environ["DB_BASE_URI"]
     db_name = f"model_bazaar_{random.randint(0, 1e6)}"
 
     eng = create_engine(db_uri, isolation_level="AUTOCOMMIT", poolclass=NullPool)
