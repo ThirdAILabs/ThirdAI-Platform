@@ -1,0 +1,47 @@
+name: Unit Tests
+
+# Kills old jobs from the same pr if we push a new commit
+# See https://stackoverflow.com/questions/66335225/how-to-cancel-previous-runs-in-the-pr-when-you-push-new-commitsupdate-the-curre
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: install dependencies
+        run: |
+          pip3 install -r thirdai_platform/requirements.txt
+          pip3 install pytest
+      - name: setup environment
+        run: cp thirdai_platform/tests/.env thirdai_platform
+      - name: install nomad and vault
+        run: |
+          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt update && sudo apt install nomad vault
+          sudo nomad agent -dev -config="local_setup/agent.hcl" &
+      - name: setup traefik
+        run: |
+          wget https://github.com/traefik/traefik/releases/download/v3.1.2/traefik_v3.1.2_linux_amd64.tar.gz
+          tar -xf traefik_v3.1.2_linux_amd64.tar.gz
+          bash local_setup/launch_traefik.sh &
+      - name: setup postgresql 
+        run: |
+          sudo apt install postgresql
+      - name: run unit tests
+        run: |
+          python3 -m pytest ./thirdai_platform/tests -v

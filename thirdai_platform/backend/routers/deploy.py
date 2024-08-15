@@ -12,7 +12,7 @@ from auth.jwt import (
     verify_access_token,
     verify_access_token_no_throw,
 )
-from backend.auth_dependencies import is_model_owner, verify_model_access
+from backend.auth_dependencies import is_model_owner
 from backend.file_handler import S3StorageHandler
 from backend.utils import (
     delete_nomad_job,
