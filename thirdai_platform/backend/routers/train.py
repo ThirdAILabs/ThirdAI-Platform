@@ -20,13 +20,13 @@ from backend.utils import (
     UDTExtraOptions,
     get_model,
     get_model_from_identifier,
+    get_nomad_job,
     get_platform,
     get_python_path,
     get_root_absolute_path,
     logger,
     response,
     submit_nomad_job,
-    get_nomad_job,
     update_json,
     validate_name,
 )
@@ -276,16 +276,6 @@ def train_ndb(
             type="ndb",
             sub_type="single" if not sharded else "shard_allocation",
         )
-
-        import time
-        for i in range(10):
-            x = get_nomad_job(new_model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT"))
-            time.sleep(0.1)
-            if x is None:
-                print("response is none at i = ", i)
-            else:
-                print("response is NOT none at i = ", i)
-                break
 
         new_model.train_status = schema.Status.starting
         session.commit()
@@ -901,21 +891,21 @@ def sync_model_bazaar(
     models: list[schema.Model] = session.query(schema.Model).all()
 
     for model in models:
-        print("model id", model.id)
-        print("model train status", model.train_status)
-        print("model deploy status", model.deploy_status)
-        model_data = get_nomad_job(f"train-{model.id}", os.getenv("NOMAD_ENDPOINT"))
-        print("model data", model_data)
-
-    for model in models:
-        if model.train_status == schema.Status.starting or model.train_status == schema.Status.in_progress:
-            model_data = get_nomad_job(model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT"))
+        if (
+            model.train_status == schema.Status.starting
+            or model.train_status == schema.Status.in_progress
+        ):
+            model_data = get_nomad_job(
+                model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT")
+            )
             if not model_data or model_data["Status"] == "dead":
                 model.train_status = schema.Status.failed
 
         if model.deploy_status == schema.Status.starting:
-            deployment_data = get_nomad_job(model.get_deployment_name(), os.getenv("NOMAD_ENDPOINT"))
-            if not deployment_data or deployment_data["Status"] == "dead" or deployment_data["Status"] == "running":
+            deployment_data = get_nomad_job(
+                model.get_deployment_name(), os.getenv("NOMAD_ENDPOINT")
+            )
+            if not deployment_data or deployment_data["Status"] == "dead":
                 model.deploy_status = schema.Status.failed
 
     session.commit()

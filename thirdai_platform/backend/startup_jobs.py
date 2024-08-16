@@ -1,7 +1,15 @@
 import os
 from pathlib import Path
 
-from backend.utils import nomad_job_exists, delete_nomad_job, get_platform, submit_nomad_job, get_empty_port, get_python_path, get_root_absolute_path
+from backend.utils import (
+    delete_nomad_job,
+    get_empty_port,
+    get_platform,
+    get_python_path,
+    get_root_absolute_path,
+    nomad_job_exists,
+    submit_nomad_job,
+)
 
 GENERATE_JOB_ID = "llm-generation"
 

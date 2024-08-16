@@ -1,8 +1,9 @@
 import os
 import time
-import requests
+from typing import Dict, Optional
 from urllib.parse import urljoin
-from typing import Optional, Dict
+
+import requests
 
 
 def make_request(api: str, method: str, suffix: str, *args, **kwargs) -> Optional[Dict]:
@@ -32,9 +33,7 @@ def make_request(api: str, method: str, suffix: str, *args, **kwargs) -> Optiona
         raise exception
 
 
-# TODO can we make this interval a configurable option?
-# TODO how do we break out of here? is the only way to do it to kill the job?
-def sync_status(interval_seconds = 15):
+def sync_status(interval_seconds=15):
     backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
 
     if backend_endpoint is None:
@@ -42,8 +41,6 @@ def sync_status(interval_seconds = 15):
 
     while True:
         time.sleep(interval_seconds)
-
-        print("HAHAHAHAHAHA LETS GO", flush=True)
 
         content = make_request(
             api=backend_endpoint,
@@ -55,5 +52,4 @@ def sync_status(interval_seconds = 15):
 
 
 if __name__ == "__main__":
-    print("IN SYNC STATUS JOB", flush=True)
     sync_status()

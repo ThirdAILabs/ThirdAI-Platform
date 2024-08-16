@@ -233,7 +233,7 @@ def deploy_model(
 
     work_dir = os.getcwd()
     platform = get_platform()
-    
+
     try:
         submit_nomad_job(
             str(Path(work_dir) / "backend" / "nomad_jobs" / "deployment_job.hcl.j2"),
