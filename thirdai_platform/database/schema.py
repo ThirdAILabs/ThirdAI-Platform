@@ -187,6 +187,7 @@ class Model(SQLDeclarativeBase):
         "ModelPermission", back_populates="model", cascade="all, delete-orphan"
     )
 
+    # TODO support sharded model names
     def get_train_job_name(self):
         return f"train-{self.id}-{self.type}-{self.sub_type}"
 

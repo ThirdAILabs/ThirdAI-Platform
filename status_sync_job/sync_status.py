@@ -42,13 +42,11 @@ def sync_status(interval_seconds=15):
     while True:
         time.sleep(interval_seconds)
 
-        content = make_request(
+        make_request(
             api=backend_endpoint,
             method="post",
             suffix="api/train/sync-status",
         )
-
-        print(content)
 
 
 if __name__ == "__main__":
