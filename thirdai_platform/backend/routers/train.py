@@ -26,6 +26,7 @@ from backend.utils import (
     logger,
     response,
     submit_nomad_job,
+    get_nomad_job,
     update_json,
     validate_name,
 )
@@ -232,26 +233,26 @@ def train_ndb(
         else False
     )
 
+    new_model = schema.Model(
+        id=model_id,
+        user_id=user.id,
+        train_status=schema.Status.not_started,
+        deploy_status=schema.Status.not_started,
+        name=model_name,
+        type="ndb",
+        sub_type="single" if not sharded else "sharded",
+        domain=user.domain,
+        access_level=schema.Access.private,
+        parent_id=base_model.id if base_model else None,
+    )
+
+    session.add(new_model)
+    session.commit()
+    session.refresh(new_model)
+
+    work_dir = os.getcwd()
+
     try:
-        new_model = schema.Model(
-            id=model_id,
-            user_id=user.id,
-            train_status=schema.Status.not_started,
-            deploy_status=schema.Status.not_started,
-            name=model_name,
-            type="ndb",
-            sub_type="single" if not sharded else "sharded",
-            domain=user.domain,
-            access_level=schema.Access.private,
-            parent_id=base_model.id if base_model else None,
-        )
-
-        session.add(new_model)
-        session.commit()
-        session.refresh(new_model)
-
-        work_dir = os.getcwd()
-
         submit_nomad_job(
             str(Path(work_dir) / "backend" / "nomad_jobs" / "train_job.hcl.j2"),
             nomad_endpoint=os.getenv("NOMAD_ENDPOINT"),
@@ -276,6 +277,18 @@ def train_ndb(
             sub_type="single" if not sharded else "shard_allocation",
         )
 
+        import time
+        for i in range(10):
+            x = get_nomad_job(new_model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT"))
+            time.sleep(0.1)
+            if x is None:
+                print("response is none at i = ", i)
+            else:
+                print("response is NOT none at i = ", i)
+                break
+
+        new_model.train_status = schema.Status.starting
+        session.commit()
     except Exception as err:
         # TODO: change the status of the new model entry to failed
 
@@ -452,29 +465,29 @@ def train_udt(
                 message=str(error),
             )
 
+    new_model: schema.Model = schema.Model(
+        id=model_id,
+        user_id=user.id,
+        train_status=schema.Status.not_started,
+        deploy_status=schema.Status.not_started,
+        name=model_name,
+        type="udt",
+        sub_type=extra_options["sub_type"],
+        domain=user.email.split("@")[1],
+        access_level=schema.Access.private,
+        parent_id=base_model.id if base_model else None,
+    )
+
+    session.add(new_model)
+    session.commit()
+    session.refresh(new_model)
+
+    work_dir = os.getcwd()
+
+    udt_subtype = extra_options["sub_type"]
+    extra_options.pop("sub_type", None)
+
     try:
-        new_model: schema.Model = schema.Model(
-            id=model_id,
-            user_id=user.id,
-            train_status=schema.Status.not_started,
-            deploy_status=schema.Status.not_started,
-            name=model_name,
-            type="udt",
-            sub_type=extra_options["sub_type"],
-            domain=user.email.split("@")[1],
-            access_level=schema.Access.private,
-            parent_id=base_model.id if base_model else None,
-        )
-
-        session.add(new_model)
-        session.commit()
-        session.refresh(new_model)
-
-        work_dir = os.getcwd()
-
-        udt_subtype = extra_options["sub_type"]
-        extra_options.pop("sub_type", None)
-
         submit_nomad_job(
             str(Path(work_dir) / "backend" / "nomad_jobs" / "train_job.hcl.j2"),
             nomad_endpoint=os.getenv("NOMAD_ENDPOINT"),
@@ -499,6 +512,8 @@ def train_udt(
             sub_type=udt_subtype,
         )
 
+        new_model.train_status = schema.Status.starting
+        session.commit()
     except Exception as err:
         # TODO: change the status of the new model entry to failed
         logger.info(str(err))
@@ -698,17 +713,17 @@ def create_shard(
             message=f"License is not valid. {str(e)}",
         )
 
+    new_shard: schema.ModelShard = schema.ModelShard(
+        model_id=model_id,
+        shard_num=shard_num,
+        train_status=schema.Status.not_started,
+    )
+    session.add(new_shard)
+    session.commit()
+
+    work_dir = os.getcwd()
+
     try:
-        new_shard: schema.ModelShard = schema.ModelShard(
-            model_id=model_id,
-            shard_num=shard_num,
-            train_status=schema.Status.not_started,
-        )
-        session.add(new_shard)
-        session.commit()
-
-        work_dir = os.getcwd()
-
         submit_nomad_job(
             str(Path(work_dir) / "backend" / "nomad_jobs" / "train_job.hcl.j2"),
             nomad_endpoint=os.getenv("NOMAD_ENDPOINT"),
@@ -732,6 +747,8 @@ def create_shard(
             shard_num=shard_num,
         )
 
+        new_shard.train_status = schema.Status.starting
+        session.commit()
     except Exception as err:
         logger.info(str(err))
         return response(
@@ -875,3 +892,32 @@ def model_shard_train_status(
         message="Successfully got the train status.",
         data=jsonable_encoder(results),
     )
+
+
+@train_router.post("/sync-status")
+def sync_model_bazaar(
+    session: Session = Depends(get_session),
+):
+    models: list[schema.Model] = session.query(schema.Model).all()
+
+    for model in models:
+        print("model id", model.id)
+        print("model train status", model.train_status)
+        print("model deploy status", model.deploy_status)
+        model_data = get_nomad_job(f"train-{model.id}", os.getenv("NOMAD_ENDPOINT"))
+        print("model data", model_data)
+
+    for model in models:
+        if model.train_status == schema.Status.starting or model.train_status == schema.Status.in_progress:
+            model_data = get_nomad_job(model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT"))
+            if not model_data or model_data["Status"] == "dead":
+                model.train_status = schema.Status.failed
+
+        if model.deploy_status == schema.Status.starting:
+            deployment_data = get_nomad_job(model.get_deployment_name(), os.getenv("NOMAD_ENDPOINT"))
+            if not deployment_data or deployment_data["Status"] == "dead" or deployment_data["Status"] == "running":
+                model.deploy_status = schema.Status.failed
+
+    session.commit()
+
+    return {"message": "successfully synced models"}

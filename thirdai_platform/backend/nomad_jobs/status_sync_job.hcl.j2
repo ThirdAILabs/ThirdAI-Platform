@@ -1,0 +1,42 @@
+job "status-sync" {
+  datacenters = ["dc1"]
+
+  type = "batch"
+
+  group "status-sync" {
+    count = 1
+
+    task "server" {
+
+      {% if platform == "docker" %}
+        driver = "docker"
+      {% elif platform == "local" %}
+        driver = "raw_exec"
+      {% endif %}
+
+      env {
+        MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
+      }
+
+      config {
+        {% if platform == "docker" %}
+          image = "{{ registry }}/{{ image_name }}:{{ tag }}"
+          image_pull_timeout = "15m"
+          auth {
+            username = "{{ docker_username }}"
+            password = "{{ docker_password }}"
+            server_address = "{{ registry }}"
+          }
+        {% elif platform == "local" %}
+          command = "{{ python_path }}"
+          args    = ["{{ train_script }}"]
+        {% endif %}
+      }
+
+      resources {
+        cpu = {{ 2400 }}
+        memory = {{ '10000' }}
+      }
+    }
+  }
+}

@@ -187,6 +187,12 @@ class Model(SQLDeclarativeBase):
         "ModelPermission", back_populates="model", cascade="all, delete-orphan"
     )
 
+    def get_train_job_name(self):
+        return f"train-{self.id}-{self.type}-{self.sub_type}"
+
+    def get_deployment_name(self):
+        return f"deployment-{self.id}"
+
     def get_default_permission(self):
         return self.default_permission
 
