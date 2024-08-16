@@ -895,7 +895,7 @@ def sync_model_bazaar(
     Syncs status of nomad jobs with internal database. This is useful for cases
     when jobs fail before we're able to catch the issue and update the database.
 
-    This function is called by the status_sync_job every so often. 
+    This function is called by the status_sync_job every so often.
     """
 
     models: list[schema.Model] = session.query(schema.Model).all()
