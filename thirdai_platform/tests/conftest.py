@@ -3,10 +3,13 @@ import random
 
 import pytest
 from sqlalchemy import NullPool, create_engine, text
+from dotenv import load_dotenv
 
 
 @pytest.fixture(autouse=True, scope="session")
 def initialize_database():
+    load_dotenv()
+
     db_uri = os.environ["DB_BASE_URI"]
     db_name = f"model_bazaar_{random.randint(0, 1e6)}"
 

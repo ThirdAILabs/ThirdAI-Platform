@@ -19,11 +19,7 @@ def test_admin_login():
     assert res.status_code == 401
 
 
-def test_email_signup():
-    from main import app
-
-    client = TestClient(app)
-
+def check_email_signup(client):
     res = login(client, username="user1@mail.com", password="firstpassword")
     assert res.status_code == 401
 
@@ -36,11 +32,7 @@ def test_email_signup():
     assert res.status_code == 200
 
 
-def test_user_auth():
-    from main import app
-
-    client = TestClient(app)
-
+def check_basic_auth(client):
     res = client.get("/api/user/info", headers=auth_header("not a jwt"))
     assert res.status_code == 401
 
@@ -55,6 +47,49 @@ def test_user_auth():
     assert res.status_code == 200
 
     res = client.get("/api/user/info", headers=auth_header(access_token[:-1]))
+    assert res.status_code == 401
+
+
+def test_email_signup_and_user_auth():
+    from main import app
+
+    client = TestClient(app)
+
+    check_email_signup(client)
+
+    check_basic_auth(client)
+
+
+def test_delete_user():
+    from main import app
+
+    client = TestClient(app)
+
+    res = create_user(
+        client, username="tmp-user", email="tmp-user@mail.com", password="tmp-pwd"
+    )
+    assert res.status_code == 200
+
+    res = login(client, username="tmp-user@mail.com", password="tmp-pwd")
+    assert res.status_code == 200
+    user_jwt = res.json()["data"]["access_token"]
+
+    res = login(client, "admin@mail.com", "password")
+    assert res.status_code == 200
+    admin_jwt = res.json()["data"]["access_token"]
+
+    res = client.get("/api/user/info", headers=auth_header(user_jwt))
+    assert res.status_code == 200
+
+    res = client.request(
+        "DELETE",
+        "/api/user/delete-user",
+        headers=auth_header(admin_jwt),
+        json={"email": "tmp-user@mail.com"},
+    )
+    assert res.status_code == 200
+
+    res = client.get("/api/user/info", headers=auth_header(user_jwt))
     assert res.status_code == 401
 
 
@@ -104,31 +139,3 @@ def test_add_remove_global_admin():
 
     res = client.get("/api/user/all-users", headers=auth_header(user_jwt))
     assert res.status_code == 403
-
-
-def test_delete_user():
-    from main import app
-
-    client = TestClient(app)
-
-    res = login(client, username="future-admin@mail.com", password="future-admin")
-    assert res.status_code == 200
-    user_jwt = res.json()["data"]["access_token"]
-
-    res = login(client, "admin@mail.com", "password")
-    assert res.status_code == 200
-    admin_jwt = res.json()["data"]["access_token"]
-
-    res = client.get("/api/user/info", headers=auth_header(user_jwt))
-    assert res.status_code == 200
-
-    res = client.request(
-        "DELETE",
-        "/api/user/delete-user",
-        headers=auth_header(admin_jwt),
-        json={"email": "future-admin@mail.com"},
-    )
-    assert res.status_code == 200
-
-    res = client.get("/api/user/info", headers=auth_header(user_jwt))
-    assert res.status_code == 401
