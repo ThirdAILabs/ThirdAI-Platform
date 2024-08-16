@@ -280,8 +280,8 @@ def train_ndb(
         new_model.train_status = schema.Status.starting
         session.commit()
     except Exception as err:
-        # TODO: change the status of the new model entry to failed
-
+        new_model.train_status = schema.Status.failed
+        session.commit()
         logger.info(str(err))
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -505,7 +505,8 @@ def train_udt(
         new_model.train_status = schema.Status.starting
         session.commit()
     except Exception as err:
-        # TODO: change the status of the new model entry to failed
+        new_model.train_status = schema.Status.failed
+        session.commit()
         logger.info(str(err))
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -740,6 +741,8 @@ def create_shard(
         new_shard.train_status = schema.Status.starting
         session.commit()
     except Exception as err:
+        new_shard.train_status = schema.Status.failed
+        session.commit()
         logger.info(str(err))
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
