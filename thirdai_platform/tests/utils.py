@@ -25,3 +25,19 @@ def create_user(client, username, email, password):
         "/api/user/email-signup-basic",
         json={"username": username, "email": email, "password": password},
     )
+
+
+def create_team(client, name, access_token):
+    return client.post(
+        "/api/team/create-team",
+        headers=auth_header(access_token),
+        params={"name": name},
+    )
+
+
+def add_user_to_team(client, team, user, access_token):
+    return client.post(
+        "/api/team/add-user-to-team",
+        headers=auth_header(access_token),
+        params={"email": user, "team_id": team},
+    )

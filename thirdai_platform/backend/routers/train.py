@@ -250,10 +250,8 @@ def train_ndb(
         session.commit()
         session.refresh(new_model)
 
-        work_dir = os.getcwd()
-
         submit_nomad_job(
-            str(Path(work_dir) / "backend" / "nomad_jobs" / "train_job.hcl.j2"),
+            str(Path(__file__).parent.parent / "nomad_jobs" / "train_job.hcl.j2"),
             nomad_endpoint=os.getenv("NOMAD_ENDPOINT"),
             platform=get_platform(),
             tag=os.getenv("TAG"),
@@ -278,7 +276,7 @@ def train_ndb(
 
     except Exception as err:
         # TODO: change the status of the new model entry to failed
-
+        print(str(err))
         logger.info(str(err))
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

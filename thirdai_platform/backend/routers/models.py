@@ -567,7 +567,7 @@ def download_public_model(
             message=str(error),
         )
 
-    if model.access_level != "public":
+    if model.access_level != schema.Access.public:
         return response(
             status_code=status.HTTP_403_FORBIDDEN,
             message="You cannot access this model without login.",
@@ -858,14 +858,14 @@ def get_model_permissions(
                         "email": user_team.user.email,
                     }
                 )
-            elif user_team.role == schema.Role.user:
-                permissions_info["read"].append(
-                    {
-                        "user_id": user_team.user.id,
-                        "username": user_team.user.username,
-                        "email": user_team.user.email,
-                    }
-                )
+            permission = model.get_user_permission(user_team.user)
+            permissions_info[str(permission).split(".")[-1]].append(
+                {
+                    "user_id": user_team.user.id,
+                    "username": user_team.user.username,
+                    "email": user_team.user.email,
+                }
+            )
 
     # Deduplicate all permission lists
     permissions_info = {

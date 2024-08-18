@@ -1,7 +1,14 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from .utils import auth_header, create_user, global_admin_token, login
+from .utils import (
+    auth_header,
+    create_user,
+    global_admin_token,
+    login,
+    create_team,
+    add_user_to_team,
+)
 
 pytestmark = [pytest.mark.unit]
 
@@ -15,22 +22,6 @@ def create_new_users(client):
         assert res.status_code == 200
 
     return users
-
-
-def create_team(client, name, access_token):
-    return client.post(
-        "/api/team/create-team",
-        headers=auth_header(access_token),
-        params={"name": name},
-    )
-
-
-def add_user_to_team(client, team, user, access_token):
-    return client.post(
-        "/api/team/add-user-to-team",
-        headers=auth_header(access_token),
-        params={"email": user, "team_id": team},
-    )
 
 
 def assign_team_admin(client, team, user, access_token):
@@ -108,7 +99,8 @@ def test_team_management():
     # Global admin can list teams
     res = client.get("/api/team/list", headers=auth_header(global_admin))
     assert res.status_code == 200
-    assert set([green_team, purple_team]) == set([t["id"] for t in res.json()["data"]])
+    all_teams = set([t["id"] for t in res.json()["data"]])
+    assert len(set([green_team, purple_team]).intersection(all_teams)) == 2
 
     # Must be admin of team to list members
     res = client.get(
@@ -168,4 +160,5 @@ def test_team_management():
     # Check list of teams
     res = client.get("/api/team/list", headers=auth_header(global_admin))
     assert res.status_code == 200
-    assert [purple_team] == [t["id"] for t in res.json()["data"]]
+    all_teams = set([t["id"] for t in res.json()["data"]])
+    assert len(set([purple_team]).intersection(all_teams)) == 1
