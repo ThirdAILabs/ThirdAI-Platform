@@ -3,7 +3,7 @@ import shutil
 
 import pytest
 from fastapi.testclient import TestClient
-from thirdai import neural_db_v2 as ndb
+from thirdai import neural_db as ndb
 
 from .utils import (
     add_user_to_team,
