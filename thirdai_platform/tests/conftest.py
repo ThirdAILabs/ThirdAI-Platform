@@ -2,8 +2,8 @@ import os
 import random
 
 import pytest
-from sqlalchemy import NullPool, create_engine, text
 from dotenv import load_dotenv
+from sqlalchemy import NullPool, create_engine, text
 
 
 @pytest.fixture(autouse=True, scope="session")

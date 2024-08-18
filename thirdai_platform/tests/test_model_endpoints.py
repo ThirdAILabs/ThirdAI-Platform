@@ -1,15 +1,17 @@
+import os
+import shutil
+
 import pytest
 from fastapi.testclient import TestClient
 from thirdai import neural_db_v2 as ndb
-import shutil
-import os
+
 from .utils import (
+    add_user_to_team,
     auth_header,
+    create_team,
     create_user,
     global_admin_token,
     login,
-    create_team,
-    add_user_to_team,
 )
 
 pytestmark = [pytest.mark.unit]

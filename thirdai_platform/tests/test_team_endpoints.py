@@ -2,12 +2,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from .utils import (
+    add_user_to_team,
     auth_header,
+    create_team,
     create_user,
     global_admin_token,
     login,
-    create_team,
-    add_user_to_team,
 )
 
 pytestmark = [pytest.mark.unit]
