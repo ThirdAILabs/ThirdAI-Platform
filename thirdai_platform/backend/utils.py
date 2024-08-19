@@ -270,11 +270,11 @@ class NDBExtraOptions(BaseModel):
 
     tokenizer: Optional[str] = None
     hidden_bias: Optional[bool] = None
-    retriever: Optional[str] = None  # This flag is for which retriever to use.
+    # This flag is for which retriever to use.
+    retriever: Optional[str] = None
     unsupervised_train: Optional[bool] = None
-    disable_finetunable_retriever: Optional[bool] = (
-        None  # This flag is to disable inverted index in supervised training.
-    )
+    # This flag is to disable inverted index in supervised training.
+    disable_finetunable_retriever: Optional[bool] = None
     checkpoint_interval: Optional[int] = None
     fast_approximation: Optional[bool] = None
     num_buckets_to_sample: Optional[int] = None

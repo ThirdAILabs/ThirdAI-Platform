@@ -2,6 +2,7 @@ import json
 import os
 import traceback
 import uuid
+from datetime import datetime
 from typing import Annotated, Dict, Optional, Union
 
 from auth.jwt import AuthenticatedUser, verify_access_token
@@ -42,19 +43,23 @@ def list_public_models(
     name: str,
     domain: Optional[str] = None,
     username: Optional[str] = None,
+    type: Optional[str] = None,
+    sub_type: Optional[str] = None,
     session: Session = Depends(get_session),
 ):
     """
     List public models.
 
     Parameters:
-    - name: The name to filter models.
-    - domain: Optional domain to filter models.
-    - username: Optional username to filter models.
-    - session: The database session (dependency).
+    - name: str - The name to filter models.
+    - domain: Optional[str] - Optional domain to filter models.
+    - username: Optional[str] - Optional username to filter models.
+    - type: Optional[str] - Optional type to filter models.
+    - sub_type: Optional[str] - Optional sub-type to filter models.
+    - session: Session - The database session (dependency).
 
     Returns:
-    - A JSON response with the list of public models.
+    - JSONResponse - A JSON response with the list of public models.
     """
     query = (
         session.query(schema.Model)
@@ -72,6 +77,12 @@ def list_public_models(
     if username:
         query = query.join(schema.User).filter(schema.User.username == username)
 
+    if type:
+        query = query.filter(schema.Model.type == type)
+
+    if sub_type:
+        query = query.filter(schema.Model.sub_type == sub_type)
+
     results = [get_high_level_model_info(result) for result in query.all()]
 
     return response(
@@ -86,23 +97,27 @@ def list_models(
     name: str,
     domain: Optional[str] = None,
     username: Optional[str] = None,
+    type: Optional[str] = None,
+    sub_type: Optional[str] = None,
     access_level: Annotated[Union[list[str], None], Query()] = None,
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
     """
-    List models based on the given name, domain, username, and access level.
+    List models based on the given name, domain, username, type, sub-type, and access level.
 
     Parameters:
-    - name: The name to filter models.
-    - domain: Optional domain to filter models.
-    - username: Optional username to filter models.
-    - access_level: Optional access level to filter models.
-    - session: The database session (dependency).
-    - authenticated_user: The authenticated user (dependency).
+    - name: str - The name to filter models.
+    - domain: Optional[str] - Optional domain to filter models.
+    - username: Optional[str] - Optional username to filter models.
+    - type: Optional[str] - Optional type to filter models.
+    - sub_type: Optional[str] - Optional sub-type to filter models.
+    - access_level: Annotated[Union[list[str], None], Query()] - Optional access level to filter models.
+    - session: Session - The database session (dependency).
+    - authenticated_user: AuthenticatedUser - The authenticated user (dependency).
 
     Returns:
-    - A JSON response with the list of models.
+    - JSONResponse - A JSON response with the list of models.
     """
     user: schema.User = authenticated_user.user
     user_teams = [ut.team_id for ut in user.teams]
@@ -150,7 +165,13 @@ def list_models(
     if username:
         query = query.join(schema.User).filter(schema.User.username == username)
 
-    results = [get_high_level_model_info(model) for model in query.all()]
+    if type:
+        query = query.filter(schema.Model.type == type)
+
+    if sub_type:
+        query = query.filter(schema.Model.sub_type == sub_type)
+
+    results = [get_high_level_model_info(result) for result in query]
 
     return response(
         status_code=status.HTTP_200_OK,

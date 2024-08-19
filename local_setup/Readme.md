@@ -16,6 +16,15 @@ Without this process, it is cumbersome to test out platform changes. We would ha
 ### Step 2: Configure and Run Local Services
 
 2. **Start Nomad in Development Mode:**
+   - Open a terminal session.
+       - Since Nomad will run jobs locally, the Python environment that is currently running in the terminal sesssion must have all dependencies for all jobs:
+       ```
+       pip3 install -r headless/requirements.txt
+       pip3 install -r train_job/requirements.txt
+       pip3 install -r deployment_job/requirements.txt
+       pip3 install -r thirdai_platform/requirements.txt
+       pip3 install -r llm_generation_job/requirements.txt
+       ```
    - Open a terminal session and run:
      ```
      sudo nomad agent -dev -config="local_setup/agent.hcl"

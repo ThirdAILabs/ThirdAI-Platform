@@ -261,7 +261,6 @@ class NDBFunctions:
     def deploy_ndb(inputs: Dict[str, Any]) -> Any:
         logging.info(f"inputs: {inputs}")
         model = inputs.get("model")
-        run_name = inputs.get("run_name")
 
         logging.info(
             f"Deploying the model {model.model_identifier} and id {model.model_id}"
