@@ -21,7 +21,7 @@ pytestmark = [pytest.mark.unit]
 def upload_model(client, access_token, name, access):
     model = thirdai.neural_db.NeuralDB()
 
-    filename = f"./tmp_{name}.db"
+    filename = f".test_data/tmp_{name}.db"
     model.save(filename)
 
     shutil.make_archive(filename, "zip", filename)

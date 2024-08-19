@@ -1,5 +1,6 @@
 import os
 import random
+import shutil
 
 import pytest
 from dotenv import load_dotenv
@@ -28,3 +29,15 @@ def initialize_database():
 
     with eng.connect() as conn:
         conn.execute(text(f"DROP DATABASE {db_name}"))
+
+
+@pytest.fixture(autouse=True, scope="session")
+def create_test_directory():
+    test_dir = ".test_data"
+    os.makedirs(test_dir, exist_ok=True)
+
+    os.environ["SHARE_DIR"] = os.path.join(test_dir, "share_dir")
+
+    yield
+
+    shutil.rmtree(test_dir)

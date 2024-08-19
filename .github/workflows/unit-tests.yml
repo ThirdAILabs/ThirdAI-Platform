@@ -92,11 +92,6 @@ jobs:
       - name: Start Vault Server
         run: nohup vault server --dev --dev-root-token-id="00000000-0000-0000-0000-000000000000" > vault.log 2>&1 &
 
-      - name: Create Directories for Share and Test
-        run: |
-          mkdir -p $HOME/nfs/dir
-          echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_ENV
-
       - name: Setup additional environment variables
         run: |
           echo "LICENSE_PATH=${{ github.workspace }}/thirdai_platform/tests/ndb_enterprise_license.json" >> $GITHUB_ENV
