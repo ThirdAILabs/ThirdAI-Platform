@@ -3,7 +3,8 @@ import shutil
 
 import pytest
 from fastapi.testclient import TestClient
-from thirdai import neural_db as ndb
+import thirdai
+import thirdai.neural_db
 
 from .utils import (
     add_user_to_team,
@@ -18,7 +19,7 @@ pytestmark = [pytest.mark.unit]
 
 
 def upload_model(client, access_token, name, access):
-    model = ndb.NeuralDB()
+    model = thirdai.neural_db.NeuralDB()
 
     filename = f"./tmp_{name}.db"
     model.save(filename)
@@ -81,8 +82,13 @@ def create_and_login(client, user):
 @pytest.fixture(scope="session")
 def create_models_and_users():
     from main import app
+    from licensing.verify import verify_license
 
     client = TestClient(app)
+
+    # So we can initialize NDBs vs upload
+    license_info = verify_license.verify_license(os.environ["LICENSE_PATH"])
+    thirdai.licensing.activate(license_info["boltLicenseKey"])
 
     tokens = [create_and_login(client, user) for user in ["user_x", "user_y", "user_z"]]
 
