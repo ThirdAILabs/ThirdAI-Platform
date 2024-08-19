@@ -13,6 +13,7 @@ boto3
 # app
 gunicorn
 fastapi==0.109.2
+fastapi_utils
 fastapi[all]
 uvicorn
 fsspec

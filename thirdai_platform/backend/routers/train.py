@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import uuid
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -37,6 +38,8 @@ from fastapi.encoders import jsonable_encoder
 from licensing.verify.verify_license import valid_job_allocation, verify_license
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
+from fastapi_utils.tasks import repeat_every
+
 
 train_router = APIRouter()
 
@@ -887,18 +890,18 @@ def model_shard_train_status(
     )
 
 
-@train_router.post("/sync-status")
-def sync_model_bazaar(
-    session: Session = Depends(get_session),
-):
+@repeat_every(seconds=5)
+def sync_job_statuses(session: Session = Depends(get_session)) -> None:
     """
     Syncs status of nomad jobs with internal database. This is useful for cases
     when jobs fail before we're able to catch the issue and update the database.
-
-    This function is called by the status_sync_job every so often.
     """
 
+    print("first print statement")
+
     models: list[schema.Model] = session.query(schema.Model).all()
+
+    print("second print")
 
     for model in models:
         if (
@@ -909,6 +912,7 @@ def sync_model_bazaar(
                 model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT")
             )
             if not model_data or model_data["Status"] == "dead":
+                print(f"Model {model.id} has train job either dead or not found in nomad. Setting status to failed")
                 model.train_status = schema.Status.failed
 
         if model.deploy_status == schema.Status.starting:
@@ -916,8 +920,14 @@ def sync_model_bazaar(
                 model.get_deployment_name(), os.getenv("NOMAD_ENDPOINT")
             )
             if not deployment_data or deployment_data["Status"] == "dead":
+                print(f"Model {model.id} has deployment job either dead or not found in nomad. Setting status to failed")
                 model.deploy_status = schema.Status.failed
 
     session.commit()
 
-    return {"message": "successfully synced models"}
+    print("HAHAHAHAHA")
+
+
+@train_router.on_event("startup")
+async def startup_event():
+    await sync_job_statuses()
