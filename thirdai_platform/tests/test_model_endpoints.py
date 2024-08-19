@@ -2,9 +2,9 @@ import os
 import shutil
 
 import pytest
-from fastapi.testclient import TestClient
 import thirdai
 import thirdai.neural_db
+from fastapi.testclient import TestClient
 
 from .utils import (
     add_user_to_team,
@@ -81,8 +81,8 @@ def create_and_login(client, user):
 
 @pytest.fixture(scope="session")
 def create_models_and_users():
-    from main import app
     from licensing.verify import verify_license
+    from main import app
 
     client = TestClient(app)
 
