@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+websockets
+llama-cpp-python[server]
+requests

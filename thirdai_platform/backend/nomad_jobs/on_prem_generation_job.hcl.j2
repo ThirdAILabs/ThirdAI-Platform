@@ -1,0 +1,61 @@
+job "on-prem-llm-generation" {
+  datacenters = ["dc1"]
+
+  type = "service"
+
+  group "generation" {
+    count = 1
+
+    network {
+      port "generation-http" {
+        {% if platform == "docker" %}
+          to = 80
+        {% elif platform == "local" %}
+          static = {{ port }}
+        {% endif %}
+      }
+    }
+
+    service {
+      name = "generation"
+      port = "generation-http"
+      provider = "nomad"
+
+      tags = [
+        "traefik.enable=true",
+        "traefik.http.routers.generation-http.rule=PathPrefix(`/generate`)",
+        "traefik.http.routers.generation-http.priority=10"
+      ]
+    }
+
+    task "backend" {
+      {% if platform == "local" %}
+        driver = "raw_exec"
+      {% elif platform == "docker" %}  
+        driver = "docker"
+
+      {% endif %}
+
+      config {
+        {% if platform == "docker" %}  
+          image = "{{ registry }}/{{ image_name }}:{{ tag }}"
+          image_pull_timeout = "15m"
+          ports = ["generation-http"]
+          auth {
+            username = "{{ docker_username }}"
+            password = "{{ docker_password }}"
+            server_address = "{{ registry }}"
+          }
+        {% elif platform == "local" %}
+          command = "{{ python_path }}"
+          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ generate_app_dir }}","--reload","--host","0.0.0.0","--port","{{ port }}"]
+        {% endif %}
+      }
+
+      resources {
+        cpu = 500
+        memory = 1000
+      }
+    }
+  }
+}
