@@ -23,7 +23,7 @@ job "on-prem-llm-generation" {
 
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.generation-http.rule=PathPrefix(`/generate`)",
+        "traefik.http.routers.generation-http.rule=PathPrefix(`/on-prem-llm/`)",
         "traefik.http.routers.generation-http.priority=10"
       ]
     }
@@ -54,7 +54,7 @@ job "on-prem-llm-generation" {
 
       resources {
         cpu = 500
-        memory = 1000
+        memory = 4000
       }
     }
   }

@@ -23,7 +23,7 @@ job "llm-generation" {
 
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.generation-http.rule=PathPrefix(`/generate`)",
+        "traefik.http.routers.generation-http.rule=PathPrefix(`/cloud-llm/`)",
         "traefik.http.routers.generation-http.priority=10"
       ]
     }

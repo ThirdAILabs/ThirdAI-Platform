@@ -647,6 +647,7 @@ async def restart_generate_job():
 
 ON_PREM_GENERATE_JOB_ID = "on-prem-llm-generation"
 
+
 async def restart_on_prem_generate_job():
     """
     Restart the LLM generation job.

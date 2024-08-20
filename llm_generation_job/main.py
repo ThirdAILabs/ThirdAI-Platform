@@ -18,7 +18,7 @@ app.add_middleware(
 )
 
 
-@app.websocket("/generate")
+@app.websocket("/cloud-llm/generate")
 async def generate(websocket: WebSocket):
     """
     WebSocket endpoint to generate text using a specified generative AI model.
