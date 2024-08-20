@@ -434,6 +434,9 @@ def submit_nomad_job(filepath, nomad_endpoint, **kwargs):
     # Submit the JSON job spec to Nomad
     response = requests.post(submit_url, headers=headers, json={"Job": json_payload})
 
+    if response.status_code != 200:
+        print(response.text)
+
     return response
 
 

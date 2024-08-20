@@ -6,6 +6,24 @@ job "on-prem-llm-generation" {
   group "generation" {
     count = 1
 
+    scaling {
+      enabled = true
+      min = 1
+      max = 1
+      policy {
+        cooldown = "10s"
+        evaluation_interval = "10s"
+        check "avg_cpu" {
+          source = "nomad-apm"
+          query = "avg_cpu-allocated"
+          query_window = "3m"
+          strategy "target-value" {
+            target = 70
+          }
+        }
+      }
+    }
+
     network {
       port "generation-http" {
         {% if platform == "docker" %}
@@ -54,7 +72,7 @@ job "on-prem-llm-generation" {
 
       resources {
         cpu = 500
-        memory = 4000
+        memory = 3000
       }
     }
   }
