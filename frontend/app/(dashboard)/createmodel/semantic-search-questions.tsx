@@ -58,14 +58,20 @@ const SemanticSearchQuestions = ({ onCreateModel, stayOnPage }: SemanticSearchQu
     const makeFileFormData = () => {
       let formData = new FormData();
       const fileDetailsList: Array<{ mode: string; location: string }> = [];
+      let fileCount = 0;
 
       sources.forEach(({type, files}) => {
         files.forEach(file => {
           formData.append('files', file);
           fileDetailsList.push({ mode: 'unsupervised', location: type });
+          fileCount++;
         });
       });
-  
+
+      if (fileCount === 0) {
+        return null;
+      }
+
       const extraOptionsForm = { retriever: 'finetunable_retriever' };
       formData.append('extra_options_form', JSON.stringify(extraOptionsForm));
       formData.append('file_details_list', JSON.stringify({ file_details: fileDetailsList }));
@@ -87,6 +93,11 @@ const SemanticSearchQuestions = ({ onCreateModel, stayOnPage }: SemanticSearchQu
         console.log(`Submitting model '${modelName}'`);
 
         const formData = makeFileFormData();
+
+        if (!formData) {
+          alert("Please upload at least one file before submitting.");
+          return;
+        }
 
         // Print out all the FormData entries
         formData.forEach((value, key) => {
