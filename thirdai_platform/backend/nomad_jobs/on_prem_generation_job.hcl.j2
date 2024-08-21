@@ -3,16 +3,16 @@ job "on-prem-llm-generation" {
 
   type = "service"
 
-  group "generation" {
+  group "on-prem-generation" {
     count = 1
 
     scaling {
       enabled = true
       min = 1
-      max = 1
+      max = 2
       policy {
-        cooldown = "10s"
-        evaluation_interval = "10s"
+        cooldown = "1m"
+        evaluation_interval = "30s"
         check "avg_cpu" {
           source = "nomad-apm"
           query = "avg_cpu-allocated"
@@ -25,24 +25,22 @@ job "on-prem-llm-generation" {
     }
 
     network {
-      port "generation-http" {
+      port "on-prem-generation-http" {
         {% if platform == "docker" %}
           to = 80
-        {% elif platform == "local" %}
-          static = {{ port }}
         {% endif %}
       }
     }
 
     service {
-      name = "generation"
-      port = "generation-http"
+      name = "on-prem-generation"
+      port = "on-prem-generation-http"
       provider = "nomad"
 
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.generation-http.rule=PathPrefix(`/on-prem-llm/`)",
-        "traefik.http.routers.generation-http.priority=10"
+        "traefik.http.routers.on-prem-generation-http.rule=PathPrefix(`/on-prem-llm/`)",
+        "traefik.http.routers.on-prem-generation-http.priority=10"
       ]
     }
 
@@ -58,7 +56,7 @@ job "on-prem-llm-generation" {
         {% if platform == "docker" %}  
           image = "{{ registry }}/{{ image_name }}:{{ tag }}"
           image_pull_timeout = "15m"
-          ports = ["generation-http"]
+          ports = ["on-prem-generation-http"]
           auth {
             username = "{{ docker_username }}"
             password = "{{ docker_password }}"
@@ -66,7 +64,7 @@ job "on-prem-llm-generation" {
           }
         {% elif platform == "local" %}
           command = "{{ python_path }}"
-          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ generate_app_dir }}","--reload","--host","0.0.0.0","--port","{{ port }}"]
+          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ generate_app_dir }}","--reload","--host","0.0.0.0","--port","${NOMAD_PORT_on_prem_generation_http}"]
         {% endif %}
       }
 
