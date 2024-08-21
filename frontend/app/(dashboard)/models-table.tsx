@@ -140,7 +140,6 @@ export function ModelsTable({
               <TableHead>Status</TableHead>
               <TableHead className="hidden md:table-cell">Type</TableHead>
               <TableHead className="hidden md:table-cell">Published on</TableHead>
-              <TableHead className="hidden md:table-cell">Description</TableHead>
               <TableHead className="hidden md:table-cell">Action</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>

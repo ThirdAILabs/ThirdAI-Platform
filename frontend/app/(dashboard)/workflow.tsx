@@ -154,7 +154,6 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
             })
         }
       </TableCell>
-      <TableCell className="hidden md:table-cell">&apos;N\A&apos;</TableCell>
       <TableCell className="hidden md:table-cell">
         <Button
           onClick={deployStatus === 'Inactive' ? handleDeploy : goToEndpoint}
