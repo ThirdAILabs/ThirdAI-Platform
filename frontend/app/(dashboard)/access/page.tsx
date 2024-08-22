@@ -115,6 +115,7 @@ export default function AccessPage() {
       setModels(modelData);
     } catch (error) {
       console.error('Failed to fetch models', error);
+      alert('Failed to fetch models' + error)
     }
   };
 
@@ -137,6 +138,7 @@ export default function AccessPage() {
       setUsers(userData);
     } catch (error) {
       console.error('Failed to fetch users', error);
+      alert('Failed to fetch users' + error)
     }
   };
 
@@ -170,6 +172,7 @@ export default function AccessPage() {
       setTeams(teamData);
     } catch (error) {
       console.error('Failed to fetch teams', error);
+      alert('Failed to fetch teams' + error)
     }
   };
 
@@ -216,6 +219,7 @@ export default function AccessPage() {
       setSelectedTeam(null);
     } catch (error) {
       console.error('Failed to update model access level', error);
+      alert('Failed to update model access level' + error)
     }
   };
   
@@ -234,6 +238,7 @@ export default function AccessPage() {
           await addUserToTeam(member.email, team_id);
         } else {
           console.error(`User with name ${memberName} not found`);
+          alert(`User with name ${memberName} not found`)
         }
       }
 
@@ -243,6 +248,7 @@ export default function AccessPage() {
         await assignTeamAdmin(admin.email, team_id);
       } else {
         console.error(`User with name ${newTeamAdmin} not found`);
+        alert(`User with name ${newTeamAdmin} not found`)
       }
 
       // Update the state
@@ -255,6 +261,7 @@ export default function AccessPage() {
       setNewTeamMembers([]);
     } catch (error) {
       console.error('Failed to create new team', error);
+      alert('Failed to create new team' + error)
     }
   };
 
@@ -265,6 +272,7 @@ export default function AccessPage() {
       const team = teams.find(t => t.name === selectedTeamForAdd);
       if (!team) {
         console.error('Selected team not found');
+        alert('Selected team not found')
         return;
       }
 
@@ -272,6 +280,7 @@ export default function AccessPage() {
       const user = users.find(u => u.name === newMember);
       if (!user) {
         console.error('User not found');
+        alert('User not found')
         return;
       }
 
@@ -287,6 +296,7 @@ export default function AccessPage() {
       setNewMember('');     // Clear the new member input
     } catch (error) {
       console.error('Failed to add member to team', error);
+      alert('Failed to add member to team' + error)
     }
   };
 
@@ -296,6 +306,7 @@ export default function AccessPage() {
       const team = teams.find(t => t.name === selectedTeamForRemove);
       if (!team) {
         console.error('Selected team not found');
+        alert('Selected team not found')
         return;
       }
 
@@ -303,6 +314,7 @@ export default function AccessPage() {
       const user = users.find(u => u.name === memberToRemove);
       if (!user) {
         console.error('User not found');
+        alert('User not found')
         return;
       }
 
@@ -318,6 +330,7 @@ export default function AccessPage() {
       setMemberToRemove(''); // Clear the member input
     } catch (error) {
       console.error('Failed to remove member from team', error);
+      alert('Failed to remove member from team' + error)
     }
   };
 
@@ -328,6 +341,7 @@ export default function AccessPage() {
       const team = teams.find(t => t.name === teamName);
       if (!team) {
         console.error('Team not found');
+        alert('Team not found')
         return;
       }
 
@@ -340,6 +354,7 @@ export default function AccessPage() {
       await getTeams()
     } catch (error) {
       console.error('Failed to delete team', error);
+      alert('Failed to delete team' + error)
     }
   };
 
@@ -350,6 +365,7 @@ export default function AccessPage() {
       const user = users.find(u => u.name === userName);
       if (!user) {
         console.error('User not found');
+        alert('User not found')
         return;
       }
 
@@ -362,6 +378,7 @@ export default function AccessPage() {
       await getTeams()
     } catch (error) {
       console.error('Failed to delete user', error);
+      alert('Failed to delete user' + error)
     }
   };
 
@@ -383,6 +400,7 @@ export default function AccessPage() {
       setWorkflows(fetchedWorkflows);
     } catch (error) {
       console.error('Failed to fetch workflows', error);
+      alert('Failed to fetch workflows' + error)
     }
   };
 
@@ -429,7 +447,7 @@ export default function AccessPage() {
                     {model.type === 'Protected Model' && (
                       <div>
                         <div>Owner: {model.owner}</div>
-                        <div>Team: {model.team || 'None'}</div>
+                        <div>Team: {teams.find(team => team.id === model.team)?.name || 'None'}</div>
                         <div>Team Admin: {model.teamAdmin || 'None'}</div>
                       </div>
                     )}

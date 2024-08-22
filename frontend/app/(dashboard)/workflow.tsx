@@ -61,6 +61,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       } catch (e) {
         setIsValid(false);
         console.error('Validation failed.', e);
+        alert('Validation failed.' + e)
       }
     }, 3000); // Adjust the interval as needed, e.g., every 5 seconds
 
@@ -76,7 +77,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       }
     } catch (e) {
       console.error('Failed to start workflow.', e);
-      alert('Failed to start the workflow.');
+      alert('Failed to start the workflow.' + e);
     }
   };
 
@@ -196,6 +197,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
                         setDeployStatus('Inactive');
                       } catch (error) {
                         console.error('Error undeploying workflow:', error);
+                        alert('Error undeploying workflow:' + error)
                       }
                     }}
                   >
@@ -215,6 +217,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
                         console.log('Workflow deleted successfully:', response);
                       } catch (error) {
                         console.error('Error deleting workflow:', error);
+                        alert('Error deleting workflow:' + error)
                       }
                     }
                   }}

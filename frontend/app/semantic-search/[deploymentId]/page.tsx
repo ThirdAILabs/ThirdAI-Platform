@@ -178,6 +178,7 @@ function App() {
                 newModelService.sources().then(setSources);
             } catch (error) {
                 console.error('Failed to fetch workflow details:', error);
+                alert('Failed to fetch workflow details:' + error)
             }
         };
     

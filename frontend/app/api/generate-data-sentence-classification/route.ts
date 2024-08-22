@@ -60,6 +60,7 @@ export const POST = async (req: NextRequest) => {
       generatedExamples.push({ category: category.name, examples });
     } catch (error) {
       console.error(`Error during fetch for category ${category.name}:`, error);
+      alert(`Error during fetch for category ${category.name}:` + error)
       throw error;
     }
   });

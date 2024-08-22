@@ -135,6 +135,7 @@ const NERQuestions = ({ workflowNames, onCreateModel, stayOnPage, appName }: NER
       setIsDataGenerating(false);
     } catch (error) {
       console.error('Error generating data:', error);
+      alert('Error generating data:' + error)
       setIsDataGenerating(false);
     }
   };

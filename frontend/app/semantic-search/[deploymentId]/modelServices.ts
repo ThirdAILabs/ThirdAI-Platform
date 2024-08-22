@@ -185,6 +185,7 @@ export class ModelService {
             })
             .catch((e) => {
                 console.error(e);
+                alert(e)
                 throw new Error('Failed to detect PII');
             });
     }
@@ -219,6 +220,7 @@ export class ModelService {
             })
             .catch((e) => {
                 console.error("Error saving model:", e);
+                alert("Error saving model:" + e)
                 throw e;
             });
     }
@@ -603,6 +605,7 @@ export class ModelService {
 
         websocketRef.current.onerror = function (error) {
             console.error("Generation Error:", error);
+            alert("Generation Error:" + error)
         };
 
         websocketRef.current.onclose = function (event) {
@@ -612,6 +615,7 @@ export class ModelService {
                 );
             } else {
                 console.error(`Connection died`);
+                alert(`Connection died`)
             }
         };
     }
@@ -681,6 +685,7 @@ export class ModelService {
             }
         } catch (e) {
             console.error(e);
+            alert(e)
             throw new Error('Failed to record event');
         }
     }

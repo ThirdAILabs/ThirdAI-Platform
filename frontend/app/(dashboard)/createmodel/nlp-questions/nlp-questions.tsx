@@ -24,6 +24,7 @@ const NLPQuestions = ({ workflowNames }: NLPQuestionsProps) => {
   const submit = async () => {
     if (!question) {
       console.error('Question is not valid');
+      alert('Question is not valid')
       return;
     }
     if (loadingAnswer) {
@@ -49,6 +50,7 @@ const NLPQuestions = ({ workflowNames }: NLPQuestionsProps) => {
       setAnswer(result.answer);
     } catch (error) {
       console.error('Error during fetch:', error);
+      alert('Error during fetch:' + error)
     } finally {
       setLoadingAnswer(false);
     }
