@@ -906,6 +906,7 @@ def get_model_permissions(
 def update_access_level(
     model_identifier: str,
     access_level: schema.Access,
+    team_id: Optional[str] = None,
     session: Session = Depends(get_session),
 ):
     """
@@ -924,6 +925,27 @@ def update_access_level(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Model not found",
         )
+
+    if access_level == schema.Access.protected:
+        if not team_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="team_id is required when setting access level to 'protected'.",
+            )
+
+        # Check if the provided team_id is valid
+        team = session.query(schema.Team).get(team_id)
+        if not team:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The provided team_id does not exist.",
+            )
+
+        # Assign the team_id to the model
+        model.team_id = team_id
+    else:
+        # If the access level is 'public' or 'private', clear the team_id
+        model.team_id = None
 
     model.access_level = access_level
     session.commit()
