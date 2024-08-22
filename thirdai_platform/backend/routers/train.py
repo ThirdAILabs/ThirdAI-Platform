@@ -35,11 +35,10 @@ from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, Form, UploadFile, status
 from fastapi.encoders import jsonable_encoder
+from fastapi_utils.tasks import repeat_every
 from licensing.verify.verify_license import valid_job_allocation, verify_license
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
-from fastapi_utils.tasks import repeat_every
-
 
 train_router = APIRouter()
 
@@ -911,7 +910,9 @@ async def sync_job_statuses() -> None:
                     model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT")
                 )
                 if not model_data or model_data["Status"] == "dead":
-                    print(f"Model {model.id} has train job either dead or not found in nomad. Setting status to failed")
+                    print(
+                        f"Model {model.id} has train job either dead or not found in nomad. Setting status to failed"
+                    )
                     model.train_status = schema.Status.failed
 
             if model.deploy_status == schema.Status.starting:
@@ -919,7 +920,9 @@ async def sync_job_statuses() -> None:
                     model.get_deployment_name(), os.getenv("NOMAD_ENDPOINT")
                 )
                 if not deployment_data or deployment_data["Status"] == "dead":
-                    print(f"Model {model.id} has deployment job either dead or not found in nomad. Setting status to failed")
+                    print(
+                        f"Model {model.id} has deployment job either dead or not found in nomad. Setting status to failed"
+                    )
                     model.deploy_status = schema.Status.failed
 
         session.commit()
