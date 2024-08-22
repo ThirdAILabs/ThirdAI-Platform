@@ -5,7 +5,9 @@ import { SelectModel } from '@/lib/db';
 import RAGQuestions from './rag-questions';
 import NLPQuestions from './nlp-questions/nlp-questions';
 import SemanticSearchQuestions from './semantic-search-questions';
-import { fetchPublicModels, fetchPrivateModels, fetchPendingModels } from "@/lib/backend"
+import { fetchPublicModels, fetchPrivateModels, fetchPendingModels,
+          fetchWorkflows, Workflow
+        } from "@/lib/backend"
 import { Button } from '@/components/ui/button';
 import { Divider } from '@mui/material';
 import { CardDescription } from '@/components/ui/card';
@@ -43,6 +45,28 @@ export default function ChooseProblem() {
     getModels();
   }, []);
 
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+
+  useEffect(() => {
+    async function getWorkflows() {
+      try {
+        const fetchedWorkflows = await fetchWorkflows();
+        console.log('workflows', fetchedWorkflows);
+        setWorkflows(fetchedWorkflows);
+      } catch (err) {
+        if (err instanceof Error) {
+          console.log(err.message);
+        } else {
+          console.log('An unknown error occurred');
+        }
+      }
+    }
+
+    getWorkflows();
+  }, []);
+  
+  const workflowNames = workflows.map(workflow => workflow.name);
+
   const RETRIEVAL = "Retrieval"
   const NLP = "Natural Language Processing"
   const RAG = "Retrieval Augmented Generation"
@@ -77,9 +101,9 @@ export default function ChooseProblem() {
         {modelType && (
           <div style={{ width: "100%", marginTop: "20px" }}>
             <Divider style={{ marginBottom: "20px" }} />
-            {modelType === RAG && <RAGQuestions models={privateModels} />}
-            {modelType === NLP && <NLPQuestions />}
-            {modelType === RETRIEVAL && <SemanticSearchQuestions />}
+            {modelType === RAG && <RAGQuestions models={privateModels} workflowNames={workflowNames} />}
+            {modelType === NLP && <NLPQuestions workflowNames={workflowNames} />}
+            {modelType === RETRIEVAL && <SemanticSearchQuestions workflowNames={workflowNames} />}
           </div>
         )}
       </div>

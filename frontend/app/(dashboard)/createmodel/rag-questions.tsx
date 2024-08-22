@@ -8,7 +8,12 @@ import { CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-const RAGQuestions = ({ models }: { models: SelectModel[] }) => {
+interface RAGQuestionsProps {
+  models: SelectModel[];
+  workflowNames: string[];
+}
+
+const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
   const [currentStep, setCurrentStep] = useState(0);
 
   // Begin state variables & func for source
@@ -102,7 +107,15 @@ const RAGQuestions = ({ models }: { models: SelectModel[] }) => {
           <Input
             className="text-md"
             value={modelName}
-            onChange={(e) => setModelName(e.target.value)}
+            onChange={(e) => {
+              const name = e.target.value;
+              if (workflowNames.includes(name)) {
+                // Notify the user about the duplicate name
+                alert("A workflow with the same name has been created. Please choose a different name.");
+              } else {
+                setModelName(name);
+              }
+            }}
             placeholder="Enter app name"
             style={{ marginTop: '10px' }}
           />
@@ -173,6 +186,7 @@ const RAGQuestions = ({ models }: { models: SelectModel[] }) => {
               ) : (
                 <div>
                   <SemanticSearchQuestions
+                    workflowNames = {workflowNames}
                     onCreateModel={(modelID) => {
                       setSsModelId(modelID);
                       setCreatedSS(true);
@@ -280,6 +294,7 @@ const RAGQuestions = ({ models }: { models: SelectModel[] }) => {
                       ) : (
                         <div>
                           <NERQuestions
+                            workflowNames = {workflowNames}
                             onCreateModel={(modelID) => {
                               setGrModelId(modelID);
                               setCreatedGR(true);

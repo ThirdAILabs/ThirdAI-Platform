@@ -21,12 +21,13 @@ const predefinedChoices = [
 ];
 
 interface NERQuestionsProps {
+  workflowNames: string[];
   onCreateModel?: (modelId: string) => void;
   stayOnPage?: boolean;
   appName?: string;
 };
 
-const NERQuestions = ({ onCreateModel, stayOnPage, appName }: NERQuestionsProps) => {
+const NERQuestions = ({ workflowNames, onCreateModel, stayOnPage, appName }: NERQuestionsProps) => {
   const [modelName, setModelName] = useState(!appName ? '' : appName);
   const [categories, setCategories] = useState([{ name: '', example: '', description: '' }]);
   const [isDataGenerating, setIsDataGenerating] = useState(false);
@@ -210,7 +211,15 @@ const NERQuestions = ({ onCreateModel, stayOnPage, appName }: NERQuestionsProps)
       <Input
         className="text-md"
         value={modelName}
-        onChange={(e) => setModelName(e.target.value)}
+        onChange={(e) => {
+          const name = e.target.value;
+          if (workflowNames.includes(name)) {
+            // Notify the user about the duplicate name
+            alert("A workflow with the same name has been created. Please choose a different name.");
+          } else {
+            setModelName(name);
+          }
+        }}
         placeholder="Enter app name"
         style={{ marginTop: "10px" }}
         disabled={appName ? true : false}

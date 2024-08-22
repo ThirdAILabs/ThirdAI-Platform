@@ -6,6 +6,7 @@ import { CardDescription } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 
 interface SemanticSearchQuestionsProps {
+  workflowNames: string[];
   onCreateModel?: (modelID: string) => void;
   stayOnPage?: boolean;
   appName?: string;
@@ -16,7 +17,7 @@ enum SourceType {
   LOCAL = "local",
 }
 
-const SemanticSearchQuestions = ({ onCreateModel, stayOnPage, appName }: SemanticSearchQuestionsProps) => {
+const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, appName }: SemanticSearchQuestionsProps) => {
     const [modelName, setModelName] = useState(!appName ? '' : appName);
     const [sources, setSources] = useState<Array<{ type: string, files: File[] }>>([]);
     const [fileCount, setFileCount] = useState<number[]>([]);
@@ -147,7 +148,15 @@ const SemanticSearchQuestions = ({ onCreateModel, stayOnPage, appName }: Semanti
         <Input 
           className="text-md"
           value={modelName}
-          onChange={(e) => setModelName(e.target.value)}
+          onChange={(e) => {
+            const name = e.target.value;
+            if (workflowNames.includes(name)) {
+              // Notify the user about the duplicate name
+              alert("A workflow with the same name has been created. Please choose a different name.");
+            } else {
+              setModelName(name);
+            }
+          }}
           placeholder="Enter app name"
           style={{marginTop: "10px"}}
           disabled={appName ? true : false}
