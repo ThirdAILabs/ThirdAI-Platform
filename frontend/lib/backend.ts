@@ -874,12 +874,16 @@ export async function fetchAllUsers(): Promise<{ data: UserResponse[] }> {
 
 // MODEL //
 
-export async function updateModelAccessLevel(model_identifier: string, access_level: 'private' | 'protected' | 'public'): Promise<void> {
+export async function updateModelAccessLevel(model_identifier: string, access_level: 'private' | 'protected' | 'public', team_id?: string): Promise<void> {
   const accessToken = getAccessToken(); // Ensure this function is implemented elsewhere in your codebase
 
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
   const params = new URLSearchParams({ model_identifier, access_level });
+
+  if (access_level === 'protected' && team_id) {
+    params.append('team_id', team_id);
+  }
 
   return new Promise((resolve, reject) => {
     axios

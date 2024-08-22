@@ -174,18 +174,26 @@ export default function AccessPage() {
   };
 
   // Handle model type change
-  const handleModelTypeChange = async (index: number, newType: 'Private Model' | 'Protected Model' | 'Public Model') => {
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [selectedType, setSelectedType] = useState<'Private Model' | 'Protected Model' | 'Public Model' | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<string | null>(null); // For team selection
+
+  const handleModelTypeChange = async (index: number) => {
+    if (!selectedType) return;
+  
     try {
       const model = models[index];
       const model_identifier = `${model.owner}/${model.name}`;
-      let access_level: 'private' | 'protected' | 'public';
-
-      switch (newType) {
+      let access_level: 'private' | 'protected' | 'public' = 'private';
+      let team_id: string | undefined;
+  
+      switch (selectedType) {
         case 'Private Model':
           access_level = 'private';
           break;
         case 'Protected Model':
           access_level = 'protected';
+          team_id = selectedTeam || undefined;
           break;
         case 'Public Model':
           access_level = 'public';
@@ -193,18 +201,24 @@ export default function AccessPage() {
         default:
           return;
       }
-
+  
       // Call the API to update the model access level
-      await updateModelAccessLevel(model_identifier, access_level);
-
+      await updateModelAccessLevel(model_identifier, access_level, team_id);
+  
       // Update the models state
       const updatedModels = [...models];
-      updatedModels[index] = { ...model, type: newType };
+      updatedModels[index] = { ...model, type: selectedType };
       setModels(updatedModels);
+  
+      // Reset editing state
+      setEditingIndex(null);
+      setSelectedType(null);
+      setSelectedTeam(null);
     } catch (error) {
       console.error('Failed to update model access level', error);
     }
   };
+  
 
   // Create a new team
   const createNewTeam = async () => {
@@ -397,23 +411,14 @@ export default function AccessPage() {
                 <th className="py-2 px-4 text-left">Model Name</th>
                 <th className="py-2 px-4 text-left">Model Type</th>
                 <th className="py-2 px-4 text-left">Access Details</th>
+                <th className="py-2 px-4 text-left">Edit Model Access</th>
               </tr>
             </thead>
             <tbody>
               {models.map((model, index) => (
                 <tr key={index} className="border-t">
                   <td className="py-2 px-4">{model.name}</td>
-                  <td className="py-2 px-4">
-                    <select
-                      value={model.type}
-                      onChange={(e) => handleModelTypeChange(index, e.target.value as 'Private Model' | 'Protected Model' | 'Public Model')}
-                      className="border border-gray-300 rounded px-2 py-1"
-                    >
-                      <option value="Private Model">Private Model</option>
-                      <option value="Protected Model">Protected Model</option>
-                      <option value="Public Model">Public Model</option>
-                    </select>
-                  </td>
+                  <td className="py-2 px-4">{model.type}</td>
                   <td className="py-2 px-4">
                     {model.type === 'Private Model' && (
                       <div>
@@ -432,6 +437,54 @@ export default function AccessPage() {
                       <div>
                         <div>Owner: {model.owner}</div>
                       </div>
+                    )}
+                  </td>
+                  <td className="py-2 px-4">
+                    {editingIndex === index ? (
+                      <div>
+                        <select
+                          value={selectedType || model.type}
+                          onChange={(e) => setSelectedType(e.target.value as 'Private Model' | 'Protected Model' | 'Public Model')}
+                          className="border border-gray-300 rounded px-2 py-1"
+                        >
+                          <option value="Private Model">Private Model</option>
+                          <option value="Protected Model">Protected Model</option>
+                          <option value="Public Model">Public Model</option>
+                        </select>
+                        {selectedType === 'Protected Model' && (
+                          <select
+                            value={selectedTeam || ''}
+                            onChange={(e) => setSelectedTeam(e.target.value)}
+                            className="border border-gray-300 rounded px-2 py-1 mt-2"
+                          >
+                            <option value="" disabled>Select Team</option>
+                            {teams.map((team) => (
+                              <option key={team.id} value={team.id}>
+                                {team.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        <button
+                          onClick={() => handleModelTypeChange(index)}
+                          className="ml-2 bg-blue-500 text-white px-2 py-1 rounded"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => setEditingIndex(null)}
+                          className="ml-2 bg-gray-500 text-white px-2 py-1 rounded"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setEditingIndex(index)}
+                        className="bg-blue-500 text-white px-2 py-1 rounded"
+                      >
+                        Change Access
+                      </button>
                     )}
                   </td>
                 </tr>
