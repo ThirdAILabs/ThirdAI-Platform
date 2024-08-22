@@ -429,7 +429,7 @@ export default function AccessPage() {
                     {model.type === 'Protected Model' && (
                       <div>
                         <div>Owner: {model.owner}</div>
-                        <div>Team: {model.team || 'None'}</div>
+                        <div>Team: {teams.find(team => team.id === model.team)?.name || 'None'}</div>
                         <div>Team Admin: {model.teamAdmin || 'None'}</div>
                       </div>
                     )}
