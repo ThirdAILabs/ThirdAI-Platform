@@ -943,9 +943,6 @@ def update_access_level(
 
         # Assign the team_id to the model
         model.team_id = team_id
-    else:
-        # If the access level is 'public' or 'private', clear the team_id
-        model.team_id = None
 
     model.access_level = access_level
     session.commit()
