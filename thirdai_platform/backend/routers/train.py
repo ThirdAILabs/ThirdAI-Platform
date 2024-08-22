@@ -891,41 +891,40 @@ def model_shard_train_status(
 
 
 @repeat_every(seconds=5)
-def sync_job_statuses(session: Session = Depends(get_session)) -> None:
+async def sync_job_statuses() -> None:
     """
     Syncs status of nomad jobs with internal database. This is useful for cases
     when jobs fail before we're able to catch the issue and update the database.
     """
 
-    print("first print statement")
+    session = next(get_session())
 
-    models: list[schema.Model] = session.query(schema.Model).all()
+    try:
+        models: list[schema.Model] = session.query(schema.Model).all()
 
-    print("second print")
+        for model in models:
+            if (
+                model.train_status == schema.Status.starting
+                or model.train_status == schema.Status.in_progress
+            ):
+                model_data = get_nomad_job(
+                    model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT")
+                )
+                if not model_data or model_data["Status"] == "dead":
+                    print(f"Model {model.id} has train job either dead or not found in nomad. Setting status to failed")
+                    model.train_status = schema.Status.failed
 
-    for model in models:
-        if (
-            model.train_status == schema.Status.starting
-            or model.train_status == schema.Status.in_progress
-        ):
-            model_data = get_nomad_job(
-                model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT")
-            )
-            if not model_data or model_data["Status"] == "dead":
-                print(f"Model {model.id} has train job either dead or not found in nomad. Setting status to failed")
-                model.train_status = schema.Status.failed
+            if model.deploy_status == schema.Status.starting:
+                deployment_data = get_nomad_job(
+                    model.get_deployment_name(), os.getenv("NOMAD_ENDPOINT")
+                )
+                if not deployment_data or deployment_data["Status"] == "dead":
+                    print(f"Model {model.id} has deployment job either dead or not found in nomad. Setting status to failed")
+                    model.deploy_status = schema.Status.failed
 
-        if model.deploy_status == schema.Status.starting:
-            deployment_data = get_nomad_job(
-                model.get_deployment_name(), os.getenv("NOMAD_ENDPOINT")
-            )
-            if not deployment_data or deployment_data["Status"] == "dead":
-                print(f"Model {model.id} has deployment job either dead or not found in nomad. Setting status to failed")
-                model.deploy_status = schema.Status.failed
-
-    session.commit()
-
-    print("HAHAHAHAHA")
+        session.commit()
+    finally:
+        session.close()
 
 
 @train_router.on_event("startup")
