@@ -6,6 +6,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  PRODUCT_VERSION: "latest"
+  
 # Controls when the workflow will run
 on:
   # Triggers the workflow on push or pull request events but only for the main branch
@@ -44,10 +47,10 @@ jobs:
           pip3 install pyopenssl --upgrade
 
       - name: Setup `nomad`
-          uses: hashicorp/setup-nomad@main
-          id: setup
-          with:
-            version: ${{ env.PRODUCT_VERSION }}
+        uses: hashicorp/setup-nomad@main
+        id: setup
+        with:
+          version: ${{ env.PRODUCT_VERSION }}
 
       - name: Start Nomad in Development Mode
         run: |
