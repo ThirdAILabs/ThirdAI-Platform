@@ -7,7 +7,11 @@ import { Button } from '@/components/ui/button';
 import { CardDescription } from '@/components/ui/card';
 import { Divider } from '@mui/material';
 
-const NLPQuestions = () => {
+interface NLPQuestionsProps {
+  workflowNames: string[];
+}
+
+const NLPQuestions = ({ workflowNames }: NLPQuestionsProps) => {
   const [question, setQuestion] = useState('');
   const [loadingAnswer, setLoadingAnswer] = useState<boolean>(false);
   const [answer, setAnswer] = useState('');
@@ -98,7 +102,7 @@ const NLPQuestions = () => {
           answer.includes('Sentence classification') ? (
             <SCQQuestions question={question} answer={answer} />
           ) : answer.includes('Token classification') ? (
-            <NERQuestions />
+            <NERQuestions workflowNames = {workflowNames}/>
           ) : null
         )
       }
