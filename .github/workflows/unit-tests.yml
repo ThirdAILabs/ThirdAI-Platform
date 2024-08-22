@@ -20,6 +20,20 @@ on:
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: model_bazaar
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s 
+          --health-timeout 5s 
+          --health-retries 5
     steps:
       - uses: actions/checkout@v2
 
@@ -29,21 +43,23 @@ jobs:
           pip3 install pytest
           pip3 install pyopenssl --upgrade
 
-      - name: Install Nomad
-        run: |
-          sudo apt-get update && sudo apt-get install -y wget gpg
-          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor > /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt-get update && sudo apt-get install -y nomad
-
+      - name: Setup `nomad`
+          uses: hashicorp/setup-nomad@main
+          id: setup
+          with:
+            version: ${{ env.PRODUCT_VERSION }}
 
       - name: Start Nomad in Development Mode
         run: |
-          nohup sudo nomad agent -dev -config="local_setup/agent.hcl" > nomad.log 2>&1 &
+          NOMAD_PATH=$(which nomad)
+          nohup sudo $NOMAD_PATH agent -dev -config="local_setup/agent.hcl" > nomad.log 2>&1 &
           echo "NOMAD_ENDPOINT=http://localhost:4646/" >> $GITHUB_ENV
       
       - name: Verify Nomad Cluster
-        run: sleep 10 && nomad node status
+        run: |
+          NOMAD_PATH=$(which nomad)
+          echo $NOMAD_PATH
+          sleep 10 && $NOMAD_PATH node status
 
       - name: Install Traefik
         run: |
@@ -58,28 +74,6 @@ jobs:
           echo "PUBLIC_MODEL_BAZAAR_ENDPOINT=http://localhost:80/" >> $GITHUB_ENV
           echo "PRIVATE_MODEL_BAZAAR_ENDPOINT=http://localhost:80/" >> $GITHUB_ENV
 
-      - name: Install PostgreSQL
-        run: |
-          sudo apt install curl ca-certificates
-          sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
-          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-          sudo apt update
-          sudo apt -y install postgresql
-
-      - name: Start PostgreSQL Service
-        run: sudo systemctl start postgresql
-
-      - name: Setup PostgreSQL Database
-        run: |
-          sleep 30 #TODO(pratik): check status here
-          sudo -u postgres psql -c "SELECT 1"
-          sudo -u postgres psql -c "CREATE ROLE postgres WITH LOGIN SUPERUSER;" || true
-          sudo -u postgres psql -c "ALTER ROLE postgres WITH PASSWORD 'password';"
-          sudo -u postgres psql -c "CREATE DATABASE model_bazaar;"
-          sudo -u postgres psql -d model_bazaar -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
-          echo "DB_BASE_URI=postgresql://postgres:password@localhost:5432" >> $GITHUB_ENV
-
       - name: Install Vault
         run: |
           curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
@@ -92,6 +86,18 @@ jobs:
       - name: Start Vault Server
         run: nohup vault server --dev --dev-root-token-id="00000000-0000-0000-0000-000000000000" > vault.log 2>&1 &
 
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          until pg_isready -h localhost -U postgres; do
+            echo "Waiting for PostgreSQL..."
+            sleep 1
+          done
+
+      - name: Create Extension
+        run: |
+          export PGPASSWORD='password'
+          psql -h localhost -U postgres -d model_bazaar -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+          
       - name: Setup additional environment variables
         run: |
           echo "LICENSE_PATH=${{ github.workspace }}/thirdai_platform/tests/ndb_enterprise_license.json" >> $GITHUB_ENV
@@ -107,3 +113,11 @@ jobs:
       - name: run unit tests
         run: |
           python3 -m pytest ./thirdai_platform/tests -v
+
+      - name: Stop Services
+        if: always()
+        run: |
+          sudo systemctl stop postgresql
+          sudo killall nomad
+          sudo killall vault
+          sudo killall traefik
