@@ -49,6 +49,7 @@ export const POST = async (req: NextRequest) => {
     return NextResponse.json({ answer: answerContent });
   } catch (error) {
     console.error('Error during fetch:', error);
+    alert('Error during fetch:' + error)
     return NextResponse.json({ error: 'Error during fetch: ' + error }, { status: 500 });
   }
 };

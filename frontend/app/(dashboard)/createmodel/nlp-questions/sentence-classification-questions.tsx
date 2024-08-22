@@ -127,6 +127,7 @@ const SCQQuestions = ({ question, answer }: SCQQuestionsProps) => {
       setIsDataGenerating(false);
     } catch (error) {
       console.error('Error generating data:', error);
+      alert('Error generating data:' + error)
       setIsDataGenerating(false);
     }
   };

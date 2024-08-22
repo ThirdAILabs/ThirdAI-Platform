@@ -103,7 +103,7 @@ const FileUploadModal: React.FC<Props> = ({
             } catch (error) {
                 console.error("Upload error:", error);
                 alert(
-                    "Upload failed due to an unknown error. Please try again.",
+                    `Upload failed due to error ${error}. Please try again.`
                 );
             }
             setUploading(false);

@@ -72,6 +72,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
         components.push('search');
       } else {
         console.error(`Semantic search model with identifier ${ssIdentifier} not found.`);
+        alert(`Semantic search model with identifier ${ssIdentifier} not found.`)
       }
 
       // Find and add the NER model if it exists
@@ -80,6 +81,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
         components.push('nlp');
       } else {
         console.error(`NER model with identifier ${grIdentifier} not found.`);
+        alert(`NER model with identifier ${grIdentifier} not found.`)
       }
   
       // Step 3: Add the models to the workflow
@@ -92,9 +94,11 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
         console.log('Models added to workflow:', addModelsResponse);
       } else {
         console.error('No models to add to the workflow');
+        alert('No models to add to the workflow')
       }
     } catch (error) {
       console.error('Error during workflow creation or model addition:', error);
+      alert('Error during workflow creation or model addition:' + error)
     }
   };
 

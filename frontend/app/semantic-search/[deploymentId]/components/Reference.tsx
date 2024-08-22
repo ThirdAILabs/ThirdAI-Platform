@@ -170,6 +170,7 @@ export default function Reference({
             })
             .catch(error => {
                 console.error('Error detecting PII:', error);
+                alert('Error detecting PII:' + error)
             });
         }
     },[info, ifGuardRailOn])
@@ -240,6 +241,7 @@ export default function Reference({
                         })
                         .catch(error => {
                             console.error("Error recording event:", error);
+                            alert("Error recording event:" + error)
                         });
                 }} target={"_blank"}>
                     {info.sourceName}
