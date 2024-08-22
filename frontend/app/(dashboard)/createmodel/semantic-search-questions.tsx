@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 interface SemanticSearchQuestionsProps {
   onCreateModel?: (modelID: string) => void;
   stayOnPage?: boolean;
+  appName: string;
 };
 
 enum SourceType {
@@ -15,8 +16,8 @@ enum SourceType {
   LOCAL = "local",
 }
 
-const SemanticSearchQuestions = ({ onCreateModel, stayOnPage }: SemanticSearchQuestionsProps) => {
-    const [modelName, setModelName] = useState('');
+const SemanticSearchQuestions = ({ onCreateModel, stayOnPage, appName }: SemanticSearchQuestionsProps) => {
+    const [modelName, setModelName] = useState(!appName ? '' : appName);
     const [sources, setSources] = useState<Array<{ type: string, files: File[] }>>([]);
     const [fileCount, setFileCount] = useState<number[]>([]);
     const router = useRouter();
@@ -149,6 +150,7 @@ const SemanticSearchQuestions = ({ onCreateModel, stayOnPage }: SemanticSearchQu
           onChange={(e) => setModelName(e.target.value)}
           placeholder="Enter app name"
           style={{marginTop: "10px"}}
+          disabled={appName ? true : false}
         />
 
         <span className="block text-lg font-semibold" style={{marginTop: "20px"}}>Sources</span>

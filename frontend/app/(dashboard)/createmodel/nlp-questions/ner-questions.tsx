@@ -23,10 +23,11 @@ const predefinedChoices = [
 interface NERQuestionsProps {
   onCreateModel?: (modelId: string) => void;
   stayOnPage?: boolean;
+  appName: string;
 };
 
-const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
-  const [modelName, setModelName] = useState("");
+const NERQuestions = ({ onCreateModel, stayOnPage, appName }: NERQuestionsProps) => {
+  const [modelName, setModelName] = useState(!appName ? '' : appName);
   const [categories, setCategories] = useState([{ name: '', example: '', description: '' }]);
   const [isDataGenerating, setIsDataGenerating] = useState(false);
   const [generatedData, setGeneratedData] = useState([]);
@@ -212,6 +213,7 @@ const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
         onChange={(e) => setModelName(e.target.value)}
         placeholder="Enter app name"
         style={{ marginTop: "10px" }}
+        disabled={appName ? true : false}
       />
       {
         generatedData.length === 0 && <>

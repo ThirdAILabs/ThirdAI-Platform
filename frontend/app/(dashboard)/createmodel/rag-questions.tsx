@@ -177,7 +177,8 @@ const RAGQuestions = ({ models }: { models: SelectModel[] }) => {
                       setSsModelId(modelID);
                       setCreatedSS(true);
                     }}
-                    stayOnPage
+                    stayOnPage={true}
+                    appName = {`${modelName}-Retrieval`}
                   />
                 </div>
               )}
@@ -283,7 +284,8 @@ const RAGQuestions = ({ models }: { models: SelectModel[] }) => {
                               setGrModelId(modelID);
                               setCreatedGR(true);
                             }}
-                            stayOnPage
+                            stayOnPage={true}
+                            appName = {`${modelName}-NER`}
                           />
                         </div>
                       )}
