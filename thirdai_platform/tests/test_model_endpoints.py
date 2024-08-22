@@ -20,6 +20,7 @@ pytestmark = [pytest.mark.unit]
 
 def upload_model(client, access_token, name, access):
     model = thirdai.neural_db.NeuralDB()
+    model.insert([thirdai.neural_db.InMemoryText("test.txt", ["a", "b", "c"])])
 
     filename = f".test_data/tmp_{name}.db"
     model.save(filename)
@@ -63,7 +64,7 @@ def upload_model(client, access_token, name, access):
         },
         headers=auth_header(token),
     )
-    print(res.json())
+
     assert res.status_code == 200
 
 
@@ -151,6 +152,22 @@ def test_check_models(create_models_and_users):
     assert not res.json()["data"]["model_present"]
 
 
+def check_downloaded_model(res):
+    extracted = ".test_data/download_model.ndb"
+
+    with open(extracted + ".zip", "wb") as file:
+        for chunk in res.iter_bytes(2000):
+            file.write(chunk)
+
+    shutil.unpack_archive(extracted + ".zip", extracted, format="zip")
+
+    db = thirdai.neural_db.NeuralDB.from_checkpoint(extracted)
+    assert db._savable_state.model.retriever.size() == 3
+
+    shutil.rmtree(extracted)
+    os.remove(extracted + ".zip")
+
+
 def test_download_public_model(create_models_and_users):
     client, _ = create_models_and_users
 
@@ -163,6 +180,7 @@ def test_download_public_model(create_models_and_users):
         "/api/model/public-download", params={"model_identifier": "user_x/test_model_a"}
     )
     assert res.status_code == 200
+    check_downloaded_model(res)
     res.close()
 
 
@@ -182,6 +200,7 @@ def test_download_model(create_models_and_users):
         headers=auth_header(user_tokens[1]),
     )
     assert res.status_code == 200
+    check_downloaded_model(res)
     res.close()
 
 
