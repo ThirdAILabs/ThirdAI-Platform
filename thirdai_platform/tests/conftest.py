@@ -8,6 +8,20 @@ from sqlalchemy import NullPool, create_engine, text
 
 
 @pytest.fixture(autouse=True, scope="session")
+def setup_env():
+    os.environ["LICENSE_PATH"] = os.path.join(
+        os.path.dirname(__file__), "ndb_enterprise_license.json"
+    )
+    os.environ["JWT_SECRET"] = "SUPER_SECRET"
+    os.environ["PLATFORM"] = "local"
+    os.environ["PYTHON_PATH"] = "python3"
+    os.environ["ADMIN_USERNAME"] = "admin"
+    os.environ["ADMIN_MAIL"] = "admin@mail.com"
+    os.environ["ADMIN_PASSWORD"] = "password"
+    os.environ["TEST_ENVIRONMENT"] = "True"
+
+
+@pytest.fixture(autouse=True, scope="session")
 def initialize_database():
     load_dotenv()
 

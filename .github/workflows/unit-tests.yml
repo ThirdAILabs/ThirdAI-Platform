@@ -100,18 +100,7 @@ jobs:
         run: |
           export PGPASSWORD='password'
           psql -h localhost -U postgres -d model_bazaar -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
-          
-      - name: Setup additional environment variables
-        run: |
-          echo "LICENSE_PATH=${{ github.workspace }}/thirdai_platform/tests/ndb_enterprise_license.json" >> $GITHUB_ENV
-          echo "JWT_SECRET=CsnCr3lebs9eJQ" >> $GITHUB_ENV
-          echo "SENDGRID_KEY=sendgrid-key" >> $GITHUB_ENV
-          echo "GENAI_KEY=your-openai-key" >> $GITHUB_ENV
-          echo "ADMIN_USERNAME=admin" >> $GITHUB_ENV
-          echo "ADMIN_MAIL=admin@mail.com" >> $GITHUB_ENV
-          echo "ADMIN_PASSWORD=password" >> $GITHUB_ENV
-          echo "PLATFORM=local" >> $GITHUB_ENV
-          echo "TEST_ENVIRONMENT=True" >> $GITHUB_ENV
+          echo "DB_BASE_URI=postgresql://postgres:password@localhost:5432" >> $GITHUB_ENV
 
       - name: run unit tests
         run: |
