@@ -1,5 +1,6 @@
 import ast
 import json
+import logging
 import os
 import pickle
 import shutil
@@ -14,7 +15,7 @@ from botocore import UNSIGNED
 from botocore.client import Config
 from fastapi import Response
 from thirdai import neural_db as ndb
-from variables import NeuralDBVariables, S3Variables
+from variables import CSVDocumentVariables, NeuralDBVariables, S3Variables
 
 GB_1 = 1024 * 1024 * 1024  # Define 1 GB in bytes
 
@@ -139,14 +140,13 @@ def convert_to_ndb_file(file: str) -> ndb.Document:
             save_extra_info=False,
         )
     elif ext == ".csv":
+        csv_variables = CSVDocumentVariables.load_from_env()
         return ndb.CSV(
             file,
-            id_column=os.getenv("CSV_ID_COLUMN", None),
-            strong_columns=ast.literal_eval(os.getenv("CSV_STRONG_COLUMNS", "None")),
-            weak_columns=ast.literal_eval(os.getenv("CSV_WEAK_COLUMNS", "None")),
-            reference_columns=ast.literal_eval(
-                os.getenv("CSV_REFERENCE_COLUMNS", "None")
-            ),
+            id_column=csv_variables.csv_id_column,
+            strong_columns=csv_variables.csv_strong_columns,
+            weak_columns=csv_variables.csv_weak_columns,
+            reference_columns=csv_variables.csv_reference_columns,
             metadata=data_dict,
             save_extra_info=False,
             on_disk=ndb_variables.docs_on_disk,

@@ -33,9 +33,10 @@ class UDTFunctions:
         logging.info(f"Running Udt with {inputs}")
         run_name = inputs.get("run_name")
         config: Config = inputs.get("config")
+        dag_name = inputs.get("dag_name")
 
         return flow.bazaar_client.train_udt(
-            model_name=f"{run_name}_{config.name}_udt_{config.sub_type}",
+            model_name=f"{run_name}_{dag_name}_{config.name}_udt_{config.sub_type}",
             supervised_docs=[
                 os.path.join(config.base_path, config.unsupervised_paths[0])
             ],
@@ -54,7 +55,10 @@ class UDTFunctions:
             f"Deploying the model {model.model_identifier} and id {model.model_id}"
         )
 
-        return flow.bazaar_client.deploy_udt(model.model_identifier)
+        return flow.bazaar_client.deploy_udt(
+            model.model_identifier,
+            f"udt_{model.model_identifier}_deployment_{run_name}",
+        )
 
     def build_extra_options(config: Config) -> Dict[str, Any]:
         if config.sub_type == "text":
@@ -206,12 +210,13 @@ class NDBFunctions:
         base_model = inputs.get("base_model", None)
         file_num = inputs.get("file_num", 0)
         test = inputs.get("test", False)
+        dag_name = inputs.get("dag_name")
 
         base_model_identifier = base_model.model_identifier if base_model else None
 
         type = "single" if not sharded else "multiple"
         return flow.train(
-            model_name=f"{run_name}_{config.name}_{type}_unsupervised",
+            model_name=f"{run_name}_{dag_name}_{config.name}_{type}_unsupervised",
             unsupervised_docs=[
                 os.path.join(config.base_path, config.unsupervised_paths[file_num])
             ],
@@ -233,12 +238,13 @@ class NDBFunctions:
         base_model = inputs.get("base_model", None)
         file_num = inputs.get("file_num", 0)
         test = inputs.get("test", False)
+        dag_name = inputs.get("dag_name")
 
         base_model_identifier = base_model.model_identifier if base_model else None
 
         type = "single" if not sharded else "multiple"
         return flow.train(
-            model_name=f"{run_name}_{config.name}_{type}_unsupervised_supervised",
+            model_name=f"{run_name}_{dag_name}_{config.name}_{type}_unsupervised_supervised",
             unsupervised_docs=[
                 os.path.join(config.base_path, config.unsupervised_paths[file_num])
             ],
@@ -261,7 +267,6 @@ class NDBFunctions:
     def deploy_ndb(inputs: Dict[str, Any]) -> Any:
         logging.info(f"inputs: {inputs}")
         model = inputs.get("model")
-        run_name = inputs.get("run_name")
 
         logging.info(
             f"Deploying the model {model.model_identifier} and id {model.model_id}"
@@ -307,7 +312,7 @@ class GlobalAdminFunctions:
     def add_new_users(inputs: Dict[str, str]):
         logging.info(f"inputs: {inputs}")
         try:
-            flow.bazaar_client.signup(
+            flow.bazaar_client.sign_up(
                 email="ga_test_global_admin@mail.com",
                 password="password",
                 username="ga_test_global_admin",
@@ -316,7 +321,7 @@ class GlobalAdminFunctions:
             pass
 
         try:
-            flow.bazaar_client.signup(
+            flow.bazaar_client.sign_up(
                 email="ga_test_team_admin@mail.com",
                 password="password",
                 username="ga_test_team_admin",
@@ -325,7 +330,7 @@ class GlobalAdminFunctions:
             pass
 
         try:
-            flow.bazaar_client.signup(
+            flow.bazaar_client.sign_up(
                 email="ga_test_team_member@mail.com",
                 password="password",
                 username="ga_test_team_member",
@@ -425,31 +430,31 @@ class TeamAdminFunctions:
     def ta_setup(inputs: Dict[str, str]):
         logging.info(f"inputs: {inputs}")
         try:
-            flow.bazaar_client.signup(
+            flow.bazaar_client.sign_up(
                 email="ta_team_admin@mail.com",
                 password="password",
                 username="ta_team_admin",
             )
         except Exception as e:
-            logging.error(f"Failed to signup another team admin: {e}")
+            logging.error(f"Failed to sign_up another team admin: {e}")
 
         try:
-            flow.bazaar_client.signup(
+            flow.bazaar_client.sign_up(
                 email="ta_another_team_admin@mail.com",
                 password="password",
                 username="ta_another_team_admin",
             )
         except Exception as e:
-            logging.error(f"Failed to signup another team admin: {e}")
+            logging.error(f"Failed to sign_up another team admin: {e}")
 
         try:
-            flow.bazaar_client.signup(
+            flow.bazaar_client.sign_up(
                 email="ta_test_team_member@mail.com",
                 password="password",
                 username="ta_test_team_member",
             )
         except Exception as e:
-            logging.error(f"Failed to signup another team member: {e}")
+            logging.error(f"Failed to sign_up another team member: {e}")
 
         response = flow.bazaar_client.add_secret_key(
             inputs.get("key"), inputs.get("value")
@@ -459,7 +464,7 @@ class TeamAdminFunctions:
     def test_ta_add_user_to_team(inputs: Dict[str, str]):
 
         logging.info(f"inputs: {inputs}")
-        flow.bazaar_client.login(
+        flow.bazaar_client.log_in(
             email="ta_team_admin@mail.com",
             password="password",
         )
@@ -579,7 +584,7 @@ class WorkflowFunctions:
         logging.info(f"inputs: {inputs}")
         response = flow.workflow_client.add_models(
             workflow_id=inputs.get("workflow_id"),
-            model_identifiers=[inputs.get("model").model_identifier],
+            model_ids=[inputs.get("model").model_id],
             components=[inputs.get("component")],
         )
 
@@ -588,7 +593,7 @@ class WorkflowFunctions:
         logging.info(f"inputs: {inputs}")
         response = flow.workflow_client.delete_models(
             workflow_id=inputs.get("workflow_id"),
-            model_identifiers=[inputs.get("model").model_identifier],
+            model_ids=[inputs.get("model").model_id],
             components=[inputs.get("component")],
         )
 
