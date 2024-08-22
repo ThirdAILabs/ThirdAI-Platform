@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 interface SemanticSearchQuestionsProps {
   onCreateModel?: (modelID: string) => void;
   stayOnPage?: boolean;
-  appName: string;
+  appName?: string;
 };
 
 enum SourceType {

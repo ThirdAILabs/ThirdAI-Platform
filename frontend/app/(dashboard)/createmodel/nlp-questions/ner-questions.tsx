@@ -23,7 +23,7 @@ const predefinedChoices = [
 interface NERQuestionsProps {
   onCreateModel?: (modelId: string) => void;
   stayOnPage?: boolean;
-  appName: string;
+  appName?: string;
 };
 
 const NERQuestions = ({ onCreateModel, stayOnPage, appName }: NERQuestionsProps) => {
