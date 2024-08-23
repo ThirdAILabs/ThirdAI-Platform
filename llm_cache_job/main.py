@@ -4,7 +4,6 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from permissions import Permissions
-from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -22,7 +21,9 @@ permissions = Permissions()
 cache: Cache = NDBSemanticCache()
 
 
-@app.get("/cache/suggestions", dependencies=[Depends(permissions.verify_read_permission)])
+@app.get(
+    "/cache/suggestions", dependencies=[Depends(permissions.verify_read_permission)]
+)
 def suggestions(model_id: str, query: str):
     result = cache.suggestions(model_id=model_id, query=query)
 
@@ -42,15 +43,9 @@ def cache_query(model_id: str, query: str):
     )
 
 
-class CacheInsertArgs(BaseModel):
-    model_id: str
-    query: str
-    llm_res: str
-
-
 @app.post("/cache/insert", dependencies=[Depends(permissions.verify_read_permission)])
-def cache_insert(args: CacheInsertArgs):
-    cache.insert(model_id=args.model_id, query=args.query, llm_res=args.llm_res)
+def cache_insert(model_id: str, query: str, llm_res: str):
+    cache.insert(model_id=model_id, query=query, llm_res=llm_res)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -58,13 +53,11 @@ def cache_insert(args: CacheInsertArgs):
     )
 
 
-class CacheInvalidateArgs(BaseModel):
-    model_id: str
-
-
-@app.post("/cache/invalidate", dependencies=[Depends(permissions.verify_read_permission)])
-def cache_invalidate(args: CacheInvalidateArgs):
-    cache.invalidate(model_id=args.model_id)
+@app.post(
+    "/cache/invalidate", dependencies=[Depends(permissions.verify_read_permission)]
+)
+def cache_invalidate(model_id: str):
+    cache.invalidate(model_id=model_id)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

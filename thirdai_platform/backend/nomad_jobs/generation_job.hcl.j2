@@ -36,6 +36,10 @@ job "llm-generation" {
 
       {% endif %}
 
+      env {
+        MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
+      }
+      
       config {
         {% if platform == "docker" %}  
           image = "{{ registry }}/{{ image_name }}:{{ tag }}"

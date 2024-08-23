@@ -8,3 +8,6 @@ class GenerateArgs(BaseModel):
     key: Optional[str] = None
     model: str = "gpt-3.5-turbo"
     provider: str = "openai"
+
+    model_id: Optional[str] = None
+    access_token: Optional[str] = None

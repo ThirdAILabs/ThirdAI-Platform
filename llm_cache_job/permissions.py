@@ -61,7 +61,6 @@ def deployment_permissions(model_bazaar_endpoint: str, model_id: str, token: str
             "override": False,
         }
     elif response.status_code != status.HTTP_200_OK:
-        print(response.text)
         return {
             "read": False,
             "write": False,
@@ -86,7 +85,7 @@ class Permissions:
         # entry_expiration_seconds: number of seconds until the permissions for a
         # token needs to be refreshed. We refresh in case a previously invalid
         # token becomes a valid token.
-        self.model_bazaar_endpoint = os.environ("MODEL_BAZAAR_ENDPOINT")
+        self.model_bazaar_endpoint = os.environ["MODEL_BAZAAR_ENDPOINT"]
         self.entry_expiration_min = entry_expiration_min
         self.expirations: List[Tuple[datetime.datetime, str]] = []
         self.cache: Dict[str, dict] = {}

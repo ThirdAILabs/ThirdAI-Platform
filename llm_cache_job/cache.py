@@ -1,6 +1,6 @@
 import uuid
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 import nltk
 from thirdai import neural_db_v2 as ndb
@@ -9,11 +9,11 @@ from thirdai.neural_db_v2.chunk_stores import constraints
 
 class Cache(ABC):
     @abstractmethod
-    def suggestions(self, model_id: str, query: str) -> List[str]:
+    def suggestions(self, model_id: str, query: str) -> List[Dict[str, Any]]:
         raise NotImplemented
 
     @abstractmethod
-    def query(self, model_id: str, query: str) -> Optional[str]:
+    def query(self, model_id: str, query: str) -> Optional[Dict[str, Any]]:
         raise NotImplemented
 
     @abstractmethod
@@ -34,15 +34,21 @@ class NDBSemanticCache(Cache):
     def __init__(self):
         self.db = ndb.NeuralDB(save_path=f"{uuid.uuid4()}.cache")
 
-    def suggestions(self, model_id: str, query: str) -> List[str]:
+    def suggestions(self, model_id: str, query: str) -> List[Dict[str, Any]]:
+        if self.db.retriever.retriever.size() == 0:
+            return []
+
         results = self.db.search(
             query=query,
             top_k=5,
             constraints={"model_id": constraints.EqualTo(model_id)},
         )
-        return [res[0].text for res in results]
+        return [{"query": res[0].text, "query_id": res[0].chunk_id} for res in results]
 
     def query(self, model_id: str, query: str) -> Optional[str]:
+        if self.db.retriever.retriever.size() == 0:
+            return None
+
         results = self.db.search(
             query=query,
             top_k=5,
@@ -56,7 +62,11 @@ class NDBSemanticCache(Cache):
         )
 
         if reranked[0][1] > 0.95:
-            return reranked[0][0].metadata["llm_res"]
+            return {
+                "query": reranked[0][0].text,
+                "query_id": reranked[0][0].chunk_id,
+                "llm_res": reranked[0][0].metadata["llm_res"],
+            }
 
         return None
 

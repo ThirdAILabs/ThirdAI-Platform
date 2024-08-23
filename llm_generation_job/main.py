@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from llms import default_keys, model_classes
 from pydantic import ValidationError
 from pydantic_models import GenerateArgs
+import requests
+from urllib.parse import urljoin
+import os
 
 app = FastAPI()
 
@@ -151,10 +154,12 @@ async def generate(websocket: WebSocket):
 
     llm = llm_class()
 
+    generated_response = ""
     try:
         async for next_word in llm.stream(
             key=key, query=generate_args.query, model=generate_args.model
         ):
+            generated_response += next_word
             await websocket.send_json(
                 {"status": "success", "content": next_word, "end_of_stream": False}
             )
@@ -170,6 +175,24 @@ async def generate(websocket: WebSocket):
     await websocket.send_json(
         {"status": "success", "content": "", "end_of_stream": True}
     )
+
+    if generate_args.model_id is not None and generate_args.access_token is not None:
+        try:
+            res = requests.post(
+                urljoin(os.environ["MODEL_BAZAAR_ENDPOINT"], "/cache/insert"),
+                params={
+                    "model_id": generate_args.model_id,
+                    "query": generate_args.query,
+                    "llm_res": generated_response,
+                },
+                headers={
+                    "Authorization": f"Bearer {generate_args.access_token}",
+                },
+            )
+            if res.status_code != 200:
+                print("LLM Cache Insertion failed: ", res.json())
+        except Exception as e:
+            print("LLM Cache Insert Error", e)
 
 
 if __name__ == "__main__":
