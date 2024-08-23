@@ -735,9 +735,8 @@ def start_workflow(
                 model.deploy_status = schema.Status.starting
                 session.commit()
             except Exception as err:
-                # TODO should we undeploy all the other models?
-                # TODO should we set workflow status to failed instead of stopped?
                 model.deploy_status = schema.Status.failed
+                workflow.status = schema.WorkflowStatus.inactive
                 session.commit()
                 raise Exception(str(err))
 
