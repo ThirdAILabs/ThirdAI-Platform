@@ -352,6 +352,41 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
     },
   ];
 
+  // This is for displaying message in case user missed requirements
+  const missingRequirements = [];
+
+  if (!modelName) {
+    missingRequirements.push('App Name is not specified (Step 1)');
+  }
+
+  if (!ssModelId) {
+    missingRequirements.push('Retrieval app is not specified (Step 2)');
+  }
+
+  if (!(ifUseLGR === 'No' || grModelId)) {
+    missingRequirements.push('LLM Guardrail is not specified (Step 3)');
+  }
+
+  if (!llmType) {
+    missingRequirements.push('LLM Type is not specified (Step 4)');
+  }
+
+
+  const errorMessage = missingRequirements.length > 0
+  ? (
+    <div>
+      {`Please go back and specify the following:`}
+      <br />
+      {missingRequirements.map((requirement, index) => (
+        <span key={index}>
+          {'• '}{requirement}
+          <br />
+        </span>
+      ))}
+    </div>
+  )
+  : '';
+
   return (
     <div>
       {/* Step Navigation */}
@@ -372,20 +407,29 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
       <div>{steps[currentStep].content}</div>
 
       {/* Step Controls */}
-      <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between' }}>
-        {currentStep > 0 && (
+      <div style={{ marginTop: '50px', display: 'flex', justifyContent: 'space-between' }}>
+        {/* Previous Button */}
+        {currentStep > 0 ? (
           <Button onClick={() => setCurrentStep(currentStep - 1)}>Previous</Button>
+        ) : (
+          <div></div> 
         )}
+        
+        {/* Next Button or Create/Deploy Button */}
         {currentStep < steps.length - 1 ? (
           <Button onClick={() => setCurrentStep(currentStep + 1)}>Next</Button>
         ) : (
-          (ssModelId && (ifUseLGR === 'No' || grModelId) && llmType && modelName) && (
-            <Link href="/">
-              <Button onClick={handleSubmit} style={{ width: '100%' }}>
-                {`${ifUseExistingSS === 'No' || (ifUseLGR === 'Yes' && ifUseExistingLGR === 'No') ? 'Create' : 'Create and Deploy'}`}
-              </Button>
-            </Link>
-          )
+          <>
+            {(ssModelId && (ifUseLGR === 'No' || grModelId) && llmType && modelName) ? (
+              <Link href="/">
+                <Button onClick={handleSubmit} style={{ width: '100%' }}>
+                  {`${ifUseExistingSS === 'No' || (ifUseLGR === 'Yes' && ifUseExistingLGR === 'No') ? 'Create' : 'Create and Deploy'}`}
+                </Button>
+              </Link>
+            ) : (
+              <div style={{ color: 'red' }}>{errorMessage}</div>
+            )}
+          </>
         )}
       </div>
     </div>
