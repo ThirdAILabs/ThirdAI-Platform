@@ -36,5 +36,4 @@ image_base_names = ImageNames(
     TRAIN_IMAGE_NAME="train_job",
     DEPLOY_IMAGE_NAME="deployment_job",
     GENERATION_IMAGE_NAME="llm_generation_job",
-    ON_PREM_GENERATION_IMAGE_NAME="on_prem_llm_generation_job",
 )

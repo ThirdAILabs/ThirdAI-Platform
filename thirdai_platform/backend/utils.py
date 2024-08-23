@@ -644,6 +644,7 @@ async def restart_generate_job():
         image_name=os.getenv("GENERATION_IMAGE_NAME"),
         python_path=get_python_path(),
         generate_app_dir=str(get_root_absolute_path() / "llm_generation_job"),
+        model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
     )
 
 
@@ -660,19 +661,16 @@ async def restart_on_prem_generate_job():
     nomad_endpoint = os.getenv("NOMAD_ENDPOINT")
     if nomad_job_exists(ON_PREM_GENERATE_JOB_ID, nomad_endpoint):
         delete_nomad_job(ON_PREM_GENERATE_JOB_ID, nomad_endpoint)
+    share_dir = os.getenv("SHARE_DIR")
+    if not share_dir:
+        raise ValueError("SHARE_DIR variable is not set.")
     cwd = Path(os.getcwd())
-    platform = get_platform()
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "on_prem_generation_job.hcl.j2"),
-        platform=platform,
-        tag=os.getenv("TAG"),
-        registry=os.getenv("DOCKER_REGISTRY"),
         docker_username=os.getenv("DOCKER_USERNAME"),
         docker_password=os.getenv("DOCKER_PASSWORD"),
-        image_name=os.getenv("ON_PREM_GENERATION_IMAGE_NAME"),
-        python_path=get_python_path(),
-        generate_app_dir=str(get_root_absolute_path() / "on_prem_llm_generation_job"),
+        share_dir=share_dir,
     )
 
 

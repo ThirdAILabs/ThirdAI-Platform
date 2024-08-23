@@ -44,6 +44,7 @@ async def startup_event():
     try:
         print("Starting Generation Job...")
         await restart_on_prem_generate_job()
+        await restart_generate_job()
         print("Successfully started Generation Job!")
         print("Adding default workflow types")
         with next(get_session()) as session:

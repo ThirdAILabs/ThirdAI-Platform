@@ -1,6 +1,7 @@
 import json
 import os
 from typing import AsyncGenerator
+from urllib.parse import urljoin
 
 import aiohttp
 
@@ -96,12 +97,51 @@ class CohereLLM(LLMBase):
                     raise Exception(f"Cohere API request failed: {error_message}")
 
 
+class OnPremLLM(LLMBase):
+    async def stream(
+        self, key: str, query: str, model: str
+    ) -> AsyncGenerator[str, None]:
+        backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
+
+        if backend_endpoint is None:
+            raise ValueError("Could not read MODEL_BAZAAR_ENDPOINT.")
+
+        url = urljoin(backend_endpoint, "on-prem-llm/completion")
+
+        headers = {"Content-Type": "application/json"}
+        body = {
+            "prompt": query,
+            "stream": True,
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=body) as response:
+                if response.status != 200:
+                    raise RuntimeError(
+                        f"Failed to connect to LLM server: {response.status}"
+                    )
+
+                async for line in response.content:
+                    line = line.decode("utf-8").strip()
+                    if line.startswith("data: "):
+                        try:
+                            data = json.loads(line[len("data: ") :])
+                            if "content" in data:
+                                yield data["content"]
+                            if data.get("stop", False):
+                                break
+                        except json.JSONDecodeError:
+                            # Handle or log the error as needed
+                            pass
+
+
 model_classes = {
     "openai": OpenAILLM,
     "cohere": CohereLLM,
+    "on-prem": OnPremLLM,
 }
 
 default_keys = {
     "openai": os.getenv("OPENAI_KEY", ""),
     "cohere": os.getenv("COHERE_KEY", ""),
+    "on-prem": "no key",
 }

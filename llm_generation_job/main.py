@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
 
 load_dotenv()
+
+import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from llms import default_keys, model_classes
@@ -18,66 +20,12 @@ app.add_middleware(
 )
 
 
-@app.websocket("/cloud-llm/generate")
+@app.websocket("/generate")
 async def generate(websocket: WebSocket):
     """
     WebSocket endpoint to generate text using a specified generative AI model.
-
-    Parameters:
-    - WebSocket connection.
-
-    Expected Message Format:
-    ```
-    {
-        "query": "Your input text",
-        "model": "Model name",
-        "provider": "AI provider",
-        "key": "Optional API key"
-    }
-    ```
-
-    Response Messages:
-    - Success message with generated content:
-    ```
-    {
-        "status": "success",
-        "content": "Generated text",
-        "end_of_stream": False
-    }
-    ```
-    - Error message in case of invalid arguments:
-    ```
-    {
-        "status": "error",
-        "detail": "Invalid arguments",
-        "errors": [{"loc": ["field"], "msg": "Error message", "type": "error type"}],
-        "end_of_stream": True
-    }
-    ```
-    - Error message in case of missing API key:
-    ```
-    {
-        "status": "error",
-        "detail": "No generative AI key provided",
-        "end_of_stream": True
-    }
-    ```
-    - Error message in case of unsupported provider:
-    ```
-    {
-        "status": "error",
-        "detail": "Unsupported provider",
-        "end_of_stream": True
-    }
-    ```
-    - Error message in case of an unexpected error:
-    ```
-    {
-        "status": "error",
-        "detail": "Unexpected error",
-        "end_of_stream": True
-    }
-    ```
+    Will keep sending content until "end_of_stream" is True.
+    If an error is found, "status" will be "error".
 
     Example:
     1. Client sends:
@@ -173,6 +121,4 @@ async def generate(websocket: WebSocket):
 
 
 if __name__ == "__main__":
-    import uvicorn
-
     uvicorn.run(app, host="localhost", port=8000)

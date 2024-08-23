@@ -4,21 +4,31 @@ job "on-prem-llm-generation" {
   type = "service"
 
   group "on-prem-generation" {
-    count = 1
+    count = 4
 
     scaling {
       enabled = true
       min = 1
-      max = 2
+      max = 30
       policy {
         cooldown = "1m"
-        evaluation_interval = "30s"
+        evaluation_interval = "10s"
+
         check "avg_cpu" {
           source = "nomad-apm"
           query = "avg_cpu-allocated"
           query_window = "3m"
           strategy "target-value" {
-            target = 70
+            target = 30
+          }
+        }
+
+        check "request_count" {
+          source = "nomad-apm"
+          query = "request_count"
+          query_window = "3m"
+          strategy "target-value" {
+            target = 3
           }
         }
       }
@@ -26,9 +36,6 @@ job "on-prem-llm-generation" {
 
     network {
       port "on-prem-generation-http" {
-        {% if platform == "docker" %}
-          to = 80
-        {% endif %}
       }
     }
 
@@ -37,40 +44,39 @@ job "on-prem-llm-generation" {
       port = "on-prem-generation-http"
       provider = "nomad"
 
+      {# This code adds a the prefix 'on-prem-llm' to all endpoints in the service. #}
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.on-prem-generation-http.rule=PathPrefix(`/on-prem-llm/`)",
+        "traefik.http.routers.on-prem-generation-http.rule=PathPrefix(`/on-prem-llm`)",
+        "traefik.http.routers.on-prem-generation-http.middlewares=on-prem-llm-stripprefix",
+        "traefik.http.middlewares.on-prem-llm-stripprefix.stripprefix.prefixes=/on-prem-llm",
         "traefik.http.routers.on-prem-generation-http.priority=10"
       ]
     }
 
     task "backend" {
-      {% if platform == "local" %}
-        driver = "raw_exec"
-      {% elif platform == "docker" %}  
-        driver = "docker"
-
-      {% endif %}
+      driver = "docker"
 
       config {
-        {% if platform == "docker" %}  
-          image = "{{ registry }}/{{ image_name }}:{{ tag }}"
-          image_pull_timeout = "15m"
-          ports = ["on-prem-generation-http"]
-          auth {
-            username = "{{ docker_username }}"
-            password = "{{ docker_password }}"
-            server_address = "{{ registry }}"
-          }
-        {% elif platform == "local" %}
-          command = "{{ python_path }}"
-          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ generate_app_dir }}","--reload","--host","0.0.0.0","--port","${NOMAD_PORT_on_prem_generation_http}"]
-        {% endif %}
+        image = "ghcr.io/ggerganov/llama.cpp:server"
+        image_pull_timeout = "15m"
+        ports = ["on-prem-generation-http"]
+        volumes = ["{{ share_dir }}/gen-ai-models:/gen-ai-models"]
+        auth {
+          username = "{{ docker_username }}"
+          password = "{{ docker_password }}"
+          server_address = "ghrc.io"
+        }
+        args = [
+          "-m", "/gen-ai-models/Phi-3-mini-4k-instruct-q4.gguf",
+          "--host", "0.0.0.0",
+          "--port", "${NOMAD_PORT_on_prem_generation_http}"
+        ]
       }
 
       resources {
-        cpu = 500
-        memory = 3000
+        cores = 10
+        memory = 4000
       }
     }
   }
