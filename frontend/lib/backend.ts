@@ -39,6 +39,7 @@ export async function fetchPrivateModels(name: string) {
     return response.data;
   } catch (error) {
     console.error('Error fetching private models:', error);
+    alert('Error fetching private models:' + error)
     throw new Error('Failed to fetch private models');
   }
 }
@@ -70,6 +71,7 @@ export async function fetchPendingModels(): Promise<PendingModel> {
     return response.data;
   } catch (error) {
     console.error('Error fetching private models:', error);
+    alert('Error fetching private models:' + error)
     throw new Error('Failed to fetch private models');
   }
 }
@@ -102,6 +104,7 @@ export async function listDeployments(deployment_id: string): Promise<Deployment
       return response.data.data;
   } catch (error) {
       console.error('Error listing deployments:', error);
+      alert('Error listing deployments:' + error)
       throw new Error('Failed to list deployments');
   }
 }
@@ -423,6 +426,32 @@ export function stop_workflow(workflowId: string): Promise<StopWorkflowResponse>
   });
 }
 
+interface DeleteWorkflowResponse {
+  status_code: number;
+  message: string;
+}
+
+export async function delete_workflow(workflowId: string): Promise<DeleteWorkflowResponse> {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  const params = new URLSearchParams({ workflow_id: workflowId });
+
+  return new Promise((resolve, reject) => {
+    axios
+      .post<DeleteWorkflowResponse>(`${thirdaiPlatformBaseUrl}/api/workflow/delete?${params.toString()}`)
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        console.error('Error deleting workflow:', err);
+        alert('Error deleting workflow:' + err)
+        reject(new Error('Failed to delete workflow'));
+      });
+  });
+}
+
+
 
 interface WorkflowModel {
   access_level: string;
@@ -473,6 +502,7 @@ export async function getWorkflowDetails(workflowId: string): Promise<WorkflowDe
       })
       .catch((err) => {
         console.error('Error fetching workflow details:', err);
+        alert('Error fetching workflow details:' + err)
         reject(new Error('Failed to fetch workflow details'));
       });
   });
@@ -643,6 +673,7 @@ export function useTokenClassificationEndpoints() {
           })
           .catch((err) => {
             console.error('Error fetching workflow details:', err);
+            alert('Error fetching workflow details:' + err)
           });
     };
     init();
@@ -658,6 +689,7 @@ export function useTokenClassificationEndpoints() {
       return response.data.data;
     } catch (error) {
       console.error('Error predicting tokens:', error);
+      alert('Error predicting tokens:' + error)
       throw new Error('Failed to predict tokens');
     }
   };
@@ -730,6 +762,7 @@ export function useTokenClassificationEndpoints() {
       };
     } catch (error) {
       console.error("Error fetching stats:", error);
+      alert("Error fetching stats:" + error)
       throw new Error("Error fetching stats.");
     }
   });
@@ -849,12 +882,16 @@ export async function fetchAllUsers(): Promise<{ data: UserResponse[] }> {
 
 // MODEL //
 
-export async function updateModelAccessLevel(model_identifier: string, access_level: 'private' | 'protected' | 'public'): Promise<void> {
+export async function updateModelAccessLevel(model_identifier: string, access_level: 'private' | 'protected' | 'public', team_id?: string): Promise<void> {
   const accessToken = getAccessToken(); // Ensure this function is implemented elsewhere in your codebase
 
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
   const params = new URLSearchParams({ model_identifier, access_level });
+
+  if (access_level === 'protected' && team_id) {
+    params.append('team_id', team_id);
+  }
 
   return new Promise((resolve, reject) => {
     axios
@@ -864,6 +901,7 @@ export async function updateModelAccessLevel(model_identifier: string, access_le
       })
       .catch((err) => {
         console.error('Error updating model access level:', err);
+        alert('Error updating model access level:' + err)
         reject(err);
       });
   });
@@ -955,6 +993,7 @@ export async function deleteUserFromTeam(email: string, team_id: string): Promis
       })
       .catch((err) => {
         console.error('Error removing user from team:', err);
+        alert('Error removing user from team:' + err)
         reject(err);
       });
   });
@@ -975,6 +1014,7 @@ export async function deleteTeamById(team_id: string): Promise<void> {
       })
       .catch((err) => {
         console.error('Error deleting team:', err);
+        alert('Error deleting team:' + err)
         reject(err);
       });
   });
@@ -998,6 +1038,7 @@ export async function deleteUserAccount(email: string): Promise<void> {
       })
       .catch((err) => {
         console.error('Error deleting user:', err);
+        alert('Error deleting user:' + err)
         reject(err);
       });
   });
@@ -1018,6 +1059,7 @@ export async function updateModel(modelIdentifier: string): Promise<void> {
       })
       .catch((err) => {
         console.error('Error updating model:', err);
+        alert('Error updating model:' + err)
         reject(err);
       });
   });

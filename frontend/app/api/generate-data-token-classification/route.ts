@@ -159,6 +159,7 @@ export const POST = async (req: NextRequest) => {
     return NextResponse.json({ syntheticDataPairs, prompts: { templatePrompt, entityValuePrompts } });
   } catch (error) {
     console.error('Error generating data:', error);
+    alert('Error generating data:' + error)
     return NextResponse.json({ error: 'Error generating data' }, { status: 500 });
   }
 };

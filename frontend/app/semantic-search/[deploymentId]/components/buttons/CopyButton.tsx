@@ -47,6 +47,7 @@ export default function CopyButton({ toCopy }: { toCopy: string }) {
                     })
                     .catch(error => {
                         console.error("Error recording event:", error);
+                        alert("Error recording event:" + error)
                     });
                     }}
                     text="Copied to clipboard!"

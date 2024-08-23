@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 
 from sqlalchemy import (
+    ARRAY,
     JSON,
     Boolean,
     Column,
@@ -18,6 +19,11 @@ from sqlalchemy.dialects.postgresql import ENUM, UUID
 from sqlalchemy.orm import declarative_base, relationship, validates
 
 SQLDeclarativeBase = declarative_base()
+
+
+class UDT_Task(str, enum.Enum):
+    TEXT = "text"
+    TOKEN = "token"
 
 
 class Status(str, enum.Enum):
@@ -192,6 +198,13 @@ class Model(SQLDeclarativeBase):
         "ModelPermission", back_populates="model", cascade="all, delete-orphan"
     )
 
+    # TODO support sharded model names
+    def get_train_job_name(self):
+        return f"train-{self.id}-{self.type}-{self.sub_type}"
+
+    def get_deployment_name(self):
+        return f"deployment-{self.id}"
+
     def get_default_permission(self):
         return self.default_permission
 
@@ -202,6 +215,22 @@ class Model(SQLDeclarativeBase):
             r"^[\w-]+$", name
         ), "Model name should only contain alphanumeric characters, underscores, and hyphens"
         return name
+
+    @validates("access_level")
+    def validate_access_level(self, key, access_level):
+        # If access level is 'protected', ensure team_id is not None
+        if access_level == Access.protected and self.team_id is None:
+            raise ValueError("team_id cannot be None when access_level is 'protected'.")
+
+        return access_level
+
+    @validates("team_id")
+    def validate_team_id(self, key, team_id):
+        # For protected access, team_id should not be None
+        if self.access_level == Access.protected and team_id is None:
+            raise ValueError("team_id cannot be None when access_level is 'protected'.")
+
+        return team_id
 
     def get_user_permission(self, user):
         # check whether we can find permission in explicit permissions first
@@ -427,3 +456,15 @@ class WorkflowModel(SQLDeclarativeBase):
             name="unique_workflow_model_component",
         ),
     )
+
+
+class Catalog(SQLDeclarativeBase):
+    __tablename__ = "catalog"
+
+    id = Column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    name = Column(String(100), nullable=False)
+    task = Column(ENUM(UDT_Task), nullable=False)
+    num_generated_samples = Column(Integer)
+    target_labels = Column(ARRAY(String), nullable=False)

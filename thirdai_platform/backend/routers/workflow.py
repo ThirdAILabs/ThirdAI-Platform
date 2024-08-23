@@ -692,10 +692,10 @@ def start_workflow(
                 )
             memory = (size_in_memory // 1000000) + 1000  # MB required for deployment
 
-            try:
-                work_dir = os.getcwd()
-                platform = get_platform()
+            work_dir = os.getcwd()
+            platform = get_platform()
 
+            try:
                 submit_nomad_job(
                     str(
                         Path(work_dir)
@@ -732,11 +732,11 @@ def start_workflow(
                     aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
                 )
 
-                model.deploy_status = schema.Status.in_progress
+                model.deploy_status = schema.Status.starting
                 session.commit()
-
             except Exception as err:
                 model.deploy_status = schema.Status.failed
+                workflow.status = schema.WorkflowStatus.inactive
                 session.commit()
                 raise Exception(str(err))
 

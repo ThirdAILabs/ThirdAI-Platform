@@ -35,14 +35,22 @@ export function ModelsTable({
   // Hardcode the model display
   let modelsPerPage = 5;
 
+  const [currentPage, setCurrentPage] = useState(Math.ceil(offset / modelsPerPage) + 1);
+
   let router = useRouter();
 
   function prevPage() {
-    router.back();
+    if (offset >= modelsPerPage) {
+      const newOffset = offset - modelsPerPage;
+      router.push(`/?q=${searchStr}&offset=${newOffset}`, { scroll: false });
+    }
   }
 
   function nextPage() {
-    router.push(`/?offset=${offset}`, { scroll: false });
+    if (offset + modelsPerPage < totalWorkflows) {
+      const newOffset = offset + modelsPerPage;
+      router.push(`/?q=${searchStr}&offset=${newOffset}`, { scroll: false });
+    }
   }
 
   const [privateModels, setPrivateModels] = useState<SelectModel[]>([])
@@ -106,6 +114,13 @@ export function ModelsTable({
 
   const totalWorkflows = workflows.length;
 
+  // const displayedWorkflows = workflows.slice(offset, offset + modelsPerPage);
+  const filteredWorkflows = workflows.filter(workflow =>
+    workflow.name.toLowerCase().includes(searchStr.toLowerCase())
+  );
+  const displayedWorkflows = filteredWorkflows.slice(offset, offset + modelsPerPage);
+
+
   return (
     <Card>
       <CardHeader>
@@ -125,9 +140,7 @@ export function ModelsTable({
               <TableHead>Status</TableHead>
               <TableHead className="hidden md:table-cell">Type</TableHead>
               <TableHead className="hidden md:table-cell">Published on</TableHead>
-              <TableHead className="hidden md:table-cell">Description</TableHead>
-              <TableHead className="hidden md:table-cell">Endpoint</TableHead>
-              <TableHead className="hidden md:table-cell">Deploy</TableHead>
+              <TableHead className="hidden md:table-cell">Action</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
               </TableHead>
@@ -140,10 +153,13 @@ export function ModelsTable({
 
             {pendingModels.map((model, index) => (
                 <Model key={index + 100} model={model} pending = {true} />
-            ))} */}
+            ))}  */}
 
-            {workflows.map((workflow, index) => (
+            {/* {workflows.map((workflow, index) => (
                 <WorkFlow key={index + 200} workflow={workflow} />
+            ))} */}
+            {displayedWorkflows.map((workflow, index) => (
+              <WorkFlow key={index + 200} workflow={workflow} />
             ))}
           </TableBody>
         </Table>
@@ -153,27 +169,27 @@ export function ModelsTable({
           <div className="text-xs text-muted-foreground">
             Showing{' '}
             <strong>
-              {Math.min(offset - modelsPerPage, totalWorkflows) + 1}-{offset}
+              {Math.min(offset + 1, totalWorkflows)}-{Math.min(offset + modelsPerPage, totalWorkflows)}
             </strong>{' '}
-            of <strong>{totalWorkflows}</strong> models
+            of <strong>{totalWorkflows}</strong> workflows
           </div>
           <div className="flex">
             <Button
-              formAction={prevPage}
+              onClick={prevPage}
               variant="ghost"
               size="sm"
-              type="submit"
-              disabled={offset === modelsPerPage}
+              type="button"
+              disabled={offset <= 0}
             >
               <ChevronLeft className="mr-2 h-4 w-4" />
               Prev
             </Button>
             <Button
-              formAction={nextPage}
+              onClick={nextPage}
               variant="ghost"
               size="sm"
-              type="submit"
-              disabled={offset + modelsPerPage > totalWorkflows}
+              type="button"
+              disabled={offset + modelsPerPage >= totalWorkflows}
             >
               Next
               <ChevronRight className="ml-2 h-4 w-4" />

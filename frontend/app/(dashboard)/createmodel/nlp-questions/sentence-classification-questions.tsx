@@ -8,6 +8,11 @@ interface SCQQuestionsProps {
   answer: string;
 }
 
+type Category = {
+  name: string;
+  example: string;
+};
+
 type GeneratedData = {
   category: string;
   examples: string[];
@@ -43,6 +48,21 @@ const SCQQuestions = ({ question, answer }: SCQQuestionsProps) => {
     setCategories(categories.filter((_, i) => i !== index));
   };
 
+  const validateCategories = () => {
+    // Check if any category has an empty name or example
+    return categories.every((category: Category) => {
+      return category.name && category.example
+    });
+  };
+
+  const validateLabels = () => {
+    // ensure that category.name does not contain space
+    return categories.every((category: Category) => {
+      return !category.name.includes(' ');
+    });
+  };
+
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     console.log('Categories and examples:', categories);
@@ -50,6 +70,29 @@ const SCQQuestions = ({ question, answer }: SCQQuestionsProps) => {
 
     setShowReview(true);
   };
+
+  const handleReview = () => {
+    if (validateCategories()) {
+      if (validateLabels()) {
+        setShowReview(true);
+        return true;
+      } else {
+        alert('CategoryName field should not have any space.');
+        return false;
+      }
+    } else {
+      alert('All fields (CategoryName, Example) must be filled for each category.');
+      return false;
+    }
+  };
+
+  const handleAddAndReviewCategory = () => {
+    const reviewSuccess = handleReview();
+    if (reviewSuccess) {
+      handleAddCategory();
+    }
+  };
+
 
   const generateData = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -84,6 +127,7 @@ const SCQQuestions = ({ question, answer }: SCQQuestionsProps) => {
       setIsDataGenerating(false);
     } catch (error) {
       console.error('Error generating data:', error);
+      alert('Error generating data:' + error)
       setIsDataGenerating(false);
     }
   };
@@ -139,7 +183,7 @@ const SCQQuestions = ({ question, answer }: SCQQuestionsProps) => {
             </button>
           </div>
         ))}
-        <button type="button" className='bg-blue-500 text-white px-4 py-2 rounded-md mt-2 mr-2' onClick={handleAddCategory}>
+        <button type="button" className='bg-blue-500 text-white px-4 py-2 rounded-md mt-2 mr-2' onClick={handleAddAndReviewCategory}>
           Add Category
         </button>
         <button type="button" className='bg-green-500 text-white px-4 py-2 rounded-md mt-2' onClick={() => { setShowReview(true) }}>Finish and Review</button>

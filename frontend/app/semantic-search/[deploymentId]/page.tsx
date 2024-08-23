@@ -178,6 +178,7 @@ function App() {
                 newModelService.sources().then(setSources);
             } catch (error) {
                 console.error('Failed to fetch workflow details:', error);
+                alert('Failed to fetch workflow details:' + error)
             }
         };
     
@@ -224,7 +225,114 @@ function App() {
             });
     }
 
-    function submit(query: string, genaiPrompt: string) {
+    interface PiiMapValue {
+        id: number;
+        originalToken: string;
+        tag: string;
+    }    
+
+    async function submit(query: string, genaiPrompt: string) {
+        function replacePlaceholdersWithOriginal(text: string, piiMap: Map<string, PiiMapValue>): string {
+            const placeholderPattern = /\[([A-Z]+) #(\d+)\]/g;
+            return text.replace(placeholderPattern, (match, tag, id) => {
+                // Find the original value in piiMap by ID
+                for (const [originalSentence, value] of piiMap.entries()) {
+                    if (value.id.toString() === id && value.tag === tag) {
+                        return originalSentence;
+                    }
+                }
+                return match; // Return the placeholder if no match is found (should not happen)
+            });
+        }
+    
+        async function replacePIIWithPlaceholders(content: string, piiMap: Map<string, PiiMapValue>): Promise<string> {
+            function getSubstringOverlap(str1: string, str2: string): number {
+                const len1 = str1.length;
+                const len2 = str2.length;
+            
+                let maxOverlap = 0;
+                for (let i = 0; i < len1; i++) {
+                    for (let j = 0; j < len2; j++) {
+                        let overlap = 0;
+                        while (i + overlap < len1 && j + overlap < len2 && str1[i + overlap] === str2[j + overlap]) {
+                            overlap++;
+                        }
+                        maxOverlap = Math.max(maxOverlap, overlap);
+                    }
+                }
+                return maxOverlap;
+            }
+            
+            const prediction = await modelService!.piiDetect(content);
+            const { tokens, predicted_tags } = prediction;
+    
+            // Step 1: Concatenate tokens into sentences
+            let sentences: string[] = [];
+            let sentenceTags: string[] = [];
+            let currentSentence = '';
+            let currentTag = '';
+        
+            for (let i = 0; i < tokens.length; i++) {
+                const word = tokens[i];
+                const tag = predicted_tags[i][0];
+                // console.log('tag:', tag)
+        
+                if (tag === currentTag) {
+                    currentSentence += ` ${word}`;
+                } else {
+                    if (currentSentence) {
+                        sentences.push(currentSentence.trim());
+                        sentenceTags.push(currentTag);
+                    }
+                    currentSentence = word;
+                    currentTag = tag;
+                }
+            }
+        
+            // Push the last sentence and tag
+            if (currentSentence) {
+                sentences.push(currentSentence.trim());
+                sentenceTags.push(currentTag);
+            }
+       
+            // console.log('sentences:', sentences)
+            // console.log('sentenceTags:', sentenceTags)
+    
+    
+            // Step 2: Operate on the level of sentences
+            let currentId = piiMap.size + 1;
+            const processedSentences = sentences.map((sentence, index) => {
+                const tag = sentenceTags[index];
+        
+                if (tag !== 'O') {
+                    // Filter existing entries in piiMap by the same tag
+                    const filteredMapEntries = Array.from(piiMap.entries()).filter(([_, value]) => value.tag === tag);
+        
+                    let matchedEntry: [string, PiiMapValue] | undefined;
+                    
+                    // Check for substring overlap
+                    for (const [existingToken, value] of filteredMapEntries) {
+                        if (getSubstringOverlap(sentence, value.originalToken) > 5) {
+                            matchedEntry = [existingToken, value];
+                            break;
+                        }
+                    }
+        
+                    if (matchedEntry) {
+                        return `[${tag} #${matchedEntry[1].id}]`;
+                    } else {
+                        piiMap.set(sentence, { id: currentId, originalToken: sentence, tag });
+                        currentId++;
+                        return `[${tag} #${piiMap.get(sentence)?.id}]`;
+                    }
+                } else {
+                    return sentence;
+                }
+            });
+        
+            return processedSentences.join(" ");
+        }
+
         if (websocketRef.current) {
             websocketRef.current.close();
         }
@@ -234,14 +342,61 @@ function App() {
         setCheckedIds(new Set<number>());
         setCanSearchMore(true);
         setNumReferences(c.numReferencesFirstLoad);
+
         if (query.trim().length > 0) {
-            getResults(
-                query,
-                c.numReferencesFirstLoad + 1 * c.numReferencesLoadMore,
-            ).then((results) => {
-                if (results &&
-                    ifGenerationOn // turn on generation only if specified
-                ) {
+            if (ifGuardRailOn) {
+                // Case 1: Guardrail is ON
+                const piiMap = new Map<string, PiiMapValue>();
+    
+                const results = await getResults(
+                    query,
+                    c.numReferencesFirstLoad + 1 * c.numReferencesLoadMore
+                );
+    
+                if (results && ifGenerationOn) {
+                    const processedReferences = await Promise.all(
+                        results.references.map(async (reference) => {
+                            const processedContent = await replacePIIWithPlaceholders(reference.content, piiMap);
+                            return { ...reference, content: processedContent };
+                        })
+                    );
+    
+                    const processedQuery = await replacePIIWithPlaceholders(query, piiMap);
+    
+                    console.log('processedQuery:', processedQuery);
+                    console.log('piiMap:', piiMap);
+                    console.log('processedReferences:');
+                    processedReferences.forEach(reference => {
+                        console.log(reference.content);
+                    });
+    
+                    modelService!.generateAnswer(
+                        processedQuery,
+                        `${genaiPrompt}. [TAG #id] is sensitive information replaced as a placeholder, use them in your response for consistency.`,
+                        processedReferences,
+                        websocketRef,
+                        (next) => {                        
+                            setAnswer((prev) => {
+                                // Concatenate previous answer and the new part
+                                const fullAnswer = prev + next;
+                                
+                                // Replace placeholders in the concatenated string
+                                const replacedAnswer = replacePlaceholdersWithOriginal(fullAnswer, piiMap);
+                                
+                                // Return the final processed answer to update the state
+                                return replacedAnswer;
+                            });
+                        },
+                    );
+                }
+            } else {
+                // Case 2: Guardrail is OFF (Normal generation)
+                const results = await getResults(
+                    query,
+                    c.numReferencesFirstLoad + 1 * c.numReferencesLoadMore
+                );
+    
+                if (results && ifGenerationOn) {
                     modelService!.generateAnswer(
                         query,
                         genaiPrompt,
@@ -250,12 +405,13 @@ function App() {
                         (next) => setAnswer((prev) => prev + next),
                     );
                 }
-            });
+            }
         } else {
             setResults(null);
             setAnswer("");
         }
     }
+
 
     function regenerateWithSelectedReferences() {
         setAnswer("");

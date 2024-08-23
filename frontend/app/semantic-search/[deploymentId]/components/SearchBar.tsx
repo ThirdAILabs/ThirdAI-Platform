@@ -190,6 +190,7 @@ export default function SearchBar({
             })
             .catch((error) => {
                 console.error("Error overriding model:", error);
+                alert("Error overriding model:" + error)
                 const errorMessage =
                     typeof error === "string"
                         ? error
@@ -212,6 +213,7 @@ export default function SearchBar({
             })
             .catch((error) => {
                 console.error("Error overriding model:", error);
+                alert("Error overriding model:" + error)
                 const errorMessage =
                     typeof error === "string"
                         ? error
@@ -221,7 +223,6 @@ export default function SearchBar({
     };
 
     const handleSubmit = () => {
-        console.log("submit");
         onSubmit(query, prompt)
 
         // Create a telemetry event
@@ -241,6 +242,7 @@ export default function SearchBar({
             })
             .catch(error => {
                 console.error("Error recording event:", error);
+                alert("Error recording event:" + error)
             });
 
     };

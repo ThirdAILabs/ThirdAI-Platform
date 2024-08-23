@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
-import { Workflow, validate_workflow, start_workflow, stop_workflow } from '@/lib/backend';
+import { Workflow, validate_workflow, start_workflow, stop_workflow, delete_workflow } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
 
 export function WorkFlow({ workflow }: { workflow: Workflow }) {
@@ -61,6 +61,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       } catch (e) {
         setIsValid(false);
         console.error('Validation failed.', e);
+        alert('Validation failed.' + e)
       }
     }, 3000); // Adjust the interval as needed, e.g., every 5 seconds
 
@@ -76,7 +77,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       }
     } catch (e) {
       console.error('Failed to start workflow.', e);
-      alert('Failed to start the workflow.');
+      alert('Failed to start the workflow.' + e);
     }
   };
 
@@ -154,30 +155,16 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
             })
         }
       </TableCell>
-      <TableCell className="hidden md:table-cell">&apos;N\A&apos;</TableCell>
       <TableCell className="hidden md:table-cell">
-        <button type="button" 
-                onClick={goToEndpoint}
-                className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-full text-sm p-2.5 text-center inline-flex items-center me-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
-          <svg className="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
-          <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M1 5h12m0 0L9 1m4 4L9 9"/>
-          </svg>
-          <span className="sr-only">Go to endpoint</span>
-        </button>
-      </TableCell>
-      <TableCell className="hidden md:table-cell">
-        {
-          isValid
-          &&
-          <button type="button" 
-                  onClick={handleDeploy}
-                  className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-full text-sm p-2.5 text-center inline-flex items-center me-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
-            <svg className="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
-              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M1 5h12m0 0L9 1m4 4L9 9"/>
-            </svg>
-            <span className="sr-only">Deploy</span>
-          </button>
-        }
+        <Button
+          onClick={deployStatus === 'Inactive' ? handleDeploy : goToEndpoint}
+          className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm p-2.5 text-center inline-flex items-center me-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+        >
+          <span className="sr-only">
+            {deployStatus === 'Inactive' ? 'Start' : 'Go to endpoint'}
+          </span>
+          {deployStatus === 'Inactive' ? 'Start' : 'Go to endpoint'}
+        </Button>
       </TableCell>
       <TableCell>
         <DropdownMenu>
@@ -210,6 +197,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
                         setDeployStatus('Inactive');
                       } catch (error) {
                         console.error('Error undeploying workflow:', error);
+                        alert('Error undeploying workflow:' + error)
                       }
                     }}
                   >
@@ -219,6 +207,25 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
               </DropdownMenuItem>
               </>
             }
+            <DropdownMenuItem>
+              <form>
+                <button type="button"
+                  onClick={async () => {
+                    if (window.confirm('Are you sure you want to delete this workflow?')) {
+                      try {
+                        const response = await delete_workflow(workflow.id);
+                        console.log('Workflow deleted successfully:', response);
+                      } catch (error) {
+                        console.error('Error deleting workflow:', error);
+                        alert('Error deleting workflow:' + error)
+                      }
+                    }
+                  }}
+                >
+                  Delete Workflow
+                </button>
+              </form>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>

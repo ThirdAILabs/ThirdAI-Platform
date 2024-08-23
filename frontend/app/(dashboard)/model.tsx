@@ -72,6 +72,7 @@ export function Model({ model, pending }: { model: SelectModel, pending?: boolea
                       })
                       .catch((error) => {
                           console.error('Error listing deployments:', error);
+                          alert('Error listing deployments:' + error);
                       });
 
                     } else if (response.data.deploy_status === 'in_progress') {
@@ -92,6 +93,7 @@ export function Model({ model, pending }: { model: SelectModel, pending?: boolea
                       setDeployStatus('Ready to Deploy')
                     } else {
                       console.error('Error fetching deployment status:', error);
+                      alert('Error fetching deployment status:' + error);
                     }
                   });
                 }
@@ -113,6 +115,7 @@ export function Model({ model, pending }: { model: SelectModel, pending?: boolea
                 setDeployStatus('Ready to Deploy')
               } else {
                 console.error('Error fetching deployment status:', error);
+                alert('Error fetching deployment status:' + error)
               }
             });
           }
@@ -136,6 +139,7 @@ export function Model({ model, pending }: { model: SelectModel, pending?: boolea
                 setDeployStatus('Ready to Deploy');
               } else {
                 console.error('Error fetching deployment status:', error);
+                alert('Error fetching deployment status:' + error)
               }
             });
           }
@@ -215,6 +219,7 @@ export function Model({ model, pending }: { model: SelectModel, pending?: boolea
             })
             .catch((error) => {
                 console.error('Error listing deployments:', error);
+                alert('Error listing deployments:' + error)
             });
 
           } else if (response.data.deploy_status === 'in_progress') {
@@ -238,6 +243,7 @@ export function Model({ model, pending }: { model: SelectModel, pending?: boolea
               })
               .catch((error) => {
                 console.error('Error deploying model:', error);
+                alert('Error deploying model:' + error)
               });
 
           }
@@ -258,9 +264,11 @@ export function Model({ model, pending }: { model: SelectModel, pending?: boolea
               })
               .catch((error) => {
                 console.error('Error deploying model:', error);
+                alert('Error deploying model:' + error)
               });
           } else {
             console.error('Error fetching deployment status:', error);
+            alert('Error fetching deployment status:' + error)
           }
         });
       }
@@ -335,6 +343,7 @@ export function Model({ model, pending }: { model: SelectModel, pending?: boolea
                             })
                             .catch((error) => {
                               console.error('Error deploying model:', error);
+                              alert('Error deploying model:' + error)
                             });
                     }
 
@@ -384,6 +393,7 @@ export function Model({ model, pending }: { model: SelectModel, pending?: boolea
                                   })
                                   .catch((error) => {
                                     console.error('Error deploying model:', error);
+                                    alert('Error deploying model:' + error)
                                   });
     
                               }
@@ -413,11 +423,13 @@ export function Model({ model, pending }: { model: SelectModel, pending?: boolea
                                   })
                                   .catch((error) => {
                                     console.error('Error deploying model:', error);
+                                    alert('Error deploying model:' + error)
                                   });
     
     
                               } else {
                                 console.error('Error fetching deployment status:', error);
+                                alert('Error fetching deployment status:' + error)
                               }
                             });
                         }
@@ -465,6 +477,7 @@ export function Model({ model, pending }: { model: SelectModel, pending?: boolea
                       .catch((error) => {
                         // Handle error, e.g., display an error message
                         console.error("Failed to stop deployment:", error);
+                        alert("Failed to stop deployment:" + error)
                         // Add any additional error handling logic here
                       });
                   }}

@@ -3,7 +3,7 @@ import time
 from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
 from permissions import Permissions
-from pydantic_models.inputs import BaseQueryParams
+from pydantic_models.inputs import BaseQueryParams, SearchResultsTokenClassification
 from routers.model import get_model
 from throughput import Throughput
 from utils import propagate_error, response
@@ -49,11 +49,13 @@ def udt_query(
 
     results = model.predict(**params, token=token)
 
-    tokens_identified.log(
-        len([tags[0] for tags in results.predicted_tags if tags[0] != "O"])
-    )
-    queries_ingested.log(1)
-    queries_ingested_bytes.log(len(params["query"]))
+    # TODO(pratik/geordie/yash): Add logging for search results text classification
+    if isinstance(results, SearchResultsTokenClassification):
+        tokens_identified.log(
+            len([tags[0] for tags in results.predicted_tags if tags[0] != "O"])
+        )
+        queries_ingested.log(1)
+        queries_ingested_bytes.log(len(params["query"]))
 
     return response(
         status_code=status.HTTP_200_OK,

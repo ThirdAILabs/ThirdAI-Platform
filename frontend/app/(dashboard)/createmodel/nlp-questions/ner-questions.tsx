@@ -21,17 +21,19 @@ const predefinedChoices = [
 ];
 
 interface NERQuestionsProps {
+  workflowNames: string[];
   onCreateModel?: (modelId: string) => void;
   stayOnPage?: boolean;
+  appName?: string;
 };
 
-const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
-  const [modelName, setModelName] = useState("");
+const NERQuestions = ({ workflowNames, onCreateModel, stayOnPage, appName }: NERQuestionsProps) => {
+  const [modelName, setModelName] = useState(!appName ? '' : appName);
   const [categories, setCategories] = useState([{ name: '', example: '', description: '' }]);
   const [isDataGenerating, setIsDataGenerating] = useState(false);
   const [generatedData, setGeneratedData] = useState([]);
   const [generateDataPrompt, setGenerateDataPrompt] = useState('');
-  
+
   const router = useRouter();
 
   const handleCategoryChange = (index: number, field: keyof Category, value: string) => {
@@ -42,6 +44,41 @@ const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
 
   const handleAddCategory = () => {
     setCategories([...categories, { name: '', example: '', description: '' }]);
+  };
+
+  const validateCategories = () => {
+    // Check if any category has an empty name, example, or description
+    return categories.every((category: Category) => {
+      return category.name && category.example && category.description;
+    });
+  };
+
+  const validateTags = () => {
+    // ensure that category.name does not contain space
+    return categories.every((category: Category) => {
+      return !category.name.includes(' ');
+    });
+  };
+
+  const handleReview = () => {
+    if (validateCategories()) {
+      if (validateTags()) {
+        return true;
+      } else {
+        alert('Category Name should not have any space.');
+        return false;
+      }
+    } else {
+      alert('All fields (Category Name, Example, Description) must be filled for each category.');
+      return false;
+    }
+  };
+
+  const handleAddAndReviewCategory = () => {
+    const reviewSuccess = handleReview();
+    if (reviewSuccess) {
+      handleAddCategory();
+    }
   };
 
   const handleRemoveCategory = (index: number) => {
@@ -62,6 +99,11 @@ const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
         alert("All tokens must have a name, example, and description.");
         return;
       }
+    }
+
+    const reviewSuccess = handleReview();
+    if (!reviewSuccess) {
+      return;
     }
 
     if (isDataGenerating) {
@@ -93,6 +135,7 @@ const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
       setIsDataGenerating(false);
     } catch (error) {
       console.error('Error generating data:', error);
+      alert('Error generating data:' + error)
       setIsDataGenerating(false);
     }
   };
@@ -126,9 +169,9 @@ const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
       alert("Please enter a model name.");
       return;
     }
-  
+
     const tags = Array.from(new Set(categories.map(cat => cat.name)));
-  
+
     try {
       const modelResponse = await trainTokenClassifier(modelName, generatedData, tags);
       const modelId = modelResponse.data.model_id;
@@ -137,22 +180,23 @@ const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
       if (onCreateModel) {
         onCreateModel(modelId);
       }
-  
+
+
       // Create workflow after model creation
       const workflowName = modelName;
       const workflowTypeName = "nlp"; // Assuming this is the type for NER workflows
       const workflowResponse = await create_workflow({ name: workflowName, typeName: workflowTypeName });
       const workflowId = workflowResponse.data.workflow_id;
-  
+
       // Add the model to the workflow with the appropriate component
       const addModelsResponse = await add_models_to_workflow({
         workflowId,
         modelIdentifiers: [modelId],
         components: ['nlp'], // Specific to this use case
       });
-  
+
       console.log('Workflow and model addition successful:', addModelsResponse);
-  
+
       if (!stayOnPage) {
         router.push("/");
       }
@@ -160,7 +204,7 @@ const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
       console.log(e || 'Failed to create NER model and workflow');
     }
   };
-  
+
 
   return (
     <div>
@@ -168,22 +212,31 @@ const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
       <Input
         className="text-md"
         value={modelName}
-        onChange={(e) => setModelName(e.target.value)}
+        onChange={(e) => {
+          const name = e.target.value;
+          if (workflowNames.includes(name)) {
+            // Notify the user about the duplicate name
+            alert("A workflow with the same name has been created. Please choose a different name.");
+          } else {
+            setModelName(name);
+          }
+        }}
         placeholder="Enter app name"
-        style={{marginTop: "10px"}}
+        style={{ marginTop: "10px" }}
+        disabled={appName ? true : false}
       />
       {
         generatedData.length === 0 && <>
-          <span className="block text-lg font-semibold" style={{marginTop: "20px"}}>Specify Tokens</span>
+          <span className="block text-lg font-semibold" style={{ marginTop: "20px" }}>Specify Tokens</span>
           <form onSubmit={handleSubmit}>
-            <div style={{display: "flex", flexDirection: "column", marginTop: "10px"}}>
+            <div style={{ display: "flex", flexDirection: "column", marginTop: "10px" }}>
 
               {categories.map((category, index) => (
-                <div key={index} style={{display: "flex", flexDirection: "row", gap: "10px", justifyContent: "space-between"}}>
-                  <div style={{width: "100%"}}>
+                <div key={index} style={{ display: "flex", flexDirection: "row", gap: "10px", justifyContent: "space-between" }}>
+                  <div style={{ width: "100%" }}>
                     <Input
                       list={`category-options-${index}`}
-                      style={{width: "100%"}}
+                      style={{ width: "100%" }}
                       className="text-md"
                       placeholder="Category Name"
                       value={category.name}
@@ -196,14 +249,14 @@ const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
                     </datalist>
                   </div>
                   <Input
-                    style={{width: "100%"}}
+                    style={{ width: "100%" }}
                     className="text-md"
                     placeholder="Example"
                     value={category.example}
                     onChange={(e) => handleCategoryChange(index, 'example', e.target.value)}
                   />
                   <Input
-                    style={{width: "100%"}}
+                    style={{ width: "100%" }}
                     className="text-md"
                     placeholder="What this category is about."
                     value={category.description}
@@ -214,12 +267,12 @@ const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
                   </Button>
                 </div>
               ))}
-              <Button style={{marginTop: "10px", width: "fit-content"}} onClick={handleAddCategory}>
+              <Button style={{ marginTop: "10px", width: "fit-content" }} onClick={handleAddAndReviewCategory}>
                 Add Category
               </Button>
               {
                 categories.length > 0 &&
-                <Button variant={isDataGenerating ? "secondary" : "default"} style={{marginTop: "30px"}} onClick={generateData}>
+                <Button variant={isDataGenerating ? "secondary" : "default"} style={{ marginTop: "30px" }} onClick={generateData}>
                   {isDataGenerating ? "Generating data..." : "Generate data"}
                 </Button>
               }
@@ -237,8 +290,8 @@ const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
       {
         generatedData.length > 0 && (
           <>
-            <h3 className='text-lg font-semibold' style={{marginTop: "20px"}}>Categories and Examples</h3>
-            <Table style={{marginTop: "10px"}}>
+            <h3 className='text-lg font-semibold' style={{ marginTop: "20px" }}>Categories and Examples</h3>
+            <Table style={{ marginTop: "10px" }}>
               <TableHeader>
                 <TableRow>
                   <TableHead>Category</TableHead>
@@ -260,7 +313,7 @@ const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
         )
       }
 
-      {! isDataGenerating && generatedData.length > 0 && (
+      {!isDataGenerating && generatedData.length > 0 && (
         <div className='mt-5'>
           <h3 className='mb-3 text-lg font-semibold'>Generated Data</h3>
           <div>
@@ -271,11 +324,11 @@ const NERQuestions = ({ onCreateModel, stayOnPage }: NERQuestionsProps) => {
             ))}
           </div>
 
-          <div style={{display: "flex", flexDirection: "row", justifyContent: "space-between", gap: "10px", marginTop: "20px"}}>
-            <Button variant="outline" style={{width: "100%"}} onClick={() => setGeneratedData([])}>
+          <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", gap: "10px", marginTop: "20px" }}>
+            <Button variant="outline" style={{ width: "100%" }} onClick={() => setGeneratedData([])}>
               Redefine Tokens
             </Button>
-            <Button style={{width: "100%"}} onClick={handleCreateNERModel}>
+            <Button style={{ width: "100%" }} onClick={handleCreateNERModel}>
               Create
             </Button>
           </div>

@@ -88,6 +88,15 @@ Without this process, it is cumbersome to test out platform changes. We would ha
       uvicorn main:app --reload --host 0.0.0.0 --port 8000
       ```
 
+13. **Insert existing datasets in DB:**
+    - These existing datasets are present in the share directory of blade. 
+    - Make sure you are on blade when you insert the datasets
+    - Go to `thirdai_platform` folder and run
+      ```
+      python3 insert_datasets.py
+      ```
+    - The datasets should now reflect in your catalog table of db
+    - The datasets will be saved in `datasets` folder inside your `SHARE_DIR`  
 
 Extra steps that may help:
 - Click the Apple icon at the top left of the screen, go to System Settings/Preferences -> Network -> Wi-Fi (or ethernet, whatever you are connected to) -> Details (next to the network you are connected to) -> TCP/IP, and where it says "Configure IPv6", change the value to "Link-Local Only". Click Ok to save the changes.
@@ -103,3 +112,4 @@ Extra steps that may help:
 ### Setting up HashiCorp Vault
 You can use the following instructions to set it up:
 https://waytohksharma.medium.com/install-hashicorp-vault-on-mac-fdbd8cd9113b
+

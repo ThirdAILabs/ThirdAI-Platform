@@ -160,19 +160,20 @@ export default function Reference({
 
     useEffect(()=>{
         if (ifGuardRailOn) {
-            console.log('info.content', info.content)
+            // console.log('info.content', info.content)
     
             // Call piiDetect and handle the promise with .then
             modelService.piiDetect(info.content)
             .then(result => {
-                console.log('result', result);
+                // console.log('result', result);
                 setPrediction(result);
             })
             .catch(error => {
                 console.error('Error detecting PII:', error);
+                alert('Error detecting PII:' + error)
             });
         }
-    },[info])
+    },[info, ifGuardRailOn])
 
     useEffect(() => {
         const { tokens, predicted_tags } = prediction;
@@ -206,7 +207,7 @@ export default function Reference({
             result.push([currentSentence.trim(), currentTag]);
         }
 
-        console.log('trans result', result)
+        // console.log('trans result', result)
 
         // console.log('newtransformedPrediction', result);
         // setTransformedPrediction(result);
@@ -240,6 +241,7 @@ export default function Reference({
                         })
                         .catch(error => {
                             console.error("Error recording event:", error);
+                            alert("Error recording event:" + error)
                         });
                 }} target={"_blank"}>
                     {info.sourceName}

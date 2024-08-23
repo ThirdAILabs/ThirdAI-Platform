@@ -1,0 +1,59 @@
+job "GenerateData-{{ data_id }}" {
+  datacenters = ["dc1"]
+
+  type = "batch"
+
+  group "generate-data-job" {
+    count = 1
+
+    task "server" {
+
+      {% if platform == "docker" %}
+      driver = "docker"
+      {% elif platform == "local" %}
+      driver = "raw_exec"
+      {% endif %}
+
+      env {
+        DATA_ID = "{{ data_id }}"
+        DATA_CATEGORY = "{{ data_category }}"
+        LLM_PROVIDER = "{{ llm_provider }}"
+        GENAI_KEY = "{{ genai_key }}"
+        TASK_PROMPT = "{{ task_prompt }}"
+
+        {%- for key, value in extra_options.items() %}
+        {{ key | upper }} = "{{ value }}"
+        {%- endfor %}
+
+        {% if platform == "docker" %}
+        MODEL_BAZAAR_DIR = "/model_bazaar"
+        {% elif platform == "local" %}
+        MODEL_BAZAAR_DIR = "{{ share_dir }}"
+        {% endif %}
+      }
+
+      config {
+        {% if platform == "docker" %}
+        image = "{{ registry }}/{{ image_name }}:{{ tag }}"
+        image_pull_timeout = "15m"
+        auth {
+          username = "{{ docker_username }}"
+          password = "{{ docker_password }}"
+          server_address = "{{ registry }}"
+        }
+        volumes = [
+          "{{ share_dir }}:/model_bazaar"
+        ]
+        {% elif platform == "local" %}
+        command = "{{ python_path }}"
+        args    = ["{{ train_script }}"]
+        {% endif %}
+      }
+
+      resources {
+        cpu = {{ extra_options.get('allocation__cores', 1) * 2400 }}
+        memory = {{ extra_options.get('allocation_memory', '6800') }}
+      }
+    }
+  }
+}

@@ -9,19 +9,19 @@ export default async function ModelsPage({
   searchParams: { q: string; offset: string };
 }) {
   const search = searchParams.q ?? '';
-  const offset = searchParams.offset ?? 5;
+  const offset = parseInt(searchParams.offset, 10) || 0;
 
   return (
     <Tabs defaultValue="all">
       <div className="flex items-center">
-        <TabsList>
+        {/* <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="active">Active</TabsTrigger>
           <TabsTrigger value="draft">Draft</TabsTrigger>
           <TabsTrigger value="archived" className="hidden sm:flex">
             Archived
           </TabsTrigger>
-        </TabsList>
+        </TabsList> */}
         <div className="ml-auto flex items-center gap-2">
           <ImportModelButton />
           <CreateModelButton />

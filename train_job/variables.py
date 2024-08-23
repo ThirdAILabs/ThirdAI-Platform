@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import ast
+import html
 import os
 from dataclasses import MISSING, asdict, dataclass, field, fields
 from enum import Enum
 from typing import Dict, List, Optional, Type, TypeVar, Union, get_args, get_origin
+
+from pydantic import root_validator
 
 T = TypeVar("T", bound="EnvLoader")
 
@@ -96,6 +99,7 @@ class EnvLoader:
                 if enum_type and issubclass(enum_type, Enum):
                     return enum_type[enum_member]
 
+        value = html.unescape(value)
         if field_type == bool:
             return ast.literal_eval(value.capitalize())
         if field_type == int:
@@ -155,12 +159,25 @@ class MachVariables(EnvLoader):
 
 
 @dataclass
-class FinetunableRetrieverVariables(EnvLoader):
+class VersionedEnvLoader(EnvLoader):
+    version: str = "v1"
+
+    def __post_init__(self):
+        if self.version == "v1":
+            # Automatically set on_disk and docs_on_disk to False if they exist
+            if hasattr(self, "on_disk"):
+                self.on_disk = False
+            if hasattr(self, "docs_on_disk"):
+                self.docs_on_disk = False
+
+
+@dataclass
+class FinetunableRetrieverVariables(VersionedEnvLoader):
     on_disk: bool = True
 
 
 @dataclass
-class NeuralDBVariables(EnvLoader):
+class NeuralDBVariables(VersionedEnvLoader):
     num_shards: int = 1
     num_models_per_shard: int = 1
     retriever: RetrieverEnum = RetrieverEnum.FINETUNABLE_RETRIEVER
@@ -210,3 +227,11 @@ class ComputeVariables(EnvLoader):
 class ShardVariables(EnvLoader):
     shard_num: int
     num_classes: int
+
+
+@dataclass
+class CSVDocumentVariables(EnvLoader):
+    csv_id_column: str = None
+    csv_strong_columns: list[str] = None
+    csv_weak_columns: list[str] = None
+    csv_reference_columns: list[str] = None
