@@ -23,6 +23,7 @@ async def sync_job_statuses() -> None:
                 model.train_status == schema.Status.starting
                 or model.train_status == schema.Status.in_progress
             ):
+                # TODO support sharded models
                 model_data = get_nomad_job(
                     model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT")
                 )
@@ -31,17 +32,27 @@ async def sync_job_statuses() -> None:
                         f"Model {model.id} has train job either dead or not found in nomad. Setting status to failed"
                     )
                     model.train_status = schema.Status.failed
-                    
-            # if model.deploy_status == schema.Status.complete then set status to stopped
-            if model.deploy_status == schema.Status.starting and model.deploy_status == schema.Status.in_progress:
-                deployment_data = get_nomad_job(
-                    model.get_deployment_name(), os.getenv("NOMAD_ENDPOINT")
-                )
+
+            deployment_data = get_nomad_job(
+                model.get_deployment_name(), os.getenv("NOMAD_ENDPOINT")
+            )
+            if (
+                model.deploy_status == schema.Status.starting
+                or model.deploy_status == schema.Status.in_progress
+            ):
                 if not deployment_data or deployment_data["Status"] == "dead":
                     print(
                         f"Model {model.id} has deployment job either dead or not found in nomad. Setting status to failed"
                     )
                     model.deploy_status = schema.Status.failed
+
+            if model.deploy_status == schema.Status.complete:
+                if not deployment_data or deployment_data["Status"] == "dead":
+                    print(
+                        f"Model {model.id} deployment status was complete but the nomad"
+                        "job is either dead or not found. Setting status to stopped instead."
+                    )
+                    model.deploy_status = schema.Status.stopped
 
         session.commit()
     finally:
