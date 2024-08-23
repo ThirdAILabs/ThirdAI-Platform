@@ -85,6 +85,7 @@ def propagate_error(func):
         try:
             return func(*args, **kwargs)
         except Exception:
+            print(traceback.format_exc())
             return response(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 message=str(traceback.format_exc()),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import html
 import os
 from dataclasses import MISSING, asdict, dataclass, field, fields
 from enum import Enum
@@ -96,6 +97,7 @@ class EnvLoader:
                 if enum_type and issubclass(enum_type, Enum):
                     return enum_type[enum_member]
 
+        value = html.unescape(value)
         if field_type == bool:
             return ast.literal_eval(value.capitalize())
         if field_type == int:
@@ -210,3 +212,11 @@ class ComputeVariables(EnvLoader):
 class ShardVariables(EnvLoader):
     shard_num: int
     num_classes: int
+
+
+@dataclass
+class CSVDocumentVariables(EnvLoader):
+    csv_id_column: str = None
+    csv_strong_columns: list[str] = None
+    csv_weak_columns: list[str] = None
+    csv_reference_columns: list[str] = None

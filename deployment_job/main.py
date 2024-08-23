@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from reporter import Reporter
 from routers.ndb import create_ndb_router, process_tasks
+from routers.telemetry import telemetry_router  # Import the telemetry router
 from routers.udt import udt_router
 from utils import delete_deployment_job
 from variables import GeneralVariables, TypeEnum
@@ -78,6 +79,8 @@ task_queue = Queue()
 tasks = {}
 task_lock = Lock()
 
+# Include the telemetry router for all deployments
+app.include_router(telemetry_router, prefix=f"/{general_variables.model_id}/telemetry")
 
 if general_variables.type == TypeEnum.NDB:
     ndb_router = create_ndb_router(task_queue, task_lock, tasks)

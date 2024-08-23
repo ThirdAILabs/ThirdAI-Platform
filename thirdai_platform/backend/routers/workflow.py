@@ -13,7 +13,6 @@ from backend.auth_dependencies import (
 from backend.utils import (
     delete_nomad_job,
     get_empty_port,
-    get_model_from_identifier,
     get_platform,
     get_python_path,
     get_root_absolute_path,
@@ -58,8 +57,10 @@ def workflow_types(
                     "name": "semantic_search",
                     "description": "Semantic search workflow",
                     "model_requirements": [
-                        {"component": "search", "type": "ndb"},
-                        {"component": "guardrail", "type": "udt", "subtype": "token"}
+                        [
+                            {"component": "search", "type": "ndb"},
+                            {"component": "guardrail", "type": "udt", "subtype": "token"}
+                        ]
                     ]
                 },
                 ...
@@ -143,7 +144,7 @@ def create_workflow(
         name=name,
         type_id=workflow_type.id,
         user_id=user.id,
-        status=schema.Status.not_started,
+        status=schema.WorkflowStatus.inactive,
     )
 
     session.add(new_workflow)
@@ -159,14 +160,14 @@ def create_workflow(
 
 class WorkflowParams(BaseModel):
     workflow_id: str
-    model_identifiers: List[str]
+    model_ids: List[str]
     components: List[str]  # Added to match components with models
 
     class Config:
         schema_extra = {
             "example": {
                 "workflow_id": "f84b8f1d-76e1-4d9b-bb1a-8f8d5d6f1a3c",
-                "model_identifiers": ["model1", "model2"],
+                "model_ids": ["model1_id", "model2_id"],
                 "components": ["search", "guardrail"],  # Example components
             }
         }
@@ -182,7 +183,7 @@ def add_models(
     Add models to a workflow.
 
     - **Parameters**:
-      - `body` (WorkflowParams): JSON body with workflow ID, model identifiers, and components.
+      - `body` (WorkflowParams): JSON body with workflow ID, model IDs, and components.
     - **Returns**:
       - `status_code` (int): HTTP status code.
       - `message` (str): Response message.
@@ -192,7 +193,7 @@ def add_models(
     ```json
     {
         "workflow_id": "f84b8f1d-76e1-4d9b-bb1a-8f8d5d6f1a3c",
-        "model_identifiers": ["model1", "model2"],
+        "model_ids": ["model1_id", "model2_id"],
         "components": ["search", "guardrail"]
     }
     ```
@@ -204,8 +205,8 @@ def add_models(
         "message": "Models added to workflow successfully.",
         "data": {
             "models": [
-                {"id": "model1", "name": "Model 1"...},
-                {"id": "model2", "name": "Model 2"...}
+                {"id": "model1_id", "name": "Model 1"...},
+                {"id": "model2_id", "name": "Model 2"...}
             ]
         }
     }
@@ -228,13 +229,12 @@ def add_models(
             detail="You do not have owner permissions to this workflow",
         )
 
-    for model_identifier, component in zip(body.model_identifiers, body.components):
-        try:
-            model: schema.Model = get_model_from_identifier(model_identifier, session)
-        except Exception as error:
+    for model_id, component in zip(body.model_ids, body.components):
+        model: schema.Model = session.query(schema.Model).get(model_id)
+        if not model:
             return response(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                message=str(error),
+                message=f"Model with ID {model_id} not found.",
             )
 
         workflow_model: schema.WorkflowModel = (
@@ -277,7 +277,7 @@ def delete_models(
     Delete models from a workflow.
 
     - **Parameters**:
-      - `body` (WorkflowParams): JSON body with workflow ID, model identifiers, and components.
+      - `body` (WorkflowParams): JSON body with workflow ID, model IDs, and components.
     - **Returns**:
       - `status_code` (int): HTTP status code.
       - `message` (str): Response message.
@@ -287,7 +287,7 @@ def delete_models(
     ```json
     {
         "workflow_id": "f84b8f1d-76e1-4d9b-bb1a-8f8d5d6f1a3c",
-        "model_identifiers": ["model1", "model2"],
+        "model_ids": ["model1_id", "model2_id"],
         "components": ["search", "guardrail"]
     }
     ```
@@ -299,7 +299,7 @@ def delete_models(
         "message": "Models deleted from workflow successfully.",
         "data": {
             "models": [
-                {"id": "model3", "name": "Model 3"...}
+                {"id": "model3_id", "name": "Model 3"...}
             ]
         }
     }
@@ -322,13 +322,12 @@ def delete_models(
             detail="You do not have owner permissions to this workflow",
         )
 
-    for model_identifier, component in zip(body.model_identifiers, body.components):
-        try:
-            model: schema.Model = get_model_from_identifier(model_identifier, session)
-        except Exception as error:
+    for model_id, component in zip(body.model_ids, body.components):
+        model: schema.Model = session.query(schema.Model).get(model_id)
+        if not model:
             return response(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                message=str(error),
+                message=f"Model with ID {model_id} not found.",
             )
 
         workflow_model: schema.WorkflowModel = (
@@ -413,35 +412,48 @@ def validate_workflow(
     workflow_type: schema.WorkflowType = workflow.workflow_type
     model_requirements = workflow_type.model_requirements
 
-    issues = defaultdict(list)
+    all_requirements_valid = False
+    issues_per_group = []
 
-    for requirement in model_requirements:
-        component = requirement["component"]
-        model_type = requirement["type"]
-        sub_type = requirement.get("subtype")
+    # Loop over each requirement group
+    for requirement_group in model_requirements:
+        group_issues = defaultdict(list)
 
-        matching_models = [
-            wm
-            for wm in workflow_models
-            if wm.component == component
-            and wm.model.type == model_type
-            and (sub_type is None or wm.model.sub_type == sub_type)
-        ]
+        for requirement in requirement_group:
+            component = requirement["component"]
+            model_type = requirement["type"]
+            sub_type = requirement.get("subtype")
 
-        required_count = (
-            1  # Since each requirement object represents exactly one required model
-        )
+            matching_models = [
+                wm
+                for wm in workflow_models
+                if wm.component == component
+                and wm.model.type == model_type
+                and (sub_type is None or wm.model.sub_type == sub_type)
+            ]
 
-        if len(matching_models) != required_count:
-            issues[component].append(
-                f"Requires exactly {required_count} {model_type}(s) with component {component} and subtype {sub_type}, but found {len(matching_models)}."
+            required_count = (
+                1  # Since each requirement object represents exactly one required model
             )
 
-    if issues:
+            if len(matching_models) != required_count:
+                group_issues[component].append(
+                    f"Requires exactly {required_count} {model_type}(s) with component {component} and subtype {sub_type}, but found {len(matching_models)}."
+                )
+
+        if not group_issues:
+            # If no issues in this group, the workflow is valid
+            all_requirements_valid = True
+            break
+        else:
+            # Store issues for this group
+            issues_per_group.append(group_issues)
+
+    if not all_requirements_valid:
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
-            message="Validation failed. Some models have issues.",
-            data={"models": jsonable_encoder(issues)},
+            message="Validation failed. Some model requirement groups have issues.",
+            data={"issues": jsonable_encoder(issues_per_group)},
         )
 
     return response(
@@ -454,7 +466,7 @@ def validate_workflow(
 @workflow_router.post("/update-status", dependencies=[Depends(is_workflow_owner)])
 def update_workflow_status(
     workflow_id: str,
-    new_status: schema.Status,
+    new_status: schema.WorkflowStatus,
     session: Session = Depends(get_session),
 ):
     """
@@ -471,7 +483,7 @@ def update_workflow_status(
     ```json
     {
         "workflow_id": "f84b8f1d-76e1-4d9b-bb1a-8f8d5d6f1a3c",
-        "new_status": "complete"
+        "new_status": "active"
     }
     ```
 
@@ -554,9 +566,7 @@ def stop_workflow(
                 .filter(
                     schema.WorkflowModel.model_id == model.id,
                     schema.Workflow.id != workflow_id,
-                    schema.Workflow.status.in_(
-                        [schema.Status.in_progress, schema.Status.complete]
-                    ),
+                    schema.Workflow.status.in_([schema.WorkflowStatus.active]),
                 )
                 .count()
             )
@@ -570,14 +580,14 @@ def stop_workflow(
                     model.deploy_status = schema.Status.stopped
                     session.commit()
                 except Exception as err:
-                    workflow.status = schema.Status.stopped
+                    workflow.status = schema.WorkflowStatus.inactive
                     session.commit()
                     return response(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                         message=f"Failed to undeploy model {model.name}: {str(err)}",
                     )
 
-    workflow.status = schema.Status.stopped
+    workflow.status = schema.WorkflowStatus.inactive
     session.commit()
 
     return response(
@@ -631,14 +641,12 @@ def start_workflow(
             message="Workflow not found.",
         )
 
-    workflow.status = schema.Status.in_progress
+    workflow.status = schema.WorkflowStatus.active
     session.commit()
 
     workflow_models: List[schema.WorkflowModel] = workflow.workflow_models
 
     if not workflow_models:
-        workflow.status = schema.Status.stopped
-        session.commit()
         return response(
             status_code=status.HTTP_404_NOT_FOUND,
             message="No models found in the workflow.",
@@ -653,8 +661,6 @@ def start_workflow(
             all_training_complete = False
 
     if not all_training_complete:
-        workflow.status = schema.Status.stopped
-        session.commit()
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
             message="Cannot start workflow. Some models are not ready.",
@@ -668,13 +674,12 @@ def start_workflow(
             schema.Status.in_progress,
             schema.Status.complete,
         ]:
-            if not model.get_owner_permission(authenticated_user.user):
+            if not model.get_user_permission(authenticated_user.user):
                 return response(
                     status_code=status.HTTP_403_FORBIDDEN,
                     message=(
                         f"You do not have permission to deploy model {model.name} "
                         f"(component: {workflow_model.component}). "
-                        "Please contact the model owner or admin for deployment."
                     ),
                 )
 
@@ -682,8 +687,6 @@ def start_workflow(
                 meta_data = json.loads(model.meta_data.train)
                 size_in_memory = int(meta_data["size_in_memory"])
             except (json.JSONDecodeError, KeyError) as e:
-                workflow.status = schema.Status.stopped
-                session.commit()
                 raise Exception(
                     "Failed to parse model metadata or missing 'size_in_memory'."
                 )
@@ -735,7 +738,6 @@ def start_workflow(
                 # TODO should we undeploy all the other models?
                 # TODO should we set workflow status to failed instead of stopped?
                 model.deploy_status = schema.Status.failed
-                workflow.status = schema.Status.stopped
                 session.commit()
                 raise Exception(str(err))
 
@@ -749,7 +751,7 @@ def start_workflow(
 class WorkflowTypeParams(BaseModel):
     name: str
     description: str
-    model_requirements: List[dict]
+    model_requirements: List[List[dict]]  # Updated to list of list of dictionaries
 
     class Config:
         schema_extra = {
@@ -757,8 +759,14 @@ class WorkflowTypeParams(BaseModel):
                 "name": "semantic_search",
                 "description": "Semantic search workflow",
                 "model_requirements": [
-                    {"component": "search", "type": "ndb"},
-                    {"component": "guardrail", "type": "udt", "subtype": "token"},
+                    [
+                        {"component": "search", "type": "ndb"},
+                        {"component": "guardrail", "type": "udt", "subtype": "token"},
+                    ],
+                    [
+                        {"component": "search", "type": "ndb"},
+                        {"component": "guardrail", "type": "udt", "subtype": "text"},
+                    ],
                 ],
             }
         }
@@ -785,8 +793,10 @@ def add_workflow_type(
         "name": "semantic_search",
         "description": "Semantic search workflow",
         "model_requirements": [
-            {"component": "search", "type": "ndb"},
-            {"component": "guardrail", "type": "udt", "subtype": "token"}
+            [
+                {"component": "search", "type": "ndb"},
+                {"component": "guardrail", "type": "udt", "subtype": "token"}
+            ]
         ]
     }
     ```
@@ -928,6 +938,7 @@ def get_workflow_details(
         "type": workflow.workflow_type.name,
         "type_id": str(workflow.type_id),
         "status": workflow.status,
+        "publish_date": str(workflow.published_date),
         "models": jsonable_encoder(list_workflow_models(workflow=workflow)),
     }
 
@@ -1064,6 +1075,7 @@ def list_accessible_workflows(
             "type_id": str(workflow.type_id),
             "status": workflow.status,
             "models": jsonable_encoder(list_workflow_models(workflow=workflow)),
+            "publish_date": str(workflow.published_date),
             "created_by": {
                 "id": str(workflow.user.id),
                 "username": workflow.user.username,
@@ -1077,4 +1089,68 @@ def list_accessible_workflows(
         status_code=status.HTTP_200_OK,
         message="Successfully retrieved accessible workflows.",
         data=jsonable_encoder(workflow_list),
+    )
+
+
+@workflow_router.get("/type")
+def get_workflow_type_details(
+    type_id: str,
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
+    """
+    Get detailed information about a specific workflow type.
+
+    - **Parameters**:
+      - `type_id` (str): The ID of the workflow type to retrieve.
+    - **Returns**:
+      - `status_code` (int): HTTP status code.
+      - `message` (str): Response message.
+      - `data` (dict): Detailed information about the workflow type.
+
+    **Example Request**:
+    ```json
+    {
+        "type_id": "c1b1c5d7-8b8a-4f3b-a88b-2ec5a7a5f014"
+    }
+    ```
+
+    **Example Response**:
+    ```json
+    {
+        "status_code": 200,
+        "message": "Workflow type details retrieved successfully.",
+        "data": {
+            "id": "c1b1c5d7-8b8a-4f3b-a88b-2ec5a7a5f014",
+            "name": "semantic_search",
+            "description": "Semantic search workflow",
+            "model_requirements": [
+                [
+                    {"component": "search", "type": "ndb"},
+                    {"component": "guardrail", "type": "udt", "subtype": "token"}
+                ]
+            ]
+        }
+    }
+    ```
+    """
+    workflow_type = session.query(schema.WorkflowType).filter_by(id=type_id).first()
+
+    if not workflow_type:
+        return response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Workflow type not found.",
+        )
+
+    workflow_type_data = {
+        "id": str(workflow_type.id),
+        "name": workflow_type.name,
+        "description": workflow_type.description,
+        "model_requirements": workflow_type.model_requirements,
+    }
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Workflow type details retrieved successfully.",
+        data=jsonable_encoder(workflow_type_data),
     )

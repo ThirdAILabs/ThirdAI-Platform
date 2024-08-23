@@ -23,6 +23,7 @@ from backend.utils import (
     model_accessible,
     response,
     submit_nomad_job,
+    update_json,
     update_json_list,
 )
 from database import schema
@@ -31,6 +32,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from licensing.verify.verify_license import valid_job_allocation, verify_license
 from pydantic import BaseModel
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 deploy_router = APIRouter()

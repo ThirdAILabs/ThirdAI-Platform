@@ -1,6 +1,8 @@
 import json
 import os
+import traceback
 import uuid
+from datetime import datetime
 from typing import Annotated, Dict, Optional, Union
 
 from auth.jwt import AuthenticatedUser, verify_access_token
@@ -11,6 +13,7 @@ from backend.auth_dependencies import (
     verify_model_read_access,
 )
 from backend.utils import (
+    delete_nomad_job,
     get_expiry_min,
     get_high_level_model_info,
     get_model,
@@ -40,19 +43,23 @@ def list_public_models(
     name: str,
     domain: Optional[str] = None,
     username: Optional[str] = None,
+    type: Optional[str] = None,
+    sub_type: Optional[str] = None,
     session: Session = Depends(get_session),
 ):
     """
     List public models.
 
     Parameters:
-    - name: The name to filter models.
-    - domain: Optional domain to filter models.
-    - username: Optional username to filter models.
-    - session: The database session (dependency).
+    - name: str - The name to filter models.
+    - domain: Optional[str] - Optional domain to filter models.
+    - username: Optional[str] - Optional username to filter models.
+    - type: Optional[str] - Optional type to filter models.
+    - sub_type: Optional[str] - Optional sub-type to filter models.
+    - session: Session - The database session (dependency).
 
     Returns:
-    - A JSON response with the list of public models.
+    - JSONResponse - A JSON response with the list of public models.
     """
     query = (
         session.query(schema.Model)
@@ -70,6 +77,12 @@ def list_public_models(
     if username:
         query = query.join(schema.User).filter(schema.User.username == username)
 
+    if type:
+        query = query.filter(schema.Model.type == type)
+
+    if sub_type:
+        query = query.filter(schema.Model.sub_type == sub_type)
+
     results = [get_high_level_model_info(result) for result in query.all()]
 
     return response(
@@ -84,23 +97,27 @@ def list_models(
     name: str,
     domain: Optional[str] = None,
     username: Optional[str] = None,
+    type: Optional[str] = None,
+    sub_type: Optional[str] = None,
     access_level: Annotated[Union[list[str], None], Query()] = None,
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
     """
-    List models based on the given name, domain, username, and access level.
+    List models based on the given name, domain, username, type, sub-type, and access level.
 
     Parameters:
-    - name: The name to filter models.
-    - domain: Optional domain to filter models.
-    - username: Optional username to filter models.
-    - access_level: Optional access level to filter models.
-    - session: The database session (dependency).
-    - authenticated_user: The authenticated user (dependency).
+    - name: str - The name to filter models.
+    - domain: Optional[str] - Optional domain to filter models.
+    - username: Optional[str] - Optional username to filter models.
+    - type: Optional[str] - Optional type to filter models.
+    - sub_type: Optional[str] - Optional sub-type to filter models.
+    - access_level: Annotated[Union[list[str], None], Query()] - Optional access level to filter models.
+    - session: Session - The database session (dependency).
+    - authenticated_user: AuthenticatedUser - The authenticated user (dependency).
 
     Returns:
-    - A JSON response with the list of models.
+    - JSONResponse - A JSON response with the list of models.
     """
     user: schema.User = authenticated_user.user
     user_teams = [ut.team_id for ut in user.teams]
@@ -148,7 +165,13 @@ def list_models(
     if username:
         query = query.join(schema.User).filter(schema.User.username == username)
 
-    results = [get_high_level_model_info(model) for model in query.all()]
+    if type:
+        query = query.filter(schema.Model.type == type)
+
+    if sub_type:
+        query = query.filter(schema.Model.sub_type == sub_type)
+
+    results = [get_high_level_model_info(result) for result in query]
 
     return response(
         status_code=status.HTTP_200_OK,
@@ -567,7 +590,7 @@ def download_public_model(
             message=str(error),
         )
 
-    if model.access_level != "public":
+    if model.access_level != schema.Access.public:
         return response(
             status_code=status.HTTP_403_FORBIDDEN,
             message="You cannot access this model without login.",
@@ -858,14 +881,14 @@ def get_model_permissions(
                         "email": user_team.user.email,
                     }
                 )
-            elif user_team.role == schema.Role.user:
-                permissions_info["read"].append(
-                    {
-                        "user_id": user_team.user.id,
-                        "username": user_team.user.username,
-                        "email": user_team.user.email,
-                    }
-                )
+            permission = model.get_user_permission(user_team.user)
+            permissions_info[str(permission).split(".")[-1]].append(
+                {
+                    "user_id": user_team.user.id,
+                    "username": user_team.user.username,
+                    "email": user_team.user.email,
+                }
+            )
 
     # Deduplicate all permission lists
     permissions_info = {
@@ -883,6 +906,7 @@ def get_model_permissions(
 def update_access_level(
     model_identifier: str,
     access_level: schema.Access,
+    team_id: Optional[str] = None,
     session: Session = Depends(get_session),
 ):
     """
@@ -901,6 +925,24 @@ def update_access_level(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Model not found",
         )
+
+    if access_level == schema.Access.protected:
+        if not team_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="team_id is required when setting access level to 'protected'.",
+            )
+
+        # Check if the provided team_id is valid
+        team = session.query(schema.Team).get(team_id)
+        if not team:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The provided team_id does not exist.",
+            )
+
+        # Assign the team_id to the model
+        model.team_id = team_id
 
     model.access_level = access_level
     session.commit()
@@ -946,4 +988,57 @@ def update_default_permission(
             "model_id": str(model.id),
             "default_permission": str(model.default_permission),
         },
+    )
+
+
+@model_router.post("/delete", dependencies=[Depends(is_model_owner)])
+def delete_model(
+    model_identifier: str,
+    session: Session = Depends(get_session),
+):
+    """
+    Deletes a specified model.
+
+    - **model_identifier**: The model identifier of the model to delete
+    """
+
+    try:
+        model: schema.Model = get_model_from_identifier(model_identifier, session)
+    except Exception as error:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=str(error),
+        )
+
+    errors = []
+
+    # Step 1: Delete model storage
+    try:
+        storage.delete(model.id)
+    except Exception as storage_error:
+        errors.append(f"Failed to delete model from storage: {str(storage_error)}")
+
+    # Step 2: Delete Nomad job
+    try:
+        delete_nomad_job(f"deployment-{model.id}", os.getenv("NOMAD_ENDPOINT"))
+    except Exception as nomad_error:
+        errors.append(f"Failed to delete Nomad job: {str(nomad_error)}")
+
+    # Step 3: Delete model from the database
+    try:
+        session.delete(model)
+        session.commit()
+    except Exception as db_error:
+        errors.append(f"Failed to delete model from database: {str(db_error)}")
+
+    # If any errors occurred, return them in the response
+    if errors:
+        return response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Model deletion encountered issues.",
+            data={"errors": errors},
+        )
+
+    return response(
+        status_code=status.HTTP_200_OK, message="Successfully deleted the model."
     )

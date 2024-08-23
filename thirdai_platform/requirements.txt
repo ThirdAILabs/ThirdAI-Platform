@@ -28,3 +28,4 @@ google-auth-oauthlib
 thirdai[all]
 langchain_openai
 hvac
+nltk

@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 
 from sqlalchemy import (
+    ARRAY,
     JSON,
     Boolean,
     Column,
@@ -20,6 +21,11 @@ from sqlalchemy.orm import declarative_base, relationship, validates
 SQLDeclarativeBase = declarative_base()
 
 
+class UDT_Task(str, enum.Enum):
+    TEXT = "text"
+    TOKEN = "token"
+
+
 class Status(str, enum.Enum):
     not_started = "not_started"
     starting = "starting"
@@ -27,6 +33,11 @@ class Status(str, enum.Enum):
     stopped = "stopped"
     complete = "complete"
     failed = "failed"
+
+
+class WorkflowStatus(str, enum.Enum):
+    inactive = "inactive"
+    active = "active"
 
 
 class Role(enum.Enum):
@@ -205,6 +216,22 @@ class Model(SQLDeclarativeBase):
         ), "Model name should only contain alphanumeric characters, underscores, and hyphens"
         return name
 
+    @validates("access_level")
+    def validate_access_level(self, key, access_level):
+        # If access level is 'protected', ensure team_id is not None
+        if access_level == Access.protected and self.team_id is None:
+            raise ValueError("team_id cannot be None when access_level is 'protected'.")
+
+        return access_level
+
+    @validates("team_id")
+    def validate_team_id(self, key, team_id):
+        # For protected access, team_id should not be None
+        if self.access_level == Access.protected and team_id is None:
+            raise ValueError("team_id cannot be None when access_level is 'protected'.")
+
+        return team_id
+
     def get_user_permission(self, user):
         # check whether we can find permission in explicit permissions first
         explicit_permission = next(
@@ -338,7 +365,12 @@ class Workflow(SQLDeclarativeBase):
     user_id = Column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    status = Column(ENUM(Status), nullable=False, default=Status.not_started)
+    status = Column(
+        ENUM(WorkflowStatus), nullable=False, default=WorkflowStatus.inactive
+    )
+    published_date = Column(
+        DateTime, default=datetime.utcnow().isoformat(), nullable=True
+    )
 
     user = relationship("User", back_populates="workflows")
     workflow_models = relationship(
@@ -424,3 +456,15 @@ class WorkflowModel(SQLDeclarativeBase):
             name="unique_workflow_model_component",
         ),
     )
+
+
+class Catalog(SQLDeclarativeBase):
+    __tablename__ = "catalog"
+
+    id = Column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    name = Column(String(100), nullable=False)
+    task = Column(ENUM(UDT_Task), nullable=False)
+    num_generated_samples = Column(Integer)
+    target_labels = Column(ARRAY(String), nullable=False)

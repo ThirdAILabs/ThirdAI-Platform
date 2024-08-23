@@ -13,7 +13,7 @@ import requests
 from database import schema
 from fastapi.responses import JSONResponse
 from jinja2 import Template
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, root_validator, validator
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger("ThirdAI_Platform")
@@ -193,6 +193,48 @@ class UDTExtraOptions(BaseModel):
             values["default_tag"] = values.get("default_tag", "O")
         return values
 
+    @validator("target_labels")
+    def check_target_labels(cls, v, values):
+        sub_type = values.get("sub_type")
+        if sub_type == "token":
+            if not v:
+                raise ValueError("target_labels must be a non-empty list")
+            for label in v:
+                if len(label) == 0:
+                    raise ValueError(
+                        f'target_labels cannot contain empty strings: "{label}" is invalid'
+                    )
+                if " " in label:
+                    raise ValueError(
+                        f'target_labels cannot contain spaces: "{label}" is invalid'
+                    )
+        return v
+
+    @validator("default_tag")
+    def check_default_tag(cls, v, values):
+        sub_type = values.get("sub_type")
+        if sub_type == "token":
+            if not v:
+                raise ValueError("default_tag must be specified")
+            if " " in v:
+                raise ValueError(f'default_tag cannot contain spaces: "{v}" is invalid')
+        return v
+
+    @validator("n_target_classes")
+    def check_n_target_classes(cls, v, values):
+        """
+        Checks if n_target_classes > 0
+        """
+        sub_type = values.get("sub_type")
+        if sub_type == "text":
+            if v is None:
+                raise ValueError("n_target_classes must be specified")
+            if v <= 0:
+                raise ValueError(
+                    f"n_target_classes must be a positive integer: {v} is invalid"
+                )
+        return v
+
 
 class NDBExtraOptions(BaseModel):
     """
@@ -270,11 +312,11 @@ class NDBExtraOptions(BaseModel):
 
     tokenizer: Optional[str] = None
     hidden_bias: Optional[bool] = None
-    retriever: Optional[str] = None  # This flag is for which retriever to use.
+    # This flag is for which retriever to use.
+    retriever: Optional[str] = None
     unsupervised_train: Optional[bool] = None
-    disable_finetunable_retriever: Optional[bool] = (
-        None  # This flag is to disable inverted index in supervised training.
-    )
+    # This flag is to disable inverted index in supervised training.
+    disable_finetunable_retriever: Optional[bool] = None
     checkpoint_interval: Optional[int] = None
     fast_approximation: Optional[bool] = None
     num_buckets_to_sample: Optional[int] = None
@@ -373,7 +415,7 @@ def get_hcl_payload(filepath, is_jinja, **kwargs):
         content = file.read()
 
     if is_jinja:
-        template = Template(content)
+        template = Template(content, autoescape=True)
         hcl_content = template.render(**kwargs)
     else:
         hcl_content = content
