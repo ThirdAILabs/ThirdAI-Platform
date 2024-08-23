@@ -29,7 +29,8 @@ async def sync_job_statuses() -> None:
                 )
                 if not model_data or model_data["Status"] == "dead":
                     print(
-                        f"Model {model.id} has train job either dead or not found in nomad. Setting status to failed"
+                        f"Model {model.id} train status was starting or in_progress but the nomad"
+                        "job is either dead or not found. Setting status to failed."
                     )
                     model.train_status = schema.Status.failed
 
@@ -42,7 +43,8 @@ async def sync_job_statuses() -> None:
             ):
                 if not deployment_data or deployment_data["Status"] == "dead":
                     print(
-                        f"Model {model.id} has deployment job either dead or not found in nomad. Setting status to failed"
+                        f"Model {model.id} deployment status was starting or in_progress but the nomad"
+                        "job is either dead or not found. Setting status to failed."
                     )
                     model.deploy_status = schema.Status.failed
 

@@ -58,7 +58,7 @@ async def startup_event():
         print("Added workflow types")
     except Exception as error:
         print(f"Initializing default workflow types failed: {error}", file=sys.stderr)
-        raise error
+        raise
 
     await sync_job_statuses()
 
