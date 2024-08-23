@@ -1,0 +1,61 @@
+job "llm-cache" {
+  datacenters = ["dc1"]
+
+  type = "service"
+
+  group "llm-cache" {
+    count = 1
+
+    network {
+      port "llm-cache-http" {
+        {% if platform == "docker" %}
+          to = 80
+        {% elif platform == "local" %}
+          static = {{ port }}
+        {% endif %}
+      }
+    }
+
+    service {
+      name = "llm-cache"
+      port = "llm-cache-http"
+      provider = "nomad"
+
+      tags = [
+        "traefik.enable=true",
+        "traefik.http.routers.llm-cache-http.rule=PathPrefix(`/cache/`)",
+        "traefik.http.routers.llm-cache-http.priority=10"
+      ]
+    }
+
+    task "backend" {
+      {% if platform == "local" %}
+        driver = "raw_exec"
+      {% elif platform == "docker" %}  
+        driver = "docker"
+
+      {% endif %}
+
+      config {
+        {% if platform == "docker" %}  
+          image = "{{ registry }}/{{ image_name }}:{{ tag }}"
+          image_pull_timeout = "15m"
+          ports = ["llm-cache-http"]
+          auth {
+            username = "{{ docker_username }}"
+            password = "{{ docker_password }}"
+            server_address = "{{ registry }}"
+          }
+        {% elif platform == "local" %}
+          command = "{{ python_path }}"
+          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ llm_cache_app_dir }}","--reload","--host","0.0.0.0","--port","{{ port }}"]
+        {% endif %}
+      }
+
+      resources {
+        cpu = 2400
+        memory = 5000
+      }
+    }
+  }
+}

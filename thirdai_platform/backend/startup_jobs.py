@@ -39,3 +39,27 @@ async def restart_generate_job():
         python_path=get_python_path(),
         generate_app_dir=str(get_root_absolute_path() / "llm_generation_job"),
     )
+
+
+LLM_CACHE_JOB_ID = "llm-cache"
+
+
+async def restart_llm_cache_job():
+    nomad_endpoint = os.getenv("NOMAD_ENDPOINT")
+    if nomad_job_exists(LLM_CACHE_JOB_ID, nomad_endpoint):
+        delete_nomad_job(LLM_CACHE_JOB_ID, nomad_endpoint)
+    cwd = Path(os.getcwd())
+    platform = get_platform()
+    return submit_nomad_job(
+        nomad_endpoint=nomad_endpoint,
+        filepath=str(cwd / "backend" / "nomad_jobs" / "llm_cache_job.hcl.j2"),
+        platform=platform,
+        port=None if platform == "docker" else get_empty_port(),
+        tag=os.getenv("TAG"),
+        registry=os.getenv("DOCKER_REGISTRY"),
+        docker_username=os.getenv("DOCKER_USERNAME"),
+        docker_password=os.getenv("DOCKER_PASSWORD"),
+        image_name=os.getenv("LLM_CACHE_IMAGE_NAME"),
+        python_path=get_python_path(),
+        llm_cache_app_dir=str(get_root_absolute_path() / "llm_cache_job"),
+    )
