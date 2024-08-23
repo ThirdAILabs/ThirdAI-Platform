@@ -21,7 +21,6 @@ from backend.utils import (
     UDTExtraOptions,
     get_model,
     get_model_from_identifier,
-    get_nomad_job,
     get_platform,
     get_python_path,
     get_root_absolute_path,
@@ -35,7 +34,6 @@ from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, Form, UploadFile, status
 from fastapi.encoders import jsonable_encoder
-from fastapi_utils.tasks import repeat_every
 from licensing.verify.verify_license import valid_job_allocation, verify_license
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
@@ -235,28 +233,32 @@ def train_ndb(
         else False
     )
 
-    new_model = schema.Model(
-        id=model_id,
-        user_id=user.id,
-        train_status=schema.Status.not_started,
-        deploy_status=schema.Status.not_started,
-        name=model_name,
-        type="ndb",
-        sub_type="single" if not sharded else "sharded",
-        domain=user.domain,
-        access_level=schema.Access.private,
-        parent_id=base_model.id if base_model else None,
-    )
+    try:
+        new_model = schema.Model(
+            id=model_id,
+            user_id=user.id,
+            train_status=schema.Status.not_started,
+            deploy_status=schema.Status.not_started,
+            name=model_name,
+            type="ndb",
+            sub_type="single" if not sharded else "sharded",
+            domain=user.domain,
+            access_level=schema.Access.private,
+            parent_id=base_model.id if base_model else None,
+        )
 
-    session.add(new_model)
-    session.commit()
-    session.refresh(new_model)
-
-    work_dir = os.getcwd()
+        session.add(new_model)
+        session.commit()
+        session.refresh(new_model)
+    except Exception as err:
+        return response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=str(err),
+        )
 
     try:
         submit_nomad_job(
-            str(Path(work_dir) / "backend" / "nomad_jobs" / "train_job.hcl.j2"),
+            str(Path(os.getcwd()) / "backend" / "nomad_jobs" / "train_job.hcl.j2"),
             nomad_endpoint=os.getenv("NOMAD_ENDPOINT"),
             platform=get_platform(),
             tag=os.getenv("TAG"),
@@ -457,22 +459,28 @@ def train_udt(
                 message=str(error),
             )
 
-    new_model: schema.Model = schema.Model(
-        id=model_id,
-        user_id=user.id,
-        train_status=schema.Status.not_started,
-        deploy_status=schema.Status.not_started,
-        name=model_name,
-        type="udt",
-        sub_type=extra_options["sub_type"],
-        domain=user.email.split("@")[1],
-        access_level=schema.Access.private,
-        parent_id=base_model.id if base_model else None,
-    )
+    try:
+        new_model: schema.Model = schema.Model(
+            id=model_id,
+            user_id=user.id,
+            train_status=schema.Status.not_started,
+            deploy_status=schema.Status.not_started,
+            name=model_name,
+            type="udt",
+            sub_type=extra_options["sub_type"],
+            domain=user.email.split("@")[1],
+            access_level=schema.Access.private,
+            parent_id=base_model.id if base_model else None,
+        )
 
-    session.add(new_model)
-    session.commit()
-    session.refresh(new_model)
+        session.add(new_model)
+        session.commit()
+        session.refresh(new_model)
+    except Exception as err:
+        return response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=str(err),
+        )
 
     work_dir = os.getcwd()
 
@@ -706,13 +714,19 @@ def create_shard(
             message=f"License is not valid. {str(e)}",
         )
 
-    new_shard: schema.ModelShard = schema.ModelShard(
-        model_id=model_id,
-        shard_num=shard_num,
-        train_status=schema.Status.not_started,
-    )
-    session.add(new_shard)
-    session.commit()
+    try:
+        new_shard: schema.ModelShard = schema.ModelShard(
+            model_id=model_id,
+            shard_num=shard_num,
+            train_status=schema.Status.not_started,
+        )
+        session.add(new_shard)
+        session.commit()
+    except Exception as err:
+        return response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=str(err),
+        )
 
     work_dir = os.getcwd()
 
@@ -887,49 +901,3 @@ def model_shard_train_status(
         message="Successfully got the train status.",
         data=jsonable_encoder(results),
     )
-
-
-@repeat_every(seconds=5)
-async def sync_job_statuses() -> None:
-    """
-    Syncs status of nomad jobs with internal database. This is useful for cases
-    when jobs fail before we're able to catch the issue and update the database.
-    """
-
-    session = next(get_session())
-
-    try:
-        models: list[schema.Model] = session.query(schema.Model).all()
-
-        for model in models:
-            if (
-                model.train_status == schema.Status.starting
-                or model.train_status == schema.Status.in_progress
-            ):
-                model_data = get_nomad_job(
-                    model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT")
-                )
-                if not model_data or model_data["Status"] == "dead":
-                    print(
-                        f"Model {model.id} has train job either dead or not found in nomad. Setting status to failed"
-                    )
-                    model.train_status = schema.Status.failed
-
-            if model.deploy_status == schema.Status.starting:
-                deployment_data = get_nomad_job(
-                    model.get_deployment_name(), os.getenv("NOMAD_ENDPOINT")
-                )
-                if not deployment_data or deployment_data["Status"] == "dead":
-                    print(
-                        f"Model {model.id} has deployment job either dead or not found in nomad. Setting status to failed"
-                    )
-                    model.deploy_status = schema.Status.failed
-
-        session.commit()
-    finally:
-        session.close()
-
-
-@train_router.on_event("startup")
-async def startup_event():
-    await sync_job_statuses()

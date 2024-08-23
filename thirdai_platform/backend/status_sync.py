@@ -1,0 +1,48 @@
+import os
+
+from backend.utils import get_nomad_job
+from database import schema
+from database.session import get_session
+from fastapi_utils.tasks import repeat_every
+
+
+@repeat_every(seconds=5)
+async def sync_job_statuses() -> None:
+    """
+    Syncs status of nomad jobs with internal database. This is useful for cases
+    when jobs fail before we're able to catch the issue and update the database.
+    """
+
+    session = next(get_session())
+
+    try:
+        models: list[schema.Model] = session.query(schema.Model).all()
+
+        for model in models:
+            if (
+                model.train_status == schema.Status.starting
+                or model.train_status == schema.Status.in_progress
+            ):
+                model_data = get_nomad_job(
+                    model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT")
+                )
+                if not model_data or model_data["Status"] == "dead":
+                    print(
+                        f"Model {model.id} has train job either dead or not found in nomad. Setting status to failed"
+                    )
+                    model.train_status = schema.Status.failed
+                    
+            # if model.deploy_status == schema.Status.complete then set status to stopped
+            if model.deploy_status == schema.Status.starting and model.deploy_status == schema.Status.in_progress:
+                deployment_data = get_nomad_job(
+                    model.get_deployment_name(), os.getenv("NOMAD_ENDPOINT")
+                )
+                if not deployment_data or deployment_data["Status"] == "dead":
+                    print(
+                        f"Model {model.id} has deployment job either dead or not found in nomad. Setting status to failed"
+                    )
+                    model.deploy_status = schema.Status.failed
+
+        session.commit()
+    finally:
+        session.close()
