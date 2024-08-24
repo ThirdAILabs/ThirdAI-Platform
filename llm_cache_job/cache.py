@@ -61,7 +61,7 @@ class NDBSemanticCache(Cache):
             reverse=True,
         )
 
-        if reranked[0][1] > 0.95:
+        if len(reranked) > 0 and reranked[0][1] > 0.95:
             return {
                 "query": reranked[0][0].text,
                 "query_id": reranked[0][0].chunk_id,
