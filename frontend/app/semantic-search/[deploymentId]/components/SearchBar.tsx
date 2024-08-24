@@ -256,18 +256,9 @@ export default function SearchBar({
 
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
 
-    function extractModelIdFromUrl(url: string) {
-        const urlParts = new URL(url);
-        const pathSegments = urlParts.pathname.split('/');
-        return pathSegments[pathSegments.length - 1]; // Assumes the modelId is the last segment
-    }
-
-    const modelId = modelService ? extractModelIdFromUrl(modelService.url) : '';
-
-    console.log('modelId is:', modelId)
-
     const debouncedFetch = debounce((query) => {
-        fetchAutoCompleteQueries(modelId, query)
+        const modelId = modelService?.getModelID();
+        fetchAutoCompleteQueries(modelId!, query)
           .then(data => {
             setSuggestions(data.suggestions); // Storing the suggestions in state
             console.log('suggestions:', data.suggestions); // Adjust according to actual data structure

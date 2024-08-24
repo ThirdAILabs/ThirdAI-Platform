@@ -30,7 +30,7 @@ import { createDeploymentUrl, createTokenModelUrl } from "./components/Deploymen
 import PillButton from "./components/buttons/PillButton";
 import { useParams, useSearchParams } from "next/navigation";
 import { CardTitle } from "@/components/ui/card";
-import { getWorkflowDetails } from '@/lib/backend';
+import { getWorkflowDetails, fetchCachedGeneration } from '@/lib/backend';
 
 const Frame = styled.section<{ $opacity: string }>`
     position: absolute;
@@ -397,6 +397,22 @@ function App() {
                 );
     
                 if (results && ifGenerationOn) {
+                    // First check the cache
+                    const modelId = modelService?.getModelID();
+
+                    const cachedResult = await fetchCachedGeneration(modelId!, query);
+                    
+                    console.log('cachedResult', cachedResult)
+
+                    if (cachedResult && cachedResult.llm_res) {
+                        // Use the cached result directly if available
+                        console.log('cached query is', cachedResult.query)
+                        console.log('cached generation is', cachedResult.llm_res)
+                        setAnswer(cachedResult.llm_res);
+
+                        return
+                    }
+
                     modelService!.generateAnswer(
                         query,
                         genaiPrompt,

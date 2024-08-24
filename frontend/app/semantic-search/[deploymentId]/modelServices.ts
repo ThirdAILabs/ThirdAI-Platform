@@ -136,6 +136,17 @@ export class ModelService {
         };
     }
     
+    getModelID(): string {
+        function extractModelIdFromUrl(url: string) {
+            const urlParts = new URL(url);
+            const pathSegments = urlParts.pathname.split('/');
+            return pathSegments[pathSegments.length - 1]; // Assumes the modelId is the last segment
+        }
+
+        const modelId = extractModelIdFromUrl(this.url);
+
+        return modelId
+    }
 
     async sources(): Promise<Source[]> {
         const url = new URL(this.url + "/sources");

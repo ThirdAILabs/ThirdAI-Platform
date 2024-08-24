@@ -1105,8 +1105,8 @@ export async function fetchAutoCompleteQueries(modelId: string, query: string) {
   const params = new URLSearchParams({ model_id: modelId, query });
   
   try {
-    console.log('thirdaiPlatformBaseUrl is', thirdaiPlatformBaseUrl)
-    console.log('thirdaiCacheBaseUrl is', thirdaiCacheBaseUrl)
+    // console.log('thirdaiPlatformBaseUrl is', thirdaiPlatformBaseUrl)
+    // console.log('thirdaiCacheBaseUrl is', thirdaiCacheBaseUrl)
     
     // const response = await axios.get(`${thirdaiCacheBaseUrl}/api/cache/suggestions?${params.toString()}`);
     const response = await axios.get(`http://localhost:8001/cache/suggestions?${params.toString()}`);
@@ -1115,5 +1115,20 @@ export async function fetchAutoCompleteQueries(modelId: string, query: string) {
   } catch (err) {
     console.error('Error fetching autocomplete suggestions:', err);
     throw err; // Re-throwing the error to handle it in the component
+  }
+}
+
+export async function fetchCachedGeneration(modelId: string, query: string) {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+
+  const params = new URLSearchParams({ model_id: modelId, query });
+
+  try {
+      const response = await axios.get(`http://localhost:8001/cache/query?${params.toString()}`);
+      return response.data.cached_response; // Assuming the backend returns the data directly
+  } catch (err) {
+      console.error('Error fetching cached generation:', err);
+      throw err; // Re-throwing the error to handle it in the component
   }
 }
