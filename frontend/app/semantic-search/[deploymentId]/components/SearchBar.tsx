@@ -273,10 +273,6 @@ export default function SearchBar({
             setSuggestions([])
         }
       }, [query]);
-    
-    const handleSuggestionClick = (suggestionQuery: string) => {
-        setQuery(suggestionQuery); // Set the search input to the selected suggestion
-    };
 
     return (
         <Container>
@@ -307,7 +303,11 @@ export default function SearchBar({
             <div className="w-full mt-2" style={{backgroundColor: 'white'}}>
                 {suggestions.map(suggestion => (
                     <button key={suggestion.query_id}
-                            onClick={() => handleSuggestionClick(suggestion.query)}
+                            onClick={() => {
+                                const suggestionQuery = suggestion.query
+                                setQuery(suggestionQuery)
+                                onSubmit(query, prompt)
+                            }}
                             className="block w-full text-left p-2 hover:bg-gray-100 cursor-pointer">
                         {suggestion.query}
                     </button>
