@@ -30,7 +30,7 @@ import { createDeploymentUrl, createTokenModelUrl } from "./components/Deploymen
 import PillButton from "./components/buttons/PillButton";
 import { useParams, useSearchParams } from "next/navigation";
 import { CardTitle } from "@/components/ui/card";
-import { getWorkflowDetails, fetchCachedGeneration } from '@/lib/backend';
+import { getWorkflowDetails, fetchCachedGeneration, cacheGenerationResult } from '@/lib/backend';
 
 const Frame = styled.section<{ $opacity: string }>`
     position: absolute;
@@ -400,17 +400,20 @@ function App() {
                     // First check the cache
                     const modelId = modelService?.getModelID();
 
-                    const cachedResult = await fetchCachedGeneration(modelId!, query);
+                    try {
+                        const cachedResult = await fetchCachedGeneration(modelId!, query);
+                        console.log('cachedResult', cachedResult);
                     
-                    console.log('cachedResult', cachedResult)
-
-                    if (cachedResult && cachedResult.llm_res) {
-                        // Use the cached result directly if available
-                        console.log('cached query is', cachedResult.query)
-                        console.log('cached generation is', cachedResult.llm_res)
-                        setAnswer(cachedResult.llm_res);
-
-                        return
+                        if (cachedResult && cachedResult.llm_res) {
+                            console.log('cached query is', cachedResult.query);
+                            console.log('cached generation is', cachedResult.llm_res);
+                            setAnswer(cachedResult.llm_res); // Directly use the cached result if available
+                    
+                            return; // Stop further execution since the answer was found in cache
+                        }
+                    } catch (error) {
+                        console.error('Failed to retrieve cached result:', error);
+                        // Continue to generate a new answer if there's an error in fetching from the cache
                     }
 
                     modelService!.generateAnswer(
@@ -419,6 +422,14 @@ function App() {
                         results.references,
                         websocketRef,
                         (next) => setAnswer((prev) => prev + next),
+                        async (finalAnswer) => { // This is the onComplete callback, receiving the final generated answer
+                            try {
+                                await cacheGenerationResult(modelId!, query, finalAnswer);
+                                console.log('Cached the generation result successfully.');
+                            } catch (error) {
+                                console.error('Failed to cache the generation result:', error);
+                            }
+                        }
                     );
                 }
             }

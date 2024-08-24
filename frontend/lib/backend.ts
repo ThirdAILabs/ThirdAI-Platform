@@ -1132,3 +1132,22 @@ export async function fetchCachedGeneration(modelId: string, query: string) {
       throw err; // Re-throwing the error to handle it in the component
   }
 }
+
+export async function cacheGenerationResult(modelId: string, query: string, llmRes: string) {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+
+  const params = new URLSearchParams({
+      model_id: modelId,
+      query,
+      llm_res: llmRes
+  });
+
+  try {
+      const response = await axios.post(`http://localhost:8001/cache/insert?${params.toString()}`);
+      return response.data; // Assuming the backend returns the data directly
+  } catch (err) {
+      console.error('Error caching generation result:', err);
+      throw err; // Re-throwing the error to handle it in the component
+  }
+}

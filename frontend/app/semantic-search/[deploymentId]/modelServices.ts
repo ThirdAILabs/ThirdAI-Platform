@@ -588,7 +588,10 @@ export class ModelService {
         references: ReferenceInfo[],
         websocketRef: React.MutableRefObject<WebSocket | null>,
         onNextWord: (str: string) => void,
+        onComplete?: (finalAnswer: string) => void
     ) {
+        let finalAnswer = ''; // Variable to accumulate the response
+
         const args = {
             query: genaiQuery(question, references, genaiPrompt),
             key: "sk-PYTWB6gs_ofO44-teXA2rIRGRbJfzqDyNXBalHXKcvT3BlbkFJk5905SK2RVE6_ME8i4Lnp9qULbyPZSyOU0vh2fZfQA" // fill in openai key
@@ -608,6 +611,7 @@ export class ModelService {
             }
             if (response["status"] === "success") {
                 onNextWord(response["content"]);
+                finalAnswer += response["content"]; // Append each piece of content to the finalAnswer
             }
             if (response["end_of_stream"]) {
                 websocketRef.current!.close();
@@ -624,6 +628,9 @@ export class ModelService {
                 console.log(
                     `Closed cleanly, code=${event.code}, reason=${event.reason}`,
                 );
+                if (typeof onComplete === 'function') {
+                    onComplete(finalAnswer); // Call onComplete with the accumulated finalAnswer
+                }
             } else {
                 console.error(`Connection died`);
                 alert(`Connection died`)
