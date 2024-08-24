@@ -231,7 +231,13 @@ function App() {
         tag: string;
     }    
 
-    async function submit(query: string, genaiPrompt: string) {
+    const [queryInfo, setQueryInfo] = useState<{
+        cachedQuery: string;
+        userQuery: string;
+        isDifferent: boolean;
+    } | null>(null);
+
+    async function submit(query: string, genaiPrompt: string, bypassCache = false) {
         function replacePlaceholdersWithOriginal(text: string, piiMap: Map<string, PiiMapValue>): string {
             const placeholderPattern = /\[([A-Z]+) #(\d+)\]/g;
             return text.replace(placeholderPattern, (match, tag, id) => {
@@ -397,24 +403,35 @@ function App() {
                 );
     
                 if (results && ifGenerationOn) {
-                    // First check the cache
                     const modelId = modelService?.getModelID();
 
-                    try {
-                        const cachedResult = await fetchCachedGeneration(modelId!, query);
-                        console.log('cachedResult', cachedResult);
-                    
-                        if (cachedResult && cachedResult.llm_res) {
-                            console.log('cached query is', cachedResult.query);
-                            console.log('cached generation is', cachedResult.llm_res);
-                            setAnswer(cachedResult.llm_res); // Directly use the cached result if available
-                    
-                            return; // Stop further execution since the answer was found in cache
+                    if (! bypassCache) {
+                        try {
+                            const cachedResult = await fetchCachedGeneration(modelId!, query);
+                            console.log('cachedResult', cachedResult);
+                        
+                            if (cachedResult && cachedResult.llm_res) {
+                                console.log('cached query is', cachedResult.query);
+                                console.log('cached generation is', cachedResult.llm_res);
+                                setAnswer(cachedResult.llm_res); // Directly use the cached result if available
+
+                                // Set the query information including whether they differ
+                                setQueryInfo({
+                                    cachedQuery: cachedResult.query,
+                                    userQuery: query,
+                                    isDifferent: cachedResult.query !== query
+                                });
+
+                                return; // Stop further execution since the answer was found in cache
+                            }
+                        } catch (error) {
+                            console.error('Failed to retrieve cached result:', error);
+                            // Continue to generate a new answer if there's an error in fetching from the cache
                         }
-                    } catch (error) {
-                        console.error('Failed to retrieve cached result:', error);
-                        // Continue to generate a new answer if there's an error in fetching from the cache
                     }
+
+                    // No cache hit or cache not used, proceed with generation
+                    setQueryInfo(null); // Indicates no cached data was used
 
                     modelService!.generateAnswer(
                         query,
@@ -615,6 +632,10 @@ function App() {
                                                     <Spacer $height="30px" />
                                                     <GeneratedAnswer
                                                         answer={answer}
+                                                        regenerateAndBypassCache={()=>{
+                                                            submit(query, prompt, true)
+                                                        }}
+                                                        queryInfo={queryInfo}
                                                     />
                                                 </>
                                             }

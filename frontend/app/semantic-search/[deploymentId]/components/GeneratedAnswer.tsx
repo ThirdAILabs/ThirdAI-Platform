@@ -9,6 +9,12 @@ import TypingAnimation from "./TypingAnimation";
 
 interface GeneratedAnswerProps {
     answer: string;
+    regenerateAndBypassCache?: () => void;  // Function to trigger regeneration of the original query
+    queryInfo?: {
+        cachedQuery: string;
+        userQuery: string;
+        isDifferent: boolean;
+    } | null; // Accept null as a possible type
 }
 
 const Container = styled.section`
@@ -40,7 +46,7 @@ const disclaimer =
     "knowledgebase. Generative AI is experimental and may " +
     "not find the appropriate answer sometimes.";
 
-export default function GeneratedAnswer({ answer }: GeneratedAnswerProps) {
+export default function GeneratedAnswer({ answer, queryInfo, regenerateAndBypassCache }: GeneratedAnswerProps) {
     return (
         <Container>
             <Header>
@@ -48,6 +54,15 @@ export default function GeneratedAnswer({ answer }: GeneratedAnswerProps) {
                 <Spacer $width="10px" />
                 <MoreInfo info={disclaimer} width="240px" />
             </Header>
+            {queryInfo && queryInfo.isDifferent && (
+                <div className="text-sm mb-2">
+                    Showing result for '{queryInfo.cachedQuery}'
+                    <br />
+                    <a onClick={regenerateAndBypassCache} style={{ cursor: 'pointer', color: 'blue', textDecoration: 'underline' }}>
+                        Search instead for '{queryInfo.userQuery}'
+                    </a>
+                </div>
+            )}
             {answer.length === 0 ? (
                 <>
                     <Spacer $height="20px" />
