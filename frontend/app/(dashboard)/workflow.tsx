@@ -109,11 +109,11 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       } else if (allComplete) {
         setDeployStatus('Active'); // Models are complete and workflow is active
       } else {
-        setDeployStatus('Ready to Start');
+        setDeployStatus('Starting');
       }
     } else {
-      // If no models are present, the workflow is ready to deploy
-      setDeployStatus('Ready to Start');
+      // If no models are present, the workflow should not exist
+      setDeployStatus('Error');
     }
   }, [workflow.models, workflow.status]);
 

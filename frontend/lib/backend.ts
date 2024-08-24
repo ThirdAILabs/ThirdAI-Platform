@@ -7,6 +7,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export const thirdaiPlatformBaseUrl = _.trim(process.env.THIRDAI_PLATFORM_BASE_URL!, '/');
+export const thirdaiCacheBaseUrl = _.trim(process.env.THIRDAI_CACHE_BASE_URL!, '/');
 export const deploymentBaseUrl = _.trim(process.env.DEPLOYMENT_BASE_URL!, '/');
 
 export function getAccessToken(throwIfNotFound: boolean = true): string | null {
@@ -1092,5 +1093,27 @@ export async function accessTokenUser(accessToken: string | null) {
     return response.data.data as User;
   } catch (error) {
     return null;
+  }
+}
+
+
+
+export async function fetchAutoCompleteQueries(modelId: string, query: string) {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  const params = new URLSearchParams({ model_id: modelId, query });
+  
+  try {
+    console.log('thirdaiPlatformBaseUrl is', thirdaiPlatformBaseUrl)
+    console.log('thirdaiCacheBaseUrl is', thirdaiCacheBaseUrl)
+    
+    // const response = await axios.get(`${thirdaiCacheBaseUrl}/api/cache/suggestions?${params.toString()}`);
+    const response = await axios.get(`http://localhost:8001/cache/suggestions?${params.toString()}`);
+
+    return response.data; // Assuming the backend returns the data directly
+  } catch (err) {
+    console.error('Error fetching autocomplete suggestions:', err);
+    throw err; // Re-throwing the error to handle it in the component
   }
 }

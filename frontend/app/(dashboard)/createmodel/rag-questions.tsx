@@ -81,7 +81,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
         components.push('nlp');
       } else {
         console.error(`NER model with identifier ${grIdentifier} not found.`);
-        alert(`NER model with identifier ${grIdentifier} not found.`)
+        // alert(`NER model with identifier ${grIdentifier} not found.`)
       }
   
       // Step 3: Add the models to the workflow

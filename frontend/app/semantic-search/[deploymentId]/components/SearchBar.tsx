@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useRef, useState } from "react";
+import React, { useCallback, useContext, useRef, useState, useEffect } from "react";
 import { Button } from '@/components/ui/button';
 import styled from "styled-components";
 import {
@@ -20,6 +20,8 @@ import Modal from "./Modal";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DropdownMenuContent } from "@radix-ui/react-dropdown-menu";
+import { fetchAutoCompleteQueries } from '@/lib/backend';
+import { debounce } from 'lodash';
 
 const Container = styled.section`
     box-shadow: 0 10px 10px 4px muted;
@@ -94,6 +96,11 @@ interface ModelDescriptionProps {
     sources: Source[];
     setSources: (sources: Source[]) => void;
     ifGenerationOn: boolean;
+}
+
+interface Suggestion {
+    query: string;
+    query_id: number;
 }
 
 function ModelDescription(props: ModelDescriptionProps) {
@@ -247,8 +254,42 @@ export default function SearchBar({
 
     };
 
+    const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+
+    function extractModelIdFromUrl(url: string) {
+        const urlParts = new URL(url);
+        const pathSegments = urlParts.pathname.split('/');
+        return pathSegments[pathSegments.length - 1]; // Assumes the modelId is the last segment
+    }
+
+    const modelId = modelService ? extractModelIdFromUrl(modelService.url) : '';
+
+    console.log('modelId is:', modelId)
+
+    const debouncedFetch = debounce((query) => {
+        fetchAutoCompleteQueries(modelId, query)
+          .then(data => {
+            setSuggestions(data.suggestions); // Storing the suggestions in state
+            console.log('suggestions:', data.suggestions); // Adjust according to actual data structure
+          })
+          .catch(err => console.error('Failed to fetch suggestions:', err));
+      }, 300); // Adjust debounce time as needed
+    
+      useEffect(() => {
+        if (query.length > 2) { // Only fetch suggestions if query length is more than 2 characters
+          debouncedFetch(query);
+        } else {
+            setSuggestions([])
+        }
+      }, [query]);
+    
+    const handleSuggestionClick = (suggestionQuery: string) => {
+        setQuery(suggestionQuery); // Set the search input to the selected suggestion
+    };
+
     return (
         <Container>
+            <div>
             <SearchArea style={{marginBottom: "5px"}}>
                 <Input
                     autoFocus
@@ -272,6 +313,16 @@ export default function SearchBar({
                 <Spacer $width="7px" />
                 <SaveButton onClick={handleSaveClick} />
             </SearchArea>
+            <div className="w-full mt-2" style={{backgroundColor: 'white'}}>
+                {suggestions.map(suggestion => (
+                    <button key={suggestion.query_id}
+                            onClick={() => handleSuggestionClick(suggestion.query)}
+                            className="block w-full text-left p-2 hover:bg-gray-100 cursor-pointer">
+                        {suggestion.query}
+                    </button>
+                ))}
+            </div>
+            </div>
             {dialogOpen && (
                 <>
                     <Spacer $height="5px" />
@@ -285,12 +336,15 @@ export default function SearchBar({
             )}
 
             <Spacer $height="5px" />
+            {
+                (! suggestions || suggestions.length === 0) && 
             <ModelDescription
                 onClickViewDocuments={() => setShowSources((val) => !val)}
                 sources={sources}
                 setSources={setSources}
                 ifGenerationOn={ifGenerationOn}
             />
+            }
             <Spacer $height="5px" />
 
             {modalOpen && (
