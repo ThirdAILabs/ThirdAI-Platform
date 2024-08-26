@@ -2,8 +2,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from cache import Cache, NDBSemanticCache
 import logging
+
+from cache import Cache, NDBSemanticCache
 from fastapi import Depends, FastAPI, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware

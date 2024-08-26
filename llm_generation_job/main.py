@@ -1,14 +1,15 @@
 from dotenv import load_dotenv
 
 load_dotenv()
+import os
+from urllib.parse import urljoin
+
+import requests
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from llms import default_keys, model_classes
 from pydantic import ValidationError
 from pydantic_models import GenerateArgs
-import requests
-from urllib.parse import urljoin
-import os
 
 app = FastAPI()
 

@@ -5,10 +5,10 @@ from typing import Dict, List, Tuple
 from urllib.parse import urljoin
 
 import fastapi
-import requests
 import jwt
-from pydantic import BaseModel
+import requests
 from fastapi import status
+from pydantic import BaseModel
 
 CREDENTIALS_EXCEPTION = fastapi.HTTPException(
     status_code=fastapi.status.HTTP_401_UNAUTHORIZED,
@@ -168,10 +168,10 @@ class Permissions:
     def create_temporary_cache_access_token(self, model_id: str) -> str:
         """
         We need to pass some sort of access token to /generate so that the generation
-        service can update the cache. However headers cannot be passed to a json WebSocket, 
+        service can update the cache. However headers cannot be passed to a json WebSocket,
         and url params are less secure. Thus we don't want to use the regular auth token.
-        This method creates a temporary access token that has a short expiration and 
-        can only be used to update the llm cache. The user must request that token and 
+        This method creates a temporary access token that has a short expiration and
+        can only be used to update the llm cache. The user must request that token and
         then pass it to /generate so that the generation service can update the cache.
         """
         payload = {
