@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from cache import Cache, NDBSemanticCache
+import logging
 from fastapi import Depends, FastAPI, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +32,8 @@ cache: Cache = NDBSemanticCache()
 def suggestions(model_id: str, query: str):
     result = cache.suggestions(model_id=model_id, query=query)
 
+    logging.info(f"found {len(result)} suggestions for query={query}")
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"status": "success", "suggestions": jsonable_encoder(result)},
@@ -41,6 +44,11 @@ def suggestions(model_id: str, query: str):
 def cache_query(model_id: str, query: str):
     result = cache.query(model_id=model_id, query=query)
 
+    if result:
+        logging.info(f"found cached result for query={query}")
+    else:
+        logging.info(f"found no cached result for query={query}")
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"status": "success", "cached_response": jsonable_encoder(result)},
@@ -50,6 +58,8 @@ def cache_query(model_id: str, query: str):
 @app.post("/cache/insert", dependencies=[Depends(permissions.verify_read_permission)])
 def cache_insert(model_id: str, query: str, llm_res: str):
     cache.insert(model_id=model_id, query=query, llm_res=llm_res)
+
+    logging.info(f"cached query={query}")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

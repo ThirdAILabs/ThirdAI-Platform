@@ -7,7 +7,6 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export const thirdaiPlatformBaseUrl = _.trim(process.env.THIRDAI_PLATFORM_BASE_URL!, '/');
-export const thirdaiCacheBaseUrl = _.trim(process.env.THIRDAI_CACHE_BASE_URL!, '/');
 export const deploymentBaseUrl = _.trim(process.env.DEPLOYMENT_BASE_URL!, '/');
 
 export function getAccessToken(throwIfNotFound: boolean = true): string | null {
@@ -1105,11 +1104,7 @@ export async function fetchAutoCompleteQueries(modelId: string, query: string) {
   const params = new URLSearchParams({ model_id: modelId, query });
   
   try {
-    // console.log('thirdaiPlatformBaseUrl is', thirdaiPlatformBaseUrl)
-    // console.log('thirdaiCacheBaseUrl is', thirdaiCacheBaseUrl)
-    
-    // const response = await axios.get(`${thirdaiCacheBaseUrl}/api/cache/suggestions?${params.toString()}`);
-    const response = await axios.get(`http://localhost:8001/cache/suggestions?${params.toString()}`);
+    const response = await axios.get(`${deploymentBaseUrl}/cache/suggestions?${params.toString()}`);
 
     return response.data; // Assuming the backend returns the data directly
   } catch (err) {
@@ -1125,7 +1120,7 @@ export async function fetchCachedGeneration(modelId: string, query: string) {
   const params = new URLSearchParams({ model_id: modelId, query });
 
   try {
-      const response = await axios.get(`http://localhost:8001/cache/query?${params.toString()}`);
+      const response = await axios.get(`${deploymentBaseUrl}/cache/query?${params.toString()}`);
       return response.data.cached_response; // Assuming the backend returns the data directly
   } catch (err) {
       console.error('Error fetching cached generation:', err);
@@ -1144,7 +1139,7 @@ export async function cacheGenerationResult(modelId: string, query: string, llmR
   });
 
   try {
-      const response = await axios.post(`http://localhost:8001/cache/insert?${params.toString()}`);
+      const response = await axios.post(`${deploymentBaseUrl}/cache/insert?${params.toString()}`);
       return response.data; // Assuming the backend returns the data directly
   } catch (err) {
       console.error('Error caching generation result:', err);
