@@ -25,9 +25,15 @@ class Cache(ABC):
         raise NotImplemented
 
 
-def similarity(query: str, cached_query: str) -> float:
+def char_similarity(query: str, cached_query: str) -> float:
     edits = nltk.edit_distance(query, cached_query, transpositions=True)
     return 1 - edits / len(query)
+
+
+def token_similarity(query: str, cached_query: str) -> float:
+    query_set = set(query.split())
+    overlap = len(query_set.intersection(cached_query.split()))
+    return overlap / len(query_set)
 
 
 class NDBSemanticCache(Cache):
@@ -56,7 +62,7 @@ class NDBSemanticCache(Cache):
         )
 
         reranked = sorted(
-            [(res[0], similarity(query, res[0].text)) for res in results],
+            [(res[0], token_similarity(query, res[0].text)) for res in results],
             key=lambda x: x[1],
             reverse=True,
         )
