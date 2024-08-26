@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { signIn } from '@/lib/auth';
 import { userRegister } from "@/lib/backend";
 import { useRouter } from 'next/navigation';
+import Link from 'next/link'
 
 export default function SignupForm() {
   const [email, setEmail] = useState('');
@@ -63,7 +64,17 @@ export default function SignupForm() {
             />
         </div>
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-        <Button type="submit" className="w-full">Sign Up</Button>
+
+        <div className="flex items-center">
+          <Button type="submit" className="flex-grow mr-2">
+            Sign Up
+          </Button>
+          <Link href="/login-email" className="w-auto">
+            <Button type="button" className="w-full">
+              Log In
+            </Button>
+          </Link>
+        </div>
     </form>
   );
 }

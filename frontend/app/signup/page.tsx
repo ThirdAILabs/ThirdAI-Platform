@@ -5,9 +5,7 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
-import { signIn } from '@/lib/auth';
 import SignupForm from './signup-form';
-import Link from 'next/link'
 
 export default function SignupPage() {
 
@@ -22,12 +20,6 @@ export default function SignupPage() {
         </CardHeader>
         <CardFooter>
           <SignupForm/>
-
-          <Link href="/login-email">
-            <button type="button">
-              Log In
-            </button>
-          </Link>
         </CardFooter>
       </Card>
     </div>

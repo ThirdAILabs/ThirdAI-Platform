@@ -84,6 +84,9 @@ export function ModelsTable({
       }
     }
 
+    // Call the function immediately
+    getModels()
+
     const intervalId = setInterval(getModels, 3000);
 
     // Cleanup function to clear the interval when the component unmounts
@@ -106,6 +109,9 @@ export function ModelsTable({
         }
       }
     }
+
+    // Call the function immediately
+    getWorkflows();
 
     const intervalId = setInterval(getWorkflows, 3000);
 

@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import React, { useState, useEffect } from 'react';
 import { SelectModel } from '@/lib/db';
 import NERQuestions from './nlp-questions/ner-questions';
@@ -7,6 +6,12 @@ import { create_workflow, add_models_to_workflow } from '@/lib/backend';
 import { CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useRouter } from 'next/navigation';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 
 interface RAGQuestionsProps {
   models: SelectModel[];
@@ -52,6 +57,8 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
 
   // End state variables & func for LLM
 
+  const router = useRouter();
+
   const handleSubmit = async () => {
     const workflowName = modelName;
     const workflowTypeName = 'rag';
@@ -96,11 +103,16 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
         console.error('No models to add to the workflow');
         alert('No models to add to the workflow')
       }
+
+      // Go back home page
+      router.push("/")
     } catch (error) {
       console.error('Error during workflow creation or model addition:', error);
       alert('Error during workflow creation or model addition:' + error)
     }
   };
+
+  const [warningMessage, setWarningMessage] = useState("");
 
   const steps = [
     {
@@ -114,15 +126,20 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
             onChange={(e) => {
               const name = e.target.value;
               if (workflowNames.includes(name)) {
-                // Notify the user about the duplicate name
-                alert("A workflow with the same name has been created. Please choose a different name.");
+                setWarningMessage("A workflow with the same name has been created. Please choose a different name.");
               } else {
-                setModelName(name);
+                setWarningMessage(""); // Clear the warning if the name is unique
               }
+              setModelName(name)
             }}
             placeholder="Enter app name"
             style={{ marginTop: '10px' }}
           />
+          {warningMessage && (
+            <span style={{ color: "red", marginTop: "10px" }}>
+              {warningMessage}
+            </span>
+          )}
         </div>
       ),
     },
@@ -420,12 +437,27 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
           <Button onClick={() => setCurrentStep(currentStep + 1)}>Next</Button>
         ) : (
           <>
-            {(ssModelId && (ifUseLGR === 'No' || grModelId) && llmType && modelName) ? (
-              <Link href="/">
-                <Button onClick={handleSubmit} style={{ width: '100%' }}>
-                  {`${ifUseExistingSS === 'No' || (ifUseLGR === 'Yes' && ifUseExistingLGR === 'No') ? 'Create' : 'Create and Deploy'}`}
-                </Button>
-              </Link>
+            {(ssModelId && (ifUseLGR === 'No' || grModelId) && modelName) ? (
+              <div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <Button 
+                        onClick={handleSubmit} 
+                        style={{ width: '100%' }}
+                        disabled={!(ssModelId && (ifUseLGR === 'No' || grModelId) && llmType && modelName)}
+                      >
+                        Create
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  {!(ssModelId && (ifUseLGR === 'No' || grModelId) && llmType && modelName) && (
+                    <TooltipContent side="bottom">
+                      LLM Type is not specified
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </div>
             ) : (
               <div style={{ color: 'red' }}>{errorMessage}</div>
             )}

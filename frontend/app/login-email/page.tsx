@@ -66,13 +66,13 @@ export default function LoginPage() {
             </div>
             {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
             
-            <Button type="submit" className="w-full">Login</Button>
+            <div className="flex items-center justify-between mb-4">
+              <Button type="submit" className="w-full">Login</Button>
+              <Link href="/signup" className="ml-4">
+                <Button type="button" className="w-full">Sign up</Button>
+              </Link>
+            </div>
           </form>
-          <Link href="/signup">
-            <button type="button">
-              Sign up
-            </button>
-          </Link>
         </CardFooter>
       </Card>
     </div>

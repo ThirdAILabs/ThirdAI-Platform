@@ -280,6 +280,9 @@ function App() {
 
             for (let i = 0; i < tokens.length; i++) {
                 const word = tokens[i];
+                if (! (predicted_tags && predicted_tags[i])) {
+                    continue
+                }
                 const tag = predicted_tags[i][0];
                 // console.log('tag:', tag)
 

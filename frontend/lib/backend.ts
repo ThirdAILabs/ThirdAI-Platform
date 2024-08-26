@@ -39,7 +39,7 @@ export async function fetchPrivateModels(name: string) {
     return response.data;
   } catch (error) {
     console.error('Error fetching private models:', error);
-    alert('Error fetching private models:' + error)
+    // alert('Error fetching private models:' + error)
     throw new Error('Failed to fetch private models');
   }
 }
@@ -71,7 +71,7 @@ export async function fetchPendingModels(): Promise<PendingModel> {
     return response.data;
   } catch (error) {
     console.error('Error fetching private models:', error);
-    alert('Error fetching private models:' + error)
+    // alert('Error fetching private models:' + error)
     throw new Error('Failed to fetch private models');
   }
 }
