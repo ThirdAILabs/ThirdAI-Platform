@@ -306,7 +306,7 @@ export default function SearchBar({
                             onClick={() => {
                                 const suggestionQuery = suggestion.query
                                 setQuery(suggestionQuery)
-                                onSubmit(query, prompt)
+                                onSubmit(suggestionQuery, prompt)
                             }}
                             className="block w-full text-left p-2 hover:bg-gray-100 cursor-pointer">
                         {suggestion.query}

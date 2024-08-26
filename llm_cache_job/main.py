@@ -26,6 +26,11 @@ permissions = Permissions()
 cache: Cache = NDBSemanticCache()
 
 
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+
 @app.get(
     "/cache/suggestions", dependencies=[Depends(permissions.verify_read_permission)]
 )
@@ -82,4 +87,4 @@ def cache_invalidate(model_id: str):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="localhost", port=8000)
+    uvicorn.run(app, host="localhost", port=8001)
