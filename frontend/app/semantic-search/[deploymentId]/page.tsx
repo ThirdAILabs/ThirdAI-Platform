@@ -30,7 +30,7 @@ import { createDeploymentUrl, createTokenModelUrl } from "./components/Deploymen
 import PillButton from "./components/buttons/PillButton";
 import { useParams, useSearchParams } from "next/navigation";
 import { CardTitle } from "@/components/ui/card";
-import { getWorkflowDetails, fetchCachedGeneration, cacheGenerationResult } from '@/lib/backend';
+import { getWorkflowDetails, fetchCachedGeneration } from '@/lib/backend';
 
 const Frame = styled.section<{ $opacity: string }>`
     position: absolute;
@@ -439,14 +439,6 @@ function App() {
                         results.references,
                         websocketRef,
                         (next) => setAnswer((prev) => prev + next),
-                        async (finalAnswer) => { // This is the onComplete callback, receiving the final generated answer
-                            try {
-                                await cacheGenerationResult(modelId!, query, finalAnswer);
-                                console.log('Cached the generation result successfully.');
-                            } catch (error) {
-                                console.error('Failed to cache the generation result:', error);
-                            }
-                        }
                     );
                 }
             }

@@ -6,6 +6,8 @@ from urllib.parse import urljoin
 
 import fastapi
 import requests
+import jwt
+from pydantic import BaseModel
 from fastapi import status
 
 CREDENTIALS_EXCEPTION = fastapi.HTTPException(
@@ -16,6 +18,11 @@ CREDENTIALS_EXCEPTION = fastapi.HTTPException(
     # https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate
     headers={"WWW-Authenticate": "Bearer"},
 )
+
+
+class TokenPayload(BaseModel):
+    model_id: str
+    exp: datetime.datetime
 
 
 def optional_token_bearer(request: fastapi.Request) -> str:
@@ -157,3 +164,41 @@ class Permissions:
             if not self._get_permissions(model_id=model_id, token=token)[0]:
                 raise CREDENTIALS_EXCEPTION
         return token
+
+    def create_temporary_cache_access_token(self, model_id: str) -> str:
+        """
+        We need to pass some sort of access token to /generate so that the generation
+        service can update the cache. However headers cannot be passed to a json WebSocket, 
+        and url params are less secure. Thus we don't want to use the regular auth token.
+        This method creates a temporary access token that has a short expiration and 
+        can only be used to update the llm cache. The user must request that token and 
+        then pass it to /generate so that the generation service can update the cache.
+        """
+        payload = {
+            "exp": datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=3),
+            "model_id": model_id,
+        }
+
+        return jwt.encode(
+            payload=payload,
+            key=os.getenv("JWT_SECRET"),
+            algorithm="HS256",
+        )
+
+    def verify_temporary_cache_access_token(
+        self, token: str = fastapi.Depends(optional_token_bearer)
+    ):
+        try:
+            payload = TokenPayload(
+                **jwt.decode(
+                    token,
+                    key=os.getenv("JWT_SECRET"),
+                    algorithms=["HS256"],
+                )
+            )
+            if payload.model_id is None:
+                raise CREDENTIALS_EXCEPTION
+
+            return payload.model_id
+        except jwt.PyJWTError:
+            raise CREDENTIALS_EXCEPTION

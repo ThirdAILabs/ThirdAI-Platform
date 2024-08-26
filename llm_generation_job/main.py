@@ -176,21 +176,23 @@ async def generate(websocket: WebSocket):
         {"status": "success", "content": "", "end_of_stream": True}
     )
 
-    if generate_args.model_id is not None and generate_args.access_token is not None:
+    if (
+        generate_args.original_query is not None
+        and generate_args.cache_access_token is not None
+    ):
         try:
             res = requests.post(
                 urljoin(os.environ["MODEL_BAZAAR_ENDPOINT"], "/cache/insert"),
                 params={
-                    "model_id": generate_args.model_id,
-                    "query": generate_args.query,
+                    "query": generate_args.original_query,
                     "llm_res": generated_response,
                 },
                 headers={
-                    "Authorization": f"Bearer {generate_args.access_token}",
+                    "Authorization": f"Bearer {generate_args.cache_access_token}",
                 },
             )
             if res.status_code != 200:
-                print("LLM Cache Insertion failed: ", res.json())
+                print(f"LLM Cache Insertion failed: {res}")
         except Exception as e:
             print("LLM Cache Insert Error", e)
 

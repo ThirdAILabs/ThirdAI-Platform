@@ -30,17 +30,29 @@ def query(client, model_id, query):
     return res.json()["cached_response"]
 
 
-def insert(client, model_id, query, llm_res):
-    res = client.post(
+def try_insert(client, query, llm_res, token):
+    return client.post(
         "/cache/insert",
-        headers=auth_header(""),
+        headers=auth_header(token),
         params={
-            "model_id": model_id,
             "query": query,
             "llm_res": llm_res,
         },
     )
+
+
+def insert(client, query, llm_res, token):
+    assert try_insert(client, query, llm_res, token).status_code == 200
+
+
+def get_token(client, model_id):
+    res = client.get(
+        "/cache/token",
+        params={"model_id": model_id},
+        headers=auth_header(""),
+    )
     assert res.status_code == 200
+    return res.json()["access_token"]
 
 
 def dummy_verify(self, model_id):
@@ -50,6 +62,7 @@ def dummy_verify(self, model_id):
 @pytest.mark.unit
 def test_llm_cache():
     os.environ["MODEL_BAZAAR_ENDPOINT"] = ""
+    os.environ["JWT_SECRET"] = "12345"
     from permissions import Permissions
 
     Permissions.verify_read_permission = dummy_verify
@@ -62,9 +75,19 @@ def test_llm_cache():
 
     assert query(client, "abc", "wht is the capital of fran") == None
 
-    insert(client, "abc", "what is the capital of france", "paris")
-    insert(client, "abc", "what is the capital of norway", "oslo")
-    insert(client, "xyz", "what is the capital of denmark", "coppenhagen")
+    res = try_insert(client, "what is the capital of france", "paris", token="249")
+    assert res.status_code == 401
+
+    access_token = get_token(client, "abc")
+
+    insert(client, "what is the capital of france", "paris", access_token)
+    insert(client, "what is the capital of norway", "oslo", access_token)
+    insert(
+        client,
+        "what is the capital of denmark",
+        "coppenhagen",
+        get_token(client, "xyz"),
+    )
 
     results = suggestions(client, "abc", "wht is the capital of fran")
     assert len(results) == 2

@@ -1,5 +1,6 @@
 import { genaiQuery } from "./genai";
 import { Box, Chunk, DocChunks } from "./components/pdf_viewer/interfaces";
+import { temporaryCacheToken } from "@/lib/backend";
 
 export interface ReferenceJson {
     id: number;
@@ -592,9 +593,12 @@ export class ModelService {
     ) {
         let finalAnswer = ''; // Variable to accumulate the response
 
+        const cache_access_token =  await temporaryCacheToken(this.getModelID());
         const args = {
             query: genaiQuery(question, references, genaiPrompt),
-            key: "sk-PYTWB6gs_ofO44-teXA2rIRGRbJfzqDyNXBalHXKcvT3BlbkFJk5905SK2RVE6_ME8i4Lnp9qULbyPZSyOU0vh2fZfQA" // fill in openai key
+            key: "sk-PYTWB6gs_ofO44-teXA2rIRGRbJfzqDyNXBalHXKcvT3BlbkFJk5905SK2RVE6_ME8i4Lnp9qULbyPZSyOU0vh2fZfQA", // fill in openai key
+            original_query: question,
+            cache_access_token: cache_access_token.access_token
         };
 
         const uri = this.wsUrl + "/generate";

@@ -9,5 +9,6 @@ class GenerateArgs(BaseModel):
     model: str = "gpt-3.5-turbo"
     provider: str = "openai"
 
-    model_id: Optional[str] = None
-    access_token: Optional[str] = None
+    # For caching we want just the query, not the entire prompt. 
+    original_query: Optional[str] = None 
+    cache_access_token: Optional[str] = None

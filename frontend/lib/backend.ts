@@ -1128,21 +1128,17 @@ export async function fetchCachedGeneration(modelId: string, query: string) {
   }
 }
 
-export async function cacheGenerationResult(modelId: string, query: string, llmRes: string) {
+export async function temporaryCacheToken(modelId: string) {
   const accessToken = getAccessToken();
   axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
 
-  const params = new URLSearchParams({
-      model_id: modelId,
-      query,
-      llm_res: llmRes
-  });
+  const params = new URLSearchParams({model_id: modelId});
 
   try {
-      const response = await axios.post(`${deploymentBaseUrl}/cache/insert?${params.toString()}`);
+      const response = await axios.get(`${deploymentBaseUrl}/cache/token?${params.toString()}`);
       return response.data; // Assuming the backend returns the data directly
   } catch (err) {
-      console.error('Error caching generation result:', err);
+      console.error('Error getting temporary cache access token:', err);
       throw err; // Re-throwing the error to handle it in the component
   }
 }
