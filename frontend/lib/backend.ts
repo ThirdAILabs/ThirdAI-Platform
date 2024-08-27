@@ -298,6 +298,37 @@ export function add_models_to_workflow({ workflowId, modelIdentifiers, component
   });
 }
 
+interface SetGenAIProviderParams {
+  workflowId: string;
+  provider: string;
+}
+
+export function set_gen_ai_provider({ workflowId, provider }: SetGenAIProviderParams): Promise<any> {
+  const accessToken = getAccessToken();
+
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  return new Promise((resolve, reject) => {
+    axios
+      .post(`${thirdaiPlatformBaseUrl}/api/workflow/set-gen-ai-provider`, {
+        workflow_id: workflowId,
+        provider,
+      })
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        if (err.response && err.response.data) {
+          reject(new Error(err.response.data.detail || 'Failed to set generation AI provider'));
+        } else {
+          reject(new Error('Failed to set generation AI provider'));
+        }
+      });
+  });
+}
+
+
+
 export interface CreatedBy {
   id: string;
   username: string;
