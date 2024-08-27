@@ -1,11 +1,9 @@
 import os
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
-import nltk
 from thirdai import neural_db_v2 as ndb
-from thirdai import search
 from thirdai.neural_db_v2.chunk_stores import constraints
 
 
@@ -27,20 +25,14 @@ class Cache(ABC):
         raise NotImplemented
 
 
-def char_similarity(query: str, cached_query: str) -> float:
-    edits = nltk.edit_distance(query, cached_query, transpositions=True)
-    return 1 - edits / len(query)
-
-
-def token_similarity(query: str, cached_query: str) -> float:
-    query_set = set(query.split())
-    overlap = len(query_set.intersection(cached_query.split()))
-    return overlap / len(query_set)
+def token_similarity(query_tokens: Set[str], cached_query: str) -> float:
+    overlap = len(query_tokens.intersection(cached_query.split()))
+    return overlap / len(query_tokens)
 
 
 class NDBSemanticCache(Cache):
     def __init__(self):
-        self.db = ndb.NeuralDB(save_path=f"{uuid.uuid4()}.cache")
+        self.db = ndb.NeuralDB(save_path=os.getenv("LLM_CACHE_PATH"))
         self.threshold = float(os.getenv("LLM_CACHE_THRESHOLD", "0.95"))
 
     def suggestions(self, model_id: str, query: str) -> List[Dict[str, Any]]:
@@ -52,7 +44,16 @@ class NDBSemanticCache(Cache):
             top_k=5,
             constraints={"model_id": constraints.EqualTo(model_id)},
         )
-        return [{"query": res[0].text, "query_id": res[0].chunk_id} for res in results]
+
+        unique_suggestions = set()
+        suggestions = []
+        for res, _ in results:
+            if res.text in unique_suggestions:
+                continue
+            suggestions.append({"query": res.text, "query_id": res.chunk_id})
+            unique_suggestions.add(res.text)
+
+        return suggestions
 
     def query(self, model_id: str, query: str) -> Optional[str]:
         if self.db.retriever.retriever.size() == 0:
@@ -64,8 +65,9 @@ class NDBSemanticCache(Cache):
             constraints={"model_id": constraints.EqualTo(model_id)},
         )
 
+        query_tokens = set(query.split())
         reranked = sorted(
-            [(res[0], token_similarity(query, res[0].text)) for res in results],
+            [(res[0], token_similarity(query_tokens, res[0].text)) for res in results],
             key=lambda x: x[1],
             reverse=True,
         )

@@ -1,17 +1,14 @@
-from dotenv import load_dotenv
-
-load_dotenv()
-
 import logging
 
 from cache import Cache, NDBSemanticCache
-from fastapi import Depends, FastAPI, status
+from fastapi import APIRouter, Depends, FastAPI, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from permissions import Permissions
 
 app = FastAPI()
+router = APIRouter()
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,9 +29,7 @@ logging.basicConfig(
 )
 
 
-@app.get(
-    "/cache/suggestions", dependencies=[Depends(permissions.verify_read_permission)]
-)
+@router.get("/suggestions", dependencies=[Depends(permissions.verify_read_permission)])
 def suggestions(model_id: str, query: str):
     result = cache.suggestions(model_id=model_id, query=query)
 
@@ -46,7 +41,7 @@ def suggestions(model_id: str, query: str):
     )
 
 
-@app.get("/cache/query", dependencies=[Depends(permissions.verify_read_permission)])
+@router.get("/query", dependencies=[Depends(permissions.verify_read_permission)])
 def cache_query(model_id: str, query: str):
     result = cache.query(model_id=model_id, query=query)
 
@@ -61,7 +56,7 @@ def cache_query(model_id: str, query: str):
     )
 
 
-@app.post("/cache/insert")
+@router.post("/insert")
 def cache_insert(
     query: str,
     llm_res: str,
@@ -77,9 +72,7 @@ def cache_insert(
     )
 
 
-@app.post(
-    "/cache/invalidate", dependencies=[Depends(permissions.verify_read_permission)]
-)
+@router.post("/invalidate", dependencies=[Depends(permissions.verify_write_permission)])
 def cache_invalidate(model_id: str):
     cache.invalidate(model_id=model_id)
 
@@ -89,7 +82,7 @@ def cache_invalidate(model_id: str):
     )
 
 
-@app.get("/cache/token", dependencies=[Depends(permissions.verify_read_permission)])
+@router.get("/token", dependencies=[Depends(permissions.verify_read_permission)])
 def temporary_cache_token(model_id: str):
     logging.info(f"creating cache token for model {model_id}")
 
@@ -102,6 +95,9 @@ def temporary_cache_token(model_id: str):
             ),
         },
     )
+
+
+app.include_router(router, prefix="/cache")
 
 
 if __name__ == "__main__":

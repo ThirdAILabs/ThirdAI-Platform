@@ -171,6 +171,26 @@ class Permissions:
                 raise CREDENTIALS_EXCEPTION
         return token
 
+    def verify_write_permission(
+        self, model_id: str, token: str = fastapi.Depends(optional_token_bearer)
+    ) -> str:
+        """
+        Verifies write permission for the token.
+
+        Args:
+            token (str): The access token.
+
+        Returns:
+            str: The access token if permission is granted.
+
+        Raises:
+            HTTPException: If the token does not have write permission.
+        """
+        with self.cache_lock:
+            if not self._get_permissions(model_id=model_id, token=token)[1]:
+                raise CREDENTIALS_EXCEPTION
+        return token
+
     def create_temporary_cache_access_token(self, model_id: str) -> str:
         """
         We need to pass some sort of access token to /generate so that the generation

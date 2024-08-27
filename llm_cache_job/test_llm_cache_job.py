@@ -1,4 +1,5 @@
 import os
+import shutil
 
 import pytest
 from fastapi.testclient import TestClient
@@ -60,14 +61,24 @@ def dummy_verify(self, model_id):
     return ""
 
 
+@pytest.fixture(scope="function")
+def cache_filename():
+    path = "./tmp.cache"
+    yield path
+    shutil.rmtree(path)
+
+
 @pytest.mark.unit
-def test_llm_cache():
+def test_llm_cache(cache_filename):
     os.environ["MODEL_BAZAAR_ENDPOINT"] = ""
     os.environ["JWT_SECRET"] = "12345"
     os.environ["LLM_CACHE_THRESHOLD"] = "0.7"
+    os.environ["LLM_CACHE_PATH"] = cache_filename
+
     from permissions import Permissions
 
     Permissions.verify_read_permission = dummy_verify
+    Permissions.verify_write_permission = dummy_verify
 
     import main
 
@@ -98,3 +109,10 @@ def test_llm_cache():
 
     result = query(client, "abc", "what is the capital of franc")
     assert result["llm_res"] == "paris"
+
+    res = client.post(
+        "/cache/invalidate", params={"model_id": "abc"}, headers=auth_header("")
+    )
+    assert res.status_code == 200
+
+    assert query(client, "abc", "what is the capital of franc") == None
