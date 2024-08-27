@@ -296,6 +296,36 @@ def set_gen_ai_provider(
 
     workflow.gen_ai_provider = body.provider
     session.commit()
+
+
+@workflow_router.post("/get-gen-ai-provider")
+def set_gen_ai_provider(
+    body: WorkflowGenAIModel,
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
+    workflow: schema.Workflow = session.query(schema.Workflow).get(body.workflow_id)
+
+    if not workflow:
+        return response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Workflow not found.",
+        )
+
+    if (
+        workflow.user_id != authenticated_user.user.id
+        and not authenticated_user.user.is_global_admin()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have owner permissions to this workflow",
+        )
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Models deleted from workflow successfully.",
+        data={"provider": workflow.gen_ai_provider},
+    )
     
 
 @workflow_router.post("/delete-models")
