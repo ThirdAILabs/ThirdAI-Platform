@@ -32,6 +32,8 @@ from sqlalchemy.orm import Session
 
 workflow_router = APIRouter()
 
+def get_workflow()
+
 
 @workflow_router.get("/types")
 def workflow_types(
@@ -298,9 +300,13 @@ def set_gen_ai_provider(
     session.commit()
 
 
+class WorkflowNoGenAIModel(BaseModel):
+    workflow_id: str
+
+
 @workflow_router.post("/get-gen-ai-provider")
 def set_gen_ai_provider(
-    body: WorkflowGenAIModel,
+    body: WorkflowNoGenAIModel,
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
