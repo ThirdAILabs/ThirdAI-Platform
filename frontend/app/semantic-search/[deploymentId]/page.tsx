@@ -145,6 +145,7 @@ function App() {
 
     const searchParams = useSearchParams();
     const [ifGenerationOn, setIfGenerationOn] = useState(false);
+    const [cacheEnabled, setCacheEnabled] = useState(true); // default generation cache is on
     const [ifGuardRailOn, setIfGuardRailOn] = useState(false);
 
     useEffect(() => {
@@ -408,7 +409,8 @@ function App() {
                 if (results && ifGenerationOn) {
                     const modelId = modelService?.getModelID();
 
-                    if (!bypassCache) {
+                    // If we don't want to bypassCache AND cache generation is enabled
+                    if (!bypassCache && cacheEnabled) {
                         try {
                             const cachedResult = await fetchCachedGeneration(modelId!, query);
                             console.log('cachedResult', cachedResult);
@@ -613,6 +615,7 @@ function App() {
                                         prompt={prompt}
                                         setPrompt={setPrompt}
                                         ifGenerationOn={ifGenerationOn}
+                                        cacheEnabled = {cacheEnabled}
                                     />
                                     {failed && (
                                         <Pad $top="100px">
@@ -638,6 +641,8 @@ function App() {
                                                             submit(query, prompt, true)
                                                         }}
                                                         queryInfo={queryInfo}
+                                                        cacheEnabled = {cacheEnabled}
+                                                        setCacheEnabled = {setCacheEnabled}
                                                     />
                                                 </>
                                             }
