@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from llms import default_keys, model_classes, OnPremLLM
-from pydantic import ValidationError
+from pydantic import ValidationError, BaseModel
 from pydantic_models import GenerateArgs
 from fastapi.responses import StreamingResponse
 
@@ -20,15 +20,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+# Define a Pydantic model for the request body
+class QueryRequest(BaseModel):
+    query: str
 
 @app.post("/cloud-llm/genpost")
-def generate(query: "str"):
-    return "LOL"
+def generate(request: QueryRequest):
     llm = OnPremLLM()
 
     async def event_stream():
-        async for chunk in llm.stream(query):
+        async for chunk in llm.stream("", request.query, ""):
             yield chunk
 
     return StreamingResponse(event_stream(), media_type="text/plain")

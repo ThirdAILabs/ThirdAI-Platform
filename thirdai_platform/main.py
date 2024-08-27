@@ -76,16 +76,3 @@ async def startup_event():
 
 if __name__ == "__main__":
     uvicorn.run(app, host="localhost", port=8000)
-
-
-
-
-
-# curl --request POST     --url http://localhost:80/on-prem-llm/completion     --header "Content-Type: application/json"     --data '{"system_prompt": "You are a helpful assistant. Please be concise in your answers.", "prompt": "What is the reason that the stock market is hard to predict? Please be concise. <|assistant|>", "stream": true}'
-# curl --request POST     --url http://localhost:80/on-prem-llm/completion     --header "Content-Type: application/json"     --data '{"system_prompt": "You are a helpful assistant. Please be concise in your answers.", "prompt": "Are these the same institution? MD Anderson, Texas and Texas, MD Anderson. <|assistant|>", "stream": true}'
-# curl --request POST     --url http://localhost:80/on-prem-llm/completion     --header "Content-Type: application/json"     --data '{"system_prompt": "You are a helpful assistant. Please be concise in your answers.", "prompt": "Are these the same institution?: \n \"Pathology and Histology core at Baylor College of Medicine, Houston, Texas\" and \"Institute of Radiation and Radiation Medicine or Institute of Electromagnetic and Particle Radiation Medicine\" <|assistant|>", "stream": true}'
-# curl --request POST     --url http://localhost:80/on-prem-llm/completion     --header "Content-Type: application/json"     --data '{"system_prompt": "You are a helpful assistant. Please be concise in your answers.", "prompt": "If a city has a population of 450,000 men, how many women do you estimate are in that city? <|assistant|>", "stream": true}'
-
-# Are these the same institution?: \n 'Pathology and Histology core at Baylor College of Medicine, Houston, Texas' and 'Institute of Radiation and Radiation Medicine or Institute of Electromagnetic and Particle Radiation Medicine'
-
-# Are these the same institution? MD Anderson, Texas and Texas, MD Anderson
