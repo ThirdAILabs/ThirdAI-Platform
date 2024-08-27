@@ -1,4 +1,4 @@
-job "cloud-llm-generation" {
+job "llm-dispatch-generation" {
   datacenters = ["dc1"]
 
   type = "service"
@@ -21,7 +21,7 @@ job "cloud-llm-generation" {
 
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.cloud-generation-http.rule=PathPrefix(`/cloud-llm/`)",
+        "traefik.http.routers.cloud-generation-http.rule=PathPrefix(`/llm-dispatch/`)",
         "traefik.http.routers.cloud-generation-http.priority=10"
       ]
     }

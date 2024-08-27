@@ -40,7 +40,6 @@ async def restart_generate_job():
         model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
         python_path=get_python_path(),
         generate_app_dir=str(get_root_absolute_path() / "llm_generation_job"),
-        model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT", None),
     )
 
 

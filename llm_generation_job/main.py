@@ -28,7 +28,7 @@ app.add_middleware(
 class QueryRequest(BaseModel):
     query: str
 
-@app.post("/cloud-llm/genpost")
+@app.post("/llm-dispatch/genpost")
 def generate(request: QueryRequest):
     llm = OnPremLLM()
 
@@ -39,7 +39,7 @@ def generate(request: QueryRequest):
     return StreamingResponse(event_stream(), media_type="text/plain")
 
 
-@app.websocket("/cloud-llm/generate")
+@app.websocket("/llm-dispatch/generate")
 async def generate(websocket: WebSocket):
     """
     WebSocket endpoint to generate text using a specified generative AI model.

@@ -22,7 +22,7 @@ with requests.post(url, headers=headers, json=data, stream=True) as response:
             print(chunk.decode('utf-8'))
 
 
-# curl --request POST --url http://localhost:80/cloud-llm/genpost --header "Content-Type: application/json" --data '{"query": "Hello!"}'
+# curl --request POST --url http://localhost:80/llm-dispatch/genpost --header "Content-Type: application/json" --data '{"query": "Hello!"}'
 
 
 import aiohttp
@@ -59,7 +59,7 @@ asyncio.run(main())
 
 import requests
 
-url = "http://127.0.0.1:80/cloud-llm/genpost"
+url = "http://127.0.0.1:80/llm-dispatch/genpost"
 headers = {
     "Content-Type": "application/json"
 }
