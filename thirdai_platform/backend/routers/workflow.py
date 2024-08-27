@@ -20,6 +20,7 @@ from backend.utils import (
     response,
     submit_nomad_job,
 )
+from backend.startup_jobs import restart_on_prem_generate_job
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -266,6 +267,36 @@ def add_models(
         data={"models": jsonable_encoder(list_workflow_models(workflow=workflow))},
     )
 
+class WorkflowGenAIModel(BaseModel):
+    workflow_id: str
+    provider: str
+
+@workflow_router.post("/set-gen-ai-provider")
+def set_gen_ai_provider(
+    body: WorkflowGenAIModel,
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
+    workflow: schema.Workflow = session.query(schema.Workflow).get(body.workflow_id)
+
+    if not workflow:
+        return response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Workflow not found.",
+        )
+
+    if (
+        workflow.user_id != authenticated_user.user.id
+        and not authenticated_user.user.is_global_admin()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have owner permissions to this workflow",
+        )
+
+    workflow.gen_ai_provider = body.provider
+    session.commit()
+    
 
 @workflow_router.post("/delete-models")
 def delete_models(
@@ -739,6 +770,9 @@ def start_workflow(
                 workflow.status = schema.WorkflowStatus.inactive
                 session.commit()
                 raise Exception(str(err))
+    
+    if workflow.gen_ai_provider == "on-prem":
+        restart_on_prem_generate_job()
 
     return response(
         status_code=status.HTTP_202_ACCEPTED,
