@@ -62,18 +62,18 @@ def dummy_verify(self, model_id):
 
 
 @pytest.fixture(scope="function")
-def cache_filename():
-    path = "./tmp.cache"
+def temp_share():
+    path = "./tmp"
     yield path
     shutil.rmtree(path)
 
 
 @pytest.mark.unit
-def test_llm_cache(cache_filename):
+def test_llm_cache(temp_share):
     os.environ["MODEL_BAZAAR_ENDPOINT"] = ""
     os.environ["JWT_SECRET"] = "12345"
     os.environ["LLM_CACHE_THRESHOLD"] = "0.7"
-    os.environ["LLM_CACHE_PATH"] = cache_filename
+    os.environ["SHARE_DIR"] = temp_share
 
     from permissions import Permissions
 

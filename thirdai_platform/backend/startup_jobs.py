@@ -63,7 +63,7 @@ async def restart_llm_cache_job():
         docker_password=os.getenv("DOCKER_PASSWORD"),
         image_name=os.getenv("LLM_CACHE_IMAGE_NAME"),
         model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
-        llm_cache_path=f"{uuid.uuid4()}.cache",
+        share_dir=os.getenv("SHARE_DIR"),
         python_path=get_python_path(),
         llm_cache_app_dir=str(get_root_absolute_path() / "llm_cache_job"),
     )
