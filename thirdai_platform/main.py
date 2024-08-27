@@ -1,4 +1,5 @@
 import sys
+import os
 
 from dotenv import load_dotenv
 
@@ -46,11 +47,20 @@ app.include_router(recovery, prefix="/api/recovery", tags=["recovery"])
 async def startup_event():
     try:
         print("Starting Generation Job...")
-        await restart_on_prem_generate_job()
         await restart_generate_job()
         print("Successfully started Generation Job!")
     except Exception as error:
         print(f"Failed to start the Generation Job : {error}", file=sys.stderr)
+    
+    if os.getenv("ENABLE_ON_PREM_GENERATION_JOB"):
+        try:
+            print("Starting On Prem Generation Job...")
+            await restart_on_prem_generate_job()
+            print("Successfully started On Prem Generation Job!")
+        except Exception as error:
+            print(f"Failed to start the On Prem Generation Job : {error}", file=sys.stderr)
+    else:
+        print("ENABLE_ON_PREM_GENERATION_JOB is False, not starting the job.")
 
     try:
         print("Adding default workflow types")
@@ -66,3 +76,16 @@ async def startup_event():
 
 if __name__ == "__main__":
     uvicorn.run(app, host="localhost", port=8000)
+
+
+
+
+
+# curl --request POST     --url http://localhost:80/on-prem-llm/completion     --header "Content-Type: application/json"     --data '{"system_prompt": "You are a helpful assistant. Please be concise in your answers.", "prompt": "What is the reason that the stock market is hard to predict? Please be concise. <|assistant|>", "stream": true}'
+# curl --request POST     --url http://localhost:80/on-prem-llm/completion     --header "Content-Type: application/json"     --data '{"system_prompt": "You are a helpful assistant. Please be concise in your answers.", "prompt": "Are these the same institution? MD Anderson, Texas and Texas, MD Anderson. <|assistant|>", "stream": true}'
+# curl --request POST     --url http://localhost:80/on-prem-llm/completion     --header "Content-Type: application/json"     --data '{"system_prompt": "You are a helpful assistant. Please be concise in your answers.", "prompt": "Are these the same institution?: \n \"Pathology and Histology core at Baylor College of Medicine, Houston, Texas\" and \"Institute of Radiation and Radiation Medicine or Institute of Electromagnetic and Particle Radiation Medicine\" <|assistant|>", "stream": true}'
+# curl --request POST     --url http://localhost:80/on-prem-llm/completion     --header "Content-Type: application/json"     --data '{"system_prompt": "You are a helpful assistant. Please be concise in your answers.", "prompt": "If a city has a population of 450,000 men, how many women do you estimate are in that city? <|assistant|>", "stream": true}'
+
+# Are these the same institution?: \n 'Pathology and Histology core at Baylor College of Medicine, Houston, Texas' and 'Institute of Radiation and Radiation Medicine or Institute of Electromagnetic and Particle Radiation Medicine'
+
+# Are these the same institution? MD Anderson, Texas and Texas, MD Anderson

@@ -110,7 +110,8 @@ class OnPremLLM(LLMBase):
 
         headers = {"Content-Type": "application/json"}
         body = {
-            "prompt": query,
+            "system_prompt": "You are a helpful assistant. Please be concise in your answers.",
+            "prompt": query + "<|assistant|>",
             "stream": True,
         }
         async with aiohttp.ClientSession() as session:
@@ -121,6 +122,7 @@ class OnPremLLM(LLMBase):
                     )
 
                 async for line in response.content:
+                    print(line)
                     line = line.decode("utf-8").strip()
                     if line.startswith("data: "):
                         try:

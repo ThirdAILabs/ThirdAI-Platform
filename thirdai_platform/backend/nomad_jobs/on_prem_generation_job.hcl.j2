@@ -4,35 +4,7 @@ job "on-prem-llm-generation" {
   type = "service"
 
   group "on-prem-generation" {
-    count = 4
-
-    scaling {
-      enabled = true
-      min = 1
-      max = 30
-      policy {
-        cooldown = "1m"
-        evaluation_interval = "10s"
-
-        check "avg_cpu" {
-          source = "nomad-apm"
-          query = "avg_cpu-allocated"
-          query_window = "3m"
-          strategy "target-value" {
-            target = 30
-          }
-        }
-
-        check "request_count" {
-          source = "nomad-apm"
-          query = "request_count"
-          query_window = "3m"
-          strategy "target-value" {
-            target = 3
-          }
-        }
-      }
-    }
+    count = "{{ num_allocations }}"
 
     network {
       port "on-prem-generation-http" {
@@ -44,7 +16,7 @@ job "on-prem-llm-generation" {
       port = "on-prem-generation-http"
       provider = "nomad"
 
-      {# This code adds a the prefix 'on-prem-llm' to all endpoints in the service. #}
+      {# This code adds the prefix 'on-prem-llm' to all endpoints in this service. #}
       tags = [
         "traefik.enable=true",
         "traefik.http.routers.on-prem-generation-http.rule=PathPrefix(`/on-prem-llm`)",
@@ -61,21 +33,21 @@ job "on-prem-llm-generation" {
         image = "ghcr.io/ggerganov/llama.cpp:server"
         image_pull_timeout = "15m"
         ports = ["on-prem-generation-http"]
-        volumes = ["{{ share_dir }}/gen-ai-models:/gen-ai-models"]
+        volumes = ["{{ mount_dir }}:/gen-ai-models"]
         auth {
           username = "{{ docker_username }}"
           password = "{{ docker_password }}"
           server_address = "ghrc.io"
         }
         args = [
-          "-m", "/gen-ai-models/Phi-3-mini-4k-instruct-q4.gguf",
+          "-m", "/gen-ai-models/{{ model_name }}",
           "--host", "0.0.0.0",
           "--port", "${NOMAD_PORT_on_prem_generation_http}"
         ]
       }
 
       resources {
-        cores = 10
+        cpu=20000
         memory = 4000
       }
     }

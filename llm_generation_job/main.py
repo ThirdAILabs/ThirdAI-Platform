@@ -5,9 +5,10 @@ load_dotenv()
 import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from llms import default_keys, model_classes
+from llms import default_keys, model_classes, OnPremLLM
 from pydantic import ValidationError
 from pydantic_models import GenerateArgs
+from fastapi.responses import StreamingResponse
 
 app = FastAPI()
 
@@ -20,7 +21,20 @@ app.add_middleware(
 )
 
 
-@app.websocket("/generate")
+
+@app.post("/cloud-llm/genpost")
+def generate(query: "str"):
+    return "LOL"
+    llm = OnPremLLM()
+
+    async def event_stream():
+        async for chunk in llm.stream(query):
+            yield chunk
+
+    return StreamingResponse(event_stream(), media_type="text/plain")
+
+
+@app.websocket("/cloud-llm/generate")
 async def generate(websocket: WebSocket):
     """
     WebSocket endpoint to generate text using a specified generative AI model.

@@ -44,7 +44,7 @@ async def restart_generate_job():
 ON_PREM_GENERATE_JOB_ID = "on-prem-llm-generation"
 
 
-async def restart_on_prem_generate_job():
+async def restart_on_prem_generate_job(model_name="qwen2-0_5b-instruct-fp16.gguf"):
     """
     Restart the LLM generation job.
 
@@ -58,10 +58,17 @@ async def restart_on_prem_generate_job():
     if not share_dir:
         raise ValueError("SHARE_DIR variable is not set.")
     cwd = Path(os.getcwd())
+    mount_dir = os.path.join(share_dir, "gen-ai-models")
+    model_path = os.path.join(mount_dir, model_name)
+    if not os.path.exists(model_path):
+        raise ValueError(f"Cannot find model at location: {model_path}.")
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "on_prem_generation_job.hcl.j2"),
         docker_username=os.getenv("DOCKER_USERNAME"),
         docker_password=os.getenv("DOCKER_PASSWORD"),
-        share_dir=share_dir,
+        mount_dir=mount_dir,
+        num_allocations=4,
+        cores_per_allocation=10,
+        model_name=model_name,
     )
