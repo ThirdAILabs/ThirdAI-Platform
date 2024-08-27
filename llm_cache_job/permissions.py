@@ -1,5 +1,6 @@
 import datetime
 import os
+import secrets
 from threading import Lock
 from typing import Dict, List, Tuple
 from urllib.parse import urljoin
@@ -98,6 +99,11 @@ class Permissions:
         self.cache: Dict[str, dict] = {}
         self.cache_lock = Lock()
 
+        # Because these secrets are just used temporary authentication for cache insertions
+        # and have a short expiration, we just generate a secure random token on startup to
+        # avoid having to pass the JWT secret to the nomad job running this caching service.
+        self.secret = secrets.SystemRandom().randbytes(16)
+
     def _clear_expired_entries(self) -> None:
         """
         Clears expired entries from the cache.
@@ -179,22 +185,14 @@ class Permissions:
             "model_id": model_id,
         }
 
-        return jwt.encode(
-            payload=payload,
-            key=os.getenv("JWT_SECRET"),
-            algorithm="HS256",
-        )
+        return jwt.encode(payload=payload, key=self.secret, algorithm="HS256")
 
     def verify_temporary_cache_access_token(
         self, token: str = fastapi.Depends(optional_token_bearer)
     ):
         try:
             payload = TokenPayload(
-                **jwt.decode(
-                    token,
-                    key=os.getenv("JWT_SECRET"),
-                    algorithms=["HS256"],
-                )
+                **jwt.decode(token, key=self.secret, algorithms=["HS256"])
             )
             if payload.model_id is None:
                 raise CREDENTIALS_EXCEPTION
