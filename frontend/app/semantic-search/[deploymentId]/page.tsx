@@ -420,12 +420,11 @@ function App() {
                                 console.log('cached generation is', cachedResult.llm_res);
 
                                 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+                                setQueryInfo(null);
                                 for (const token of cachedResult.llm_res.split(' ')) {
                                     setAnswer((prev) => prev + " " + token);
                                     await sleep(20);
                                 }
-
-                                // setAnswer(cachedResult.llm_res); // Directly use the cached result if available
 
                                 // Set the query information including whether they differ
                                 setQueryInfo({
