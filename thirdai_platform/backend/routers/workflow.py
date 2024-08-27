@@ -32,8 +32,6 @@ from sqlalchemy.orm import Session
 
 workflow_router = APIRouter()
 
-def get_workflow()
-
 
 @workflow_router.get("/types")
 def workflow_types(
