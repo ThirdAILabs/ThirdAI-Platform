@@ -1143,7 +1143,7 @@ def list_accessible_workflows(
             "status": workflow.status,
             "models": jsonable_encoder(list_workflow_models(workflow=workflow)),
             "publish_date": str(workflow.published_date),
-            "gen-ai-provider": workflow.gen_ai_provider,
+            "gen_ai_provider": workflow.gen_ai_provider,
             "created_by": {
                 "id": str(workflow.user.id),
                 "username": workflow.user.username,
