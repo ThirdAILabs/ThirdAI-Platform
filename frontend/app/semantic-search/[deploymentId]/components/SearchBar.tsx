@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useRef, useState } from "react";
+import React, { useCallback, useContext, useRef, useState, useEffect } from "react";
 import { Button } from '@/components/ui/button';
 import styled from "styled-components";
 import {
@@ -20,6 +20,8 @@ import Modal from "./Modal";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DropdownMenuContent } from "@radix-ui/react-dropdown-menu";
+import { fetchAutoCompleteQueries } from '@/lib/backend';
+import { debounce } from 'lodash';
 
 const Container = styled.section`
     box-shadow: 0 10px 10px 4px muted;
@@ -96,6 +98,11 @@ interface ModelDescriptionProps {
     ifGenerationOn: boolean;
 }
 
+interface Suggestion {
+    query: string;
+    query_id: number;
+}
+
 function ModelDescription(props: ModelDescriptionProps) {
     return (
         <Description>
@@ -138,6 +145,7 @@ interface SearchBarProps {
     prompt: string;
     setPrompt: (prompt: string) => void;
     ifGenerationOn: boolean;
+    cacheEnabled: boolean;
 }
 
 export default function SearchBar({
@@ -148,7 +156,8 @@ export default function SearchBar({
     setSources,
     prompt,
     setPrompt,
-    ifGenerationOn
+    ifGenerationOn,
+    cacheEnabled
 }: SearchBarProps) {
     const modelService = useContext<ModelService | null>(ModelServiceContext);
     const [showSources, setShowSources] = useState(false);
@@ -223,6 +232,10 @@ export default function SearchBar({
     };
 
     const handleSubmit = () => {
+        // When a user hits enter (to trigger generation) or 
+        // click on one suggestion to trigger cache-generation, the suggestion bar would go away.
+        setShowSuggestionBar(false)
+
         onSubmit(query, prompt)
 
         // Create a telemetry event
@@ -247,8 +260,34 @@ export default function SearchBar({
 
     };
 
+    const [showSuggestionBar, setShowSuggestionBar] = useState<boolean>(false);
+
+    const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+
+    const debouncedFetch = debounce((query) => {
+        // Whether to show is default to true, but depends on if actual suggestions were fetched
+        setShowSuggestionBar(suggestions && suggestions.length !== 0)
+
+        const modelId = modelService?.getModelID();
+        fetchAutoCompleteQueries(modelId!, query)
+          .then(data => {
+            setSuggestions(data.suggestions); // Storing the suggestions in state
+            console.log('suggestions:', data.suggestions); // Adjust according to actual data structure
+          })
+          .catch(err => console.error('Failed to fetch suggestions:', err));
+      }, 300); // Adjust debounce time as needed
+    
+      useEffect(() => {
+        if (query.length > 2) { // Only fetch suggestions if query length is more than 2 characters
+          debouncedFetch(query);
+        } else {
+            setSuggestions([])
+        }
+      }, [query]);
+
     return (
         <Container>
+            <div>
             <SearchArea style={{marginBottom: "5px"}}>
                 <Input
                     autoFocus
@@ -272,6 +311,48 @@ export default function SearchBar({
                 <Spacer $width="7px" />
                 <SaveButton onClick={handleSaveClick} />
             </SearchArea>
+            <div className="w-full mt-2" style={{backgroundColor: 'white'}}>
+                {cacheEnabled && showSuggestionBar && suggestions.map(suggestion => (
+                    <button key={suggestion.query_id}
+                            onClick={() => {
+                                // When a user hits enter (to trigger generation) or 
+                                // click on one suggestion to trigger cache-generation, the suggestion bar would go away.
+                                setSuggestions([]) // this part prevents setShowSuggestionBar(suggestions && suggestions.length !== 0) to be true, thus suggestions won't show up.
+                                setShowSuggestionBar(false)
+
+                                const suggestionQuery = suggestion.query
+                                setQuery(suggestionQuery)
+                                onSubmit(suggestionQuery, prompt)
+
+
+                                // Record the fact that cache is clicked by user: //
+                                // Create a telemetry event
+                                const event = {
+                                    UserAction: 'User clicked cache query',
+                                    UIComponent: 'SearchTextInput',
+                                    UI: 'SearchBar',
+                                    data: {
+                                        user_query: query,
+                                        cached_query: suggestionQuery
+                                    }
+                                };
+
+                                // Record the event
+                                modelService!.recordEvent(event)
+                                    .then(data => {
+                                        console.log("Event recorded successfully:", data);
+                                    })
+                                    .catch(error => {
+                                        console.error("Error recording event:", error);
+                                        alert("Error recording event:" + error)
+                                    }); 
+                            }}
+                            className="block w-full text-left p-2 hover:bg-gray-100 cursor-pointer">
+                        {suggestion.query}
+                    </button>
+                ))}
+            </div>
+            </div>
             {dialogOpen && (
                 <>
                     <Spacer $height="5px" />
@@ -285,12 +366,15 @@ export default function SearchBar({
             )}
 
             <Spacer $height="5px" />
+            {
+            !showSuggestionBar && 
             <ModelDescription
                 onClickViewDocuments={() => setShowSources((val) => !val)}
                 sources={sources}
                 setSources={setSources}
                 ifGenerationOn={ifGenerationOn}
             />
+            }
             <Spacer $height="5px" />
 
             {modalOpen && (

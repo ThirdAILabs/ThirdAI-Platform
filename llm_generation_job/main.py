@@ -3,6 +3,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import uvicorn
+import os
+from urllib.parse import urljoin
+
+import requests
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from llms import default_keys, model_classes, OnPremLLM
@@ -114,10 +118,12 @@ async def generate(websocket: WebSocket):
 
     llm = llm_class()
 
+    generated_response = ""
     try:
         async for next_word in llm.stream(
             key=key, query=generate_args.query, model=generate_args.model
         ):
+            generated_response += next_word
             await websocket.send_json(
                 {"status": "success", "content": next_word, "end_of_stream": False}
             )
@@ -133,6 +139,26 @@ async def generate(websocket: WebSocket):
     await websocket.send_json(
         {"status": "success", "content": "", "end_of_stream": True}
     )
+
+    if (
+        generate_args.original_query is not None
+        and generate_args.cache_access_token is not None
+    ):
+        try:
+            res = requests.post(
+                urljoin(os.environ["MODEL_BAZAAR_ENDPOINT"], "/cache/insert"),
+                params={
+                    "query": generate_args.original_query,
+                    "llm_res": generated_response,
+                },
+                headers={
+                    "Authorization": f"Bearer {generate_args.cache_access_token}",
+                },
+            )
+            if res.status_code != 200:
+                print(f"LLM Cache Insertion failed: {res}")
+        except Exception as e:
+            print("LLM Cache Insert Error", e)
 
 
 if __name__ == "__main__":

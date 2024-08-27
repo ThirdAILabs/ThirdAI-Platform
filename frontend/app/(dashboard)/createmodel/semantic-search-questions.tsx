@@ -142,6 +142,8 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
 
     console.log('sources', sources);
 
+    const [warningMessage, setWarningMessage] = useState("");
+
     return (
       <div>
         <span className="block text-lg font-semibold">App Name</span>
@@ -151,16 +153,22 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
           onChange={(e) => {
             const name = e.target.value;
             if (workflowNames.includes(name)) {
-              // Notify the user about the duplicate name
-              alert("A workflow with the same name has been created. Please choose a different name.");
+              setWarningMessage("A workflow with the same name has been created. Please choose a different name.");
             } else {
-              setModelName(name);
+              setWarningMessage(""); // Clear the warning if the name is unique
             }
+            setModelName(name)
           }}
           placeholder="Enter app name"
           style={{marginTop: "10px"}}
           disabled={appName ? true : false}
         />
+
+        {warningMessage && (
+          <span style={{ color: "red", marginTop: "10px" }}>
+            {warningMessage}
+          </span>
+        )}
 
         <span className="block text-lg font-semibold" style={{marginTop: "20px"}}>Sources</span>
         <CardDescription>Select files to search over.</CardDescription>

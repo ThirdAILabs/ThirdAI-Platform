@@ -1,28 +1,30 @@
-job "cloud-llm-generation" {
+job "llm-cache" {
   datacenters = ["dc1"]
 
   type = "service"
 
-  group "cloud-generation" {
+  group "llm-cache" {
     count = 1
 
     network {
-      port "cloud-generation-http" {
+      port "llm-cache-http" {
         {% if platform == "docker" %}
           to = 80
+        {% elif platform == "local" %}
+          static = {{ port }}
         {% endif %}
       }
     }
 
     service {
-      name = "cloud-generation"
-      port = "cloud-generation-http"
+      name = "llm-cache"
+      port = "llm-cache-http"
       provider = "nomad"
 
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.cloud-generation-http.rule=PathPrefix(`/cloud-llm/`)",
-        "traefik.http.routers.cloud-generation-http.priority=10"
+        "traefik.http.routers.llm-cache-http.rule=PathPrefix(`/cache/`)",
+        "traefik.http.routers.llm-cache-http.priority=10"
       ]
     }
 
@@ -31,30 +33,40 @@ job "cloud-llm-generation" {
         driver = "raw_exec"
       {% elif platform == "docker" %}  
         driver = "docker"
+
       {% endif %}
 
       env {
         MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
+        {% if platform == "docker" %}
+        SHARE_DIR = "/share"
+        {% elif platform == "local" %}
+        SHARE_DIR = "{{ share_dir }}"
+        {% endif %}
       }
+
       config {
         {% if platform == "docker" %}  
           image = "{{ registry }}/{{ image_name }}:{{ tag }}"
           image_pull_timeout = "15m"
-          ports = ["cloud-generation-http"]
+          ports = ["llm-cache-http"]
           auth {
             username = "{{ docker_username }}"
             password = "{{ docker_password }}"
             server_address = "{{ registry }}"
           }
+          volumes = [
+            "{{ share_dir }}:/share"
+          ]
         {% elif platform == "local" %}
           command = "{{ python_path }}"
-          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ generate_app_dir }}","--reload","--host","0.0.0.0","--port","${NOMAD_PORT_cloud_generation_http}"]
+          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ llm_cache_app_dir }}","--reload","--host","0.0.0.0","--port","{{ port }}"]
         {% endif %}
       }
 
       resources {
-        cpu = 500
-        memory = 1000
+        cpu = 2400
+        memory = 5000
       }
     }
   }

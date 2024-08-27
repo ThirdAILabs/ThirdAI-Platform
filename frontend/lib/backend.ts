@@ -39,7 +39,7 @@ export async function fetchPrivateModels(name: string) {
     return response.data;
   } catch (error) {
     console.error('Error fetching private models:', error);
-    alert('Error fetching private models:' + error)
+    // alert('Error fetching private models:' + error)
     throw new Error('Failed to fetch private models');
   }
 }
@@ -71,7 +71,7 @@ export async function fetchPendingModels(): Promise<PendingModel> {
     return response.data;
   } catch (error) {
     console.error('Error fetching private models:', error);
-    alert('Error fetching private models:' + error)
+    // alert('Error fetching private models:' + error)
     throw new Error('Failed to fetch private models');
   }
 }
@@ -1092,5 +1092,53 @@ export async function accessTokenUser(accessToken: string | null) {
     return response.data.data as User;
   } catch (error) {
     return null;
+  }
+}
+
+
+
+export async function fetchAutoCompleteQueries(modelId: string, query: string) {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  const params = new URLSearchParams({ model_id: modelId, query });
+  
+  try {
+    const response = await axios.get(`${deploymentBaseUrl}/cache/suggestions?${params.toString()}`);
+
+    return response.data; // Assuming the backend returns the data directly
+  } catch (err) {
+    console.error('Error fetching autocomplete suggestions:', err);
+    throw err; // Re-throwing the error to handle it in the component
+  }
+}
+
+export async function fetchCachedGeneration(modelId: string, query: string) {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+
+  const params = new URLSearchParams({ model_id: modelId, query });
+
+  try {
+      const response = await axios.get(`${deploymentBaseUrl}/cache/query?${params.toString()}`);
+      return response.data.cached_response; // Assuming the backend returns the data directly
+  } catch (err) {
+      console.error('Error fetching cached generation:', err);
+      throw err; // Re-throwing the error to handle it in the component
+  }
+}
+
+export async function temporaryCacheToken(modelId: string) {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+
+  const params = new URLSearchParams({model_id: modelId});
+
+  try {
+      const response = await axios.get(`${deploymentBaseUrl}/cache/token?${params.toString()}`);
+      return response.data; // Assuming the backend returns the data directly
+  } catch (err) {
+      console.error('Error getting temporary cache access token:', err);
+      throw err; // Re-throwing the error to handle it in the component
   }
 }

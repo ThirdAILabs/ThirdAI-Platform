@@ -30,7 +30,7 @@ import { createDeploymentUrl, createTokenModelUrl } from "./components/Deploymen
 import PillButton from "./components/buttons/PillButton";
 import { useParams, useSearchParams } from "next/navigation";
 import { CardTitle } from "@/components/ui/card";
-import { getWorkflowDetails } from '@/lib/backend';
+import { getWorkflowDetails, fetchCachedGeneration } from '@/lib/backend';
 
 const Frame = styled.section<{ $opacity: string }>`
     position: absolute;
@@ -145,12 +145,13 @@ function App() {
 
     const searchParams = useSearchParams();
     const [ifGenerationOn, setIfGenerationOn] = useState(false);
+    const [cacheEnabled, setCacheEnabled] = useState(true); // default generation cache is on
     const [ifGuardRailOn, setIfGuardRailOn] = useState(false);
 
     useEffect(() => {
         const workflowId = searchParams.get('workflowId');
         const generationOn = searchParams.get('ifGenerationOn') === 'true';
-        
+
         console.log('workflowId', workflowId)
         console.log('generationOn', generationOn)
 
@@ -181,7 +182,7 @@ function App() {
                 alert('Failed to fetch workflow details:' + error)
             }
         };
-    
+
         if (workflowId) {
             fetchWorkflowDetails();
         }
@@ -229,9 +230,15 @@ function App() {
         id: number;
         originalToken: string;
         tag: string;
-    }    
+    }
 
-    async function submit(query: string, genaiPrompt: string) {
+    const [queryInfo, setQueryInfo] = useState<{
+        cachedQuery: string;
+        userQuery: string;
+        isDifferent: boolean;
+    } | null>(null);
+
+    async function submit(query: string, genaiPrompt: string, bypassCache = false) {
         function replacePlaceholdersWithOriginal(text: string, piiMap: Map<string, PiiMapValue>): string {
             const placeholderPattern = /\[([A-Z]+) #(\d+)\]/g;
             return text.replace(placeholderPattern, (match, tag, id) => {
@@ -244,12 +251,12 @@ function App() {
                 return match; // Return the placeholder if no match is found (should not happen)
             });
         }
-    
+
         async function replacePIIWithPlaceholders(content: string, piiMap: Map<string, PiiMapValue>): Promise<string> {
             function getSubstringOverlap(str1: string, str2: string): number {
                 const len1 = str1.length;
                 const len2 = str2.length;
-            
+
                 let maxOverlap = 0;
                 for (let i = 0; i < len1; i++) {
                     for (let j = 0; j < len2; j++) {
@@ -262,21 +269,24 @@ function App() {
                 }
                 return maxOverlap;
             }
-            
+
             const prediction = await modelService!.piiDetect(content);
             const { tokens, predicted_tags } = prediction;
-    
+
             // Step 1: Concatenate tokens into sentences
             let sentences: string[] = [];
             let sentenceTags: string[] = [];
             let currentSentence = '';
             let currentTag = '';
-        
+
             for (let i = 0; i < tokens.length; i++) {
                 const word = tokens[i];
+                if (! (predicted_tags && predicted_tags[i])) {
+                    continue
+                }
                 const tag = predicted_tags[i][0];
                 // console.log('tag:', tag)
-        
+
                 if (tag === currentTag) {
                     currentSentence += ` ${word}`;
                 } else {
@@ -288,28 +298,28 @@ function App() {
                     currentTag = tag;
                 }
             }
-        
+
             // Push the last sentence and tag
             if (currentSentence) {
                 sentences.push(currentSentence.trim());
                 sentenceTags.push(currentTag);
             }
-       
+
             // console.log('sentences:', sentences)
             // console.log('sentenceTags:', sentenceTags)
-    
-    
+
+
             // Step 2: Operate on the level of sentences
             let currentId = piiMap.size + 1;
             const processedSentences = sentences.map((sentence, index) => {
                 const tag = sentenceTags[index];
-        
+
                 if (tag !== 'O') {
                     // Filter existing entries in piiMap by the same tag
                     const filteredMapEntries = Array.from(piiMap.entries()).filter(([_, value]) => value.tag === tag);
-        
+
                     let matchedEntry: [string, PiiMapValue] | undefined;
-                    
+
                     // Check for substring overlap
                     for (const [existingToken, value] of filteredMapEntries) {
                         if (getSubstringOverlap(sentence, value.originalToken) > 5) {
@@ -317,7 +327,7 @@ function App() {
                             break;
                         }
                     }
-        
+
                     if (matchedEntry) {
                         return `[${tag} #${matchedEntry[1].id}]`;
                     } else {
@@ -329,7 +339,7 @@ function App() {
                     return sentence;
                 }
             });
-        
+
             return processedSentences.join(" ");
         }
 
@@ -347,12 +357,12 @@ function App() {
             if (ifGuardRailOn) {
                 // Case 1: Guardrail is ON
                 const piiMap = new Map<string, PiiMapValue>();
-    
+
                 const results = await getResults(
                     query,
                     c.numReferencesFirstLoad + 1 * c.numReferencesLoadMore
                 );
-    
+
                 if (results && ifGenerationOn) {
                     const processedReferences = await Promise.all(
                         results.references.map(async (reference) => {
@@ -360,29 +370,29 @@ function App() {
                             return { ...reference, content: processedContent };
                         })
                     );
-    
+
                     const processedQuery = await replacePIIWithPlaceholders(query, piiMap);
-    
+
                     console.log('processedQuery:', processedQuery);
                     console.log('piiMap:', piiMap);
                     console.log('processedReferences:');
                     processedReferences.forEach(reference => {
                         console.log(reference.content);
                     });
-    
+
                     modelService!.generateAnswer(
                         processedQuery,
                         `${genaiPrompt}. [TAG #id] is sensitive information replaced as a placeholder, use them in your response for consistency.`,
                         processedReferences,
                         websocketRef,
-                        (next) => {                        
+                        (next) => {
                             setAnswer((prev) => {
                                 // Concatenate previous answer and the new part
                                 const fullAnswer = prev + next;
-                                
+
                                 // Replace placeholders in the concatenated string
                                 const replacedAnswer = replacePlaceholdersWithOriginal(fullAnswer, piiMap);
-                                
+
                                 // Return the final processed answer to update the state
                                 return replacedAnswer;
                             });
@@ -395,8 +405,45 @@ function App() {
                     query,
                     c.numReferencesFirstLoad + 1 * c.numReferencesLoadMore
                 );
-    
+
                 if (results && ifGenerationOn) {
+                    const modelId = modelService?.getModelID();
+
+                    // If we don't want to bypassCache AND cache generation is enabled
+                    if (!bypassCache && cacheEnabled) {
+                        try {
+                            const cachedResult = await fetchCachedGeneration(modelId!, query);
+                            console.log('cachedResult', cachedResult);
+
+                            if (cachedResult && cachedResult.llm_res) {
+                                console.log('cached query is', cachedResult.query);
+                                console.log('cached generation is', cachedResult.llm_res);
+
+                                const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+                                setQueryInfo(null);
+                                for (const token of cachedResult.llm_res.split(' ')) {
+                                    setAnswer((prev) => prev + " " + token);
+                                    await sleep(20);
+                                }
+
+                                // Set the query information including whether they differ
+                                setQueryInfo({
+                                    cachedQuery: cachedResult.query,
+                                    userQuery: query,
+                                    isDifferent: cachedResult.query !== query
+                                });
+
+                                return; // Stop further execution since the answer was found in cache
+                            }
+                        } catch (error) {
+                            console.error('Failed to retrieve cached result:', error);
+                            // Continue to generate a new answer if there's an error in fetching from the cache
+                        }
+                    }
+
+                    // No cache hit or cache not used, proceed with generation
+                    setQueryInfo(null); // Indicates no cached data was used
+
                     modelService!.generateAnswer(
                         query,
                         genaiPrompt,
@@ -488,7 +535,7 @@ function App() {
         <ModelServiceContext.Provider value={modelService}>
             {modelService && (
                 <Frame $opacity={opacity}>
-                    <div style={{height: "100%", width: "100%"}}>
+                    <div style={{ height: "100%", width: "100%" }}>
 
                         {pdfInfo && (
                             <PdfViewerWrapper>
@@ -567,6 +614,7 @@ function App() {
                                         prompt={prompt}
                                         setPrompt={setPrompt}
                                         ifGenerationOn={ifGenerationOn}
+                                        cacheEnabled = {cacheEnabled}
                                     />
                                     {failed && (
                                         <Pad $top="100px">
@@ -588,22 +636,28 @@ function App() {
                                                     <Spacer $height="30px" />
                                                     <GeneratedAnswer
                                                         answer={answer}
+                                                        regenerateAndBypassCache={() => {
+                                                            submit(query, prompt, true)
+                                                        }}
+                                                        queryInfo={queryInfo}
+                                                        cacheEnabled = {cacheEnabled}
+                                                        setCacheEnabled = {setCacheEnabled}
                                                     />
                                                 </>
                                             }
                                             <Spacer $height="50px" />
                                             {checkedIds.size >
                                                 0 && (
-                                                <PillButton
-                                                    onClick={
-                                                        regenerateWithSelectedReferences
-                                                    }
-                                                >
-                                                    Regenerate with
-                                                    selected
-                                                    references
-                                                </PillButton>
-                                            )}
+                                                    <PillButton
+                                                        onClick={
+                                                            regenerateWithSelectedReferences
+                                                        }
+                                                    >
+                                                        Regenerate with
+                                                        selected
+                                                        references
+                                                    </PillButton>
+                                                )}
                                             <Spacer $height="50px" />
                                             <ReferenceList
                                                 references={results.references.slice(
@@ -623,8 +677,8 @@ function App() {
                                                     checkedIds
                                                 }
                                                 onCheck={onCheck}
-                                                modelService = {modelService}
-                                                ifGuardRailOn = {ifGuardRailOn}
+                                                modelService={modelService}
+                                                ifGuardRailOn={ifGuardRailOn}
                                             />
                                         </Pad>
                                     </Pad>
