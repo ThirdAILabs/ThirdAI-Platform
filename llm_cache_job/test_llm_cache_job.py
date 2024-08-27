@@ -64,6 +64,7 @@ def dummy_verify(self, model_id):
 def test_llm_cache():
     os.environ["MODEL_BAZAAR_ENDPOINT"] = ""
     os.environ["JWT_SECRET"] = "12345"
+    os.environ["LLM_CACHE_THRESHOLD"] = "0.7"
     from permissions import Permissions
 
     Permissions.verify_read_permission = dummy_verify
