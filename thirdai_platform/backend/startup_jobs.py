@@ -68,7 +68,7 @@ async def restart_on_prem_generate_job(model_name="qwen2-0_5b-instruct-fp16.gguf
         docker_username=os.getenv("DOCKER_USERNAME"),
         docker_password=os.getenv("DOCKER_PASSWORD"),
         mount_dir=mount_dir,
-        num_allocations=4,
+        num_allocations=1,
         cores_per_allocation=10,
         model_name=model_name,
     )
