@@ -145,6 +145,7 @@ interface SearchBarProps {
     prompt: string;
     setPrompt: (prompt: string) => void;
     ifGenerationOn: boolean;
+    cacheEnabled: boolean;
 }
 
 export default function SearchBar({
@@ -155,7 +156,8 @@ export default function SearchBar({
     setSources,
     prompt,
     setPrompt,
-    ifGenerationOn
+    ifGenerationOn,
+    cacheEnabled
 }: SearchBarProps) {
     const modelService = useContext<ModelService | null>(ModelServiceContext);
     const [showSources, setShowSources] = useState(false);
@@ -310,7 +312,7 @@ export default function SearchBar({
                 <SaveButton onClick={handleSaveClick} />
             </SearchArea>
             <div className="w-full mt-2" style={{backgroundColor: 'white'}}>
-                {showSuggestionBar && suggestions.map(suggestion => (
+                {cacheEnabled && showSuggestionBar && suggestions.map(suggestion => (
                     <button key={suggestion.query_id}
                             onClick={() => {
                                 // When a user hits enter (to trigger generation) or 
