@@ -420,7 +420,7 @@ function App() {
                                 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
                                 for (const token of cachedResult.llm_res.split(' ')) {
                                     setAnswer((prev) => prev + " " + token);
-                                    await sleep(10);
+                                    await sleep(20);
                                 }
 
                                 // setAnswer(cachedResult.llm_res); // Directly use the cached result if available
