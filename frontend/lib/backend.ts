@@ -343,6 +343,7 @@ export interface Workflow {
   publish_date: string;
   created_by: CreatedBy;
   models: WorkflowModel[];
+  gen_ai_provider: string;
 }
 
 export function fetchWorkflows(): Promise<Workflow[]> {
@@ -514,6 +515,7 @@ interface WorkflowDetailsResponse {
     type: string;
     type_id: string;
     status: string;
+    gen_ai_provider: string;
     models: WorkflowModel[];
   };
 }

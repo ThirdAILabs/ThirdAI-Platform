@@ -35,7 +35,8 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       }
       case "rag": {
         let ifGenerationOn = true; // false if semantic search, true if RAG
-        const newUrl = `/semantic-search/${workflow.id}?workflowId=${workflow.id}&ifGenerationOn=${ifGenerationOn}`;
+        const genAiProvider = `${workflow.gen_ai_provider}`;
+        const newUrl = `/semantic-search/${workflow.id}?workflowId=${workflow.id}&ifGenerationOn=${ifGenerationOn}&genAiProvider=${genAiProvider}`;
         window.open(newUrl, '_blank');
         break;
       }
