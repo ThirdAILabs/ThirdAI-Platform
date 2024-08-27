@@ -1,10 +1,11 @@
+import os
 import uuid
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
-import os
 
 import nltk
-from thirdai import search, neural_db_v2 as ndb
+from thirdai import neural_db_v2 as ndb
+from thirdai import search
 from thirdai.neural_db_v2.chunk_stores import constraints
 
 
