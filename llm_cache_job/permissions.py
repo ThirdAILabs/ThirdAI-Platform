@@ -181,7 +181,8 @@ class Permissions:
         then pass it to /generate so that the generation service can update the cache.
         """
         payload = {
-            "exp": datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=3),
+            "exp": datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(minutes=3),
             "model_id": model_id,
         }
 
