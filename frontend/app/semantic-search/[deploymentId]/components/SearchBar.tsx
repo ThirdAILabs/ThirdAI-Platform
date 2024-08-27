@@ -317,6 +317,7 @@ export default function SearchBar({
                             onClick={() => {
                                 // When a user hits enter (to trigger generation) or 
                                 // click on one suggestion to trigger cache-generation, the suggestion bar would go away.
+                                setSuggestions([]) // this part prevents setShowSuggestionBar(suggestions && suggestions.length !== 0) to be true, thus suggestions won't show up.
                                 setShowSuggestionBar(false)
 
                                 const suggestionQuery = suggestion.query
