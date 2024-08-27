@@ -60,6 +60,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
         }
       } catch (e) {
         setIsValid(false);
+        setDeployStatus('Starting')
         console.error('Validation failed.', e);
         // alert('Validation failed.' + e)
       }

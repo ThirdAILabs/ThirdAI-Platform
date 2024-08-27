@@ -230,6 +230,10 @@ export default function SearchBar({
     };
 
     const handleSubmit = () => {
+        // When a user hits enter (to trigger generation) or 
+        // click on one suggestion to trigger cache-generation, the suggestion bar would go away.
+        setShowSuggestionBar(false)
+
         onSubmit(query, prompt)
 
         // Create a telemetry event
@@ -254,9 +258,14 @@ export default function SearchBar({
 
     };
 
+    const [showSuggestionBar, setShowSuggestionBar] = useState<boolean>(false);
+
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
 
     const debouncedFetch = debounce((query) => {
+        // Whether to show is default to true, but depends on if actual suggestions were fetched
+        setShowSuggestionBar(suggestions && suggestions.length !== 0)
+
         const modelId = modelService?.getModelID();
         fetchAutoCompleteQueries(modelId!, query)
           .then(data => {
@@ -301,12 +310,39 @@ export default function SearchBar({
                 <SaveButton onClick={handleSaveClick} />
             </SearchArea>
             <div className="w-full mt-2" style={{backgroundColor: 'white'}}>
-                {suggestions.map(suggestion => (
+                {showSuggestionBar && suggestions.map(suggestion => (
                     <button key={suggestion.query_id}
                             onClick={() => {
+                                // When a user hits enter (to trigger generation) or 
+                                // click on one suggestion to trigger cache-generation, the suggestion bar would go away.
+                                setShowSuggestionBar(false)
+
                                 const suggestionQuery = suggestion.query
                                 setQuery(suggestionQuery)
                                 onSubmit(suggestionQuery, prompt)
+
+
+                                // Record the fact that cache is clicked by user: //
+                                // Create a telemetry event
+                                const event = {
+                                    UserAction: 'User clicked cache query',
+                                    UIComponent: 'SearchTextInput',
+                                    UI: 'SearchBar',
+                                    data: {
+                                        user_query: query,
+                                        cached_query: suggestionQuery
+                                    }
+                                };
+
+                                // Record the event
+                                modelService!.recordEvent(event)
+                                    .then(data => {
+                                        console.log("Event recorded successfully:", data);
+                                    })
+                                    .catch(error => {
+                                        console.error("Error recording event:", error);
+                                        alert("Error recording event:" + error)
+                                    }); 
                             }}
                             className="block w-full text-left p-2 hover:bg-gray-100 cursor-pointer">
                         {suggestion.query}
@@ -328,7 +364,7 @@ export default function SearchBar({
 
             <Spacer $height="5px" />
             {
-                (! suggestions || suggestions.length === 0) && 
+            !showSuggestionBar && 
             <ModelDescription
                 onClickViewDocuments={() => setShowSources((val) => !val)}
                 sources={sources}
