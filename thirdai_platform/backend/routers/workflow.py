@@ -10,6 +10,7 @@ from backend.auth_dependencies import (
     is_workflow_accessible,
     is_workflow_owner,
 )
+from backend.startup_jobs import restart_on_prem_generate_job
 from backend.utils import (
     delete_nomad_job,
     get_empty_port,
@@ -20,7 +21,6 @@ from backend.utils import (
     response,
     submit_nomad_job,
 )
-from backend.startup_jobs import restart_on_prem_generate_job
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -31,6 +31,25 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 workflow_router = APIRouter()
+
+
+def get_workflow(session, workflow_id, authenticated_user):
+    workflow: schema.Workflow = session.query(schema.Workflow).get(workflow_id)
+
+    if not workflow:
+        return response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Workflow not found.",
+        )
+
+    if (
+        workflow.user_id != authenticated_user.user.id
+        and not authenticated_user.user.is_global_admin()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have owner permissions to this workflow",
+        )
 
 
 @workflow_router.get("/types")
@@ -213,22 +232,7 @@ def add_models(
     }
     ```
     """
-    workflow: schema.Workflow = session.query(schema.Workflow).get(body.workflow_id)
-
-    if not workflow:
-        return response(
-            status_code=status.HTTP_404_NOT_FOUND,
-            message="Workflow not found.",
-        )
-
-    if (
-        workflow.user_id != authenticated_user.user.id
-        and not authenticated_user.user.is_global_admin()
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have owner permissions to this workflow",
-        )
+    workflow = get_workflow(session, body.workflow_id, authenticated_user)
 
     for model_id, component in zip(body.model_ids, body.components):
         model: schema.Model = session.query(schema.Model).get(model_id)
@@ -267,9 +271,11 @@ def add_models(
         data={"models": jsonable_encoder(list_workflow_models(workflow=workflow))},
     )
 
+
 class WorkflowGenAIModel(BaseModel):
     workflow_id: str
     provider: str
+
 
 @workflow_router.post("/set-gen-ai-provider")
 def set_gen_ai_provider(
@@ -277,60 +283,11 @@ def set_gen_ai_provider(
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
-    workflow: schema.Workflow = session.query(schema.Workflow).get(body.workflow_id)
-
-    if not workflow:
-        return response(
-            status_code=status.HTTP_404_NOT_FOUND,
-            message="Workflow not found.",
-        )
-
-    if (
-        workflow.user_id != authenticated_user.user.id
-        and not authenticated_user.user.is_global_admin()
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have owner permissions to this workflow",
-        )
+    workflow = get_workflow(session, body.workflow_id, authenticated_user)
 
     workflow.gen_ai_provider = body.provider
     session.commit()
 
-
-class WorkflowNoGenAIModel(BaseModel):
-    workflow_id: str
-
-
-@workflow_router.post("/get-gen-ai-provider")
-def set_gen_ai_provider(
-    body: WorkflowNoGenAIModel,
-    session: Session = Depends(get_session),
-    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
-):
-    workflow: schema.Workflow = session.query(schema.Workflow).get(body.workflow_id)
-
-    if not workflow:
-        return response(
-            status_code=status.HTTP_404_NOT_FOUND,
-            message="Workflow not found.",
-        )
-
-    if (
-        workflow.user_id != authenticated_user.user.id
-        and not authenticated_user.user.is_global_admin()
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have owner permissions to this workflow",
-        )
-
-    return response(
-        status_code=status.HTTP_200_OK,
-        message="Models deleted from workflow successfully.",
-        data={"provider": workflow.gen_ai_provider},
-    )
-    
 
 @workflow_router.post("/delete-models")
 def delete_models(
@@ -370,22 +327,7 @@ def delete_models(
     }
     ```
     """
-    workflow: schema.Workflow = session.query(schema.Workflow).get(body.workflow_id)
-
-    if not workflow:
-        return response(
-            status_code=status.HTTP_404_NOT_FOUND,
-            message="Workflow not found.",
-        )
-
-    if (
-        workflow.user_id != authenticated_user.user.id
-        and not authenticated_user.user.is_global_admin()
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have owner permissions to this workflow",
-        )
+    workflow = get_workflow(session, body.workflow_id, authenticated_user)
 
     for model_id, component in zip(body.model_ids, body.components):
         model: schema.Model = session.query(schema.Model).get(model_id)
@@ -662,7 +604,7 @@ def stop_workflow(
 
 
 @workflow_router.post("/start", dependencies=[Depends(is_workflow_owner)])
-def start_workflow(
+async def start_workflow(
     workflow_id: str,
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
@@ -804,9 +746,9 @@ def start_workflow(
                 workflow.status = schema.WorkflowStatus.inactive
                 session.commit()
                 raise Exception(str(err))
-    
+
     if workflow.gen_ai_provider == "on-prem":
-        restart_on_prem_generate_job()
+        await restart_on_prem_generate_job()
 
     return response(
         status_code=status.HTTP_202_ACCEPTED,

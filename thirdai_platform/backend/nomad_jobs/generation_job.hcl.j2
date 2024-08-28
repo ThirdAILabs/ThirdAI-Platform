@@ -3,11 +3,11 @@ job "llm-dispatch" {
 
   type = "service"
 
-  group "cloud-generation" {
+  group "llm-dispatch" {
     count = 1
 
     network {
-      port "cloud-generation-http" {
+      port "llm-dispatch-http" {
         {% if platform == "docker" %}
           to = 80
         {% endif %}
@@ -15,14 +15,14 @@ job "llm-dispatch" {
     }
 
     service {
-      name = "cloud-generation"
-      port = "cloud-generation-http"
+      name = "llm-dispatch"
+      port = "llm-dispatch-http"
       provider = "nomad"
 
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.cloud-generation-http.rule=PathPrefix(`/llm-dispatch/`)",
-        "traefik.http.routers.cloud-generation-http.priority=10"
+        "traefik.http.routers.llm-dispatch-http.rule=PathPrefix(`/llm-dispatch/`)",
+        "traefik.http.routers.llm-dispatch-http.priority=10"
       ]
     }
 
@@ -40,7 +40,7 @@ job "llm-dispatch" {
         {% if platform == "docker" %}  
           image = "{{ registry }}/{{ image_name }}:{{ tag }}"
           image_pull_timeout = "15m"
-          ports = ["cloud-generation-http"]
+          ports = ["llm-dispatch-http"]
           auth {
             username = "{{ docker_username }}"
             password = "{{ docker_password }}"
@@ -48,7 +48,7 @@ job "llm-dispatch" {
           }
         {% elif platform == "local" %}
           command = "{{ python_path }}"
-          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ generate_app_dir }}","--reload","--host","0.0.0.0","--port","${NOMAD_PORT_cloud_generation_http}"]
+          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ generate_app_dir }}","--reload","--host","0.0.0.0","--port","${NOMAD_PORT_llm_dispatch_http}"]
         {% endif %}
       }
 

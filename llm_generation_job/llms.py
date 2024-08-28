@@ -107,7 +107,7 @@ class OnPremLLM(LLMBase):
             raise ValueError("Could not read MODEL_BAZAAR_ENDPOINT.")
 
         url = urljoin(backend_endpoint, "on-prem-llm/completion")
-        #TODO what is the error with the backend endpoint???
+        # TODO what is the error with the backend endpoint???
         url = "http://127.0.0.1:80/on-prem-llm/completion"
 
         headers = {"Content-Type": "application/json"}
@@ -123,7 +123,7 @@ class OnPremLLM(LLMBase):
                     raise RuntimeError(
                         f"Failed to connect to LLM server: {response.status}"
                     )
-                
+
                 async for line in response.content.iter_any():
                     line = line.decode("utf-8").strip()
                     if line and line.startswith("data: "):

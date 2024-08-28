@@ -2,17 +2,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-import uvicorn
 import os
 from urllib.parse import urljoin
 
 import requests
+import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from llms import default_keys, model_classes, OnPremLLM
-from pydantic import ValidationError, BaseModel
-from pydantic_models import GenerateArgs
 from fastapi.responses import StreamingResponse
+from llms import OnPremLLM, default_keys, model_classes
+from pydantic import BaseModel, ValidationError
+from pydantic_models import GenerateArgs
 
 app = FastAPI()
 
@@ -24,9 +24,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Define a Pydantic model for the request body
 class QueryRequest(BaseModel):
     query: str
+
 
 @app.post("/llm-dispatch/genpost")
 def generate(request: QueryRequest):
