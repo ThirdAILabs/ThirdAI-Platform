@@ -168,5 +168,3 @@ data/
 *.db
 
 */ndb_enterprise_license.json
-
-*.gguf

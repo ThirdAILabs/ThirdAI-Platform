@@ -9,15 +9,15 @@ job "on-prem-llm-generation" {
     scaling {
       enabled = true
       min = 1
-      max = 30
+      max = 5
 
       {# 
         We choose the target value of 35 because anecdotally on blade we were seeing core usage
         between 35 and 55. We aim to be on the lower end because we ideally have some idle time
         on each service.
 
-        However, this scaling based on CPU MHz is slightly flaky and we might want 
-        to move to something more consistent based on number of requests or idle
+        However, this scaling based on CPU MHz is slightly flaky and we'll want
+        to move to something more consistent. Probably based on number of requests or idle
         time. One idea would be to always have some X% of services idle. This is 
         not natively available in nomad and we'll have to set up some other means for this. 
       #}
