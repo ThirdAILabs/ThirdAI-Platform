@@ -31,7 +31,6 @@ async def restart_generate_job():
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "generation_job.hcl.j2"),
         platform=platform,
-        port=None if platform == "docker" else get_empty_port(),
         tag=os.getenv("TAG"),
         registry=os.getenv("DOCKER_REGISTRY"),
         docker_username=os.getenv("DOCKER_USERNAME"),
