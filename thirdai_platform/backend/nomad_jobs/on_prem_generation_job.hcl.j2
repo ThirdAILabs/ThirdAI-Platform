@@ -65,8 +65,6 @@ job "on-prem-llm-generation" {
         ports = ["on-prem-generation-http"]
         volumes = ["{{ mount_dir }}:/gen-ai-models"]
         auth {
-          username = "{{ docker_username }}"
-          password = "{{ docker_password }}"
           server_address = "ghrc.io"
         }
         args = [

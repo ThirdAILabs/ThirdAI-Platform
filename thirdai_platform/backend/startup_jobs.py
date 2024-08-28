@@ -46,7 +46,7 @@ ON_PREM_GENERATE_JOB_ID = "on-prem-llm-generation"
 
 
 async def start_on_prem_generate_job(
-    model_name="qwen2-0_5b-instruct-fp16.gguf", restart=True
+    model_name="qwen2-0_5b-instruct-fp16.gguf", restart_if_exists=True
 ):
     """
     Restart the LLM generation job.
@@ -56,6 +56,8 @@ async def start_on_prem_generate_job(
     """
     nomad_endpoint = os.getenv("NOMAD_ENDPOINT")
     if nomad_job_exists(ON_PREM_GENERATE_JOB_ID, nomad_endpoint):
+        if not restart_if_exists:
+            return
         delete_nomad_job(ON_PREM_GENERATE_JOB_ID, nomad_endpoint)
     share_dir = os.getenv("SHARE_DIR")
     if not share_dir:
@@ -68,8 +70,6 @@ async def start_on_prem_generate_job(
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "on_prem_generation_job.hcl.j2"),
-        docker_username=os.getenv("DOCKER_USERNAME"),
-        docker_password=os.getenv("DOCKER_PASSWORD"),
         mount_dir=mount_dir,
         initial_allocations=1,
         min_allocations=1,

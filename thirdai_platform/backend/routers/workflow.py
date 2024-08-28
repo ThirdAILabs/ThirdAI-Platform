@@ -10,20 +10,21 @@ from backend.auth_dependencies import (
     is_workflow_accessible,
     is_workflow_owner,
 )
-from backend.startup_jobs import restart_on_prem_generate_job
+from backend.startup_jobs import start_on_prem_generate_job
 from backend.utils import (
     delete_nomad_job,
     get_empty_port,
     get_platform,
     get_python_path,
     get_root_absolute_path,
+    get_workflow,
     list_workflow_models,
     response,
     submit_nomad_job,
 )
 from database import schema
 from database.session import get_session
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
 from licensing.verify.verify_license import verify_license
 from pydantic import BaseModel
@@ -31,27 +32,6 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 workflow_router = APIRouter()
-
-
-def get_workflow(session, workflow_id, authenticated_user):
-    workflow: schema.Workflow = session.query(schema.Workflow).get(workflow_id)
-
-    if not workflow:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workflow not found.",
-        )
-
-    if (
-        workflow.user_id != authenticated_user.user.id
-        and not authenticated_user.user.is_global_admin()
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have owner permissions to this workflow",
-        )
-
-    return workflow
 
 
 @workflow_router.get("/types")
@@ -750,7 +730,7 @@ async def start_workflow(
                 raise Exception(str(err))
 
     if workflow.gen_ai_provider == "on-prem":
-        await restart_on_prem_generate_job()
+        await start_on_prem_generate_job(restart_if_exists=False)
 
     return response(
         status_code=status.HTTP_202_ACCEPTED,
@@ -948,6 +928,7 @@ def get_workflow_details(
         "name": workflow.name,
         "type": workflow.workflow_type.name,
         "type_id": str(workflow.type_id),
+        "gen_ai_provider": workflow.gen_ai_provider,
         "status": workflow.status,
         "publish_date": str(workflow.published_date),
         "models": jsonable_encoder(list_workflow_models(workflow=workflow)),
