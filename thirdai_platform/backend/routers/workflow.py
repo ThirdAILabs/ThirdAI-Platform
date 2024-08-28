@@ -37,9 +37,9 @@ def get_workflow(session, workflow_id, authenticated_user):
     workflow: schema.Workflow = session.query(schema.Workflow).get(workflow_id)
 
     if not workflow:
-        return response(
+        raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            message="Workflow not found.",
+            detail="Workflow not found.",
         )
 
     if (
@@ -50,6 +50,8 @@ def get_workflow(session, workflow_id, authenticated_user):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have owner permissions to this workflow",
         )
+
+    return workflow
 
 
 @workflow_router.get("/types")

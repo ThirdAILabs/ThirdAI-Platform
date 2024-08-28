@@ -1,4 +1,3 @@
-import os
 import sys
 
 from dotenv import load_dotenv
@@ -16,11 +15,7 @@ from backend.routers.train import train_router as train
 from backend.routers.user import user_router as user
 from backend.routers.vault import vault_router as vault
 from backend.routers.workflow import workflow_router as workflow
-from backend.startup_jobs import (
-    restart_generate_job,
-    restart_llm_cache_job,
-    restart_on_prem_generate_job,
-)
+from backend.startup_jobs import restart_generate_job, restart_llm_cache_job
 from backend.status_sync import sync_job_statuses
 from database.session import get_session
 from database.utils import initialize_default_workflow_types
@@ -55,13 +50,6 @@ async def startup_event():
         print("Successfully started Generation Job!")
     except Exception as error:
         print(f"Failed to start the Generation Job : {error}", file=sys.stderr)
-
-    try:
-        print("Starting On Prem Generation Job...")
-        await restart_on_prem_generate_job()
-        print("Successfully started On Prem Generation Job!")
-    except Exception as error:
-        print(f"Failed to start the On Prem Generation Job : {error}", file=sys.stderr)
 
     try:
         print("Starting LLM Cache Job...")

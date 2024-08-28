@@ -9,9 +9,8 @@ import requests
 import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
-from llms import OnPremLLM, default_keys, model_classes
-from pydantic import BaseModel, ValidationError
+from llms import default_keys, model_classes
+from pydantic import ValidationError
 from pydantic_models import GenerateArgs
 
 app = FastAPI()
@@ -32,7 +31,7 @@ async def generate(websocket: WebSocket):
     Will keep sending content until "end_of_stream" is True.
     If an error is found, "status" will be "error".
 
-    Example:
+    Example Success:
     1. Client sends:
     ```
     {
@@ -57,6 +56,15 @@ async def generate(websocket: WebSocket):
         "end_of_stream": True
     }
     ```
+
+    Example Error:
+     ```
+     {
+         "status": "error",
+         "detail": "No generative AI key provided",
+         "end_of_stream": True
+     }
+     ```
     """
     await websocket.accept()
     while True:

@@ -29,7 +29,7 @@ async def restart_generate_job():
     platform = get_platform()
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
-        filepath=str(cwd / "backend" / "nomad_jobs" / "generation_job.hcl.j2"),
+        filepath=str(cwd / "backend" / "nomad_jobs" / "llm_dispatch_job.hcl.j2"),
         platform=platform,
         tag=os.getenv("TAG"),
         registry=os.getenv("DOCKER_REGISTRY"),
@@ -38,14 +38,16 @@ async def restart_generate_job():
         image_name=os.getenv("GENERATION_IMAGE_NAME"),
         model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
         python_path=get_python_path(),
-        generate_app_dir=str(get_root_absolute_path() / "llm_generation_job"),
+        generate_app_dir=str(get_root_absolute_path() / "llm_dispatch_job"),
     )
 
 
 ON_PREM_GENERATE_JOB_ID = "on-prem-llm-generation"
 
 
-async def restart_on_prem_generate_job(model_name="qwen2-0_5b-instruct-fp16.gguf"):
+async def start_on_prem_generate_job(
+    model_name="qwen2-0_5b-instruct-fp16.gguf", restart=True
+):
     """
     Restart the LLM generation job.
 
@@ -69,8 +71,11 @@ async def restart_on_prem_generate_job(model_name="qwen2-0_5b-instruct-fp16.gguf
         docker_username=os.getenv("DOCKER_USERNAME"),
         docker_password=os.getenv("DOCKER_PASSWORD"),
         mount_dir=mount_dir,
-        num_allocations=1,
+        initial_allocations=1,
+        min_allocations=1,
+        max_allocations=5,
         cores_per_allocation=10,
+        memory_per_allocation=4000,
         model_name=model_name,
     )
 

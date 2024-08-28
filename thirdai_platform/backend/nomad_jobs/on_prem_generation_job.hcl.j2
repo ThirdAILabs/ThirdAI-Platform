@@ -4,12 +4,12 @@ job "on-prem-llm-generation" {
   type = "service"
 
   group "on-prem-generation" {
-    count = "{{ num_allocations }}"
+    count = "{{ initial_allocations }}"
 
     scaling {
       enabled = true
-      min = 1
-      max = 5
+      min = {{ min_allocations }}
+      max = {{ max_allocations }}
 
       {# 
         We choose the target value of 35 because anecdotally on blade we were seeing core usage
@@ -77,8 +77,8 @@ job "on-prem-llm-generation" {
       }
 
       resources {
-        cores=10
-        memory = 4000
+        cores = {{ cores_per_allocation }}
+        memory = {{ memory_per_allocation }}
       }
     }
   }
