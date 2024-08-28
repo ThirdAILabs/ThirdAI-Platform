@@ -589,19 +589,24 @@ export class ModelService {
         references: ReferenceInfo[],
         websocketRef: React.MutableRefObject<WebSocket | null>,
         onNextWord: (str: string) => void,
+        genAiProvider?: string, // Add this parameter
         onComplete?: (finalAnswer: string) => void
     ) {
         let finalAnswer = ''; // Variable to accumulate the response
 
         const cache_access_token =  await temporaryCacheToken(this.getModelID());
-        const args = {
+        const args: any = {
             query: genaiQuery(question, references, genaiPrompt),
             key: "sk-PYTWB6gs_ofO44-teXA2rIRGRbJfzqDyNXBalHXKcvT3BlbkFJk5905SK2RVE6_ME8i4Lnp9qULbyPZSyOU0vh2fZfQA", // fill in openai key
             original_query: question,
             cache_access_token: cache_access_token.access_token
         };
 
-        const uri = this.wsUrl + "/generate";
+        if (genAiProvider) {
+            args.provider = genAiProvider;
+        }
+
+        const uri = this.wsUrl + "/llm-dispatch/generate";
         websocketRef.current = new WebSocket(uri);
 
         websocketRef.current.onopen = async function (event) {
