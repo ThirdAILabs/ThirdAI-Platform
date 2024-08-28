@@ -56,17 +56,12 @@ async def startup_event():
     except Exception as error:
         print(f"Failed to start the Generation Job : {error}", file=sys.stderr)
 
-    if os.getenv("ENABLE_ON_PREM_GENERATION_JOB"):
-        try:
-            print("Starting On Prem Generation Job...")
-            await restart_on_prem_generate_job()
-            print("Successfully started On Prem Generation Job!")
-        except Exception as error:
-            print(
-                f"Failed to start the On Prem Generation Job : {error}", file=sys.stderr
-            )
-    else:
-        print("ENABLE_ON_PREM_GENERATION_JOB is False, not starting the job.")
+    try:
+        print("Starting On Prem Generation Job...")
+        await restart_on_prem_generate_job()
+        print("Successfully started On Prem Generation Job!")
+    except Exception as error:
+        print(f"Failed to start the On Prem Generation Job : {error}", file=sys.stderr)
 
     try:
         print("Starting LLM Cache Job...")
