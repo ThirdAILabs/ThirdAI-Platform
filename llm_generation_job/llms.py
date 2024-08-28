@@ -107,8 +107,6 @@ class OnPremLLM(LLMBase):
             raise ValueError("Could not read MODEL_BAZAAR_ENDPOINT.")
 
         url = urljoin(backend_endpoint, "on-prem-llm/completion")
-        # TODO what is the error with the backend endpoint???
-        url = "http://127.0.0.1:80/on-prem-llm/completion"
 
         headers = {"Content-Type": "application/json"}
         data = {
@@ -116,7 +114,6 @@ class OnPremLLM(LLMBase):
             "prompt": query + "<|assistant|>",
             "stream": True,
         }
-        print("HAHA", url)
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=data) as response:
                 if response.status != 200:
