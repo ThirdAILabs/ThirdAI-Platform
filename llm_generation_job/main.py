@@ -25,22 +25,6 @@ app.add_middleware(
 )
 
 
-# Define a Pydantic model for the request body
-class QueryRequest(BaseModel):
-    query: str
-
-
-@app.post("/llm-dispatch/genpost")
-def generate(request: QueryRequest):
-    llm = OnPremLLM()
-
-    async def event_stream():
-        async for chunk in llm.stream("", request.query, ""):
-            yield chunk
-
-    return StreamingResponse(event_stream(), media_type="text/plain")
-
-
 @app.websocket("/llm-dispatch/generate")
 async def generate(websocket: WebSocket):
     """
