@@ -1,6 +1,9 @@
 import { genaiQuery } from "./genai";
 import { Box, Chunk, DocChunks } from "./components/pdf_viewer/interfaces";
 import { temporaryCacheToken } from "@/lib/backend";
+import _ from 'lodash';
+
+export const deploymentBaseUrl = _.trim(process.env.NEXT_PUBLIC_DEPLOYMENT_BASE_URL!, '/');
 
 export interface ReferenceJson {
     id: number;
@@ -111,7 +114,7 @@ export class ModelService {
 
     constructor(url: string, tokenModelUrl: string, sessionId: string) {
         this.url = url;
-        this.wsUrl = process.env.DEPLOYMENT_BASE_URL!.replace("http", "ws");
+        this.wsUrl = deploymentBaseUrl.replace("http", "ws");
         this.sessionId = sessionId;
         this.tokenModelUrl = tokenModelUrl;
         this.authToken = window.localStorage.getItem(
@@ -171,7 +174,7 @@ export class ModelService {
         const url = new URL(this.tokenModelUrl + "/predict");
 
         const baseParams = { query: query, top_k: 1 };
-        
+
         return fetch(url, {
             method: "POST",
             headers: {
@@ -331,14 +334,14 @@ export class ModelService {
         const baseParams = { query: queryText, top_k: topK };
         const ndbParams = { constraints: {} };
 
-        return fetch(url, { 
-                method: "POST", 
-                headers: {
-                    ...this.authHeader(),
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ base_params: baseParams, ndb_params: ndbParams })
-            })
+        return fetch(url, {
+            method: "POST",
+            headers: {
+                ...this.authHeader(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ base_params: baseParams, ndb_params: ndbParams })
+        })
             .then(this.handleInvalidAuth())
             .then((response) => {
                 if (response.ok) {
@@ -685,16 +688,16 @@ export class ModelService {
         const timestamp = new Date().toISOString();
         const userAgent = navigator.userAgent;
         const machineType = userAgent;
-    
+
         const telemetryPackage: TelemetryEventPackage = {
             UserName: userName,
             timestamp: timestamp,
             UserMachine: machineType,
             event: event
         };
-    
+
         const serializedData = JSON.stringify(telemetryPackage);
-    
+
         try {
             const response = await fetch(this.url + '/telemetry/record-event', {
                 method: "POST",
@@ -703,7 +706,7 @@ export class ModelService {
                 },
                 body: serializedData,
             });
-    
+
             if (response.ok) {
                 return response.json();
             } else {
@@ -716,5 +719,5 @@ export class ModelService {
             throw new Error('Failed to record event');
         }
     }
-    
+
 }

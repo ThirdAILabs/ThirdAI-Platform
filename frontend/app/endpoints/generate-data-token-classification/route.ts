@@ -1,9 +1,9 @@
-// app/api/generate-data-token-classification/route.ts
+// app/endpoints/generate-data-token-classification/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
 });
 
 const generateSentences = async (prompt: string) => {
@@ -93,7 +93,7 @@ const generateSyntheticSentence = (template: string, realValuesMap: { [key: stri
 };
 
 export const POST = async (req: NextRequest) => {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
 
   if (!apiKey) {
     return NextResponse.json({ error: 'API key is not defined' }, { status: 500 });

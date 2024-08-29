@@ -8,6 +8,12 @@ import boto3
 from fastapi import HTTPException, UploadFile, status
 from pydantic import BaseModel, validator
 
+MODEL_BAZAAR_PATH = (
+    "/model_bazaar"
+    if os.path.exists("/.dockerenv")
+    else os.getenv("SHARE_DIR", "/model_bazaar")
+)
+
 
 class FileType(str, Enum):
     """
@@ -170,7 +176,7 @@ class NDBFileDetails(BasicFileDetails):
         ]
 
         destination_path = os.path.join(
-            os.getenv("SHARE_DIR", "/model_bazaar"),
+            MODEL_BAZAAR_PATH,
             "data",
             str(data_id),
             "relations.json",
@@ -273,7 +279,7 @@ def get_files(files: List[UploadFile], data_id, files_info: List[BasicFileDetail
     for i, file in enumerate(files):
         file_info = files_info[i]
         destination_dir = os.path.join(
-            os.getenv("SHARE_DIR", "/model_bazaar"),
+            MODEL_BAZAAR_PATH,
             "data",
             str(data_id),
             file_info.mode,

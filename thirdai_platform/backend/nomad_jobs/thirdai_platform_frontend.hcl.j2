@@ -1,0 +1,68 @@
+job "thirdai-platform-frontend" {
+  datacenters = ["dc1"]
+
+  type = "service"
+
+  group "thirdai-platform-frontend" {
+    count = 1
+
+    network {
+      port "thirdai-platform-frontend-http" {
+        {% if platform == "docker" %}
+          to = 3000
+        {% elif platform == "local" %}
+          static = 3000
+        {% endif %}
+      }
+    }
+
+    service {
+      name = "thirdai-platform-frontend"
+      port = "thirdai-platform-frontend-http"
+      provider = "nomad"
+
+      tags = [
+        "traefik.enable=true",
+        "traefik.http.routers.thirdai-platform-frontend-http.rule=PathPrefix(`/`)",
+        "traefik.http.routers.thirdai-platform-frontend-http.priority=1"
+      ]
+    }
+
+    task "server" {
+
+      {% if platform == "docker" %}
+        driver = "docker"
+      {% elif platform == "local" %}
+        driver = "raw_exec"
+      {% endif %}
+
+      env {
+        NEXT_PUBLIC_DEPLOYMENT_BASE_URL = "{{ deployment_base_url }}"
+        NEXT_PUBLIC_THIRDAI_PLATFORM_BASE_URL = "{{ thirdai_platform_base_url }}"
+        NEXT_PUBLIC_OPENAI_API_KEY = "{{ openai_api_key }}"
+      }
+
+      config {
+        {% if platform == "docker" %}
+          image = "{{ registry }}/{{ image_name }}:{{ tag }}"
+          image_pull_timeout = "15m"
+          ports = ["thirdai-platform-frontend-http"]
+          auth {
+            username = "{{ docker_username }}"
+            password = "{{ docker_password }}"
+            server_address = "{{ registry }}"
+          }
+        {% elif platform == "local" %}
+          command = "npm"
+          args = ["run","start-no-env","-C","{{ app_dir }}"]
+        {% endif %}
+      }
+
+      resources {
+        cpu    = 500
+        memory = 1000
+        memory_max = 4000
+      }
+    }
+  }
+}

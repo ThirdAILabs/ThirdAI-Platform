@@ -1,13 +1,13 @@
-// app/api/which-nlp-use-case/route.ts
+// app/endpoints/which-nlp-use-case/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
 });
 
 export const POST = async (req: NextRequest) => {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
 
   if (!apiKey) {
     return NextResponse.json({ error: 'API key is not defined' }, { status: 500 });
