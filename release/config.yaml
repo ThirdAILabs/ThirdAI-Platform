@@ -7,7 +7,7 @@ azure:
       push_credentials:
         password: /6WCAtZuvdhWPyw2VTArrXEgaxOf/5J0NJHoXfflGX+ACRAcpvWw
         username: thirdaiplatform-push-on-prem-llm
-      version: 0.0.4
+      version: 0.0.6
     release-test:
       pull_credentials:
         password: ivG00o0TTx10TZDh6Y4chVxDEGR92h0ib4uA5WjF2H+ACRC95ggs
