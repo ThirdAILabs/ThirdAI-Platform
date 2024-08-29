@@ -106,12 +106,18 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
 
       // Step 4: Set the generation AI provider based on the selected LLM type
       let provider = '';
-      if (llmType === 'OpenAI') {
-        provider = 'openai';
-      } else if (llmType === 'On-prem') {
-        provider = 'on-prem';
-      } else if (llmType === 'Self-host') {
-        provider = 'self-host';
+      switch (llmType) {
+        case 'OpenAI':
+          provider = 'openai';
+          break;
+        case 'On-prem':
+          provider = 'on-prem';
+          break;
+        case 'Self-host':
+          provider = 'self-host';
+          break;
+        default:
+          // handle 
       }
 
       if (provider) {
