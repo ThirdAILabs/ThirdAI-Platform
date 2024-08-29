@@ -1,5 +1,13 @@
 azure:
   branches:
+    on-prem-llm:
+      pull_credentials:
+        password: lZit7mOLUB2e7j/Ak50OXCHer4EdaCUDZ8EVHbQnJj+ACRAP/xev
+        username: thirdaiplatform-pull-on-prem-llm
+      push_credentials:
+        password: /6WCAtZuvdhWPyw2VTArrXEgaxOf/5J0NJHoXfflGX+ACRAcpvWw
+        username: thirdaiplatform-push-on-prem-llm
+      version: 0.0.4
     release-test:
       pull_credentials:
         password: ivG00o0TTx10TZDh6Y4chVxDEGR92h0ib4uA5WjF2H+ACRC95ggs
