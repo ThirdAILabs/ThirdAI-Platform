@@ -73,7 +73,7 @@ Without this process, it is cumbersome to test out platform changes. We would ha
       - Change `PUBLIC_MODEL_BAZAAR_ENDPOINT` and `PRIVATE_MODEL_BAZAAR_ENDPOINT` to be "http://localhost:8000/" (make sure to include the trailing /)
       - Change `NOMAD_ENDPOINT` to "http://localhost:4646/"
       - Change `LICENSE_PATH` to point to your Rag on Rails license (look below for how to create a license file)
-      - Change `SHARE_DIR` to point to an empty directory where all models and files will be saved
+      - Change `SHARE_DIR` to point to an empty directory where all models and files will be saved.
       - Create a `JWT_SECRET` key for generating access token
       - Change the `SENDGRID_KEY`
       - Change the `PYTHON_PATH` to your virtual env python path.

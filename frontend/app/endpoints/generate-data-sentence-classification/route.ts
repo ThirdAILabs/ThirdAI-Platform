@@ -1,9 +1,9 @@
-// app/api/generate-data/route.ts
+// app/endpoints/generate-data-sentence-classification/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
 });
 
 const generateExamples = async (prompt: string) => {
@@ -28,7 +28,7 @@ const generateExamples = async (prompt: string) => {
 };
 
 export const POST = async (req: NextRequest) => {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
 
   if (!apiKey) {
     return NextResponse.json({ error: 'API key is not defined' }, { status: 500 });
@@ -52,7 +52,7 @@ export const POST = async (req: NextRequest) => {
       One such example is "${category.example}".
       The examples should be complete sentences without any numeric numbers, bullet points, or any other extraneous content.
     `;
-    
+
     prompts.push([prompt, category.name]);
 
     try {

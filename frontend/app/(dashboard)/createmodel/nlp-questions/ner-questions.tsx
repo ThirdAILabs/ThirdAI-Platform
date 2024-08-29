@@ -113,7 +113,7 @@ const NERQuestions = ({ workflowNames, onCreateModel, stayOnPage, appName }: NER
     try {
       setIsDataGenerating(true);
 
-      const response = await fetch('/api/generate-data-token-classification', {
+      const response = await fetch('/endpoints/generate-data-token-classification', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

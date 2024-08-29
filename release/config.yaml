@@ -1,5 +1,13 @@
 azure:
   branches:
+    release-test:
+      pull_credentials:
+        password: ivG00o0TTx10TZDh6Y4chVxDEGR92h0ib4uA5WjF2H+ACRC95ggs
+        username: thirdaiplatform-pull-release-test
+      push_credentials:
+        password: c3P3qKGzI2dBE6fiKJfF+zHos70aRFcJ6vVLZh+zq0+ACRCEzI7T
+        username: thirdaiplatform-push-release-test
+      version: 0.0.18
     test_1:
       pull_credentials:
         password: lfhxcL/qmrYP24rIH2vmRNSYV9ZlNCfxJyQI6E3kVi+ACRDjUz22

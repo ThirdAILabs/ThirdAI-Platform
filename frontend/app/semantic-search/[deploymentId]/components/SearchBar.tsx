@@ -117,7 +117,7 @@ function ModelDescription(props: ModelDescriptionProps) {
                     <Button size="sm" className="h-8 gap-1" onClick={props.onClickViewDocuments}>
                         View Documents
                     </Button>
-                </DropdownMenuTrigger>  
+                </DropdownMenuTrigger>
                 <Sources sources={props.sources} setSources={props.setSources} visible />
             </DropdownMenu>
         </Description>
@@ -129,7 +129,7 @@ function GlobalModelDescription() {
         <Description>
             Generating answers from knowledgebase documents, or
             <Spacer $width="7px" />
-            <a href={process.env.REACT_APP_MODEL_BAZAAR_URL}>
+            <a href={process.env.NEXT_PUBLIC_THIRDAI_PLATFORM_BASE_URL}>
                 <TryNewModelButton>use your own documents</TryNewModelButton>
             </a>
         </Description>

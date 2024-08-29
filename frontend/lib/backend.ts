@@ -6,8 +6,8 @@ import _ from 'lodash';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-export const thirdaiPlatformBaseUrl = _.trim(process.env.THIRDAI_PLATFORM_BASE_URL!, '/');
-export const deploymentBaseUrl = _.trim(process.env.DEPLOYMENT_BASE_URL!, '/');
+export const thirdaiPlatformBaseUrl = _.trim(process.env.NEXT_PUBLIC_THIRDAI_PLATFORM_BASE_URL!, '/');
+export const deploymentBaseUrl = _.trim(process.env.NEXT_PUBLIC_DEPLOYMENT_BASE_URL!, '/');
 
 export function getAccessToken(throwIfNotFound: boolean = true): string | null {
   const accessToken = localStorage.getItem('accessToken');
@@ -45,11 +45,11 @@ export async function fetchPrivateModels(name: string) {
 }
 
 export async function fetchPublicModels(name: string) {
-    const response = await fetch(`${thirdaiPlatformBaseUrl}/api/model/public-list?name=${name}`);
-    if (!response.ok) {
-        throw new Error('Failed to fetch public models');
-    }
-    return response.json();
+  const response = await fetch(`${thirdaiPlatformBaseUrl}/api/model/public-list?name=${name}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch public models');
+  }
+  return response.json();
 }
 
 // Define a type for the pending model data structure
@@ -98,10 +98,10 @@ export async function listDeployments(deployment_id: string): Promise<Deployment
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
   try {
-      const response = await axios.get<ApiResponse>(`${thirdaiPlatformBaseUrl}/api/deploy/list-deployments`, {
-          params: { deployment_id },
-      });
-      return response.data.data;
+    const response = await axios.get<ApiResponse>(`${thirdaiPlatformBaseUrl}/api/deploy/list-deployments`, {
+      params: { deployment_id },
+    });
+    return response.data.data;
   } catch (error) {
       console.error('Error listing deployments:', error);
       alert('Error listing deployments:' + error)
@@ -174,9 +174,9 @@ interface DeploymentResponse {
 }
 
 export function deployModel(values: { deployment_name: string; model_identifier: string, use_llm_guardrail?: boolean, token_model_identifier?: string;
- }) : 
+ }) :
   Promise<DeploymentResponse>  {
-  
+
   const accessToken = getAccessToken()
 
   // Set the default authorization header for axios
@@ -190,13 +190,13 @@ export function deployModel(values: { deployment_name: string; model_identifier:
       model_identifier: values.model_identifier,
       use_llm_guardrail: values.use_llm_guardrail ? 'true' : 'false',
       token_model_identifier: values.token_model_identifier
-    }); 
+    });
   } else {
     params = new URLSearchParams({
       deployment_name: values.deployment_name,
       model_identifier: values.model_identifier,
       use_llm_guardrail: values.use_llm_guardrail ? 'true' : 'false'
-    }); 
+    });
   }
 
   return new Promise((resolve, reject) => {
@@ -212,31 +212,31 @@ export function deployModel(values: { deployment_name: string; model_identifier:
 }
 
 interface TrainNdbParams {
-    name: string;
-    formData: FormData;
+  name: string;
+  formData: FormData;
 }
 
 export function train_ndb({ name, formData }: TrainNdbParams): Promise<any> {
-    // Retrieve the access token from local storage
-    const accessToken = getAccessToken()
+  // Retrieve the access token from local storage
+  const accessToken = getAccessToken()
 
-    // Set the default authorization header for axios
-    axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+  // Set the default authorization header for axios
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-    return new Promise((resolve, reject) => {
-        axios
-            .post(`${thirdaiPlatformBaseUrl}/api/train/ndb?model_name=${name}`, formData)
-            .then((res) => {
-                resolve(res.data);
-            })
-            .catch((err) => {
-                if (err.response && err.response.data) {
-                    reject(new Error(err.response.data.detail || 'Failed to run model'));
-                } else {
-                    reject(new Error('Failed to run model'));
-                }
-            });
-    });
+  return new Promise((resolve, reject) => {
+    axios
+      .post(`${thirdaiPlatformBaseUrl}/api/train/ndb?model_name=${name}`, formData)
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        if (err.response && err.response.data) {
+          reject(new Error(err.response.data.detail || 'Failed to run model'));
+        } else {
+          reject(new Error('Failed to run model'));
+        }
+      });
+  });
 }
 
 interface CreateWorkflowParams {
@@ -250,6 +250,7 @@ export function create_workflow({ name, typeName }: CreateWorkflowParams): Promi
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
   const params = new URLSearchParams({ name, type_name: typeName });
+
 
   return new Promise((resolve, reject) => {
     axios
@@ -279,22 +280,22 @@ export function add_models_to_workflow({ workflowId, modelIdentifiers, component
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
   return new Promise((resolve, reject) => {
-      axios
-          .post(`${thirdaiPlatformBaseUrl}/api/workflow/add-models`, {
-              workflow_id: workflowId,
-              model_ids: modelIdentifiers,
-              components,
-          })
-          .then((res) => {
-              resolve(res.data);
-          })
-          .catch((err) => {
-              if (err.response && err.response.data) {
-                  reject(new Error(err.response.data.detail || 'Failed to add models to workflow'));
-              } else {
-                  reject(new Error('Failed to add models to workflow'));
-              }
-          });
+    axios
+      .post(`${thirdaiPlatformBaseUrl}/api/workflow/add-models`, {
+        workflow_id: workflowId,
+        model_ids: modelIdentifiers,
+        components,
+      })
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        if (err.response && err.response.data) {
+          reject(new Error(err.response.data.detail || 'Failed to add models to workflow'));
+        } else {
+          reject(new Error('Failed to add models to workflow'));
+        }
+      });
   });
 }
 
@@ -543,51 +544,51 @@ export async function getWorkflowDetails(workflowId: string): Promise<WorkflowDe
 
 
 export function userEmailLogin(email: string, password: string, setAccessToken: (token: string) => void): Promise<any> {
-    return new Promise((resolve, reject) => {
-      axios
-        .get(`${thirdaiPlatformBaseUrl}/api/user/email-login`, {
-          headers: {
-            Authorization: `Basic ${window.btoa(`${email}:${password}`)}`,
-          },
-        })
-        .then((res) => {
-          const accessToken = res.data.data.access_token;
+  return new Promise((resolve, reject) => {
+    axios
+      .get(`${thirdaiPlatformBaseUrl}/api/user/email-login`, {
+        headers: {
+          Authorization: `Basic ${window.btoa(`${email}:${password}`)}`,
+        },
+      })
+      .then((res) => {
+        const accessToken = res.data.data.access_token;
 
-          if (accessToken) {
-            // Store accessToken into local storage, replacing any existing one.
-            localStorage.setItem('accessToken', accessToken);
-            setAccessToken(accessToken);
-          }
+        if (accessToken) {
+          // Store accessToken into local storage, replacing any existing one.
+          localStorage.setItem('accessToken', accessToken);
+          setAccessToken(accessToken);
+        }
 
-          const username = res.data.data.user.username;
+        const username = res.data.data.user.username;
 
-          if (username) {
-            localStorage.setItem("username", username);
-          }
+        if (username) {
+          localStorage.setItem("username", username);
+        }
 
-          resolve(res.data);
-        })
-        .catch((err) => {
-          reject(err);
-        });
-    });
+        resolve(res.data);
+      })
+      .catch((err) => {
+        reject(err);
+      });
+  });
 }
 
 export function userRegister(email: string, password: string, username: string) {
-    return new Promise((resolve, reject) => {
-      axios
-        .post(`${thirdaiPlatformBaseUrl}/api/user/email-signup-basic`, {
-          email,
-          password,
-          username,
-        })
-        .then((res) => {
-          resolve(res.data);
-        })
-        .catch((err) => {
-          reject(err);
-        });
-    });
+  return new Promise((resolve, reject) => {
+    axios
+      .post(`${thirdaiPlatformBaseUrl}/api/user/email-signup-basic`, {
+        email,
+        password,
+        username,
+      })
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        reject(err);
+      });
+  });
 }
 
 interface TokenClassificationSample {
@@ -636,24 +637,24 @@ export function trainTokenClassifier(
   }));
   formData.append("extra_options_form", JSON.stringify({
     sub_type: "token",
-    source_column: sourceColumn, 
+    source_column: sourceColumn,
     target_column: targetColumn,
     target_labels: tags,
   }))
 
   return new Promise((resolve, reject) => {
-      axios
-          .post(`${thirdaiPlatformBaseUrl}/api/train/udt?model_name=${modelName}`, formData)
-          .then((res) => {
-              resolve(res.data);
-          })
-          .catch((err) => {
-              if (err.response && err.response.data) {
-                  reject(new Error(err.response.data.detail || 'Failed to run model'));
-              } else {
-                  reject(new Error('Failed to run model'));
-              }
-          });
+    axios
+      .post(`${thirdaiPlatformBaseUrl}/api/train/udt?model_name=${modelName}`, formData)
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        if (err.response && err.response.data) {
+          reject(new Error(err.response.data.detail || 'Failed to run model'));
+        } else {
+          reject(new Error('Failed to run model'));
+        }
+      });
   });
 };
 
@@ -683,26 +684,25 @@ export function useTokenClassificationEndpoints() {
   const workflowId = params.deploymentId as string;
   const [workflowName, setWorkflowName] = useState<string>("");
   const [deploymentUrl, setDeploymentUrl] = useState<string | undefined>();
-  
+
   console.log("PARAMS", params);
 
   useEffect(() => {
     const init = async () => {
       const accessToken = getAccessToken();
       axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-  
+
       const params = new URLSearchParams({ workflow_id: workflowId });
-      
 
       axios
-          .get<WorkflowDetailsResponse>(`${thirdaiPlatformBaseUrl}/api/workflow/details?${params.toString()}`)
-          .then((res) => {
-            setWorkflowName(res.data.data.name)
-            for (const model of res.data.data.models) {
-              if (model.component === 'nlp') {
-                setDeploymentUrl(`${deploymentBaseUrl}/${model.model_id}`);
-              }
+        .get<WorkflowDetailsResponse>(`${thirdaiPlatformBaseUrl}/api/workflow/details?${params.toString()}`)
+        .then((res) => {
+          setWorkflowName(res.data.data.name)
+          for (const model of res.data.data.models) {
+            if (model.component === 'nlp') {
+              setDeploymentUrl(`${deploymentBaseUrl}/${model.model_id}`);
             }
+          }
           })
           .catch((err) => {
             console.error('Error fetching workflow details:', err);
@@ -711,7 +711,7 @@ export function useTokenClassificationEndpoints() {
     };
     init();
   }, []);
-  
+
   const predict = async (query: string): Promise<TokenClassificationResult> => {
     // Set the default authorization header for axios
     axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
@@ -1119,7 +1119,7 @@ export async function accessTokenUser(accessToken: string | null) {
 
   // Set the default authorization header for axios
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-  
+
   try {
     const response = await axios.get(`${thirdaiPlatformBaseUrl}/api/user/info`);
     return response.data.data as User;

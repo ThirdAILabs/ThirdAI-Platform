@@ -73,10 +73,10 @@ export default function GeneratedAnswer({ answer, queryInfo, regenerateAndBypass
             </Header>
             {queryInfo && queryInfo.isDifferent && (
                 <div className="text-sm mb-2">
-                    Showing result for '{queryInfo.cachedQuery}'
+                    Showing result for &apos;{queryInfo.cachedQuery}&apos;
                     <br />
                     <a onClick={regenerateAndBypassCache} style={{ cursor: 'pointer', color: 'blue', textDecoration: 'underline' }}>
-                        Search instead for '{queryInfo.userQuery}'
+                        Search instead for &apos;{queryInfo.userQuery}&apos;
                     </a>
                 </div>
             )}
