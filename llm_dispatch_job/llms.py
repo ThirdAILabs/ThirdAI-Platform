@@ -1,10 +1,10 @@
+import asyncio
 import json
 import os
 from typing import AsyncGenerator
 from urllib.parse import urljoin
 
 import aiohttp
-import asyncio
 
 
 class LLMBase:

@@ -68,7 +68,7 @@ async def generate(websocket: WebSocket):
      ```
 
     Providers should be one of on-prem, openai, or cohere
-    Other errors include missing genai key, unsupported provider, invalid 
+    Other errors include missing genai key, unsupported provider, invalid
     arguments, or internal error
     """
     await websocket.accept()
