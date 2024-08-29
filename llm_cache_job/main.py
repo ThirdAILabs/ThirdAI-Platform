@@ -20,6 +20,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+license_key = os.getenv("LICENSE_KEY")
+model_bazaar_dir = os.getenv("MODEL_BAZAAR_DIR")
+if license_key == "file_license":
+    thirdai.licensing.set_path(
+        os.path.join(model_bazaar_dir, "license/license.serialized")
+    )
+else:
+    thirdai.licensing.activate(license_key)
 
 permissions = Permissions()
 
@@ -103,15 +111,6 @@ app.include_router(router, prefix="/cache")
 
 
 if __name__ == "__main__":
-    license_key = os.getenv("LICENSE_KEY")
-    model_bazaar_dir = os.getenv("MODEL_BAZAAR_DIR")
-    if license_key == "file_license":
-        thirdai.licensing.set_path(
-            os.path.join(model_bazaar_dir, "license/license.serialized")
-        )
-    else:
-        thirdai.licensing.activate(license_key)
-
     import uvicorn
 
     uvicorn.run(app, host="localhost", port=8000)
