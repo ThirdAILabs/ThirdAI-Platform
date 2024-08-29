@@ -4,6 +4,7 @@ from typing import AsyncGenerator
 from urllib.parse import urljoin
 
 import aiohttp
+import asyncio
 
 
 class LLMBase:
@@ -106,7 +107,7 @@ class OnPremLLM(LLMBase):
         if backend_endpoint is None:
             raise ValueError("Could not read MODEL_BAZAAR_ENDPOINT.")
 
-        url = urljoin(backend_endpoint, "on-prem-llm/completion")
+        url = urljoin(backend_endpoint, "/on-prem-llm/completion")
 
         headers = {"Content-Type": "application/json"}
         data = {
