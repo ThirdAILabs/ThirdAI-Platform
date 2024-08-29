@@ -589,7 +589,7 @@ export class ModelService {
         references: ReferenceInfo[],
         websocketRef: React.MutableRefObject<WebSocket | null>,
         onNextWord: (str: string) => void,
-        genAiProvider?: string, // Add this parameter
+        genAiProvider?: string,
         onComplete?: (finalAnswer: string) => void
     ) {
         let finalAnswer = ''; // Variable to accumulate the response

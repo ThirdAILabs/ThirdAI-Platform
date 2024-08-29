@@ -6,7 +6,6 @@ import os
 from urllib.parse import urljoin
 
 import requests
-import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from llms import default_keys, model_classes
@@ -161,4 +160,6 @@ async def generate(websocket: WebSocket):
 
 
 if __name__ == "__main__":
+    import uvicorn
+
     uvicorn.run(app, host="localhost", port=8000)
