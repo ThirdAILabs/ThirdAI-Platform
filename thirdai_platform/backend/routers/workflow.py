@@ -270,6 +270,12 @@ def set_gen_ai_provider(
     workflow.gen_ai_provider = body.provider
     session.commit()
 
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Successful",
+        success=True,
+    )
+
 
 @workflow_router.post("/delete-models")
 def delete_models(

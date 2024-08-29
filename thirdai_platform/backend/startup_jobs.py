@@ -46,7 +46,8 @@ ON_PREM_GENERATE_JOB_ID = "on-prem-llm-generation"
 
 
 async def start_on_prem_generate_job(
-    model_name="qwen2-0_5b-instruct-fp16.gguf", restart_if_exists=True
+    model_name="qwen2-0_5b-instruct-fp16.gguf",
+    restart_if_exists=True,
 ):
     """
     Restart the LLM generation job.

@@ -15,7 +15,11 @@ from backend.routers.train import train_router as train
 from backend.routers.user import user_router as user
 from backend.routers.vault import vault_router as vault
 from backend.routers.workflow import workflow_router as workflow
-from backend.startup_jobs import restart_generate_job, restart_llm_cache_job
+from backend.startup_jobs import (
+    restart_generate_job,
+    restart_llm_cache_job,
+    start_on_prem_generate_job,
+)
 from backend.status_sync import sync_job_statuses
 from database.session import get_session
 from database.utils import initialize_default_workflow_types
