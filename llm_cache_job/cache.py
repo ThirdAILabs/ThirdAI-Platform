@@ -1,5 +1,4 @@
 import os
-import uuid
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Set
 
@@ -32,9 +31,9 @@ def token_similarity(query_tokens: Set[str], cached_query: str) -> float:
 
 class NDBSemanticCache(Cache):
     def __init__(self):
-        print("AT", os.path.join(os.getenv("SHARE_DIR"), "llm_cache.ndb"))
+        print("AT", os.path.join(os.getenv("MODEL_BAZAAR_DIR"), "llm_cache.ndb"))
         self.db = ndb.NeuralDB(
-            save_path=os.path.join(os.getenv("SHARE_DIR"), "llm_cache.ndb")
+            save_path=os.path.join(os.getenv("MODEL_BAZAAR_DIR"), "llm_cache.ndb")
         )
         self.threshold = float(os.getenv("LLM_CACHE_THRESHOLD", "0.95"))
 

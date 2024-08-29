@@ -9,8 +9,11 @@ from backend.utils import (
     get_python_path,
     get_root_absolute_path,
     nomad_job_exists,
+    response,
     submit_nomad_job,
 )
+from fastapi import status
+from licensing.verify.verify_license import valid_job_allocation, verify_license
 
 GENERATE_JOB_ID = "llm-generation"
 THIRDAI_PLATFORM_FRONTEND_ID = "thirdai-platform-frontend"
@@ -115,6 +118,22 @@ async def restart_llm_cache_job():
         delete_nomad_job(LLM_CACHE_JOB_ID, nomad_endpoint)
     cwd = Path(os.getcwd())
     platform = get_platform()
+    try:
+        license_info = verify_license(
+            os.getenv(
+                "LICENSE_PATH", "/model_bazaar/license/ndb_enterprise_license.json"
+            )
+        )
+        if not valid_job_allocation(license_info, os.getenv("NOMAD_ENDPOINT")):
+            return response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Resource limit reached, cannot allocate new jobs.",
+            )
+    except Exception as e:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"License is not valid. {str(e)}",
+        )
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "llm_cache_job.hcl.j2"),
@@ -129,4 +148,5 @@ async def restart_llm_cache_job():
         share_dir=os.getenv("SHARE_DIR"),
         python_path=get_python_path(),
         llm_cache_app_dir=str(get_root_absolute_path() / "llm_cache_job"),
+        license_key=license_info["boltLicenseKey"],
     )
