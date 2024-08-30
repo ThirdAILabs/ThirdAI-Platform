@@ -6,8 +6,8 @@ from typing import List
 
 from exceptional_handler import apply_exception_handler
 from models.ndb_model_interface import NDBModel
-from thirdai import neural_db as ndb
 from options import FileInfo
+from thirdai import neural_db as ndb
 from utils import check_disk, consumer, producer
 
 

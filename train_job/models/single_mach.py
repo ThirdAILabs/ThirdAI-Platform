@@ -5,9 +5,9 @@ from typing import List
 
 from exceptional_handler import apply_exception_handler
 from models.ndb_model_interface import NDBModel
+from options import FileInfo, MachOptions
 from thirdai import neural_db as ndb
 from utils import check_disk, process_file
-from options import MachOptions, FileInfo
 
 
 @apply_exception_handler

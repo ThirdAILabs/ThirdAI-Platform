@@ -6,13 +6,13 @@ from typing import List
 import thirdai
 from exceptional_handler import apply_exception_handler
 from models.model import Model
-from thirdai import bolt
 from options import (
+    FileInfo,
     TextClassificationOptions,
     TokenClassificationOptions,
     UDTTrainOptions,
-    FileInfo,
 )
+from thirdai import bolt
 
 
 @apply_exception_handler

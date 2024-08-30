@@ -1,6 +1,6 @@
+from abc import ABC, abstractmethod
 from typing import Dict, Optional
 from urllib.parse import urljoin
-from abc import ABC, abstractmethod
 
 import requests
 

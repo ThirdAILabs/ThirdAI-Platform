@@ -1,20 +1,21 @@
-import pytest
 import os
 import shutil
+from typing import Dict
+
+import pytest
 from options import (
     BaseOptions,
+    FileInfo,
     NDBOptions,
     NDBv1Options,
-    FileInfo,
-    UDTOptions,
     TextClassificationOptions,
     TokenClassificationOptions,
+    UDTOptions,
 )
-from run import get_model
 from reporter import Reporter
-from thirdai import neural_db as ndb
-from typing import Dict
+from run import get_model
 from thirdai import bolt
+from thirdai import neural_db as ndb
 
 pytestmark = [pytest.mark.unit]
 

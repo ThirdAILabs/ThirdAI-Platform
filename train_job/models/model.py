@@ -4,8 +4,8 @@ from pathlib import Path
 
 from exceptional_handler import apply_exception_handler
 from logger import LoggerConfig
-from reporter import Reporter
 from options import BaseOptions
+from reporter import Reporter
 
 
 @apply_exception_handler

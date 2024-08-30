@@ -3,6 +3,7 @@ import nltk
 nltk.download("punkt_tab")
 print("Downloading punkttab")
 
+import argparse
 import os
 
 import thirdai
@@ -12,9 +13,8 @@ from models.classification_models import (
 )
 from models.finetunable_retriever import FinetunableRetriever
 from models.single_mach import SingleMach
-from options import BaseOptions, ModelType, RetrieverType, UDTSubType, NDBVersion
-from reporter import Reporter, HttpReporter
-import argparse
+from options import BaseOptions, ModelType, NDBVersion, RetrieverType, UDTSubType
+from reporter import HttpReporter, Reporter
 
 
 def get_model(options: BaseOptions, reporter: Reporter):

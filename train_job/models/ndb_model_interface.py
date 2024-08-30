@@ -6,10 +6,10 @@ from typing import List
 import thirdai
 from exceptional_handler import apply_exception_handler
 from models.model import Model
+from options import BaseOptions, FileInfo, NDBv1Options
+from reporter import Reporter
 from thirdai import neural_db as ndb
 from utils import convert_supervised_to_ndb_file, get_directory_size
-from options import NDBv1Options, BaseOptions, FileInfo
-from reporter import Reporter
 
 
 @apply_exception_handler
