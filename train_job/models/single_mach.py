@@ -6,21 +6,17 @@ from typing import List
 from exceptional_handler import apply_exception_handler
 from models.ndb_model_interface import NDBModel
 from thirdai import neural_db as ndb
-from utils import check_disk, list_files, process_file
-from variables import MachVariables
+from utils import check_disk, process_file
+from options import MachOptions, FileInfo
 
 
 @apply_exception_handler
 class SingleMach(NDBModel):
     report_failure_method = "report_status"
 
-    def __init__(self):
-        """
-        Initialize the SingleMach model with general, NeuralDB-specific, and Mach-specific variables.
-        """
-        super().__init__()
-        self.mach_variables: MachVariables = MachVariables.load_from_env()
-        self.logger.info("SingleMach initialized with Mach-specific variables.")
+    @property
+    def mach_options(self) -> MachOptions:
+        return self.ndb_options.mach_options
 
     def unsupervised_train(self, db: ndb.NeuralDB, files: List[str]):
         """
@@ -39,7 +35,7 @@ class SingleMach(NDBModel):
             unsupervised_docs,
             train=True,
             checkpoint_config=self.unsupervised_checkpoint_config,
-            epochs=self.train_variables.unsupervised_epochs,
+            epochs=self.mach_options.unsupervised_epochs,
         )
         self.logger.info("Completed unsupervised training.")
 
@@ -55,7 +51,7 @@ class SingleMach(NDBModel):
 
         db.supervised_train(
             supervised_sources,
-            epochs=self.train_variables.supervised_epochs,
+            epochs=self.mach_options.supervised_epochs,
             checkpoint_config=self.supervised_checkpoint_config,
         )
         self.logger.info("Completed supervised training.")
@@ -65,11 +61,12 @@ class SingleMach(NDBModel):
         Train the SingleMach model with unsupervised and supervised data.
         """
         self.logger.info("Training process started.")
-        self.reporter.report_status(self.general_variables.model_id, "in_progress")
+        self.reporter.report_status(self.options.model_id, "in_progress")
 
-        unsupervised_files = list_files(self.data_dir / "unsupervised")
-        supervised_files = list_files(self.data_dir / "supervised")
-        test_files = list_files(self.data_dir / "test")
+        unsupervised_files = self.options.model_options.unsupervised_files
+        supervised_files = self.options.model_options.supervised_files
+
+        test_files = self.options.model_options.test_files
 
         db = self.get_db()
 
@@ -77,7 +74,7 @@ class SingleMach(NDBModel):
 
         if unsupervised_files:
             self.logger.info(f"Found {len(unsupervised_files)} unsupervised files.")
-            check_disk(db, self.general_variables.model_bazaar_dir, unsupervised_files)
+            check_disk(db, self.options.model_bazaar_dir, unsupervised_files)
             self.unsupervised_train(db, unsupervised_files)
             self.logger.info("Completed Unsupervised Training")
             if test_files:
@@ -85,7 +82,7 @@ class SingleMach(NDBModel):
 
         if supervised_files:
             self.logger.info(f"Found {len(supervised_files)} supervised files.")
-            check_disk(db, self.general_variables.model_bazaar_dir, supervised_files)
+            check_disk(db, self.options.model_bazaar_dir, supervised_files)
             self.supervised_train(db, supervised_files)
             self.logger.info("Completed Supervised Training")
 
@@ -112,7 +109,7 @@ class SingleMach(NDBModel):
         self.finalize_training(db, total_time)
         self.logger.info("Training finalized successfully.")
 
-    def evaluate(self, db: ndb.NeuralDB, files: List[str], **kwargs):
+    def evaluate(self, db: ndb.NeuralDB, files: List[FileInfo], **kwargs):
         """
         Evaluate the model with the given test files.
         Args:
@@ -122,8 +119,8 @@ class SingleMach(NDBModel):
         self.logger.info("Starting evaluation process.")
         for file in files:
             metrics = db._savable_state.model.model.evaluate(
-                file,
-                metrics=self.train_variables.metrics,
+                file.path,
+                metrics=self.mach_options.metrics,
             )
             self.logger.info(f"For file {file} metrics are {metrics}")
 
@@ -135,13 +132,13 @@ class SingleMach(NDBModel):
         """
         self.logger.info("Initializing a new NeuralDB instance.")
         return ndb.NeuralDB(
-            fhr=self.mach_variables.fhr,
-            embedding_dimension=self.mach_variables.embedding_dim,
-            extreme_output_dim=self.mach_variables.output_dim,
-            extreme_num_hashes=self.mach_variables.extreme_num_hashes,
-            tokenizer=self.mach_variables.tokenizer,
-            hidden_bias=self.mach_variables.hidden_bias,
-            retriever=self.ndb_variables.retriever,
+            fhr=self.mach_options.fhr,
+            embedding_dimension=self.mach_options.embedding_dim,
+            extreme_output_dim=self.mach_options.output_dim,
+            extreme_num_hashes=self.mach_options.extreme_num_hashes,
+            tokenizer=self.mach_options.tokenizer,
+            hidden_bias=self.mach_options.hidden_bias,
+            retriever=self.ndb_options.retriever.value,
         )
 
     def get_num_params(self, db: ndb.NeuralDB) -> int:

@@ -5,7 +5,7 @@ from pathlib import Path
 from exceptional_handler import apply_exception_handler
 from logger import LoggerConfig
 from reporter import Reporter
-from variables import GeneralVariables, TrainVariables
+from options import BaseOptions
 
 
 @apply_exception_handler
@@ -18,28 +18,23 @@ class Model(ABC):
     report_failure_method = "report_status"
     logger: Logger = None
 
-    def __init__(self):
+    def __init__(self, options: BaseOptions, reporter: Reporter):
         """
-        Initialize the model with general and training variables,
-        create necessary directories, and set up a reporter for status updates.
+        Initialize the model with general and training options, create necessary
+        directories, and set up a reporter for status updates.
         """
-        self.general_variables: GeneralVariables = GeneralVariables.load_from_env()
-        self.train_variables: TrainVariables = TrainVariables.load_from_env()
-        self.reporter: Reporter = Reporter(self.general_variables.model_bazaar_endpoint)
+        self.options: BaseOptions = options
+        self.reporter: Reporter = reporter
 
         # Directory for storing data
         self.data_dir: Path = (
-            Path(self.general_variables.model_bazaar_dir)
-            / "data"
-            / self.general_variables.data_id
+            Path(self.options.model_bazaar_dir) / "data" / self.options.data_id
         )
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         # Directory for storing model outputs
         self.model_dir: Path = (
-            Path(self.general_variables.model_bazaar_dir)
-            / "models"
-            / self.general_variables.model_id
+            Path(self.options.model_bazaar_dir) / "models" / self.options.model_id
         )
         self.model_dir.mkdir(parents=True, exist_ok=True)
 

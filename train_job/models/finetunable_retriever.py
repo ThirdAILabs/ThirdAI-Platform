@@ -7,25 +7,15 @@ from typing import List
 from exceptional_handler import apply_exception_handler
 from models.ndb_model_interface import NDBModel
 from thirdai import neural_db as ndb
-from utils import check_disk, consumer, list_files, producer
-from variables import FinetunableRetrieverVariables
+from options import FileInfo
+from utils import check_disk, consumer, producer
 
 
 @apply_exception_handler
 class FinetunableRetriever(NDBModel):
     report_failure_method = "report_status"
 
-    def __init__(self):
-        """
-        Initialize the FinetunableRetriever model with general and NeuralDB-specific variables.
-        """
-        super().__init__()
-        self.finetunable_retriever_variables = (
-            FinetunableRetrieverVariables.load_from_env()
-        )
-        self.logger.info("FinetunableRetriever initialized with variables.")
-
-    def unsupervised_train(self, db: ndb.NeuralDB, files: List[str]):
+    def unsupervised_train(self, db: ndb.NeuralDB, files: List[FileInfo]):
         """
         Train the model with unsupervised data.
         Args:
@@ -42,7 +32,7 @@ class FinetunableRetriever(NDBModel):
 
         consumer_thread = threading.Thread(
             target=consumer,
-            args=(buffer, db, self.train_variables.unsupervised_epochs, 50),
+            args=(buffer, db, 1, 50),
         )
 
         self.logger.info(
@@ -56,7 +46,7 @@ class FinetunableRetriever(NDBModel):
         consumer_thread.join()
         self.logger.info("Completed unsupervised training.")
 
-    def supervised_train(self, db: ndb.NeuralDB, files: List[str]):
+    def supervised_train(self, db: ndb.NeuralDB, files: List[FileInfo]):
         """
         Train the model with supervised data.
         Args:
@@ -66,10 +56,7 @@ class FinetunableRetriever(NDBModel):
         self.logger.info("Starting supervised training.")
         supervised_sources = self.get_supervised_files(files)
 
-        db.supervised_train(
-            supervised_sources,
-            epochs=self.train_variables.supervised_epochs,
-        )
+        db.supervised_train(supervised_sources)
         self.logger.info("Completed supervised training.")
 
     def train(self, **kwargs):
@@ -77,10 +64,10 @@ class FinetunableRetriever(NDBModel):
         Train the FinetunableRetriever model with unsupervised and supervised data.
         """
         self.logger.info("Training process started.")
-        self.reporter.report_status(self.general_variables.model_id, "in_progress")
+        self.reporter.report_status(self.options.model_id, "in_progress")
 
-        unsupervised_files = list_files(self.data_dir / "unsupervised")
-        supervised_files = list_files(self.data_dir / "supervised")
+        unsupervised_files = self.options.model_options.unsupervised_files
+        supervised_files = self.options.model_options.supervised_files
 
         db = self.get_db()
 
@@ -88,13 +75,13 @@ class FinetunableRetriever(NDBModel):
 
         if unsupervised_files:
             self.logger.info(f"Found {len(unsupervised_files)} unsupervised files.")
-            check_disk(db, self.general_variables.model_bazaar_dir, unsupervised_files)
+            check_disk(db, self.options.model_bazaar_dir, unsupervised_files)
             self.unsupervised_train(db, unsupervised_files)
             self.logger.info("Completed Unsupervised Training")
 
         if supervised_files:
             self.logger.info(f"Found {len(supervised_files)} supervised files.")
-            check_disk(db, self.general_variables.model_bazaar_dir, supervised_files)
+            check_disk(db, self.options.model_bazaar_dir, supervised_files)
             self.supervised_train(db, supervised_files)
             self.logger.info("Completed Supervised Training")
 
@@ -120,10 +107,7 @@ class FinetunableRetriever(NDBModel):
             ndb.NeuralDB: The initialized NeuralDB instance.
         """
         self.logger.info("Initializing a new NeuralDB instance.")
-        return ndb.NeuralDB(
-            retriever=self.ndb_variables.retriever,
-            on_disk=self.finetunable_retriever_variables.on_disk,
-        )
+        return ndb.NeuralDB(retriever="finetunable_retriever")
 
     def get_num_params(self, db: ndb.NeuralDB) -> int:
         """

@@ -1,22 +1,31 @@
 import time
 from abc import abstractmethod
 from pathlib import Path
+from typing import List
 
 import thirdai
 from exceptional_handler import apply_exception_handler
 from models.model import Model
 from thirdai import bolt
-from utils import list_files
-from variables import TextClassificationVariables, TokenClassificationVariables
+from options import (
+    TextClassificationOptions,
+    TokenClassificationOptions,
+    UDTTrainOptions,
+    FileInfo,
+)
 
 
 @apply_exception_handler
 class ClassificationModel(Model):
     report_failure_method = "report_status"
 
-    def __init__(self):
-        super().__init__()
-        self.model_save_path = self.model_dir / "model.udt"
+    @property
+    def model_save_path(self) -> Path:
+        return self.model_dir / "model.udt"
+
+    @property
+    def train_options(self) -> UDTTrainOptions:
+        return self.options.model_options.train_options
 
     @abstractmethod
     def initialize_model(self):
@@ -48,12 +57,7 @@ class ClassificationModel(Model):
         pass
 
     def get_udt_path(self, model_id):
-        return (
-            Path(self.general_variables.model_bazaar_dir)
-            / "models"
-            / model_id
-            / "model.udt"
-        )
+        return Path(self.options.model_bazaar_dir) / "models" / model_id / "model.udt"
 
     def load_model(self, model_id):
         return bolt.UniversalDeepTransformer.load(self.get_udt_path(model_id))
@@ -62,13 +66,15 @@ class ClassificationModel(Model):
         model.save(str(self.model_save_path))
 
     def get_model(self):
-        if self.general_variables.base_model_id:
-            return self.load_model(self.general_variables.base_model_id)
+        if self.options.base_model_id:
+            return self.load_model(self.options.base_model_id)
         return self.initialize_model()
 
-    def evaluate(self, model, test_files):
+    def evaluate(self, model, test_files: List[FileInfo]):
         for test_file in test_files:
-            model.evaluate(test_file, metrics=self.train_variables.validation_metrics)
+            model.evaluate(
+                test_file.path, metrics=self.train_options.validation_metrics
+            )
 
     @abstractmethod
     def train(self, **kwargs):
@@ -77,9 +83,9 @@ class ClassificationModel(Model):
 
 @apply_exception_handler
 class TextClassificationModel(ClassificationModel):
-    def __init__(self):
-        super().__init__()
-        self.txt_cls_vars = TextClassificationVariables.load_from_env()
+    @property
+    def txt_cls_vars(self) -> TextClassificationOptions:
+        return self.options.model_options.udt_options
 
     def initialize_model(self):
         return bolt.UniversalDeepTransformer(
@@ -94,21 +100,21 @@ class TextClassificationModel(ClassificationModel):
         )
 
     def train(self, **kwargs):
-        self.reporter.report_status(self.general_variables.model_id, "in_progress")
+        self.reporter.report_status(self.options.model_id, "in_progress")
 
         model = self.get_model()
 
-        supervised_files = list_files(self.data_dir / "supervised")
-        test_files = list_files(self.data_dir / "test")
+        supervised_files = self.options.model_options.supervised_files
+        test_files = self.options.model_options.test_files
 
         start_time = time.time()
         for train_file in supervised_files:
             model.train(
-                train_file,
-                epochs=self.train_variables.unsupervised_epochs,
-                learning_rate=self.train_variables.learning_rate,
-                batch_size=self.train_variables.batch_size,
-                metrics=self.train_variables.metrics,
+                train_file.path,
+                epochs=self.train_options.supervised_epochs,
+                learning_rate=self.train_options.learning_rate,
+                batch_size=self.train_options.batch_size,
+                metrics=self.train_options.metrics,
             )
         training_time = time.time() - start_time
 
@@ -122,7 +128,7 @@ class TextClassificationModel(ClassificationModel):
         latency = self.get_latency(model)
 
         self.reporter.report_complete(
-            self.general_variables.model_id,
+            self.options.model_id,
             metadata={
                 "num_params": str(num_params),
                 "thirdai_version": str(thirdai.__version__),
@@ -147,9 +153,9 @@ class TextClassificationModel(ClassificationModel):
 
 @apply_exception_handler
 class TokenClassificationModel(ClassificationModel):
-    def __init__(self):
-        super().__init__()
-        self.tkn_cls_vars = TokenClassificationVariables.load_from_env()
+    @property
+    def tkn_cls_vars(self) -> TokenClassificationOptions:
+        return self.options.model_options.udt_options
 
     def initialize_model(self):
         target_labels = self.tkn_cls_vars.target_labels
@@ -165,21 +171,21 @@ class TokenClassificationModel(ClassificationModel):
         )
 
     def train(self, **kwargs):
-        self.reporter.report_status(self.general_variables.model_id, "in_progress")
+        self.reporter.report_status(self.options.model_id, "in_progress")
 
         model = self.get_model()
 
-        supervised_files = list_files(self.data_dir / "supervised")
-        test_files = list_files(self.data_dir / "test")
+        supervised_files = self.options.model_options.supervised_files
+        test_files = self.options.model_options.test_files
 
         start_time = time.time()
         for train_file in supervised_files:
             model.train(
-                train_file,
-                epochs=self.train_variables.unsupervised_epochs,
-                learning_rate=self.train_variables.learning_rate,
-                batch_size=self.train_variables.batch_size,
-                metrics=self.train_variables.metrics,
+                train_file.path,
+                epochs=self.train_options.supervised_epochs,
+                learning_rate=self.train_options.learning_rate,
+                batch_size=self.train_options.batch_size,
+                metrics=self.train_options.metrics,
             )
         training_time = time.time() - start_time
 
@@ -193,7 +199,7 @@ class TokenClassificationModel(ClassificationModel):
         latency = self.get_latency(model)
 
         self.reporter.report_complete(
-            self.general_variables.model_id,
+            self.options.model_id,
             metadata={
                 "num_params": str(num_params),
                 "thirdai_version": str(thirdai.__version__),
