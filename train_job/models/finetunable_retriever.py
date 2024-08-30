@@ -66,8 +66,8 @@ class FinetunableRetriever(NDBModel):
         self.logger.info("Training process started.")
         self.reporter.report_status(self.options.model_id, "in_progress")
 
-        unsupervised_files = self.options.model_options.unsupervised_files
-        supervised_files = self.options.model_options.supervised_files
+        unsupervised_files = self.options.unsupervised_files
+        supervised_files = self.options.supervised_files
 
         db = self.get_db()
 

@@ -72,10 +72,6 @@ class NDBOptions(BaseModel):
         ..., discriminator="version"
     )
 
-    unsupervised_files: List[FileInfo]
-    supervised_files: List[FileInfo] = []
-    test_files: List[FileInfo] = []
-
 
 class UDTSubType(str, Enum):
     text = "text"
@@ -117,9 +113,6 @@ class UDTOptions(BaseModel):
         ..., discriminator="udt_sub_type"
     )
 
-    train_files: List[FileInfo]
-    test_files: List[FileInfo] = []
-
     train_options: UDTTrainOptions = UDTTrainOptions()
 
 
@@ -134,3 +127,20 @@ class BaseOptions(BaseModel):
     model_options: Union[NDBOptions, UDTOptions] = Field(
         ..., discriminator="model_type"
     )
+
+    unsupervised_files: List[FileInfo] = []
+    supervised_files: List[FileInfo] = []
+    test_files: List[FileInfo] = []
+
+    @model_validator(mode="after")
+    def validate_data_and_model(self):
+        if (
+            self.model_options.model_type == ModelType.NDB
+            and len(self.unsupervised_files) == 0
+        ):
+            raise ValueError("Must specify unsupervised data for training NDB")
+
+        if self.model_options.model_type == ModelType.UDT and (
+            len(self.supervised_files) == 0 or len(self.unsupervised_files) > 0
+        ):
+            raise ValueError("Must specify only supervised data for training UDT")
