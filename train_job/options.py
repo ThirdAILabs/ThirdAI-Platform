@@ -122,11 +122,6 @@ class UDTOptions(BaseModel):
     train_options: UDTTrainOptions = UDTTrainOptions()
 
 
-class S3Variables(BaseModel):
-    aws_access_key: Optional[str] = None
-    aws_secret_access_key: Optional[str] = None
-
-
 class BaseOptions(BaseModel):
     model_bazaar_dir: str
     license_key: str
@@ -138,5 +133,3 @@ class BaseOptions(BaseModel):
     model_options: Union[NDBOptions, UDTOptions] = Field(
         ..., discriminator="model_type"
     )
-
-    s3_variables: S3Variables
