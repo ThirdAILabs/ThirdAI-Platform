@@ -104,7 +104,7 @@ class TextClassificationModel(ClassificationModel):
 
         model = self.get_model()
 
-        supervised_files = self.options.model_options.supervised_files
+        supervised_files = self.options.model_options.train_files
         test_files = self.options.model_options.test_files
 
         start_time = time.time()
@@ -175,7 +175,7 @@ class TokenClassificationModel(ClassificationModel):
 
         model = self.get_model()
 
-        supervised_files = self.options.model_options.supervised_files
+        supervised_files = self.options.model_options.train_files
         test_files = self.options.model_options.test_files
 
         start_time = time.time()

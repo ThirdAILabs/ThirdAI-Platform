@@ -40,7 +40,7 @@ class RetrieverType(str, Enum):
 
 
 class NDBv1Options(BaseModel):
-    version: Literal[NDBVersion.v1]
+    version: Literal[NDBVersion.v1] = NDBVersion.v1
 
     retriever: RetrieverType = RetrieverType.finetunable_retriever
 
@@ -56,16 +56,17 @@ class NDBv1Options(BaseModel):
             self.retriever == RetrieverType.finetunable_retriever and self.mach_options
         ):
             raise ValueError("mach_options must be provided if using mach or hybrid")
+        return self
 
 
 class NDBv2Options(BaseModel):
-    version: Literal[NDBVersion.v2]
+    version: Literal[NDBVersion.v2] = NDBVersion.v2
 
     on_disk: bool = True
 
 
 class NDBOptions(BaseModel):
-    model_type: Literal[ModelType.NDB]
+    model_type: Literal[ModelType.NDB] = ModelType.NDB
 
     version_options: Union[NDBv1Options, NDBv2Options] = Field(
         ..., discriminator="version"
@@ -82,21 +83,21 @@ class UDTSubType(str, Enum):
 
 
 class TokenClassificationOptions(BaseModel):
-    udt_sub_type: Literal[UDTSubType.token]
+    udt_sub_type: Literal[UDTSubType.token] = UDTSubType.token
 
-    target_labels: List[str] = None
-    source_column: str = None
-    target_column: str = None
-    default_tag: str = None
+    target_labels: List[str]
+    source_column: str
+    target_column: str
+    default_tag: str
 
 
 class TextClassificationOptions(BaseModel):
-    udt_sub_type: Literal[UDTSubType.text]
+    udt_sub_type: Literal[UDTSubType.text] = UDTSubType.text
 
-    delimiter: str = None
-    text_column: str = None
-    label_column: str = None
-    n_target_classes: int = None
+    text_column: str
+    label_column: str
+    n_target_classes: int
+    delimiter: str = ","
 
 
 class UDTTrainOptions(BaseModel):
@@ -110,7 +111,7 @@ class UDTTrainOptions(BaseModel):
 
 
 class UDTOptions(BaseModel):
-    model_type: Literal[ModelType.UDT]
+    model_type: Literal[ModelType.UDT] = ModelType.UDT
 
     udt_options: Union[TokenClassificationOptions, TextClassificationOptions] = Field(
         ..., discriminator="udt_sub_type"
