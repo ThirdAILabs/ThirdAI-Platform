@@ -6,7 +6,7 @@ from typing import List
 
 from exceptional_handler import apply_exception_handler
 from models.ndb_model_interface import NDBModel
-from options import FileInfo
+from config import FileInfo
 from thirdai import neural_db as ndb
 from utils import check_disk, consumer, producer
 
@@ -64,10 +64,10 @@ class FinetunableRetriever(NDBModel):
         Train the FinetunableRetriever model with unsupervised and supervised data.
         """
         self.logger.info("Training process started.")
-        self.reporter.report_status(self.options.model_id, "in_progress")
+        self.reporter.report_status(self.config.model_id, "in_progress")
 
-        unsupervised_files = self.options.unsupervised_files
-        supervised_files = self.options.supervised_files
+        unsupervised_files = self.config.data.unsupervised_files
+        supervised_files = self.config.data.supervised_files
 
         db = self.get_db()
 
@@ -75,13 +75,13 @@ class FinetunableRetriever(NDBModel):
 
         if unsupervised_files:
             self.logger.info(f"Found {len(unsupervised_files)} unsupervised files.")
-            check_disk(db, self.options.model_bazaar_dir, unsupervised_files)
+            check_disk(db, self.config.model_bazaar_dir, unsupervised_files)
             self.unsupervised_train(db, unsupervised_files)
             self.logger.info("Completed Unsupervised Training")
 
         if supervised_files:
             self.logger.info(f"Found {len(supervised_files)} supervised files.")
-            check_disk(db, self.options.model_bazaar_dir, supervised_files)
+            check_disk(db, self.config.model_bazaar_dir, supervised_files)
             self.supervised_train(db, supervised_files)
             self.logger.info("Completed Supervised Training")
 

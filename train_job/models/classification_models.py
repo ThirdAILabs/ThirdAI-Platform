@@ -6,7 +6,7 @@ from typing import List
 import thirdai
 from exceptional_handler import apply_exception_handler
 from models.model import Model
-from options import (
+from config import (
     FileInfo,
     TextClassificationOptions,
     TokenClassificationOptions,
@@ -25,7 +25,7 @@ class ClassificationModel(Model):
 
     @property
     def train_options(self) -> UDTTrainOptions:
-        return self.options.model_options.train_options
+        return self.config.model_options.train_options
 
     @abstractmethod
     def initialize_model(self):
@@ -57,7 +57,7 @@ class ClassificationModel(Model):
         pass
 
     def get_udt_path(self, model_id):
-        return Path(self.options.model_bazaar_dir) / "models" / model_id / "model.udt"
+        return Path(self.config.model_bazaar_dir) / "models" / model_id / "model.udt"
 
     def load_model(self, model_id):
         return bolt.UniversalDeepTransformer.load(self.get_udt_path(model_id))
@@ -66,8 +66,8 @@ class ClassificationModel(Model):
         model.save(str(self.model_save_path))
 
     def get_model(self):
-        if self.options.base_model_id:
-            return self.load_model(self.options.base_model_id)
+        if self.config.base_model_id:
+            return self.load_model(self.config.base_model_id)
         return self.initialize_model()
 
     def evaluate(self, model, test_files: List[FileInfo]):
@@ -85,7 +85,7 @@ class ClassificationModel(Model):
 class TextClassificationModel(ClassificationModel):
     @property
     def txt_cls_vars(self) -> TextClassificationOptions:
-        return self.options.model_options.udt_options
+        return self.config.model_options.udt_options
 
     def initialize_model(self):
         return bolt.UniversalDeepTransformer(
@@ -100,12 +100,12 @@ class TextClassificationModel(ClassificationModel):
         )
 
     def train(self, **kwargs):
-        self.reporter.report_status(self.options.model_id, "in_progress")
+        self.reporter.report_status(self.config.model_id, "in_progress")
 
         model = self.get_model()
 
-        supervised_files = self.options.supervised_files
-        test_files = self.options.test_files
+        supervised_files = self.config.data.supervised_files
+        test_files = self.config.data.test_files
 
         start_time = time.time()
         for train_file in supervised_files:
@@ -128,7 +128,7 @@ class TextClassificationModel(ClassificationModel):
         latency = self.get_latency(model)
 
         self.reporter.report_complete(
-            self.options.model_id,
+            self.config.model_id,
             metadata={
                 "num_params": str(num_params),
                 "thirdai_version": str(thirdai.__version__),
@@ -155,7 +155,7 @@ class TextClassificationModel(ClassificationModel):
 class TokenClassificationModel(ClassificationModel):
     @property
     def tkn_cls_vars(self) -> TokenClassificationOptions:
-        return self.options.model_options.udt_options
+        return self.config.model_options.udt_options
 
     def initialize_model(self):
         target_labels = self.tkn_cls_vars.target_labels
@@ -171,12 +171,12 @@ class TokenClassificationModel(ClassificationModel):
         )
 
     def train(self, **kwargs):
-        self.reporter.report_status(self.options.model_id, "in_progress")
+        self.reporter.report_status(self.config.model_id, "in_progress")
 
         model = self.get_model()
 
-        supervised_files = self.options.supervised_files
-        test_files = self.options.test_files
+        supervised_files = self.config.data.supervised_files
+        test_files = self.config.data.test_files
 
         start_time = time.time()
         for train_file in supervised_files:
@@ -199,7 +199,7 @@ class TokenClassificationModel(ClassificationModel):
         latency = self.get_latency(model)
 
         self.reporter.report_complete(
-            self.options.model_id,
+            self.config.model_id,
             metadata={
                 "num_params": str(num_params),
                 "thirdai_version": str(thirdai.__version__),

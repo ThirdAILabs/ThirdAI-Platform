@@ -3,14 +3,16 @@ import shutil
 from typing import Dict
 
 import pytest
-from options import (
-    BaseOptions,
+from config import (
+    TrainConfig,
     FileInfo,
     NDBOptions,
     NDBv1Options,
     TextClassificationOptions,
     TokenClassificationOptions,
     UDTOptions,
+    UDTData,
+    NDBData,
 )
 from reporter import Reporter
 from run import get_model
@@ -47,31 +49,33 @@ def create_tmp_model_bazaar_dir():
     [NDBv1Options(), NDBv1Options(retriever="mach", mach_options={})],
 )
 def test_ndb_train(version_options):
-    options = BaseOptions(
+    config = TrainConfig(
         model_bazaar_dir=MODEL_BAZAAR_DIR,
         license_key="",
         model_bazaar_endpoint="",
         model_id="ndb_123",
         data_id="data_123",
         model_options=NDBOptions(version_options=version_options),
-        unsupervised_files=[
-            FileInfo(
-                path=os.path.join(file_dir(), "articles.csv"),
-                options={"csv_id_column": None, "csv_weak_columns": ["text"]},
-                metadata={"a": 140},
-            ),
-            FileInfo(
-                path=os.path.join(file_dir(), "four_english_words.docx"),
-                metadata={"file_type": "docx", "a": 200},
-            ),
-            FileInfo(
-                path=os.path.join(file_dir(), "mutual_nda.pdf"),
-                metadata={"file_type": "pdf"},
-            ),
-        ],
+        data=NDBData(
+            unsupervised_files=[
+                FileInfo(
+                    path=os.path.join(file_dir(), "articles.csv"),
+                    options={"csv_id_column": None, "csv_weak_columns": ["text"]},
+                    metadata={"a": 140},
+                ),
+                FileInfo(
+                    path=os.path.join(file_dir(), "four_english_words.docx"),
+                    metadata={"file_type": "docx", "a": 200},
+                ),
+                FileInfo(
+                    path=os.path.join(file_dir(), "mutual_nda.pdf"),
+                    metadata={"file_type": "pdf"},
+                ),
+            ],
+        ),
     )
 
-    model = get_model(options, DummyReporter())
+    model = get_model(config, DummyReporter())
 
     model.train()
 
@@ -83,7 +87,7 @@ def test_ndb_train(version_options):
 
 
 def test_udt_text_train():
-    options = BaseOptions(
+    config = TrainConfig(
         model_bazaar_dir=MODEL_BAZAAR_DIR,
         license_key="",
         model_bazaar_endpoint="",
@@ -94,11 +98,13 @@ def test_udt_text_train():
                 text_column="text", label_column="id", n_target_classes=100
             ),
         ),
-        supervised_files=[FileInfo(path=os.path.join(file_dir(), "articles.csv"))],
-        test_files=[FileInfo(path=os.path.join(file_dir(), "articles.csv"))],
+        data=UDTData(
+            supervised_files=[FileInfo(path=os.path.join(file_dir(), "articles.csv"))],
+            test_files=[FileInfo(path=os.path.join(file_dir(), "articles.csv"))],
+        ),
     )
 
-    model = get_model(options, DummyReporter())
+    model = get_model(config, DummyReporter())
 
     model.train()
 
@@ -108,7 +114,7 @@ def test_udt_text_train():
 
 
 def test_udt_token_train():
-    options = BaseOptions(
+    config = TrainConfig(
         model_bazaar_dir=MODEL_BAZAAR_DIR,
         license_key="",
         model_bazaar_endpoint="",
@@ -122,11 +128,13 @@ def test_udt_token_train():
                 default_tag="O",
             ),
         ),
-        supervised_files=[FileInfo(path=os.path.join(file_dir(), "ner.csv"))],
-        test_files=[FileInfo(path=os.path.join(file_dir(), "ner.csv"))],
+        data=UDTData(
+            supervised_files=[FileInfo(path=os.path.join(file_dir(), "ner.csv"))],
+            test_files=[FileInfo(path=os.path.join(file_dir(), "ner.csv"))],
+        ),
     )
 
-    model = get_model(options, DummyReporter())
+    model = get_model(config, DummyReporter())
 
     model.train()
 

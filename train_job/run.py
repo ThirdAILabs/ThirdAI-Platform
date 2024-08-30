@@ -13,11 +13,11 @@ from models.classification_models import (
 )
 from models.finetunable_retriever import FinetunableRetriever
 from models.single_mach import SingleMach
-from options import BaseOptions, ModelType, NDBVersion, RetrieverType, UDTSubType
+from config import TrainConfig, ModelType, NDBVersion, RetrieverType, UDTSubType
 from reporter import HttpReporter, Reporter
 
 
-def get_model(options: BaseOptions, reporter: Reporter):
+def get_model(options: TrainConfig, reporter: Reporter):
     model_type = options.model_options.model_type
 
     if model_type == ModelType.NDB:
@@ -53,7 +53,7 @@ def load_options():
     args = parser.parse_args()
 
     with open(args.config) as file:
-        return BaseOptions.model_validate_json(file.read())
+        return TrainConfig.model_validate_json(file.read())
 
 
 def main():

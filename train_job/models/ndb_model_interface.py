@@ -6,7 +6,7 @@ from typing import List
 import thirdai
 from exceptional_handler import apply_exception_handler
 from models.model import Model
-from options import BaseOptions, FileInfo, NDBv1Options
+from config import TrainConfig, FileInfo, NDBv1Options
 from reporter import Reporter
 from thirdai import neural_db as ndb
 from utils import convert_supervised_to_ndb_file, get_directory_size
@@ -16,12 +16,12 @@ from utils import convert_supervised_to_ndb_file, get_directory_size
 class NDBModel(Model):
     report_failure_method = "report_status"
 
-    def __init__(self, options: BaseOptions, reporter: Reporter):
+    def __init__(self, config: TrainConfig, reporter: Reporter):
         """
         Initialize the NDBModel with general and NeuralDB-specific options.
         """
-        super().__init__(options=options, reporter=reporter)
-        self.ndb_options: NDBv1Options = self.options.model_options.version_options
+        super().__init__(config=config, reporter=reporter)
+        self.ndb_options: NDBv1Options = self.config.model_options.version_options
         self.model_save_path: Path = self.model_dir / "model.ndb"
         self.logger.info("NDBModel initialized with NeuralDB options.")
 
@@ -71,7 +71,7 @@ class NDBModel(Model):
         Returns:
             Path: The path to the NeuralDB checkpoint.
         """
-        path = Path(self.options.model_bazaar_dir) / "models" / model_id / "model.ndb"
+        path = Path(self.config.model_bazaar_dir) / "models" / model_id / "model.ndb"
         self.logger.info(f"NeuralDB path for model {model_id}: {path}")
         return path
 
@@ -92,9 +92,9 @@ class NDBModel(Model):
         Returns:
             ndb.NeuralDB: The NeuralDB instance.
         """
-        if self.options.base_model_id:
-            self.logger.info(f"Loading base model {self.options.base_model_id}")
-            return self.load_db(self.options.base_model_id)
+        if self.config.base_model_id:
+            self.logger.info(f"Loading base model {self.config.base_model_id}")
+            return self.load_db(self.config.base_model_id)
         self.logger.info("Initializing a new NeuralDB instance.")
         return self.initialize_db()
 
@@ -153,7 +153,7 @@ class NDBModel(Model):
         latency = self.get_latency(db)
 
         self.reporter.report_complete(
-            model_id=self.options.model_id,
+            model_id=self.config.model_id,
             metadata={
                 "num_params": str(num_params),
                 "size": str(size),
