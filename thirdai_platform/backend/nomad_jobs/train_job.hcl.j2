@@ -15,13 +15,6 @@ job "train-{{ model_id }}-{{ type }}-{{ sub_type }}" {
         driver = "raw_exec"
       {% endif %}
 
-      template {
-        destination = "local/config.json"
-        data = <<EOH
-{{ config_json }}
-EOH
-      }
-
       env {
         AWS_ACCESS_KEY = "{{ aws_access_key }}"
         AWS_ACCESS_SECRET = "{{ aws_access_secret }}"
@@ -39,10 +32,10 @@ EOH
           volumes = [
             "{{ share_dir }}:/model_bazaar"
           ]
-          args    = ["--config", "local/config.json]
+          args    = ["--config", "{{ config_path }}"]
         {% elif platform == "local" %}
           command = "{{ python_path }}"
-          args    = ["{{ train_script }}", "--config", "local/config.json]
+          args    = ["{{ train_script }}", "--config", "{{ config_path }}"]
         {% endif %}
       }
 
