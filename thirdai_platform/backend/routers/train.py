@@ -7,15 +7,7 @@ from typing import Dict, List, Optional
 
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
-from backend.file_handler import (
-    FileLocation,
-    FileType,
-    NDBFileDetails,
-    NDBFileDetailsList,
-    UDTFileDetails,
-    UDTFileDetailsList,
-    get_files,
-)
+from backend.file_handler import download_files, model_bazaar_path
 from backend.utils import (
     NDBExtraOptions,
     UDTExtraOptions,
@@ -30,123 +22,44 @@ from backend.utils import (
     update_json,
     validate_name,
 )
+from backend.config import TrainConfig, NDBOptions, UDTOptions, NDBData, UDTData
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, Form, UploadFile, status
-from fastapi.encoders import jsonable_encoder
 from licensing.verify.verify_license import valid_job_allocation, verify_license
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, Field
 from sqlalchemy.orm import Session
 
 train_router = APIRouter()
+
+
+class JobOptions(BaseModel):
+    allocation_cores: int = Field(1, gt=0)
+    allocation_memory: int = Field(6800, gt=500)
 
 
 @train_router.post("/ndb")
 def train_ndb(
     model_name: str,
     files: List[UploadFile],
-    file_details_list: Optional[str] = Form(default=None),
+    file_info: Optional[str] = Form(default="{}"),
     base_model_identifier: Optional[str] = None,
-    extra_options_form: str = Form(default="{}"),
+    model_options: str = Form(default="{}"),
+    job_options: str = Form(default="{}"),
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
-    """
-    Train a NeuralDB model.
-
-    Parameters:
-    - model_name: The name of the model.
-    - files: List of files to be used for training.
-    - file_details_list: Optional JSON string of file details.
-        - Example:
-        ```json
-        {
-            "file_details": [
-                {
-                    "mode": "unsupervised",
-                    "location": "local",
-                    "is_folder": false,
-                    "source_id": null,
-                    "metadata": {
-                        "key1": "value1",
-                        "key2": "value2"
-                    }
-                }
-            ]
-        }
-        ```
-        - Supported modes: "unsupervised", "supervised", "test"
-        - Supported locations: "local", "nfs", "s3"
-    - base_model_identifier: Optional identifier of the base model.
-    - extra_options_form: Optional JSON string of extra options for training.
-        - Example:
-        ```json
-        {
-            "num_models_per_shard": 1,
-            "num_shards": 1,
-            "allocation_cores": 4,
-            "allocation_memory": 8192,
-            "model_cores": 4,
-            "model_memory": 8192,
-            "priority": 1,
-            "csv_id_column": "id",
-            "csv_strong_columns": ["column1", "column2"],
-            "csv_weak_columns": ["column3"],
-            "csv_reference_columns": ["reference_column"],
-            "fhr": 100,
-            "embedding_dim": 256,
-            "output_dim": 128,
-            "max_in_memory_batches": 10,
-            "extreme_num_hashes": 10,
-            "num_classes": 2,
-            "csv_query_column": "query",
-            "csv_id_delimiter": ",",
-            "learning_rate": 0.01,
-            "batch_size": 32,
-            "unsupervised_epochs": 10,
-            "supervised_epochs": 10,
-            "tokenizer": "default",
-            "hidden_bias": true,
-            "retriever": "default",
-            "unsupervised_train": true,
-            "disable_finetunable_retriever": false,
-            "checkpoint_interval": 100,
-            "fast_approximation": false,
-            "num_buckets_to_sample": 10,
-            "metrics": ["accuracy", "f1"],
-            "on_disk": false,
-            "docs_on_disk": false
-        }
-        ```
-    - session: The database session (dependency).
-    - authenticated_user: The authenticated user (dependency).
-
-    Returns:
-    - A JSON response indicating the status of the training job submission.
-    """
     user: schema.User = authenticated_user.user
     try:
-        extra_options = NDBExtraOptions.parse_raw(extra_options_form).dict()
-        extra_options = {k: v for k, v in extra_options.items() if v is not None}
-        if extra_options:
-            print(f"Extra options for training: {extra_options}")
+        model_options = NDBOptions.model_validate_json(model_options)
+        data = NDBData.model_validate_json(file_info)
+        job_options = JobOptions.model_validate_json(job_options)
+        print(f"Extra options for training: {model_options}")
     except ValidationError as e:
-        return {"error": "Invalid extra options format", "details": str(e)}
-
-    if file_details_list:
-        try:
-            files_info_list = NDBFileDetailsList.parse_raw(file_details_list)
-            files_info = [
-                NDBFileDetails(**detail.dict())
-                for detail in files_info_list.file_details
-            ]
-        except ValidationError as e:
-            return {"error": "Invalid file details list format", "details": str(e)}
-    else:
-        files_info = [
-            NDBFileDetails(mode=FileType.unsupervised, location=FileLocation.local)
-            for _ in files
-        ]
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="Invalid options format: " + str(e),
+        )
 
     try:
         license_info = verify_license(
@@ -181,34 +94,28 @@ def train_ndb(
         )
 
     model_id = uuid.uuid4()
-    data_id = model_id
+    data_id = str(model_id)
 
-    if len(files) != len(files_info):
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"Given {len(files)} files but for {len(files_info)} files the info has given.",
+    try:
+        data = NDBData(
+            unsupervised_files=download_files(
+                files=files,
+                file_infos=data.unsupervised_files,
+                dest_dir=os.path.join(model_bazaar_path(), data_id, "unsupervised"),
+            ),
+            supervised_files=download_files(
+                files=files,
+                file_infos=data.supervised_files,
+                dest_dir=os.path.join(model_bazaar_path(), data_id, "supervised"),
+            ),
+            test_files=download_files(
+                files=files,
+                file_infos=data.test_files,
+                dest_dir=os.path.join(model_bazaar_path(), data_id, "test"),
+            ),
         )
-
-    filenames = get_files(files, data_id, files_info)
-
-    if not isinstance(filenames, list):
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message=filenames,
-        )
-
-    if len(filenames) == 0:
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message="No files provided.",
-        )
-
-    unique_filenames = set(filenames)
-    if len(filenames) != len(unique_filenames):
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message="Duplicate filenames received, please ensure each filename is unique.",
-        )
+    except Exception as error:
+        return response(status_code=status.HTTP_400_BAD_REQUEST, message=str(error))
 
     # Base model checks
     base_model = None
@@ -226,13 +133,6 @@ def train_ndb(
                 message=str(error),
             )
 
-    sharded = (
-        True
-        if extra_options.get("num_models_per_shard") > 1
-        or extra_options.get("num_shards") > 1
-        else False
-    )
-
     try:
         new_model = schema.Model(
             id=model_id,
@@ -241,7 +141,7 @@ def train_ndb(
             deploy_status=schema.Status.not_started,
             name=model_name,
             type="ndb",
-            sub_type="single" if not sharded else "sharded",
+            sub_type="single",
             domain=user.domain,
             access_level=schema.Access.private,
             parent_id=base_model.id if base_model else None,
@@ -256,6 +156,21 @@ def train_ndb(
             message=str(err),
         )
 
+    config = TrainConfig(
+        model_bazaar_dir=(
+            "/model_bazaar"
+            if get_platform() == "docker"
+            else os.getenv("SHARE_DIR", None)
+        ),
+        license_key=license_info["boltLicenseKey"],
+        model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT", None),
+        model_id=str(model_id),
+        data_id=data_id,
+        base_model_id=base_model_identifier,
+        model_options=model_options,
+        data=data,
+    )
+
     try:
         submit_nomad_job(
             str(Path(os.getcwd()) / "backend" / "nomad_jobs" / "train_job.hcl.j2"),
@@ -268,17 +183,15 @@ def train_ndb(
             image_name=os.getenv("TRAIN_IMAGE_NAME"),
             train_script=str(get_root_absolute_path() / "train_job/run.py"),
             model_id=str(model_id),
-            data_id=str(data_id),
-            model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT", None),
             share_dir=os.getenv("SHARE_DIR", None),
-            license_key=license_info["boltLicenseKey"],
-            extra_options=extra_options,
             python_path=get_python_path(),
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
-            base_model_id=("NONE" if not base_model_identifier else str(base_model.id)),
-            type="ndb",
-            sub_type="single" if not sharded else "shard_allocation",
+            type=config.model_options.model_type.value,
+            sub_type=config.model_options.version_options.version.value,
+            config_json=config.model_dump_json(indent=2),
+            allocation__cores=job_options.allocation_cores,
+            allocation_memory=job_options.allocation_memory,
         )
 
         new_model.train_status = schema.Status.starting

@@ -1,8 +1,5 @@
-{% if sub_type == "shard_train" %}
-job "train-{{ model_id }}-{{ type }}-{{ sub_type }}-{{ shard_num }}" {
-{% else %}
 job "train-{{ model_id }}-{{ type }}-{{ sub_type }}" {
-{% endif %}
+
   datacenters = ["dc1"]
 
   type = "batch"
@@ -18,27 +15,16 @@ job "train-{{ model_id }}-{{ type }}-{{ sub_type }}" {
         driver = "raw_exec"
       {% endif %}
 
+      template {
+        destination = "local/config.json"
+        data = <<EOH
+{{ config_json }}
+EOH
+      }
+
       env {
-        MODEL_ID = "{{ model_id }}"
-        DATA_ID = "{{ data_id }}"
-        MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
-        LICENSE_KEY = "{{ license_key }}"
-        BASE_MODEL_ID = "{{ base_model_id }}"
         AWS_ACCESS_KEY = "{{ aws_access_key }}"
         AWS_ACCESS_SECRET = "{{ aws_access_secret }}"
-        TYPE = "{{ type }}"
-        SUB_TYPE = "{{ sub_type }}"
-        SHARD_NUM = "{{ shard_num }}"
-
-        {%- for key, value in extra_options.items() %}
-        {{ key | upper }} = "{{ value }}"
-        {%- endfor %}
-
-        {% if platform == "docker" %}
-          MODEL_BAZAAR_DIR = "/model_bazaar"
-        {% elif platform == "local" %}
-          MODEL_BAZAAR_DIR = "{{ share_dir }}"
-        {% endif %}
       }
 
       config {
@@ -53,9 +39,10 @@ job "train-{{ model_id }}-{{ type }}-{{ sub_type }}" {
           volumes = [
             "{{ share_dir }}:/model_bazaar"
           ]
+          args    = ["--config", "local/config.json]
         {% elif platform == "local" %}
           command = "{{ python_path }}"
-          args    = ["{{ train_script }}"]
+          args    = ["{{ train_script }}", "--config", "local/config.json]
         {% endif %}
       }
 
