@@ -194,8 +194,7 @@ def train_ndb(
             python_path=get_python_path(),
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
-            type=model_type,
-            sub_type=model_sub_type,
+            train_job_name=new_model.get_train_job_name(),
             config_path=config_path,
             allocation__cores=job_options.allocation_cores,
             allocation_memory=job_options.allocation_memory,
@@ -280,9 +279,6 @@ def train_udt(
     model_id = uuid.uuid4()
     data_id = str(model_id)
 
-    model_id = uuid.uuid4()
-    data_id = str(model_id)
-
     try:
         data = UDTData(
             supervised_files=download_files(
@@ -335,6 +331,8 @@ def train_udt(
     with open(config_path, "w") as file:
         file.write(config.model_dump_json(indent=4))
 
+    model_type = config.model_options.model_type.value
+    model_sub_type = config.model_options.udt_options.udt_sub_type.value
     try:
         new_model: schema.Model = schema.Model(
             id=model_id,
@@ -342,8 +340,8 @@ def train_udt(
             train_status=schema.Status.not_started,
             deploy_status=schema.Status.not_started,
             name=model_name,
-            type="udt",
-            sub_type=config.model_options.udt_options.udt_sub_type,
+            type=model_type,
+            sub_type=model_sub_type,
             domain=user.email.split("@")[1],
             access_level=schema.Access.private,
             parent_id=base_model.id if base_model else None,
@@ -376,8 +374,7 @@ def train_udt(
             python_path=get_python_path(),
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
-            type=config.model_options.model_type.value,
-            sub_type=config.model_options.udt_options.udt_sub_type,
+            train_job_name=new_model.get_train_job_name(),
             config_path=config_path,
             allocation__cores=job_options.allocation_cores,
             allocation_memory=job_options.allocation_memory,
