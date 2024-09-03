@@ -60,15 +60,18 @@ def test_ndb_train(version_options):
             unsupervised_files=[
                 FileInfo(
                     path=os.path.join(file_dir(), "articles.csv"),
+                    location="local",
                     options={"csv_id_column": None, "csv_weak_columns": ["text"]},
                     metadata={"a": 140},
                 ),
                 FileInfo(
                     path=os.path.join(file_dir(), "four_english_words.docx"),
+                    location="local",
                     metadata={"file_type": "docx", "a": 200},
                 ),
                 FileInfo(
                     path=os.path.join(file_dir(), "mutual_nda.pdf"),
+                    location="local",
                     metadata={"file_type": "pdf"},
                 ),
             ],
@@ -99,8 +102,16 @@ def test_udt_text_train():
             ),
         ),
         data=UDTData(
-            supervised_files=[FileInfo(path=os.path.join(file_dir(), "articles.csv"))],
-            test_files=[FileInfo(path=os.path.join(file_dir(), "articles.csv"))],
+            supervised_files=[
+                FileInfo(
+                    path=os.path.join(file_dir(), "articles.csv"), location="local"
+                )
+            ],
+            test_files=[
+                FileInfo(
+                    path=os.path.join(file_dir(), "articles.csv"), location="local"
+                )
+            ],
         ),
     )
 
@@ -129,8 +140,12 @@ def test_udt_token_train():
             ),
         ),
         data=UDTData(
-            supervised_files=[FileInfo(path=os.path.join(file_dir(), "ner.csv"))],
-            test_files=[FileInfo(path=os.path.join(file_dir(), "ner.csv"))],
+            supervised_files=[
+                FileInfo(path=os.path.join(file_dir(), "ner.csv"), location="local")
+            ],
+            test_files=[
+                FileInfo(path=os.path.join(file_dir(), "ner.csv"), location="local")
+            ],
         ),
     )
 
