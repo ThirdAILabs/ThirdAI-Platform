@@ -1,3 +1,19 @@
+# Generate 66 questions on the rice pdf
+# create perturbations of 33 of them
+# now we have 99 total questions
+
+# 33 without perturbations in cache
+# 33 with perturbations not in cache
+# 33 without perturbations not in cache
+
+# at the beginning, insert the 33 without perturbations in cache into the cache
+
+# we should now hit the cache and if it is a success we return, otherwise we go to generation
+# we should cache the generated response 
+
+
+import os
+import argparse
 import json
 from dataclasses import dataclass
 from urllib.parse import urljoin
@@ -6,6 +22,13 @@ import requests
 from locust import HttpUser, TaskSet, between, events, task  # type: ignore
 from requests.auth import HTTPBasicAuth
 import pandas as pd
+import asyncio
+import json
+import websockets
+
+
+def run_async(coroutine):
+    return asyncio.new_event_loop().run_until_complete(coroutine)
 
 
 @dataclass
@@ -56,29 +79,36 @@ def request_listener(
         failure_count += 1
 
 
-deployment_id = "ca29f228-23fd-4294-8f24-96eab96ba669"
+deployment_id = "7c4475de-a9c5-4166-a103-893b50c6d4ff"
 
 
 class ModelBazaarLoadTest(TaskSet):
     df = pd.read_csv("questions.csv")
-    queries = list(df.questions)
+    in_cache = list(df.in_cache)
+    perturbed = list(df.perturbed)
+    new_queries = list(df.new_queries)
+    queries = in_cache + perturbed + new_queries
 
     def on_start(self):
-        # Perform the email login using the Login class
         login_details = Login.with_email(
-            base_url="http://localhost:80/api/",  # Update this to your base URL
-            email="yash@thirdai.com",
-            password="password",
+            base_url="http://40.69.173.69:80/api/",
+            email="david@thirdai.com",
+            password="temp123",
         )
         self.auth_token = login_details.access_token
 
-    @task(3)
-    def test_prediction(self):
+        # TODO insert the selected queries into the cache
+        # as a workaround I can manually insert the ones into the cache
+
+    @task(1)
+    def test_generation(self):
+        import random
+        query = self.queries[random.randint(0, len(self.queries) - 1)]
         if self.auth_token:
             headers = {
                 "Authorization": f"Bearer {self.auth_token}",
             }
-            base_params = {"query": "thirdai", "top_k": 5}
+            base_params = {"query": query, "top_k": 5}
             ndb_params = {"constraints": {}}
 
             response = self.client.post(
@@ -86,79 +116,43 @@ class ModelBazaarLoadTest(TaskSet):
                 json={"base_params": base_params, "ndb_params": ndb_params},
                 headers=headers,
             )
-    
-    @task(1)
-    def test_sources(self):
-        if self.auth_token:
-            headers = {
-                "Authorization": f"Bearer {self.auth_token}",
-            }
-
-            response = self.client.get(
-                f"/{deployment_id}/sources",
-                headers=headers,
-            )
-            
-    @task(2)
-    def test_associate(self):
-        if self.auth_token:
-            headers = {
-                "Authorization": f"Bearer {self.auth_token}",
-            }
-            text_pairs =[
-                {"source": "authors", "target": "contributors"},
-                {"source": "paper", "target": "document"},
-            ]
-
-            response = self.client.post(
-                f"/{deployment_id}/associate",
-                json={"text_pairs": text_pairs},
-                headers=headers,
-            )
-
-    def on_stop(self):
-        global success_count, failure_count
-        # Log the counts when the test stops
-        print(f"Total Successes: {success_count}")
-        print(f"Total Failures: {failure_count}")
-
-    @task
-    def test_api_endpoint(self):
-        import random
 
         headers = {"Content-Type": "application/json"}
 
-        data = {"query": self.queries[random.randint(0, len(self.queries) - 1)]}
+        context = " ".join('\n\n'.join([x['text'] for x in json.loads(response.text)['data']['references']]).split(" ")[:2000])
+        # print(context)
+        data = {
+            "system_prompt": "You are a helpful assistant. Please be concise in your answers.",
+            "prompt": f"Context: {context}, Question: {query}, Please be concise if you can. Answer: ",
+            "repeat_last_n": 128,
+            "n_predict": 1000,
+        }
+        # data = {"prompt": query + " Please be concise if you can."}
 
-        with self.client.post(
-            "/on-prem-llm/generate",
+        print("starting request")
+        response = self.client.post(
+           "/on-prem-llm/completion",
             json=data,
             headers=headers,
-            stream=True,
-            catch_response=True,
-        ) as response:
-            if response.status_code == 200:
-                # Process the streamed content
-                try:
-                    for chunk in response.iter_content(chunk_size=1024):
-                        if chunk:
-                            # You can process each chunk here, or just read through it
-                            pass
-                    response.success()
-                except Exception as e:
-                    response.failure(f"Failed to process streaming response: {str(e)}")
-            else:
-                response.failure(
-                    f"Failed with status code: {response.status_code}, Response: {response.text}"
-                )
+        )
+        # print("done", len(response.text))
+
+        # with self.client.post("/on-prem-llm/completion", headers=headers, json=data, stream=True) as response:
+        #     for chunk in response.iter_content(chunk_size=8192):
+        #         if chunk:
+        #             print(chunk.decode("utf-8"))
+
+    def on_stop(self):
+        global success_count, failure_count
+        print(f"Total Successes: {success_count}")
+        print(f"Total Failures: {failure_count}")
 
 
 class WebsiteUser(HttpUser):
     tasks = [ModelBazaarLoadTest]
-    wait_time = between(2, 3)  # Adjust as needed to increase concurrency
+    wait_time = between(10, 30)
 
 
 if __name__ == "__main__":
-    import os
 
-    os.system("locust -f stress_test.py --host=http://localhost:80")
+    os.system("locust -f stress_test.py --host=http://40.69.173.69:80")
