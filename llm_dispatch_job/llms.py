@@ -142,5 +142,5 @@ model_classes = {
 default_keys = {
     "openai": os.getenv("OPENAI_KEY", ""),
     "cohere": os.getenv("COHERE_KEY", ""),
-    "on-prem": "no key",
+    "on-prem": "no key",  # TODO(david) add authentication to the service
 }

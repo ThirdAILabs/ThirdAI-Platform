@@ -85,6 +85,7 @@ async def start_on_prem_generate_job(
         initial_allocations=1,
         min_allocations=1,
         max_allocations=5,
+        threads_http=2,
         cores_per_allocation=10,
         memory_per_allocation=4000,
         model_name=model_name,
