@@ -23,7 +23,7 @@ Without this process, it is cumbersome to test out platform changes. We would ha
        pip3 install -r train_job/requirements.txt
        pip3 install -r deployment_job/requirements.txt
        pip3 install -r thirdai_platform/requirements.txt
-       pip3 install -r llm_generation_job/requirements.txt
+       pip3 install -r llm_dispatch_job/requirements.txt
        ```
    - Open a terminal session and run:
      ```
@@ -67,10 +67,10 @@ Without this process, it is cumbersome to test out platform changes. We would ha
 
 ### Step 3: Build and Deploy NeuralDB
 
-10. **Configure Environment:**
+5. **Configure Environment:**
    - Navigate back to the `thirdai_platform` directory. Modify `.env.example` to match your local setup for the   following values and save it as `.env`.
       - Change `DATABASE_URI` to be your local postgresql database connection string
-      - Change `PUBLIC_MODEL_BAZAAR_ENDPOINT` and `PRIVATE_MODEL_BAZAAR_ENDPOINT` to be "http://localhost:8000/" (make sure to include the trailing /)
+      - Change `PUBLIC_MODEL_BAZAAR_ENDPOINT` and `PRIVATE_MODEL_BAZAAR_ENDPOINT` to be "http://localhost:80/" (make sure to include the trailing /)
       - Change `NOMAD_ENDPOINT` to "http://localhost:4646/"
       - Change `LICENSE_PATH` to point to your Rag on Rails license (look below for how to create a license file)
       - Change `SHARE_DIR` to point to an empty directory where all models and files will be saved.
@@ -80,15 +80,21 @@ Without this process, it is cumbersome to test out platform changes. We would ha
       - Change `GENAI_KEY` to your Generative AI provider key, e.g. OpenAI key.
 
 
-11. If you are running this dev environment on a Mac, navigate to the `thirdai_platform/backend/nomad_jobs` directory and make sure any hcl or hcl.j2 file doesn't have a line that is in the form of `cores = x`. If those lines exist, change the lines to be `cpu = x * 2500` (put the actual value of the multiplication, not x * 2500). Doing this will fix any issues related to resource allocation of Nomad jobs on MacOS, because running Docker on MacOS does funky things when trying to reserve CPUs.
+6. If you are running this dev environment on a Mac, navigate to the `thirdai_platform/backend/nomad_jobs` directory and make sure any hcl or hcl.j2 file doesn't have a line that is in the form of `cores = x`. If those lines exist, change the lines to be `cpu = x * 2500` (put the actual value of the multiplication, not x * 2500). Doing this will fix any issues related to resource allocation of Nomad jobs on MacOS, because running Docker on MacOS does funky things when trying to reserve CPUs.
 
-12. **Launch Backend:**
+7. **Launch Backend:**
     - Start the backend service using Uvicorn:
       ```
       uvicorn main:app --reload --host 0.0.0.0 --port 8000
       ```
 
-13. **Insert existing datasets in DB:**
+8. **Launch Autoscaler Job**
+    - Start the Autoscaler job using the following command, first cd into `local_setup` folder and run
+      ```
+      nomad job run -var="nomad_endpoint=$(nomad agent-info | grep 'known_servers' | awk '{print $3}' | sed 's/:4647//')" autoscaler.nomad
+      ```
+
+9. **Insert existing datasets in DB:**
     - These existing datasets are present in the share directory of blade. 
     - Make sure you are on blade when you insert the datasets
     - Go to `thirdai_platform` folder and run
@@ -112,4 +118,3 @@ Extra steps that may help:
 ### Setting up HashiCorp Vault
 You can use the following instructions to set it up:
 https://waytohksharma.medium.com/install-hashicorp-vault-on-mac-fdbd8cd9113b
-

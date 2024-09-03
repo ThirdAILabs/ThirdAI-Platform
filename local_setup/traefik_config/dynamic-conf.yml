@@ -1,12 +1,21 @@
 http:
   routers:
     modelbazaar-http:
+      rule: "PathPrefix(`/api`)"
+      priority: 10
+      service: "modelbazaar-service"
+    frontend-http:
       rule: "PathPrefix(`/`)"
       priority: 1
-      service: "modelbazaar-service"
+      service: "frontend-service"
 
   services:
     modelbazaar-service:
       loadBalancer:
         servers:
           - url: "http://localhost:8000"
+    
+    frontend-service:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:3006"

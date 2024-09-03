@@ -64,7 +64,7 @@ jobs:
         pip install -r deployment_job/requirements.txt
         pip install -r docs/requirements.txt
         pip install -r headless/requirements.txt
-        pip install -r llm_generation_job/requirements.txt
+        pip install -r llm_dispatch_job/requirements.txt
         pip install -r thirdai_platform/requirements.txt
         pip install -r train_job/requirements.txt
         echo "PYTHON_PATH=${{ github.workspace }}/venv/bin/python" >> $GITHUB_ENV

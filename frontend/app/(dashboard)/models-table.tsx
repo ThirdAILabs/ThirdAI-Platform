@@ -142,12 +142,12 @@ export function ModelsTable({
               <TableHead className="hidden w-[100px] sm:table-cell">
                 <span className="sr-only">Image</span>
               </TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="hidden md:table-cell">Type</TableHead>
-              <TableHead className="hidden md:table-cell">Published on</TableHead>
-              <TableHead className="hidden md:table-cell">Action</TableHead>
-              <TableHead>
+              <TableHead className="text-center">Name</TableHead>
+              <TableHead className="text-center">Status</TableHead>
+              <TableHead className="hidden md:table-cell text-center">Type</TableHead>
+              <TableHead className="hidden md:table-cell text-center">Published on</TableHead>
+              <TableHead className="hidden md:table-cell text-center">Action</TableHead>
+              <TableHead className="text-center">
                 <span className="sr-only">Actions</span>
               </TableHead>
             </TableRow>

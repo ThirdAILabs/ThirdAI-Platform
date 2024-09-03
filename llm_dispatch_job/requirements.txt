@@ -5,3 +5,4 @@ pydantic>=2.0.0
 uvicorn==0.18.2
 python-dotenv
 websockets
+requests<2.32.0

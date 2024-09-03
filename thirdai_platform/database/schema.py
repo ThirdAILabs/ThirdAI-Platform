@@ -376,6 +376,7 @@ class Workflow(SQLDeclarativeBase):
     workflow_models = relationship(
         "WorkflowModel", back_populates="workflow", cascade="all, delete-orphan"
     )
+    gen_ai_provider = Column(String(256), nullable=True)
     workflow_type = relationship("WorkflowType")
 
     __table_args__ = (

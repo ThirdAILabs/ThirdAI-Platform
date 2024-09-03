@@ -52,9 +52,6 @@ job "thirdai-platform-frontend" {
             password = "{{ docker_password }}"
             server_address = "{{ registry }}"
           }
-        {% elif platform == "local" %}
-          command = "npm"
-          args = ["run","start-no-env","-C","{{ app_dir }}"]
         {% endif %}
       }
 

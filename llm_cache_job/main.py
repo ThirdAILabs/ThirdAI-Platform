@@ -1,5 +1,7 @@
 import logging
+import os
 
+import thirdai
 from cache import Cache, NDBSemanticCache
 from fastapi import APIRouter, Depends, FastAPI, status
 from fastapi.encoders import jsonable_encoder
@@ -18,6 +20,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+license_key = os.getenv("LICENSE_KEY")
+model_bazaar_dir = os.getenv("MODEL_BAZAAR_DIR")
+if license_key == "file_license":
+    thirdai.licensing.set_path(
+        os.path.join(model_bazaar_dir, "license/license.serialized")
+    )
+else:
+    thirdai.licensing.activate(license_key)
 
 permissions = Permissions()
 

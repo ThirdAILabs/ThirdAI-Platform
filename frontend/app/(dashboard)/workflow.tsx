@@ -19,6 +19,14 @@ import { useRouter } from 'next/navigation';
 export function WorkFlow({ workflow }: { workflow: Workflow }) {
   const router = useRouter();
   const [deployStatus, setDeployStatus] = useState<string>('');
+  // Deploystatus can be one of following:
+    // Inactive
+    // Failed
+    // Starting
+    // Active
+    // Starting
+    // Error: Underlying model not present
+
   const [deployType, setDeployType] = useState<string>('');
 
   function goToEndpoint() {
@@ -30,12 +38,15 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
         break;
       }
       case "nlp": {
-        router.push(`/token-classification/${workflow.id}`);
+        const newUrl = `/token-classification/${workflow.id}`;
+        window.open(newUrl, '_blank');
         break;
       }
       case "rag": {
         let ifGenerationOn = true; // false if semantic search, true if RAG
-        const newUrl = `/semantic-search/${workflow.id}?workflowId=${workflow.id}&ifGenerationOn=${ifGenerationOn}`;
+        const genAiProvider = `${workflow.gen_ai_provider}`;
+        // TODO don't use url params
+        const newUrl = `/semantic-search/${workflow.id}?workflowId=${workflow.id}&ifGenerationOn=${ifGenerationOn}&genAiProvider=${genAiProvider}`;
         window.open(newUrl, '_blank');
         break;
       }
@@ -48,7 +59,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
   const [isValid, setIsValid] = useState(false);
 
   useEffect(() => {
-    const validateInterval = setInterval(async () => {
+    const validateWorkflow = async () => {
       try {
         const validationResponse = await validate_workflow(workflow.id);
         if (validationResponse.status == 'success') {
@@ -62,9 +73,13 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
         setIsValid(false);
         setDeployStatus('Starting')
         console.error('Validation failed.', e);
-        // alert('Validation failed.' + e)
       }
-    }, 3000); // Adjust the interval as needed, e.g., every 5 seconds
+    };
+
+    // Call the validation function immediately
+    validateWorkflow();
+
+    const validateInterval = setInterval(validateWorkflow, 3000); // Adjust the interval as needed
 
     return () => clearInterval(validateInterval);
   }, [workflow.id]);
@@ -73,18 +88,17 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
     try {
       if (isValid) {
         await start_workflow(workflow.id);
-      } else {
-        alert('Cannot deploy. The workflow is not valid.');
       }
     } catch (e) {
+      setDeployStatus('Starting'); // set to starting because user intends to start workflow
       console.error('Failed to start workflow.', e);
-      alert('Failed to start the workflow.' + e);
     }
   };
 
   useEffect(() => {
-    if (workflow.status === 'inactive') {
+    if (workflow.status === 'inactive' && deployStatus != 'Starting') {
       // If the workflow is inactive, we always say it's inactive regardless of model statuses
+        // AND If user hasn't tried to start deploy the workflow AND
       setDeployStatus('Inactive');
     } else if (workflow.models && workflow.models.length > 0) {
       let hasFailed = false;
@@ -100,6 +114,12 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
           allComplete = false; // If any model is in progress, not all can be complete
         } else if (model.deploy_status !== 'complete') {
           allComplete = false; // If any model is not complete, mark allComplete as false
+
+          // if user previously has specified they want to start workflow
+          if (deployStatus == 'Starting') {
+            console.log('user previously specified they want to start workflow, automatically deploy model.')
+            handleDeploy(); // automatically deploy model
+          }
         }
       }
   
@@ -116,7 +136,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       // If no models are present, the workflow is ready to deploy
       setDeployStatus('Error: Underlying model not present');
     }
-  }, [workflow.models, workflow.status]);
+  }, [workflow.models, workflow.status, deployStatus]);
 
   useEffect(()=>{
     if (workflow.type === 'semantic_search') {
@@ -128,6 +148,21 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
     }
   },[workflow.type])
 
+  const getBadgeColor = (status: string) => {
+    switch (status) {
+      case 'Active':
+        return 'bg-green-500 text-white'; // Green for good status
+      case 'Starting':
+        return 'bg-yellow-500 text-white'; // Yellow for in-progress status
+      case 'Inactive':
+        return 'bg-gray-500 text-white'; // Gray for inactive status
+      case 'Failed':
+      case 'Error: Underlying model not present':
+        return 'bg-red-500 text-white'; // Red for error statuses
+      default:
+        return 'bg-gray-500 text-white'; // Default to gray if status is unknown
+    }
+  };  
 
   return (
     <TableRow>
@@ -140,14 +175,14 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
           width="64"
         />
       </TableCell>
-      <TableCell className="font-medium">{workflow.name}</TableCell>
-      <TableCell>
-        <Badge variant="outline" className="capitalize">
+      <TableCell className="font-medium text-center font-medium">{workflow.name}</TableCell>
+      <TableCell className='text-center font-medium'>
+        <Badge variant="outline" className={`capitalize ${getBadgeColor(deployStatus)}`}>
           {deployStatus}
         </Badge>
       </TableCell>
-      <TableCell className="hidden md:table-cell">{deployType}</TableCell>
-      <TableCell className="hidden md:table-cell">
+      <TableCell className="hidden md:table-cell text-center font-medium">{deployType}</TableCell>
+      <TableCell className="hidden md:table-cell text-center font-medium">
         {
           new Date(workflow.publish_date).toLocaleDateString('en-US', {
               year: 'numeric',
@@ -156,10 +191,10 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
             })
         }
       </TableCell>
-      <TableCell className="hidden md:table-cell">
+      <TableCell className="hidden md:table-cell text-center font-medium">
         <Button
           onClick={deployStatus === 'Active' ? goToEndpoint : handleDeploy}
-          className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm p-2.5 text-center inline-flex items-center me-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+          className="text-white focus:ring-4 focus:outline-none font-medium text-sm p-2.5 text-center inline-flex items-center me-2"
           style={{ width: '100px' }}
           disabled={['Failed', 'Starting', 'Error: Underlying model not present'].includes(deployStatus)}
         >
@@ -172,7 +207,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
             : 'Endpoint'}
         </Button>
       </TableCell>
-      <TableCell>
+      <TableCell className='text-center font-medium'>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button aria-haspopup="true" size="icon" variant="ghost">

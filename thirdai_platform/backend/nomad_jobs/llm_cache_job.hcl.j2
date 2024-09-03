@@ -38,10 +38,11 @@ job "llm-cache" {
 
       env {
         MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
+        LICENSE_KEY = "{{ license_key }}"
         {% if platform == "docker" %}
-        SHARE_DIR = "/share"
+        MODEL_BAZAAR_DIR = "/model_bazaar"
         {% elif platform == "local" %}
-        SHARE_DIR = "{{ share_dir }}"
+        MODEL_BAZAAR_DIR = "{{ share_dir }}"
         {% endif %}
       }
 
@@ -56,7 +57,7 @@ job "llm-cache" {
             server_address = "{{ registry }}"
           }
           volumes = [
-            "{{ share_dir }}:/share"
+            "{{ share_dir }}:/model_bazaar"
           ]
         {% elif platform == "local" %}
           command = "{{ python_path }}"

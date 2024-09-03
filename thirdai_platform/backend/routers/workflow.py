@@ -10,19 +10,21 @@ from backend.auth_dependencies import (
     is_workflow_accessible,
     is_workflow_owner,
 )
+from backend.startup_jobs import start_on_prem_generate_job
 from backend.utils import (
     delete_nomad_job,
     get_empty_port,
     get_platform,
     get_python_path,
     get_root_absolute_path,
+    get_workflow,
     list_workflow_models,
     response,
     submit_nomad_job,
 )
 from database import schema
 from database.session import get_session
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
 from licensing.verify.verify_license import verify_license
 from pydantic import BaseModel
@@ -212,22 +214,7 @@ def add_models(
     }
     ```
     """
-    workflow: schema.Workflow = session.query(schema.Workflow).get(body.workflow_id)
-
-    if not workflow:
-        return response(
-            status_code=status.HTTP_404_NOT_FOUND,
-            message="Workflow not found.",
-        )
-
-    if (
-        workflow.user_id != authenticated_user.user.id
-        and not authenticated_user.user.is_global_admin()
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have owner permissions to this workflow",
-        )
+    workflow = get_workflow(session, body.workflow_id, authenticated_user)
 
     for model_id, component in zip(body.model_ids, body.components):
         model: schema.Model = session.query(schema.Model).get(model_id)
@@ -264,6 +251,29 @@ def add_models(
         status_code=status.HTTP_200_OK,
         message="Models added to workflow successfully.",
         data={"models": jsonable_encoder(list_workflow_models(workflow=workflow))},
+    )
+
+
+class WorkflowGenAIModel(BaseModel):
+    workflow_id: str
+    provider: str
+
+
+@workflow_router.post("/set-gen-ai-provider")
+def set_gen_ai_provider(
+    body: WorkflowGenAIModel,
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
+    workflow = get_workflow(session, body.workflow_id, authenticated_user)
+
+    workflow.gen_ai_provider = body.provider
+    session.commit()
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Successful",
+        success=True,
     )
 
 
@@ -305,22 +315,7 @@ def delete_models(
     }
     ```
     """
-    workflow: schema.Workflow = session.query(schema.Workflow).get(body.workflow_id)
-
-    if not workflow:
-        return response(
-            status_code=status.HTTP_404_NOT_FOUND,
-            message="Workflow not found.",
-        )
-
-    if (
-        workflow.user_id != authenticated_user.user.id
-        and not authenticated_user.user.is_global_admin()
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have owner permissions to this workflow",
-        )
+    workflow = get_workflow(session, body.workflow_id, authenticated_user)
 
     for model_id, component in zip(body.model_ids, body.components):
         model: schema.Model = session.query(schema.Model).get(model_id)
@@ -597,7 +592,7 @@ def stop_workflow(
 
 
 @workflow_router.post("/start", dependencies=[Depends(is_workflow_owner)])
-def start_workflow(
+async def start_workflow(
     workflow_id: str,
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
@@ -739,6 +734,9 @@ def start_workflow(
                 workflow.status = schema.WorkflowStatus.inactive
                 session.commit()
                 raise Exception(str(err))
+
+    if workflow.gen_ai_provider == "on-prem":
+        await start_on_prem_generate_job(restart_if_exists=False)
 
     return response(
         status_code=status.HTTP_202_ACCEPTED,
@@ -936,6 +934,7 @@ def get_workflow_details(
         "name": workflow.name,
         "type": workflow.workflow_type.name,
         "type_id": str(workflow.type_id),
+        "gen_ai_provider": workflow.gen_ai_provider,
         "status": workflow.status,
         "publish_date": str(workflow.published_date),
         "models": jsonable_encoder(list_workflow_models(workflow=workflow)),
@@ -1075,6 +1074,7 @@ def list_accessible_workflows(
             "status": workflow.status,
             "models": jsonable_encoder(list_workflow_models(workflow=workflow)),
             "publish_date": str(workflow.published_date),
+            "gen_ai_provider": workflow.gen_ai_provider,
             "created_by": {
                 "id": str(workflow.user.id),
                 "username": workflow.user.username,

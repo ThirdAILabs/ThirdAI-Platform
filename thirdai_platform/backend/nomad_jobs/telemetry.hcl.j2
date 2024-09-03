@@ -1,0 +1,267 @@
+job "telemetry" {
+  datacenters = ["dc1"]
+  type        = "service"
+
+  group "telemetry" {
+    count = 1
+
+    network {
+      port "vicky-http" {
+        to = 8428
+      }
+      port "loki-http" {
+        to = 3100
+      }
+
+      port "grafana-http" {
+        to = 3000
+      }
+    }
+
+    task "victoriametrics" {
+      driver = "docker"
+
+      service {
+        name     = "vicky-web"
+        provider = "nomad"
+        port     = "vicky-http"
+      }
+
+      config {
+        image = "victoriametrics/victoria-metrics:latest"
+        ports = ["vicky-http"]
+        args = [
+          "--storageDataPath=/storage",
+          "--retentionPeriod=1d",
+          "--httpListenAddr=:${NOMAD_PORT_vicky_http}",
+          "--promscrape.config=${NOMAD_TASK_DIR}/prometheus.yaml"
+        ]
+        {% if platform == "local" -%}
+        extra_hosts = ["host.docker.internal:host-gateway"]
+        {%- endif %}
+        volumes = [
+          "{{ VM_DATA_DIR }}:/storage"
+        ]
+      }
+
+      template {
+        data        = <<EOF
+global:
+  scrape_interval: 2s
+  external_labels:
+    env: "dev"
+    cluster: "local"
+
+scrape_configs:
+  - job_name: "nomad-agent"
+    metrics_path: "/v1/metrics?format=prometheus"
+    static_configs:
+      - targets:
+        {% if platform == "local" -%}
+          - "host.docker.internal:4646"
+        {%- else -%}
+          {% raw %}- "${attr.unique.network.ip-address}:4646"{% endraw %}
+        {%- endif %}
+        labels:
+          role: agent
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: "([^:]+):.+"
+        target_label: "hostname"
+        replacement: "nomad-agent-$1"
+EOF
+        destination = "${NOMAD_TASK_DIR}/prometheus.yaml"
+      }
+
+      resources {
+        cpu    = 256
+        memory = 600
+      }
+    }
+
+    task "loki" {
+      driver = "docker"
+
+      config {
+        image = "grafana/loki:3.0.0"
+        args = [
+          "-config.file",
+          "${NOMAD_TASK_DIR}/loki.yaml",
+        ]
+
+        volumes = [
+          "{{ LOKI_DATA_DIR }}:/loki_data"
+        ]
+        ports = ["loki-http"]
+        
+      }
+
+      resources {
+        cpu    = 500
+        memory = 200
+      }
+
+      /*
+        Date: 19/08/2024
+        Cannot use "data            = file(abspath("./../configs/loki.yaml"))" because file function only works via CLI currently.
+        https://github.com/hashicorp/nomad/issues/19648#issuecomment-1881052624
+        */
+      template {
+        data            = <<EOF
+{% raw -%}
+auth_enabled: false
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki_data
+  storage:
+    filesystem:
+      chunks_directory: /loki_data/chunks
+      rules_directory: /loki_data/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+frontend:
+  max_outstanding_per_tenant: 2048
+pattern_ingester:
+  enabled: true
+limits_config:
+  max_global_streams_per_user: 0
+  ingestion_rate_mb: 50000
+  ingestion_burst_size_mb: 50000
+  volume_enabled: true
+query_range:
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100
+schema_config:
+  configs:
+    - from: 2020-10-27
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+ruler:
+  alertmanager_url: http://localhost:9093
+analytics:
+  reporting_enabled: false
+ingester:
+  wal:
+    flush_on_shutdown: true
+{%- endraw %}
+EOF
+        destination     = "${NOMAD_TASK_DIR}/loki.yaml"
+      }
+
+      service {
+        name = "loki-web"
+        port = "loki-http"
+        provider = "nomad"
+        tags = [
+          "traefik.enable=true",
+          "traefik.http.routers.loki-http.rule=PathPrefix(`/loki`)",
+          "traefik.http.routers.loki-http.priority=10"
+        ]
+      }
+    }
+
+    task "grafana" {
+      lifecycle {
+        hook = "poststart"
+        sidecar = true
+      }
+
+      driver = "docker"
+
+      env {
+        GF_AUTH_ANONYMOUS_ENABLED = "true"
+        GF_AUTH_BASIC_ENABLED = "false"
+        GF_LOG_LEVEL          = "DEBUG"
+        GF_LOG_MODE           = "console"
+        GF_AUTH_ANONYMOUS_ORG_ROLE = "Admin"
+        GF_AUTH_DISABLE_LOGIN_FORM = "true"
+        GF_SERVER_ROOT_URL = "%(protocol)s://%(domain)s:%(http_port)s/grafana/"
+        GF_SERVER_SERVE_FROM_SUB_PATH = "true"
+        GF_SERVER_HTTP_PORT   = "${NOMAD_PORT_http}"
+        GF_PATHS_PROVISIONING = "/local/grafana/provisioning"
+      }
+
+      config {
+        image = "grafana/grafana:main-ubuntu"
+        ports = ["grafana-http"]
+        volumes = [
+            "{{ dashboards }}:/local/dashboards",
+            "{{ GRAFANA_DATA_DIR }}:/var/lib/grafana"
+          ]
+      }
+
+      service {
+        name = "grafana"
+        port = "grafana-http"
+        provider = "nomad"
+        tags = [
+          "traefik.enable=true",
+          "traefik.http.routers.grafana-http.rule=PathPrefix(`/grafana`)",
+          "traefik.http.routers.grafana-http.priority=10"
+        ]
+      }
+
+      resources {
+        cpu    = 256
+        memory = 300
+      }
+
+      template {
+        data        = <<EOF
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    {% if platform == "local" -%}
+    url: http://host.docker.internal:{% raw %}{{ range nomadService "vicky-web" }}{{ .Port }}{{ end }}{% endraw %}
+    {%- else -%}
+    {% raw %}{{ range nomadService "vicky-web" }}url: http://{{ .Address }}:{{ .Port }}{{ end }}{% endraw %}
+    {%- endif %}
+    isDefault: true
+    editable: false
+  - name: Loki
+    type: loki
+    access: proxy
+    {% if platform == "local" -%}
+    url: http://host.docker.internal:{% raw %}{{ range nomadService "loki-web" }}{{ .Port }}{{ end }}{% endraw %}
+    {%- else -%}
+    {% raw %}{{ range nomadService "loki-web" }}url: http://{{ .Address }}:{{ .Port }}{{ end }}{% endraw %}
+    {%- endif %}
+    editable: false
+EOF
+        destination = "/local/grafana/provisioning/datasources/datasources.yaml"
+      }
+
+      template {
+        data        = <<EOF
+{% raw -%}
+apiVersion: 1
+providers:
+  - name: dashboards
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      foldersFromFilesStructure: true
+      path: /local/dashboards
+{%- endraw %}
+EOF
+        destination = "/local/grafana/provisioning/dashboards/dashboards.yaml"
+      }
+    }
+  }
+}
