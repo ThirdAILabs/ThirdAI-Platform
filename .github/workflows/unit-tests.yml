@@ -123,6 +123,8 @@ jobs:
       run: |
         pip3 install -r train_job/requirements.txt
         pip3 install pytest
+        pip3 install pyopenssl --upgrade
+
     - name: run unit tests
       run: |
         python3 -m pytest ./train_job -v
