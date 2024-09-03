@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  unit-tests:
+  backend-unit-tests:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -113,3 +113,17 @@ jobs:
           sudo killall nomad
           sudo killall vault
           sudo killall traefik
+
+  train-job-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: install dependencies
+      run: |
+        pip3 install -r thirdai_platform/requirements.txt
+        pip3 install pytest
+        pip3 install pyopenssl --upgrade
+    - name: run unit tests
+      run: |
+        python3 -m pytest ./train_job -v
