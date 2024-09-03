@@ -329,7 +329,7 @@ def train_udt(
     )
 
     config_path = os.path.join(
-        config.model_bazaar_dir, "models", model_id, "train_config.json"
+        config.model_bazaar_dir, "models", str(model_id), "train_config.json"
     )
     os.makedirs(os.path.dirname(config_path), exist_ok=True)
     with open(config_path, "w") as file:

@@ -265,7 +265,8 @@ class ModelBazaar:
         doc_type: str = "local",
         is_async: bool = False,
         base_model_identifier: Optional[str] = None,
-        train_extra_options: Optional[dict] = None,
+        model_options: Optional[dict] = None,
+        job_options: Optional[dict] = None,
     ):
         """
         Initiates training for a model and returns a Model instance.
@@ -302,32 +303,33 @@ class ModelBazaar:
             file_details_list.append({"mode": "test", "location": doc_type})
 
         url = urljoin(self._base_url, f"train/udt")
-        files = [
-            (
-                ("files", open(file_path, "rb"))
-                if doc_type == "local"
-                else ("files", (file_path, "don't care"))
-            )
-            for file_path in docs
-        ]
-        if train_extra_options:
+
+        file_info = {
+            "supervised_files": [
+                {"path": sup_file, "location": doc_type} for sup_file in supervised_docs
+            ],
+            "test_files": (
+                [{"path": test_doc, "location": doc_type}] if test_doc else []
+            ),
+        }
+
+        all_file_paths = supervised_docs + ([test_doc] if test_doc else [])
+        if doc_type == "local":
+            files = [("files", open(file_path, "rb")) for file_path in all_file_paths]
+        else:
+            files = []
+
+        if model_options:
             files.append(
-                (
-                    "extra_options_form",
-                    (None, json.dumps(train_extra_options), "application/json"),
-                )
+                ("model_options", (None, json.dumps(model_options), "application/json"))
             )
 
-        files.append(
-            (
-                "file_details_list",
-                (
-                    None,
-                    json.dumps({"file_details": file_details_list}),
-                    "application/json",
-                ),
+        files.append(("file_info", (None, json.dumps(file_info), "application/json")))
+
+        if job_options:
+            files.append(
+                ("job_options", (None, json.dumps(job_options), "application/json"))
             )
-        )
 
         response = http_post_with_error(
             url,

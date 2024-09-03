@@ -116,7 +116,7 @@ class TokenClassificationOptions(BaseModel):
     target_labels: List[str]
     source_column: str
     target_column: str
-    default_tag: str
+    default_tag: str = "O"
 
 
 class TextClassificationOptions(BaseModel):

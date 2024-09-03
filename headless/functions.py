@@ -40,7 +40,8 @@ class UDTFunctions:
             supervised_docs=[
                 os.path.join(config.base_path, config.unsupervised_paths[0])
             ],
-            train_extra_options=UDTFunctions.build_extra_options(config),
+            model_options=UDTFunctions.build_model_options(config),
+            job_options=UDTFunctions.build_job_options(config),
             doc_type=config.doc_type,
         )
 
@@ -60,25 +61,30 @@ class UDTFunctions:
             f"udt_{model.model_identifier}_deployment_{run_name}",
         )
 
-    def build_extra_options(config: Config) -> Dict[str, Any]:
+    def build_model_options(config: Config) -> Dict[str, Any]:
         if config.sub_type == "text":
             return {
-                "sub_type": config.sub_type,
-                "text_column": config.query_column,
-                "label_column": config.id_column,
-                "allocation_memory": config.allocation_memory,
-                "allocation_cores": config.allocation_cores,
-                "n_target_classes": config.n_classes,
+                "udt_options": {
+                    "udt_sub_type": "text",
+                    "text_column": config.query_column,
+                    "label_column": config.id_column,
+                    "n_target_classes": config.n_classes,
+                }
             }
-        else:
-            return {
-                "sub_type": config.sub_type,
+        return {
+            "udt_options": {
+                "udt_sub_type": "token",
+                "target_labels": config.target_labels,
                 "source_column": config.query_column,
                 "target_column": config.id_column,
-                "allocation_memory": config.allocation_memory,
-                "allocation_cores": config.allocation_cores,
-                "target_labels": config.target_labels,
             }
+        }
+
+    def build_job_options(config: Config) -> Dict[str, Any]:
+        return {
+            "allocation_memory": config.allocation_memory,
+            "allocation_cores": config.allocation_cores,
+        }
 
 
 class CommonFunctions:
