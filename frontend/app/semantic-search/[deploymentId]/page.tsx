@@ -174,6 +174,11 @@ function App() {
                     setIfGuardRailOn(true)
                 }
 
+                if (! generationOn) { 
+                    // if generation is off, turn off cache
+                    setCacheEnabled(false)
+                }
+
                 const newModelService = new ModelService(serviceUrl, tokenModelUrl, uuidv4());
                 setModelService(newModelService);
                 newModelService.sources().then(setSources);

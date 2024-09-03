@@ -111,11 +111,13 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="mt-4 flex justify-center items-center">
-            <Link href={grafanaUrl} passHref>
-              <Button>
-                See more system stats
-              </Button>
-            </Link>
+          <Link href={grafanaUrl} passHref legacyBehavior>
+            <a target="_blank" rel="noopener noreferrer">
+            <Button>
+              See more system stats
+            </Button>
+            </a>
+          </Link>
           </div>
         </CardContent>
       </Card>

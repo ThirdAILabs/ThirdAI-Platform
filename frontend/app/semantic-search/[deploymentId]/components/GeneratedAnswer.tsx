@@ -55,7 +55,6 @@ export default function GeneratedAnswer({ answer, queryInfo, regenerateAndBypass
                 Generated Answer
                 <Spacer $width="10px" />
                 <div className="flex items-center">
-                    <span className="mr-2">Use Cache</span>
                     <button
                         onClick={() => setCacheEnabled(!cacheEnabled)}
                         className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-300 focus:outline-none ${

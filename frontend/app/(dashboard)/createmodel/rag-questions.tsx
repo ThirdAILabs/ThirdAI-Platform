@@ -59,7 +59,11 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
 
   const router = useRouter();
 
+  const [isLoading, setIsLoading] = useState(false);
+
   const handleSubmit = async () => {
+    setIsLoading(true);
+
     const workflowName = modelName;
     const workflowTypeName = 'rag';
   
@@ -109,6 +113,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
     } catch (error) {
       console.error('Error during workflow creation or model addition:', error);
       alert('Error during workflow creation or model addition:' + error)
+      setIsLoading(false);
     }
   };
 
@@ -126,7 +131,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
             onChange={(e) => {
               const name = e.target.value;
               if (workflowNames.includes(name)) {
-                setWarningMessage("A workflow with the same name has been created. Please choose a different name.");
+                setWarningMessage("An App with the same name has been created. Please choose a different name.");
               } else {
                 setWarningMessage(""); // Clear the warning if the name is unique
               }
@@ -442,12 +447,22 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div>
-                      <Button 
-                        onClick={handleSubmit} 
+                      <Button
+                        onClick={handleSubmit}
                         style={{ width: '100%' }}
-                        disabled={!(ssModelId && (ifUseLGR === 'No' || grModelId) && llmType && modelName)}
+                        disabled={
+                          isLoading || 
+                          !(ssModelId && (ifUseLGR === 'No' || grModelId) && llmType && modelName)
+                        }
                       >
-                        Create
+                        {isLoading ? (
+                          <div className="flex items-center justify-center">
+                            <div className='animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500 mr-2'></div>
+                            <span>Creating...</span>
+                          </div>
+                        ) : (
+                          "Create"
+                        )}
                       </Button>
                     </div>
                   </TooltipTrigger>

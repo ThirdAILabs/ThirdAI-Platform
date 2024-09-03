@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getUsername, train_ndb, create_workflow, add_models_to_workflow } from '@/lib/backend';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
     const [sources, setSources] = useState<Array<{ type: string, files: File[] }>>([]);
     const [fileCount, setFileCount] = useState<number[]>([]);
     const router = useRouter();
+    const [isLoading, setIsLoading] = useState(false);
     
     const addSource = (type: SourceType) => {
       setSources(prev => [...prev, {type, files: []}]);
@@ -82,13 +83,17 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
     };
 
     const submit = async () => {
+      setIsLoading(true);
+
       try {
         if (!modelName) {
           alert("Please give the app a name. The name cannot have spaces, forward slashes (/) or colons (:).")
+          setIsLoading(false);
           return;
         }
         if (modelName.includes(" ") || modelName.includes("/") || modelName.includes(":")) {
           alert("The app name cannot have spaces, forward slashes (/) or colons (:).")
+          setIsLoading(false);
           return;
         }
 
@@ -98,6 +103,7 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
 
         if (!formData) {
           alert("Please upload at least one file before submitting.");
+          setIsLoading(false);
           return;
         }
 
@@ -137,12 +143,24 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
         }
     } catch (error) {
         console.log(error);
+        setIsLoading(false);
     }
   }
 
     console.log('sources', sources);
 
     const [warningMessage, setWarningMessage] = useState("");
+
+    useEffect(()=>{
+      console.log('appname', appName)
+      if(appName) {
+        if (workflowNames.includes(appName)) {
+          setWarningMessage("An App with the same name has been created. Please choose a different name.");
+        } else {
+          setWarningMessage(""); // Clear the warning if the name is unique
+        }
+      }
+    },[appName])
 
     return (
       <div>
@@ -153,7 +171,7 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
           onChange={(e) => {
             const name = e.target.value;
             if (workflowNames.includes(name)) {
-              setWarningMessage("A workflow with the same name has been created. Please choose a different name.");
+              setWarningMessage("An App with the same name has been created. Please choose a different name.");
             } else {
               setWarningMessage(""); // Clear the warning if the name is unique
             }
@@ -161,7 +179,7 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
           }}
           placeholder="Enter app name"
           style={{marginTop: "10px"}}
-          disabled={appName ? true : false}
+          disabled={!!appName && !workflowNames.includes(modelName)} // Use !! to explicitly convert to boolean
         />
 
         {warningMessage && (
@@ -215,8 +233,15 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
         </div>
 
         <div className="flex justify-start">
-          <Button onClick={submit} style={{marginTop: "30px", width: "100%"}}>
-            Create
+          <Button onClick={submit} style={{ marginTop: "30px", width: "100%" }} disabled={isLoading}>
+            {isLoading ? (
+              <div className="flex items-center">
+                <div className='animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500 mr-2'></div>
+                <span>Creating...</span>
+              </div>
+            ) : (
+              "Create"
+            )}
           </Button>
         </div>
       </div>

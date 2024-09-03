@@ -73,7 +73,7 @@ def test_llm_cache(temp_share):
     os.environ["MODEL_BAZAAR_ENDPOINT"] = ""
     os.environ["JWT_SECRET"] = "12345"
     os.environ["LLM_CACHE_THRESHOLD"] = "0.7"
-    os.environ["SHARE_DIR"] = temp_share
+    os.environ["MODEL_BAZAAR_DIR"] = temp_share
 
     from permissions import Permissions
 

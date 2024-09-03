@@ -21,6 +21,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(''); // Clear any previous errors
     try {
       const data = await userEmailLogin(email, password, setAccessToken);
       console.log('User logged in successfully:', data);
@@ -28,6 +29,7 @@ export default function LoginPage() {
       window.location.href = '/';
     } catch (err) {
       console.log(err);
+      setError('Login failed. Please check your email and password.');
     }
   };
 
