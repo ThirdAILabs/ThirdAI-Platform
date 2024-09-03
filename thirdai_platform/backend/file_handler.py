@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod
 from typing import List
 
 import boto3
-from fastapi import HTTPException, UploadFile, status
 from backend.config import FileInfo, FileLocation
+from fastapi import HTTPException, UploadFile, status
 
 
 def model_bazaar_path():

@@ -11,8 +11,8 @@ import boto3
 import pandas as pd
 from botocore import UNSIGNED
 from botocore.client import Config
-from fastapi import Response
 from config import FileInfo
+from fastapi import Response
 from thirdai import neural_db as ndb
 
 GB_1 = 1024 * 1024 * 1024  # Define 1 GB in bytes

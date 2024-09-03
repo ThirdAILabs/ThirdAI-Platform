@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
+from backend.config import NDBData, NDBOptions, TrainConfig, UDTData, UDTOptions
 from backend.file_handler import download_files, model_bazaar_path
 from backend.utils import (
     get_model,
@@ -20,12 +21,11 @@ from backend.utils import (
     update_json,
     validate_name,
 )
-from backend.config import TrainConfig, NDBOptions, UDTOptions, NDBData, UDTData
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, Form, UploadFile, status
 from licensing.verify.verify_license import valid_job_allocation, verify_license
-from pydantic import BaseModel, ValidationError, Field
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
 train_router = APIRouter()

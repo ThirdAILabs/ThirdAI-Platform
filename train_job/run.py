@@ -7,13 +7,13 @@ import argparse
 import os
 
 import thirdai
+from config import ModelType, NDBVersion, RetrieverType, TrainConfig, UDTSubType
 from models.classification_models import (
     TextClassificationModel,
     TokenClassificationModel,
 )
 from models.finetunable_retriever import FinetunableRetriever
 from models.single_mach import SingleMach
-from config import TrainConfig, ModelType, NDBVersion, RetrieverType, UDTSubType
 from reporter import HttpReporter, Reporter
 
 

@@ -4,14 +4,14 @@ from pathlib import Path
 from typing import List
 
 import thirdai
-from exceptional_handler import apply_exception_handler
-from models.model import Model
 from config import (
     FileInfo,
     TextClassificationOptions,
     TokenClassificationOptions,
     UDTTrainOptions,
 )
+from exceptional_handler import apply_exception_handler
+from models.model import Model
 from thirdai import bolt
 
 

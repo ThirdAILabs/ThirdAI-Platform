@@ -2,9 +2,9 @@ from abc import ABC, abstractmethod
 from logging import Logger
 from pathlib import Path
 
+from config import TrainConfig
 from exceptional_handler import apply_exception_handler
 from logger import LoggerConfig
-from config import TrainConfig
 from reporter import Reporter
 
 

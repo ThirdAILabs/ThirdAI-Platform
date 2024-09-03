@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import List
 
 import thirdai
+from config import FileInfo, NDBv1Options, TrainConfig
 from exceptional_handler import apply_exception_handler
 from models.model import Model
-from config import TrainConfig, FileInfo, NDBv1Options
 from reporter import Reporter
 from thirdai import neural_db as ndb
 from utils import convert_supervised_to_ndb_file, get_directory_size

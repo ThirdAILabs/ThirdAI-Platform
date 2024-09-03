@@ -4,19 +4,19 @@ from typing import Dict
 
 import pytest
 from config import (
-    TrainConfig,
     FileInfo,
+    NDBData,
     NDBOptions,
     NDBv1Options,
     TextClassificationOptions,
     TokenClassificationOptions,
-    UDTOptions,
+    TrainConfig,
     UDTData,
-    NDBData,
+    UDTOptions,
 )
 from reporter import Reporter
 from run import get_model
-from thirdai import bolt
+from thirdai import bolt, licensing
 from thirdai import neural_db as ndb
 
 pytestmark = [pytest.mark.unit]
@@ -51,6 +51,7 @@ def create_tmp_model_bazaar_dir():
     [NDBv1Options(), NDBv1Options(retriever="mach", mach_options={})],
 )
 def test_ndb_train(version_options):
+    licensing.activate(THIRDAI_LICENSE)
     config = TrainConfig(
         model_bazaar_dir=MODEL_BAZAAR_DIR,
         license_key=THIRDAI_LICENSE,
@@ -92,6 +93,7 @@ def test_ndb_train(version_options):
 
 
 def test_udt_text_train():
+    licensing.activate(THIRDAI_LICENSE)
     config = TrainConfig(
         model_bazaar_dir=MODEL_BAZAAR_DIR,
         license_key=THIRDAI_LICENSE,
@@ -127,6 +129,7 @@ def test_udt_text_train():
 
 
 def test_udt_token_train():
+    licensing.activate(THIRDAI_LICENSE)
     config = TrainConfig(
         model_bazaar_dir=MODEL_BAZAAR_DIR,
         license_key=THIRDAI_LICENSE,
