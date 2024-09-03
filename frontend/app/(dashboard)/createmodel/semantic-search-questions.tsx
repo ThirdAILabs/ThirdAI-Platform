@@ -60,13 +60,13 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
 
     const makeFileFormData = () => {
       let formData = new FormData();
-      const fileDetailsList: Array<{ mode: string; location: string }> = [];
+      const unsupervisedFiles: Array<{ path: string; location: string }> = [];
       let fileCount = 0;
 
       sources.forEach(({type, files}) => {
         files.forEach(file => {
           formData.append('files', file);
-          fileDetailsList.push({ mode: 'unsupervised', location: type });
+          unsupervisedFiles.push({ path: file.name, location: type });
           fileCount++;
         });
       });
@@ -75,9 +75,9 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
         return null;
       }
 
-      const extraOptionsForm = { retriever: 'finetunable_retriever' };
-      formData.append('extra_options_form', JSON.stringify(extraOptionsForm));
-      formData.append('file_details_list', JSON.stringify({ file_details: fileDetailsList }));
+      const modelOptionsForm = { version_options: { version: 'v1', retriever: 'finetunable_retriever' } };
+      formData.append('model_options', JSON.stringify(modelOptionsForm));
+      formData.append('file_info', JSON.stringify({ unsupervised_files: unsupervisedFiles }));
 
       return formData;
     };
