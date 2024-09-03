@@ -5,3 +5,4 @@ pandas
 requests
 thirdai[neural_db]
 colorlog
+pydantic
