@@ -32,6 +32,8 @@ class DummyReporter(Reporter):
 
 MODEL_BAZAAR_DIR = "./model_bazaar_tmp"
 
+THIRDAI_LICENSE = "002099-64C584-3E02C8-7E51A0-DE65D9-V3"
+
 
 def file_dir():
     return os.path.join(os.path.dirname(__file__), "sample_docs")
@@ -51,7 +53,7 @@ def create_tmp_model_bazaar_dir():
 def test_ndb_train(version_options):
     config = TrainConfig(
         model_bazaar_dir=MODEL_BAZAAR_DIR,
-        license_key="",
+        license_key=THIRDAI_LICENSE,
         model_bazaar_endpoint="",
         model_id="ndb_123",
         data_id="data_123",
@@ -92,7 +94,7 @@ def test_ndb_train(version_options):
 def test_udt_text_train():
     config = TrainConfig(
         model_bazaar_dir=MODEL_BAZAAR_DIR,
-        license_key="",
+        license_key=THIRDAI_LICENSE,
         model_bazaar_endpoint="",
         model_id="udt_123",
         data_id="data_123",
@@ -127,7 +129,7 @@ def test_udt_text_train():
 def test_udt_token_train():
     config = TrainConfig(
         model_bazaar_dir=MODEL_BAZAAR_DIR,
-        license_key="",
+        license_key=THIRDAI_LICENSE,
         model_bazaar_endpoint="",
         model_id="udt_123",
         data_id="data_123",
