@@ -1,2 +1,6 @@
 azure-containerregistry
 azure-identity
+pyyaml
+docker
+pydantic
+tqdm

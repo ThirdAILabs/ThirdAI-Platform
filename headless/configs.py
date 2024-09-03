@@ -71,7 +71,7 @@ class Config(ABC):
 
     epochs: int = 3
 
-    retriever: str = "mach"
+    retriever: str = "finetunable_retriever"
 
     sub_type: str = "text"
     n_classes: Optional[int] = None

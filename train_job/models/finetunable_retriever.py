@@ -1,5 +1,6 @@
 import os
 import queue
+import shutil
 import threading
 import time
 from typing import List
@@ -112,6 +113,56 @@ class FinetunableRetriever(NDBModel):
         Evaluate the FinetunableRetriever model. Not implemented.
         """
         self.logger.warning("Evaluation method called. Not implemented.")
+
+    def load_db(self, model_id: str) -> ndb.NeuralDB:
+        """
+        This method first loads the base NeuralDB using the parent class's `load_db` method.
+        Since we use an on-disk inverted index, we need to ensure the base NeuralDB is saved
+        in the specified `model_save_path` before making any modifications to it.
+        Steps:
+        1. Load the base NeuralDB using the parent method.
+        2. Save the base NeuralDB to the specified `model_save_path`.
+        3. Reload the NeuralDB from the saved checkpoint to ensure modifications are performed
+        on the correct instance and it doesn't affect the base model index.
+        """
+        db = super().load_db(model_id)
+        db.save(self.model_save_path)
+        return ndb.NeuralDB.from_checkpoint(self.model_save_path)
+
+    def save(self, db: ndb.NeuralDB):
+        """
+        Save the NeuralDB instance to the model save path.
+        If the path exists, to save the in memory document object and also not to lose the on_disk DB
+        we will save first to a temporary location first, then replace the existing model.
+        If the path does not exist, directly save to the model save path.
+        """
+        try:
+            if not self.model_save_path.exists():
+                super().save(db)
+            else:
+                # If model_save_path exists, save to a temporary location first
+                temp_path = self.model_save_path.with_suffix(".ndb.tmp")
+                self.logger.info(
+                    f"Model save path exists. Saving temporarily to: {temp_path}"
+                )
+
+                db.save(save_to=temp_path)  # Save to temporary location
+
+                self.logger.info(f"Replacing existing model at: {self.model_save_path}")
+                shutil.rmtree(self.model_save_path)  # Remove existing path
+
+                shutil.move(
+                    temp_path, self.model_save_path
+                )  # Move temp file to final destination
+                self.logger.info(f"Model successfully saved to: {self.model_save_path}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to save model: {e}")
+            # If saving to the temporary location fails, clean up any partial saves
+            if temp_path and temp_path.exists():
+                self.logger.info(f"Cleaning up temporary save at: {temp_path}")
+                shutil.rmtree(temp_path)
+            raise
 
     def initialize_db(self) -> ndb.NeuralDB:
         """

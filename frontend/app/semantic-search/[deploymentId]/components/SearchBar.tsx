@@ -278,12 +278,15 @@ export default function SearchBar({
       }, 300); // Adjust debounce time as needed
     
       useEffect(() => {
+        if (! cacheEnabled)
+            return
+
         if (query.length > 2) { // Only fetch suggestions if query length is more than 2 characters
           debouncedFetch(query);
         } else {
             setSuggestions([])
         }
-      }, [query]);
+      }, [query, cacheEnabled]);
 
     return (
         <Container>

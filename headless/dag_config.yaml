@@ -55,6 +55,39 @@ NDB:
     dependencies: [check_unsupervised]
     params:
       model: check_unsupervised
+  
+  deploy_ndb_2:
+    function: deploy_ndb
+    dependencies: [await_train_2]
+    params:
+      model: check_unsupervised
+      run_name: variable
+
+  await_deploy_2:
+    function: await_deploy
+    dependencies: [deploy_ndb_2]
+    params:
+      deployment: deploy_ndb_2
+
+  check_search_2:
+    function: check_search
+    dependencies: [await_deploy_2]
+    params:
+      deployment: deploy_ndb_2
+
+  check_deployment_ndb_2:
+    function: check_deployment_ndb
+    dependencies: [check_search_2]
+    params:
+      deployment: deploy_ndb_2
+      config: variable
+      results: check_search_2
+  
+  undeploy_2:
+    function: undeploy
+    dependencies: [check_deployment_ndb_2]
+    params:
+      deployment: deploy_ndb_2
 
 UDT:
   config: [token, text]
