@@ -71,7 +71,7 @@ async def start_on_prem_generate_job(
     MODEL_BAZAAR_PATH = (
         "/model_bazaar"
         if os.path.exists("/.dockerenv")
-        else os.getenv("SHARE_DIR", "/model_bazaar")
+        else os.getenv("SHARE_DIR")
     )
     cwd = Path(os.getcwd())
     mount_dir = os.path.join(MODEL_BAZAAR_PATH, "gen-ai-models")

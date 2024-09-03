@@ -125,12 +125,13 @@ class OnPremLLM(LLMBase):
                 async for line in response.content.iter_any():
                     line = line.decode("utf-8").strip()
                     if line and line.startswith("data: "):
+                        offset = len("data: ")
                         try:
-                            data = json.loads(line[len("data: ") :])
-                            if "content" in data:
-                                yield data["content"]
-                        except json.JSONDecodeError:
-                            raise RuntimeError("Could not parse JSON in OnPremLLM.")
+                            data = json.loads(line[offset:])
+                        except:
+                            continue
+                        if "content" in data:
+                            yield data["content"]
 
 
 model_classes = {
