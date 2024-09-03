@@ -5,7 +5,7 @@ from typing import List
 
 import boto3
 from fastapi import HTTPException, UploadFile, status
-from config import FileInfo, FileLocation
+from backend.config import FileInfo, FileLocation
 
 
 def model_bazaar_path():
@@ -38,9 +38,10 @@ def download_files(
         all_files.extend(
             FileInfo(
                 path=filename,
+                location=file_info.location,
                 doc_id=file_info.doc_id if len(filenames) == 1 else None,
                 options=file_info.options,
-                metadata=file_info.options,
+                metadata=file_info.metadata,
             )
             for filename in filenames
         )

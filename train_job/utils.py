@@ -107,6 +107,13 @@ def convert_to_ndb_file(
             base_filename, dummy_response, metadata=metadata, save_extra_info=False
         )
     elif ext == ".csv":
+        print("CREATING CSV WITH ARGS")
+        print(file)
+        print(options.get("csv_id_column", None))
+        print(options.get("csv_strong_columns", None))
+        print(options.get("csv_weak_columns", None))
+        print(options.get("csv_reference_columns", None))
+        print(metadata)
         return ndb.CSV(
             file,
             id_column=options.get("csv_id_column", None),

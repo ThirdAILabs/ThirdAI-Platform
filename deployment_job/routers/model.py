@@ -39,12 +39,11 @@ class ModelManager:
             ValueError: If the model type is invalid.
         """
         if cls._model_instance is None:
-            print("hahahah")
             if general_variables.type == TypeEnum.NDB:
-                if general_variables.sub_type == NDBSubtype.sharded:
-                    cls._model_instance = ShardedNDB()
-                else:
+                if general_variables.sub_type == NDBSubtype.v1_single:
                     cls._model_instance = SingleNDB()
+                else:
+                    raise ValueError("Invalid model type")
             elif general_variables.type == TypeEnum.UDT:
                 if general_variables.sub_type == UDTSubtype.text:
                     cls._model_instance = TextClassificationModel()

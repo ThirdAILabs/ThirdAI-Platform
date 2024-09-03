@@ -9,8 +9,6 @@ from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
 from backend.file_handler import download_files, model_bazaar_path
 from backend.utils import (
-    NDBExtraOptions,
-    UDTExtraOptions,
     get_model,
     get_model_from_identifier,
     get_platform,
@@ -137,6 +135,19 @@ def train_ndb(
                 message=str(error),
             )
 
+    config = TrainConfig(
+        model_bazaar_dir=model_bazaar_path(),
+        license_key=license_info["boltLicenseKey"],
+        model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT", None),
+        model_id=str(model_id),
+        data_id=data_id,
+        base_model_id=(None if not base_model_identifier else str(base_model.id)),
+        model_options=model_options,
+        data=data,
+    )
+
+    model_type = "ndb"
+    model_sub_type = config.model_options.version_options.version.value + "-single"
     try:
         new_model = schema.Model(
             id=model_id,
@@ -144,8 +155,8 @@ def train_ndb(
             train_status=schema.Status.not_started,
             deploy_status=schema.Status.not_started,
             name=model_name,
-            type="ndb",
-            sub_type="single",
+            type=model_type,
+            sub_type=model_sub_type,
             domain=user.domain,
             access_level=schema.Access.private,
             parent_id=base_model.id if base_model else None,
@@ -160,19 +171,8 @@ def train_ndb(
             message=str(err),
         )
 
-    config = TrainConfig(
-        model_bazaar_dir=model_bazaar_path(),
-        license_key=license_info["boltLicenseKey"],
-        model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT", None),
-        model_id=str(model_id),
-        data_id=data_id,
-        base_model_id=base_model_identifier,
-        model_options=model_options,
-        data=data,
-    )
-
     config_path = os.path.join(
-        config.model_bazaar_dir, "models", model_id, "train_config.json"
+        config.model_bazaar_dir, "models", str(model_id), "train_config.json"
     )
     os.makedirs(os.path.dirname(config_path), exist_ok=True)
     with open(config_path, "w") as file:
@@ -194,8 +194,8 @@ def train_ndb(
             python_path=get_python_path(),
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
-            type=config.model_options.model_type.value,
-            sub_type=config.model_options.version_options.version.value,
+            type=model_type,
+            sub_type=model_sub_type,
             config_path=config_path,
             allocation__cores=job_options.allocation_cores,
             allocation_memory=job_options.allocation_memory,
@@ -323,7 +323,7 @@ def train_udt(
         model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT", None),
         model_id=str(model_id),
         data_id=data_id,
-        base_model_id=base_model_identifier,
+        base_model_id=(None if not base_model_identifier else str(base_model.id)),
         model_options=model_options,
         data=data,
     )

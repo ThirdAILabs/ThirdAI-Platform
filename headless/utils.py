@@ -39,6 +39,14 @@ def get_csv_source_id(
     """
     _, ext = os.path.splitext(file)
 
+    print("CREATING TEST CSV WITH ARGS")
+    print(file)
+    print(CSV_ID_COLUMN)
+    print(CSV_STRONG_COLUMNS)
+    print(CSV_WEAK_COLUMNS)
+    print(CSV_REFERENCE_COLUMNS)
+    print(CSV_METADATA)
+
     if ext == ".csv":
         return ndb.CSV(
             file,

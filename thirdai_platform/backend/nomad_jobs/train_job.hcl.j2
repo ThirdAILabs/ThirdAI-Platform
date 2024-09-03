@@ -40,8 +40,8 @@ job "train-{{ model_id }}-{{ type }}-{{ sub_type }}" {
       }
 
       resources {
-        cpu = {{ extra_options.get('allocation__cores', 1) * 2400 }}
-        memory = {{ extra_options.get('allocation_memory', '6800') }}
+        cpu = {{ allocation__cores * 2400 }}
+        memory = {{ allocation_memory }}
 
       }
     }

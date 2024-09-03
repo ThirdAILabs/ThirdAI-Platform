@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from client.bazaar import ModelBazaar
 from client.clients import WorkflowClient
@@ -43,11 +43,13 @@ class Flow:
         supervised_docs: Optional[List[Tuple[str, str]]] = None,
         test_doc: Optional[str] = None,
         doc_type: str = "local",
-        extra_options: Optional[Dict[str, str]] = {},
+        model_options: Optional[Dict[str, str]] = {},
         base_model_identifier: Optional[str] = None,
         is_async: bool = True,
         metadata: Optional[List[Dict[str, str]]] = None,
         nfs_base_path: Optional[str] = None,
+        doc_options: Dict[str, Dict[str, Any]] = {},
+        job_options: Optional[dict] = None,
     ):
         """
         Trains a model with the given documents and options.
@@ -78,10 +80,10 @@ class Flow:
                             if not doc_type == "nfs"
                             else os.path.join(nfs_base_path, unsup_file[1:])
                         ),
-                        extra_options.get("csv_id_column"),
-                        extra_options.get("csv_strong_columns"),
-                        extra_options.get("csv_weak_columns"),
-                        extra_options.get("csv_reference_columns"),
+                        doc_options.get(unsup_file).get("csv_id_column"),
+                        doc_options.get(unsup_file).get("csv_strong_columns"),
+                        doc_options.get(unsup_file).get("csv_weak_columns"),
+                        doc_options.get(unsup_file).get("csv_reference_columns"),
                         file_metadata,
                     ),
                 )
@@ -97,8 +99,10 @@ class Flow:
             supervised_docs=supervised_tuple,
             test_doc=test_doc,
             doc_type=doc_type,
-            train_extra_options=extra_options,
+            model_options=model_options,
             base_model_identifier=base_model_identifier,
             is_async=is_async,
             metadata=metadata,
+            doc_options=doc_options,
+            job_options=job_options,
         )
