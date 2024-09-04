@@ -9,7 +9,12 @@ from exceptional_handler import apply_exception_handler
 from models.model import Model
 from reporter import Reporter
 from thirdai import neural_db as ndb
-from utils import convert_supervised_to_ndb_file, get_directory_size
+from utils import (
+    check_csv_only,
+    convert_supervised_to_ndb_file,
+    expand_s3_buckets_and_directories,
+    get_directory_size,
+)
 
 
 @apply_exception_handler
@@ -34,6 +39,19 @@ class NDBModel(Model):
             self.get_checkpoint_dir(self.supervised_checkpoint_dir)
         )
         self.logger.info(f"Supervised checkpoint config created")
+
+    def unsupervised_files(self) -> List[FileInfo]:
+        return expand_s3_buckets_and_directories(self.config.data.unsupervised_files)
+
+    def supervised_files(self) -> List[FileInfo]:
+        all_files = expand_s3_buckets_and_directories(self.config.data.supervised_files)
+        check_csv_only(all_files)
+        return all_files
+
+    def test_files(self) -> List[FileInfo]:
+        all_files = expand_s3_buckets_and_directories(self.config.data.test_files)
+        check_csv_only(all_files)
+        return all_files
 
     def create_checkpoint_config(self, dir_path: Path):
         self.logger.info(f"Creating checkpoint config for directory: {dir_path}")

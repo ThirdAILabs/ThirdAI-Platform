@@ -1,17 +1,14 @@
 import os
-import pickle
 import shutil
 import sys
-from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import boto3
-import pandas as pd
 from botocore import UNSIGNED
 from botocore.client import Config
-from config import FileInfo
+from config import FileInfo, FileLocation
 from fastapi import Response
 from thirdai import neural_db as ndb
 
@@ -23,7 +20,7 @@ def create_s3_client() -> boto3.client:
     Create and return an S3 client using environment variables.
     """
     aws_access_key = os.getenv("AWS_ACCESS_KEY")
-    aws_secret_access_key = os.getenv("AWS_ACCESS_KEY")
+    aws_secret_access_key = os.getenv("AWS_ACCESS_SECRET")
 
     config_params = {
         "retries": {"max_attempts": 10, "mode": "standard"},
@@ -45,40 +42,70 @@ def create_s3_client() -> boto3.client:
     return s3_client
 
 
-# def list_files_in_s3(bucket_name: str, prefix: str) -> list[str]:
-#     """
-#     List all files in an S3 bucket with a given prefix.
-#     """
-#     s3 = create_s3_client()
-#     paginator = s3.get_paginator("list_objects_v2")
-#     pages = paginator.paginate(Bucket=bucket_name, Prefix=prefix)
+def list_s3_files(path: str):
+    print("LISTING S3 FILES FOR:", path)
+    s3_client = create_s3_client()
 
-#     file_keys = []
-#     for page in pages:
-#         if "Contents" in page:
-#             for obj in page["Contents"]:
-#                 file_keys.append(obj["Key"])
+    bucket_name, prefix = path.replace("s3://", "").split("/", 1)
+    paginator = s3_client.get_paginator("list_objects_v2")
+    pages = paginator.paginate(Bucket=bucket_name, Prefix=prefix)
 
-#     return file_keys
+    file_keys = []
+    for page in pages:
+        if "Contents" in page:
+            for obj in page["Contents"]:
+                file_keys.append(f"s3://{bucket_name}/{obj['Key']}")
+
+    return file_keys
 
 
-# def list_files_from_s3_txt(file_path: str) -> list[str]:
-#     """
-#     Read a list of S3 URLs from a text file and list all files within those URLs.
-#     """
-#     if not os.path.exists(file_path):
-#         raise FileNotFoundError(f"The file {file_path} does not exist.")
+def expand_file_info(paths: List[str], file_info: FileInfo):
+    return [
+        FileInfo(
+            path=path,
+            location=file_info.location,
+            doc_id=file_info.doc_id if len(paths) == 1 else None,
+            options=file_info.options,
+            metadata=file_info.metadata,
+        )
+        for path in paths
+    ]
 
-#     s3_urls = []
-#     with open(file_path, "r") as file:
-#         for line in file:
-#             s3_url = line.strip()
-#             if s3_url.startswith("s3://"):
-#                 bucket_name, prefix = s3_url.replace("s3://", "").split("/", 1)
-#                 file_keys = list_files_in_s3(bucket_name, prefix)
-#                 s3_urls.extend([f"s3://{bucket_name}/{key}" for key in file_keys])
 
-#     return s3_urls
+def list_files_in_nfs_dir(path: str):
+    return [
+        os.path.join(root, file)
+        for root, _, files_in_dir in os.walk(path)
+        for file in files_in_dir
+    ]
+
+
+def expand_s3_buckets_and_directories(file_infos: List[FileInfo]) -> List[FileInfo]:
+    expanded_files = []
+    for file_info in file_infos:
+        if file_info.location == FileLocation.local:
+            expanded_files.append(file_info)
+        elif file_info.location == FileLocation.s3:
+            s3_objects = list_s3_files(file_info.path)
+            expanded_files.extend(
+                expand_file_info(paths=s3_objects, file_info=file_info)
+            )
+        elif file_info.location == FileLocation.nfs:
+            if os.path.isdir(file_info.path):
+                directory_files = list_files_in_nfs_dir(file_info.path)
+                expanded_files.extend(
+                    expand_file_info(paths=directory_files, file_info=file_info)
+                )
+            else:
+                expanded_files.append(file_info)
+    return expanded_files
+
+
+def check_csv_only(all_files: List[FileInfo]):
+    for file in all_files:
+        _, ext = os.path.splitext(file.path)
+        if ext != ".csv":
+            raise ValueError("Only CSV files are supported for UDT training/test.")
 
 
 def convert_to_ndb_file(
@@ -107,13 +134,6 @@ def convert_to_ndb_file(
             base_filename, dummy_response, metadata=metadata, save_extra_info=False
         )
     elif ext == ".csv":
-        print("CREATING CSV WITH ARGS")
-        print(file)
-        print(options.get("csv_id_column", None))
-        print(options.get("csv_strong_columns", None))
-        print(options.get("csv_weak_columns", None))
-        print(options.get("csv_reference_columns", None))
-        print(metadata)
         return ndb.CSV(
             file,
             id_column=options.get("csv_id_column", None),

@@ -94,16 +94,6 @@ class NDBData(BaseModel):
             raise ValueError("Unsupervised files must not be empty for NDB training.")
         return self
 
-    @model_validator(mode="after")
-    def check_csv_supervised_test(self):
-        for file in self.supervised_files + self.test_files:
-            _, ext = os.path.splitext(file.path)
-            if ext != ".csv":
-                raise ValueError(
-                    "Only CSV files are supported for supervised training/test"
-                )
-        return self
-
 
 class UDTSubType(str, Enum):
     text = "text"
@@ -153,16 +143,6 @@ class UDTData(BaseModel):
 
     supervised_files: List[FileInfo]
     test_files: List[FileInfo] = []
-
-    @model_validator(mode="after")
-    def check_csv_only(self):
-        for file in self.supervised_files + self.test_files:
-            _, ext = os.path.splitext(file.path)
-            if ext != ".csv":
-                raise ValueError(
-                    "Only CSV files are supported for supervised training/test"
-                )
-        return self
 
     @model_validator(mode="after")
     def check_nonempty(self):

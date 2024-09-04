@@ -13,6 +13,7 @@ from config import (
 from exceptional_handler import apply_exception_handler
 from models.model import Model
 from thirdai import bolt
+from utils import check_csv_only, expand_s3_buckets_and_directories
 
 
 @apply_exception_handler
@@ -26,6 +27,16 @@ class ClassificationModel(Model):
     @property
     def train_options(self) -> UDTTrainOptions:
         return self.config.model_options.train_options
+
+    def supervised_files(self) -> List[FileInfo]:
+        all_files = expand_s3_buckets_and_directories(self.config.data.supervised_files)
+        check_csv_only(all_files)
+        return all_files
+
+    def test_files(self) -> List[FileInfo]:
+        all_files = expand_s3_buckets_and_directories(self.config.data.test_files)
+        check_csv_only(all_files)
+        return all_files
 
     @abstractmethod
     def initialize_model(self):
@@ -104,11 +115,8 @@ class TextClassificationModel(ClassificationModel):
 
         model = self.get_model()
 
-        supervised_files = self.config.data.supervised_files
-        test_files = self.config.data.test_files
-
         start_time = time.time()
-        for train_file in supervised_files:
+        for train_file in self.supervised_files():
             model.train(
                 train_file.path,
                 epochs=self.train_options.supervised_epochs,
@@ -120,7 +128,7 @@ class TextClassificationModel(ClassificationModel):
 
         self.save_model(model)
 
-        self.evaluate(model, test_files)
+        self.evaluate(model, self.test_files())
 
         num_params = self.get_num_params(model)
         model_size = self.get_size()
@@ -175,11 +183,8 @@ class TokenClassificationModel(ClassificationModel):
 
         model = self.get_model()
 
-        supervised_files = self.config.data.supervised_files
-        test_files = self.config.data.test_files
-
         start_time = time.time()
-        for train_file in supervised_files:
+        for train_file in self.supervised_files():
             model.train(
                 train_file.path,
                 epochs=self.train_options.supervised_epochs,
@@ -191,7 +196,7 @@ class TokenClassificationModel(ClassificationModel):
 
         self.save_model(model)
 
-        self.evaluate(model, test_files)
+        self.evaluate(model, self.test_files())
 
         num_params = self.get_num_params(model)
         model_size = self.get_size()

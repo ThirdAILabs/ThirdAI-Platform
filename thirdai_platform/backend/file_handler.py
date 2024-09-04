@@ -16,6 +16,19 @@ def model_bazaar_path():
     )
 
 
+def download_local_file(file_info: FileInfo, upload_file: UploadFile, dest_dir: str):
+    assert os.path.basename(file_info.path) == upload_file.filename
+    destination_path = os.path.join(dest_dir, upload_file.filename)
+    print(f"DOWNLOADING: {file_info.path} to {destination_path}")
+    os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+    print("made dir")
+    with open(destination_path, "wb") as f:
+        f.write(upload_file.file.read())
+    upload_file.file.close()
+    print("wrote file")
+    return destination_path
+
+
 def download_files(
     files: List[UploadFile], file_infos: List[FileInfo], dest_dir: str
 ) -> List[FileInfo]:
@@ -25,90 +38,35 @@ def download_files(
 
     all_files = []
     for file_info in file_infos:
-        handler = StorageHandlerFactory.get_handler(file_info.location)()
-
-        file = filename_to_file.get(os.path.basename(file_info.path), None)
-        try:
-            filenames = handler.process_files(file_info, file, dest_dir)
-        except Exception as error:
-            raise ValueError(
-                f"Error processing file '{file_info.path}' from '{file_info.location}': {error}"
+        if file_info.location == FileLocation.local:
+            try:
+                if not file_info.path in filename_to_file:
+                    print(f"COULDN'T FIND {file_info.path}")
+                local_path = download_local_file(
+                    file_info=file_info,
+                    upload_file=filename_to_file[os.path.basename(file_info.path)],
+                    dest_dir=dest_dir,
+                )
+            except Exception as error:
+                raise ValueError(
+                    f"Error processing file '{file_info.path}' from '{file_info.location}': {error}"
+                )
+            all_files.append(
+                FileInfo(
+                    path=local_path,
+                    location=file_info.location,
+                    doc_id=file_info.doc_id,
+                    options=file_info.options,
+                    metadata=file_info.metadata,
+                )
             )
-
-        all_files.extend(
-            FileInfo(
-                path=filename,
-                location=file_info.location,
-                doc_id=file_info.doc_id if len(filenames) == 1 else None,
-                options=file_info.options,
-                metadata=file_info.metadata,
-            )
-            for filename in filenames
-        )
+        else:
+            all_files.append(file_info)
 
     return all_files
 
 
-class StorageHandler(ABC):
-    """
-    Abstract base class for storage handlers.
-
-    Methods:
-    - process_files: Abstract method to process files.
-    - validate_file: Abstract method to validate files.
-    """
-
-    @abstractmethod
-    def process_files(
-        self, file_info: FileInfo, file: UploadFile, destination_dir: str
-    ):
-        pass
-
-
-class LocalStorageHandler(StorageHandler):
-    """
-    Local storage handler for processing and validating local files.
-
-    Methods:
-    - process_files: Processes and saves the local file.
-    - validate_file: Validates the local file.
-    """
-
-    def process_files(
-        self, file_info: FileInfo, file: UploadFile, destination_dir: str
-    ):
-        destination_path = os.path.join(destination_dir, file.filename)
-        os.makedirs(os.path.dirname(destination_path), exist_ok=True)
-        with open(destination_path, "wb") as f:
-            f.write(file.file.read())
-        file.file.close()
-        return [destination_path]
-
-
-class NFSStorageHandler(StorageHandler):
-    """
-    NFS storage handler for processing and validating NFS files.
-
-    Methods:
-    - process_files: Processes and saves the NFS file.
-    - validate_file: Validates the NFS file.
-    """
-
-    def process_files(
-        self, file_info: FileInfo, file: UploadFile, destination_dir: str
-    ):
-        if os.path.isdir(file_info.path):
-            filenames = []
-            for root, _, files_in_dir in os.walk(file_info.path):
-                filenames.extend(
-                    os.path.join(root, filename) for filename in files_in_dir
-                )
-            return filenames
-        else:
-            return [file_info.path]
-
-
-class S3StorageHandler(StorageHandler):
+class S3StorageHandler:
     """
     S3 storage handler for processing and validating S3 files.
     Methods:
@@ -151,11 +109,6 @@ class S3StorageHandler(StorageHandler):
                 config=config,
             )
         return s3_client
-
-    def process_files(
-        self, file_info: FileInfo, file: UploadFile, destination_dir: str
-    ):
-        return self.list_s3_files(file_info.path)
 
     def list_s3_files(self, filename):
         bucket_name, prefix = filename.replace("s3://", "").split("/", 1)
@@ -235,28 +188,3 @@ class S3StorageHandler(StorageHandler):
                     print(f"Uploaded {local_path} to {bucket_name}/{s3_path}.")
                 except Exception as e:
                     print(f"Failed to upload {local_path}. Error: {str(e)}")
-
-
-class StorageHandlerFactory:
-    """
-    Factory class to get the correct storage handler based on location.
-
-    Attributes:
-    - handlers: Dictionary mapping FileLocation to handler classes.
-
-    Methods:
-    - get_handler: Returns the handler class for the specified location.
-    """
-
-    handlers = {
-        FileLocation.local: LocalStorageHandler,
-        FileLocation.nfs: NFSStorageHandler,
-        FileLocation.s3: S3StorageHandler,
-    }
-
-    @classmethod
-    def get_handler(cls, location):
-        handler_class = cls.handlers.get(location)
-        if not handler_class:
-            raise ValueError(f"No handler found for location: {location}")
-        return handler_class
