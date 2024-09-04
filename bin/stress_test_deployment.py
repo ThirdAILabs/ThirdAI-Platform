@@ -13,37 +13,36 @@ locust -f stress_test_deployment.py --host=http://your-target-host.com \
 import argparse
 import json
 import random
+import sys
 from dataclasses import dataclass
 from urllib.parse import urljoin
 
 import pandas as pd
 import requests
 from locust import HttpUser, TaskSet, between, task
+from locust.main import main as locust_main
 from requests.auth import HTTPBasicAuth
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--host", type=str)
-parser.add_argument("--deployment_id", type=str)
-parser.add_argument("--email", type=str)
-parser.add_argument("--password", type=str)
-parser.add_argument(
-    "--min_wait",
-    type=int,
-    default=10,
-    help="Minimum wait time between tasks in seconds",
-)
-parser.add_argument(
-    "--max_wait",
-    type=int,
-    default=30,
-    help="Maximum wait time between tasks in seconds",
-)
-parser.add_argument(
-    "--query_file",
-    type=str,
-    help="The path to a csv file with a 'QUERY' column containing example queries.",
-)
-args = parser.parse_args()
+
+def parse_args():
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--host", type=str, required=True)
+    parser.add_argument("--deployment_id", type=str, required=True)
+    parser.add_argument("--email", type=str, required=True)
+    parser.add_argument("--password", type=str, required=True)
+    parser.add_argument("--min_wait", type=int, default=10)
+    parser.add_argument("--max_wait", type=int, default=30)
+    parser.add_argument("--query_file", type=str, required=True)
+
+    args, unknown = parser.parse_known_args()
+
+    # Remove our custom args from sys.argv
+    sys.argv = [sys.argv[0]] + unknown
+
+    return args
+
+
+args = parse_args()
 
 
 @dataclass
@@ -122,3 +121,7 @@ class WebsiteUser(HttpUser):
     tasks = [ModelBazaarLoadTest]
     wait_time = between(args.min_wait, args.max_wait)
     host = args.host
+
+
+if __name__ == "__main__":
+    locust_main()
