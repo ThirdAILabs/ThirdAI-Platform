@@ -237,7 +237,7 @@ def check_disk(db, model_bazaar_dir: str, files: list[str]):
     Check if there is enough disk space to process the files.
     """
     approx_ndb_size = 1.5 * sys.getsizeof(db) + 2 * sum(
-        [os.path.getsize(file) for file in files]
+        [os.path.getsize(file) for file in files if os.path.exists(file)]
     )
 
     available_nfs_storage = shutil.disk_usage(

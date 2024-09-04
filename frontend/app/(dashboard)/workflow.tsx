@@ -15,6 +15,8 @@ import { MoreHorizontal } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Workflow, validate_workflow, start_workflow, stop_workflow, delete_workflow } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
+import { Modal } from '@/components/ui/Modal'
+import { InformationCircleIcon } from '@heroicons/react/solid';
 
 export function WorkFlow({ workflow }: { workflow: Workflow }) {
   const router = useRouter();
@@ -164,6 +166,16 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
     }
   };  
 
+  const [showModal, setShowModal] = useState(false);
+
+  const toggleModal = () => {
+    setShowModal(!showModal);
+  };
+
+  const formatBytesToMB = (bytes: string) => {
+    return (parseInt(bytes) / (1024 * 1024)).toFixed(2) + ' MB';
+  };
+
   return (
     <TableRow>
       <TableCell className="hidden sm:table-cell">
@@ -175,21 +187,19 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
           width="64"
         />
       </TableCell>
-      <TableCell className="font-medium text-center font-medium">{workflow.name}</TableCell>
-      <TableCell className='text-center font-medium'>
+      <TableCell className="font-medium text-center">{workflow.name}</TableCell>
+      <TableCell className="text-center font-medium">
         <Badge variant="outline" className={`capitalize ${getBadgeColor(deployStatus)}`}>
           {deployStatus}
         </Badge>
       </TableCell>
       <TableCell className="hidden md:table-cell text-center font-medium">{deployType}</TableCell>
       <TableCell className="hidden md:table-cell text-center font-medium">
-        {
-          new Date(workflow.publish_date).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })
-        }
+        {new Date(workflow.publish_date).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })}
       </TableCell>
       <TableCell className="hidden md:table-cell text-center font-medium">
         <Button
@@ -206,6 +216,14 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
             ? 'Start'
             : 'Endpoint'}
         </Button>
+      </TableCell>
+      <TableCell className="text-center font-medium">
+        <button 
+          onClick={toggleModal} 
+          className="text-gray-400 hover:text-gray-600 text-sm"
+        >
+          <InformationCircleIcon className="h-6 w-6" />
+        </button>
       </TableCell>
       <TableCell className='text-center font-medium'>
         <DropdownMenu>
@@ -270,6 +288,22 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>
+
+      {/* Modal for displaying model details */}
+      {showModal && (
+        <Modal onClose={toggleModal}>
+          <div className="p-4">
+            <h2 className="text-lg font-bold mb-4">App Details</h2>
+            {workflow.models.map((model, index) => (
+              <div key={index} className="mb-4">
+                <p><strong>Model Name:</strong> {model.model_name}</p>
+                <p><strong>Size on Disk:</strong> {formatBytesToMB(model.size)}</p>
+                <p><strong>Size in Memory:</strong> {formatBytesToMB(model.size_in_memory)}</p>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
     </TableRow>
   );
 }

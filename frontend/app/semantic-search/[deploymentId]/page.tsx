@@ -489,6 +489,10 @@ function App() {
     }
 
     function openSource(ref: ReferenceInfo) {
+        if (ref.sourceURL.includes("amazonaws.com")) {
+            modelService!.openAWSReference(ref);
+            return;
+        }
         if (!ref.sourceName.toLowerCase().endsWith(".pdf")) {
             modelService!.openReferenceSource(ref);
             return;
