@@ -43,7 +43,6 @@ def create_s3_client() -> boto3.client:
 
 
 def list_s3_files(path: str):
-    print("LISTING S3 FILES FOR:", path)
     s3_client = create_s3_client()
 
     bucket_name, prefix = path.replace("s3://", "").split("/", 1)
