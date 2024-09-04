@@ -1,16 +1,49 @@
-import os
+"""
+This script stress tests a deployment's search and on-prem generation components.
+Before running, you should create a user account on a public instance of ThirdAI platform and create a deployment.
+
+Example usage:
+locust -f stress_test_deployment.py --host=http://your-target-host.com \
+    --email david@thirdai.com --password temp123 \
+    --deployment_id 573c0fce-1c10-4f68-b9da-4d610bf90f7d \
+    --min_wait 10 --max_wait 30 \
+    --query_file questions.csv
+"""
+
 import argparse
 import json
+import random
 from dataclasses import dataclass
 from urllib.parse import urljoin
 
-import requests
-from locust import HttpUser, TaskSet, between, events, task
-from requests.auth import HTTPBasicAuth
 import pandas as pd
-import asyncio
-import json
-import websockets
+import requests
+from locust import HttpUser, TaskSet, between, task
+from requests.auth import HTTPBasicAuth
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--host", type=str)
+parser.add_argument("--deployment_id", type=str)
+parser.add_argument("--email", type=str)
+parser.add_argument("--password", type=str)
+parser.add_argument(
+    "--min_wait",
+    type=int,
+    default=10,
+    help="Minimum wait time between tasks in seconds",
+)
+parser.add_argument(
+    "--max_wait",
+    type=int,
+    default=30,
+    help="Maximum wait time between tasks in seconds",
+)
+parser.add_argument(
+    "--query_file",
+    type=str,
+    help="The path to a csv file with a 'QUERY' column containing example queries.",
+)
+args = parser.parse_args()
 
 
 @dataclass
@@ -35,27 +68,20 @@ class Login:
         return Login(base_url, username, access_token)
 
 
-deployment_id = "7c4475de-a9c5-4166-a103-893b50c6d4ff"
-
-
 class ModelBazaarLoadTest(TaskSet):
-    df = pd.read_csv("questions.csv")
-    in_cache = list(df.in_cache)
-    perturbed = list(df.perturbed)
-    new_queries = list(df.new_queries)
-    queries = in_cache + perturbed + new_queries
+    df = pd.read_csv(args.query_file)
+    queries = list(df["QUERY"])
 
     def on_start(self):
         login_details = Login.with_email(
-            base_url="http://40.69.173.69:80/api/",
-            email="david@thirdai.com",
-            password="temp123",
+            base_url=urljoin(args.host, "/api/"),
+            email=args.email,
+            password=args.password,
         )
         self.auth_token = login_details.access_token
 
     @task(1)
-    def test_generation(self):
-        import random
+    def test_predict_and_generation(self):
         query = self.queries[random.randint(0, len(self.queries) - 1)]
         if self.auth_token:
             headers = {
@@ -65,15 +91,19 @@ class ModelBazaarLoadTest(TaskSet):
             ndb_params = {"constraints": {}}
 
             response = self.client.post(
-                f"/{deployment_id}/predict",
+                f"/{args.deployment_id}/predict",
                 json={"base_params": base_params, "ndb_params": ndb_params},
                 headers=headers,
             )
 
         headers = {"Content-Type": "application/json"}
 
-        context = " ".join('\n\n'.join([x['text'] for x in json.loads(response.text)['data']['references']]).split(" ")[:2000])
-        # print(context)
+        context = " ".join(
+            "\n\n".join(
+                [x["text"] for x in json.loads(response.text)["data"]["references"]]
+            ).split(" ")[:2000]
+        )
+
         data = {
             "system_prompt": "You are a helpful assistant. Please be concise in your answers.",
             "prompt": f"Context: {context}, Question: {query}, Please be concise if you can. Answer: ",
@@ -82,22 +112,13 @@ class ModelBazaarLoadTest(TaskSet):
         }
 
         response = self.client.post(
-           "/on-prem-llm/completion",
+            "/on-prem-llm/completion",
             json=data,
             headers=headers,
         )
 
-    def on_stop(self):
-        global success_count, failure_count
-        print(f"Total Successes: {success_count}")
-        print(f"Total Failures: {failure_count}")
-
 
 class WebsiteUser(HttpUser):
     tasks = [ModelBazaarLoadTest]
-    wait_time = between(10, 30)
-
-
-if __name__ == "__main__":
-
-    os.system("locust -f stress_test.py --host=http://40.69.173.69:80")
+    wait_time = between(args.min_wait, args.max_wait)
+    host = args.host

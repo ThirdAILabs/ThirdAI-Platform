@@ -9,22 +9,21 @@
 # at the beginning, insert the 33 without perturbations in cache into the cache
 
 # we should now hit the cache and if it is a success we return, otherwise we go to generation
-# we should cache the generated response 
+# we should cache the generated response
 
 
-import os
 import argparse
+import asyncio
 import json
+import os
 from dataclasses import dataclass
 from urllib.parse import urljoin
 
+import pandas as pd
 import requests
+import websockets
 from locust import HttpUser, TaskSet, between, events, task  # type: ignore
 from requests.auth import HTTPBasicAuth
-import pandas as pd
-import asyncio
-import json
-import websockets
 
 
 def run_async(coroutine):
@@ -57,7 +56,6 @@ class Login:
 # Global counters for success and failure
 success_count = 0
 failure_count = 0
-
 
 
 @events.request.add_listener
@@ -103,6 +101,7 @@ class ModelBazaarLoadTest(TaskSet):
     @task(1)
     def test_generation(self):
         import random
+
         query = self.queries[random.randint(0, len(self.queries) - 1)]
         if self.auth_token:
             headers = {
@@ -119,7 +118,11 @@ class ModelBazaarLoadTest(TaskSet):
 
         headers = {"Content-Type": "application/json"}
 
-        context = " ".join('\n\n'.join([x['text'] for x in json.loads(response.text)['data']['references']]).split(" ")[:2000])
+        context = " ".join(
+            "\n\n".join(
+                [x["text"] for x in json.loads(response.text)["data"]["references"]]
+            ).split(" ")[:2000]
+        )
         # print(context)
         data = {
             "system_prompt": "You are a helpful assistant. Please be concise in your answers.",
@@ -131,7 +134,7 @@ class ModelBazaarLoadTest(TaskSet):
 
         print("starting request")
         response = self.client.post(
-           "/on-prem-llm/completion",
+            "/on-prem-llm/completion",
             json=data,
             headers=headers,
         )

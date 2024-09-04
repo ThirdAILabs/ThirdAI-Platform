@@ -44,13 +44,7 @@ class MyUser(HttpUser):
     wait_time = between(60, 70)
 
 
-
-
-
-
-
 import requests
-
 from requests.auth import HTTPBasicAuth
 
 response = requests.get(
@@ -59,6 +53,7 @@ response = requests.get(
 )
 
 import json
+
 access_token = json.loads(response.text)["data"]["access_token"]
 
 url = "http://40.69.173.69:80/cache/token"
@@ -67,46 +62,31 @@ headers = {
     # "Content-Type": "application/json",
 }
 
-response = requests.post(url, headers=headers, params={"model_id": "7c4475de-a9c5-4166-a103-893b50c6d4ff"})
+response = requests.post(
+    url, headers=headers, params={"model_id": "7c4475de-a9c5-4166-a103-893b50c6d4ff"}
+)
 
 print(response.text)
 
 
-
-
-
-
-
-
-
-
-
-data = {
-    "model_id": "573c0fce-1c10-4f68-b9da-4d610bf90f7d"
-}
-
-
-
-
-
-
-
-
+data = {"model_id": "573c0fce-1c10-4f68-b9da-4d610bf90f7d"}
 
 
 import asyncio
 import json
+
 import websockets
+
 
 async def connect_and_generate():
     uri = "ws://localhost/llm-dispatch/generate"  # Change to the correct WebSocket URL if needed
-    
+
     # Example input message to be sent to the WebSocket
     input_message = {
         "query": "Your input text",
         "model": "Model name",
         "provider": "AI provider",
-        "key": "Optional API key"  # Leave as None or empty if not needed
+        "key": "Optional API key",  # Leave as None or empty if not needed
     }
 
     try:
@@ -122,7 +102,7 @@ async def connect_and_generate():
             while True:
                 response = await websocket.recv()
                 response_data = json.loads(response)
-                
+
                 # Process the response
                 print(f"Received response: {response_data}")
 
@@ -135,6 +115,7 @@ async def connect_and_generate():
         print(f"Connection closed with error: {e}")
     except Exception as e:
         print(f"An error occurred: {e}")
+
 
 # Run the async function
 asyncio.run(connect_and_generate())
