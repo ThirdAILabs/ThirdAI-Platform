@@ -300,8 +300,8 @@ class NDBFunctions:
         else:
             mach_options = None
         return {
-            "version_options": {
-                "version": "v1",
+            "ndb_options": {
+                "ndb_sub_type": "v1",
                 "retriever": config.retriever,
                 "mach_options": mach_options,
                 "checkpoint_interval": config.checkpoint_interval,

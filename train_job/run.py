@@ -7,7 +7,7 @@ import argparse
 import os
 
 import thirdai
-from config import ModelType, NDBVersion, RetrieverType, TrainConfig, UDTSubType
+from config import ModelType, NDBSubType, RetrieverType, TrainConfig, UDTSubType
 from models.classification_models import (
     TextClassificationModel,
     TokenClassificationModel,
@@ -21,8 +21,8 @@ def get_model(options: TrainConfig, reporter: Reporter):
     model_type = options.model_options.model_type
 
     if model_type == ModelType.NDB:
-        if options.model_options.version_options.version == NDBVersion.v1:
-            retriever = options.model_options.version_options.retriever
+        if options.model_options.ndb_options.ndb_sub_type == NDBSubType.v1:
+            retriever = options.model_options.ndb_options.retriever
 
             if retriever == RetrieverType.finetunable_retriever:
                 return FinetunableRetriever(options, reporter)

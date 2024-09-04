@@ -36,7 +36,7 @@ class MachOptions(BaseModel):
     metrics: List[str] = ["hash_precision@1", "loss"]
 
 
-class NDBVersion(str, Enum):
+class NDBSubType(str, Enum):
     v1 = "v1"
     v2 = "v2"
 
@@ -48,7 +48,7 @@ class RetrieverType(str, Enum):
 
 
 class NDBv1Options(BaseModel):
-    version: Literal[NDBVersion.v1] = NDBVersion.v1
+    ndb_sub_type: Literal[NDBSubType.v1] = NDBSubType.v1
 
     retriever: RetrieverType = RetrieverType.finetunable_retriever
 
@@ -68,7 +68,7 @@ class NDBv1Options(BaseModel):
 
 
 class NDBv2Options(BaseModel):
-    version: Literal[NDBVersion.v2] = NDBVersion.v2
+    ndb_sub_type: Literal[NDBSubType.v2] = NDBSubType.v2
 
     on_disk: bool = True
 
@@ -76,8 +76,8 @@ class NDBv2Options(BaseModel):
 class NDBOptions(BaseModel):
     model_type: Literal[ModelType.NDB] = ModelType.NDB
 
-    version_options: Union[NDBv1Options, NDBv2Options] = Field(
-        NDBv1Options(), discriminator="version"
+    ndb_options: Union[NDBv1Options, NDBv2Options] = Field(
+        NDBv1Options(), discriminator="ndb_sub_type"
     )
 
 

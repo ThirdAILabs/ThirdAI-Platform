@@ -47,10 +47,10 @@ def create_tmp_model_bazaar_dir():
 
 
 @pytest.mark.parametrize(
-    "version_options",
+    "ndb_options",
     [NDBv1Options(), NDBv1Options(retriever="mach", mach_options={})],
 )
-def test_ndb_train(version_options):
+def test_ndb_train(ndb_options):
     licensing.activate(THIRDAI_LICENSE)
     config = TrainConfig(
         model_bazaar_dir=MODEL_BAZAAR_DIR,
@@ -58,7 +58,7 @@ def test_ndb_train(version_options):
         model_bazaar_endpoint="",
         model_id="ndb_123",
         data_id="data_123",
-        model_options=NDBOptions(version_options=version_options),
+        model_options=NDBOptions(ndb_options=ndb_options),
         data=NDBData(
             unsupervised_files=[
                 FileInfo(

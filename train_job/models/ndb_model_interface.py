@@ -26,7 +26,7 @@ class NDBModel(Model):
         Initialize the NDBModel with general and NeuralDB-specific options.
         """
         super().__init__(config=config, reporter=reporter)
-        self.ndb_options: NDBv1Options = self.config.model_options.version_options
+        self.ndb_options: NDBv1Options = self.config.model_options.ndb_options
         self.model_save_path: Path = self.model_dir / "model.ndb"
         self.logger.info("NDBModel initialized with NeuralDB options.")
 

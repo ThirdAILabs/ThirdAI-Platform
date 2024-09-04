@@ -146,8 +146,6 @@ def train_ndb(
         data=data,
     )
 
-    model_type = "ndb"
-    model_sub_type = config.model_options.version_options.version.value + "-single"
     try:
         new_model = schema.Model(
             id=model_id,
@@ -155,8 +153,8 @@ def train_ndb(
             train_status=schema.Status.not_started,
             deploy_status=schema.Status.not_started,
             name=model_name,
-            type=model_type,
-            sub_type=model_sub_type,
+            type=config.model_options.model_type.value,
+            sub_type=config.model_options.ndb_options.ndb_sub_type.value,
             domain=user.domain,
             access_level=schema.Access.private,
             parent_id=base_model.id if base_model else None,

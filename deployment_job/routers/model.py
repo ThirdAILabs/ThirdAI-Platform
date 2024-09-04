@@ -40,7 +40,7 @@ class ModelManager:
         """
         if cls._model_instance is None:
             if general_variables.type == TypeEnum.NDB:
-                if general_variables.sub_type == NDBSubtype.v1_single:
+                if general_variables.sub_type == NDBSubtype.v1:
                     cls._model_instance = SingleNDB()
                 else:
                     raise ValueError("Invalid model type")
