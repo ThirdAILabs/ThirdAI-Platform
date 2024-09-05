@@ -9,27 +9,20 @@ from fastapi import HTTPException, UploadFile, status
 
 
 def model_bazaar_path():
-    return (
-        "/model_bazaar"
-        if os.path.exists("/.dockerenv")
-        else os.getenv("SHARE_DIR", "/model_bazaar")
-    )
+    return "/model_bazaar" if os.path.exists("/.dockerenv") else os.getenv("SHARE_DIR")
 
 
 def download_local_file(file_info: FileInfo, upload_file: UploadFile, dest_dir: str):
     assert os.path.basename(file_info.path) == upload_file.filename
     destination_path = os.path.join(dest_dir, upload_file.filename)
-    print(f"DOWNLOADING: {file_info.path} to {destination_path}")
     os.makedirs(os.path.dirname(destination_path), exist_ok=True)
-    print("made dir")
     with open(destination_path, "wb") as f:
         f.write(upload_file.file.read())
     upload_file.file.close()
-    print("wrote file")
     return destination_path
 
 
-def download_files(
+def download_local_files(
     files: List[UploadFile], file_infos: List[FileInfo], dest_dir: str
 ) -> List[FileInfo]:
     filename_to_file = {file.filename: file for file in files}
@@ -40,8 +33,6 @@ def download_files(
     for file_info in file_infos:
         if file_info.location == FileLocation.local:
             try:
-                if not file_info.path in filename_to_file:
-                    print(f"COULDN'T FIND {file_info.path}")
                 local_path = download_local_file(
                     file_info=file_info,
                     upload_file=filename_to_file[os.path.basename(file_info.path)],

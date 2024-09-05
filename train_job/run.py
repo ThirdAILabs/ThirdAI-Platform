@@ -61,16 +61,24 @@ def main():
 
     reporter = HttpReporter(options.model_bazaar_endpoint)
 
-    if options.license_key == "file_license":
-        thirdai.licensing.set_path(
-            os.path.join(options.model_bazaar_dir, "license/license.serialized")
+    try:
+
+        if options.license_key == "file_license":
+            thirdai.licensing.set_path(
+                os.path.join(options.model_bazaar_dir, "license/license.serialized")
+            )
+        else:
+            thirdai.licensing.activate(options.license_key)
+
+        model = get_model(options, reporter)
+
+        model.train()
+    except Exception as error:
+        reporter.report_status(
+            options.model_id,
+            status="failed",
+            message=f"Training failed with error {error}",
         )
-    else:
-        thirdai.licensing.activate(options.license_key)
-
-    model = get_model(options, reporter)
-
-    model.train()
 
 
 if __name__ == "__main__":

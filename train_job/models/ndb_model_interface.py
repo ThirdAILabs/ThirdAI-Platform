@@ -73,7 +73,7 @@ class NDBModel(Model):
         """
         Convert files to supervised NDB files.
         Args:
-            files (List[str]): List of file paths for supervised training data.
+            files (List[FileInfo]): List of file infos for supervised training data.
         Returns:
             List[ndb.Sup]: List of converted supervised NDB files.
         """

@@ -72,14 +72,25 @@ def expand_file_info(paths: List[str], file_info: FileInfo):
 
 
 def list_files_in_nfs_dir(path: str):
-    return [
-        os.path.join(root, file)
-        for root, _, files_in_dir in os.walk(path)
-        for file in files_in_dir
-    ]
+    if os.path.isdir(path):
+        return [
+            os.path.join(root, file)
+            for root, _, files_in_dir in os.walk(path)
+            for file in files_in_dir
+        ]
+    return [path]
 
 
 def expand_s3_buckets_and_directories(file_infos: List[FileInfo]) -> List[FileInfo]:
+    """
+    This function takes in a list of file infos and expands it so that each file info
+    represents a single file that can be passed to NDB or UDT. This is because we allow
+    users to specify s3 buckets or nfs directories in train, that could contain multiple
+    files, however UDT only accepts single files, and we need the individual docs themselves
+    so that we can parallelize doc parsing in NDB. If one of the input file infos
+    is an s3 bucket with N documents in it, then this will replace it with N file infos,
+    one per document in the bucket.
+    """
     expanded_files = []
     for file_info in file_infos:
         if file_info.location == FileLocation.local:
@@ -90,13 +101,10 @@ def expand_s3_buckets_and_directories(file_infos: List[FileInfo]) -> List[FileIn
                 expand_file_info(paths=s3_objects, file_info=file_info)
             )
         elif file_info.location == FileLocation.nfs:
-            if os.path.isdir(file_info.path):
-                directory_files = list_files_in_nfs_dir(file_info.path)
-                expanded_files.extend(
-                    expand_file_info(paths=directory_files, file_info=file_info)
-                )
-            else:
-                expanded_files.append(file_info)
+            directory_files = list_files_in_nfs_dir(file_info.path)
+            expanded_files.extend(
+                expand_file_info(paths=directory_files, file_info=file_info)
+            )
     return expanded_files
 
 
@@ -104,7 +112,9 @@ def check_csv_only(all_files: List[FileInfo]):
     for file in all_files:
         _, ext = os.path.splitext(file.path)
         if ext != ".csv":
-            raise ValueError("Only CSV files are supported for UDT training/test.")
+            raise ValueError(
+                "Only CSV files are supported for supervised training and test."
+            )
 
 
 def convert_to_ndb_file(

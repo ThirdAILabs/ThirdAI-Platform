@@ -8,7 +8,7 @@ from typing import Dict, List, Optional
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
 from backend.config import NDBData, NDBOptions, TrainConfig, UDTData, UDTOptions
-from backend.file_handler import download_files, model_bazaar_path
+from backend.file_handler import download_local_files, model_bazaar_path
 from backend.utils import (
     get_model,
     get_model_from_identifier,
@@ -96,21 +96,21 @@ def train_ndb(
 
     try:
         data = NDBData(
-            unsupervised_files=download_files(
+            unsupervised_files=download_local_files(
                 files=files,
                 file_infos=data.unsupervised_files,
                 dest_dir=os.path.join(
                     model_bazaar_path(), "data", data_id, "unsupervised"
                 ),
             ),
-            supervised_files=download_files(
+            supervised_files=download_local_files(
                 files=files,
                 file_infos=data.supervised_files,
                 dest_dir=os.path.join(
                     model_bazaar_path(), "data", data_id, "supervised"
                 ),
             ),
-            test_files=download_files(
+            test_files=download_local_files(
                 files=files,
                 file_infos=data.test_files,
                 dest_dir=os.path.join(model_bazaar_path(), "data", data_id, "test"),
@@ -194,7 +194,7 @@ def train_ndb(
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
             train_job_name=new_model.get_train_job_name(),
             config_path=config_path,
-            allocation__cores=job_options.allocation_cores,
+            allocation_cores=job_options.allocation_cores,
             allocation_memory=job_options.allocation_memory,
         )
 
@@ -279,14 +279,14 @@ def train_udt(
 
     try:
         data = UDTData(
-            supervised_files=download_files(
+            supervised_files=download_local_files(
                 files=files,
                 file_infos=data.supervised_files,
                 dest_dir=os.path.join(
                     model_bazaar_path(), "data", data_id, "supervised"
                 ),
             ),
-            test_files=download_files(
+            test_files=download_local_files(
                 files=files,
                 file_infos=data.test_files,
                 dest_dir=os.path.join(model_bazaar_path(), "data", data_id, "test"),
@@ -374,7 +374,7 @@ def train_udt(
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
             train_job_name=new_model.get_train_job_name(),
             config_path=config_path,
-            allocation__cores=job_options.allocation_cores,
+            allocation_cores=job_options.allocation_cores,
             allocation_memory=job_options.allocation_memory,
         )
 
