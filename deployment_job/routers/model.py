@@ -11,7 +11,7 @@ from models.classification_models import (
     TokenClassificationModel,
 )
 from models.ndb_models import ShardedNDB, SingleNDB
-from variables import GeneralVariables, NDBSubType, ModelType, UDTSubType
+from variables import GeneralVariables, ModelType, NDBSubType, UDTSubType
 
 # Initialize thirdai license
 general_variables: GeneralVariables = GeneralVariables.load_from_env()
