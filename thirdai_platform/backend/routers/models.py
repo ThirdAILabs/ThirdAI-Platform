@@ -1,8 +1,6 @@
 import json
 import os
-import traceback
 import uuid
-from datetime import datetime
 from typing import Annotated, Dict, Optional, Union
 
 from auth.jwt import AuthenticatedUser, verify_access_token
@@ -221,6 +219,9 @@ class SaveNDBDeployedModel(BaseModel):
     base_model_id: str
     model_name: str
     metadata: Dict[str, str]
+
+    class Config:
+        protected_namespaces = ()
 
 
 @model_router.post("/save-deployed")

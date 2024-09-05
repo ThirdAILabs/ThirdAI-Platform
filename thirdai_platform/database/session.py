@@ -36,7 +36,13 @@ app_env = os.getenv("APP_ENV", "Production")
 echo = True if app_env == "development" else False
 
 # Create the SQLAlchemy engine
-engine = create_engine(db_uri, echo=echo)
+engine = create_engine(
+    db_uri,
+    echo=echo,  # Controls whether SQL statements are logged. Useful for debugging in development.
+    pool_size=20,  # Number of connections to maintain in the pool for efficient connection reuse.
+    max_overflow=30,  # Additional connections allowed beyond the pool size for handling spikes in load.
+    pool_timeout=30,  # Maximum time (in seconds) to wait for a connection before timing out.
+)
 
 Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

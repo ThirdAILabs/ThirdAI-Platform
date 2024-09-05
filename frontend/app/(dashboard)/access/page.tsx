@@ -11,12 +11,13 @@ import {
 import {
   fetchAllModels, fetchAllTeams, fetchAllUsers,
   updateModelAccessLevel,
-  createTeam, addUserToTeam, assignTeamAdmin, deleteUserFromTeam, deleteTeamById,
+  createTeam, addUserToTeam, assignTeamAdmin, deleteUserFromTeam, deleteTeamById, removeTeamAdmin,
   deleteUserAccount,
   Workflow, fetchWorkflows
 } from "@/lib/backend";
 import { useContext } from 'react';
 import { UserContext } from '../../user_wrapper';
+import AutocompleteInput from '@/components/ui/AutocompleteInput';
 
 // Define types for the models, teams, and users
 type Model = {
@@ -41,7 +42,7 @@ type Model = {
 type Team = {
   id: string;
   name: string;
-  admin: string;
+  admins: string[];  // Updated to support multiple admins
   members: string[];
 };
 
@@ -148,23 +149,23 @@ export default function AccessPage() {
       console.log('Fetched Teams:', response.data);  // Print out the results
       const teamData = response.data.map((team): Team => {
         const members: string[] = [];
-        let admin = '';
-
-        // Populate members and admin from users and models data
+        const admins: string[] = [];  // Collect multiple admins
+  
+        // Populate members and admins from users and models data
         users.forEach(user => {
           const userTeam = user.teams.find(ut => ut.id === team.id);
           if (userTeam) {
             members.push(user.name);
             if (userTeam.role === 'team_admin') {
-              admin = user.name;
+              admins.push(user.name);  // Add to admins array
             }
           }
         });
-
+  
         return {
           id: team.id,
           name: team.name,
-          admin: admin,
+          admins: admins,  // Store the admins array
           members: members,
         };
       });
@@ -172,7 +173,7 @@ export default function AccessPage() {
       setTeams(teamData);
     } catch (error) {
       console.error('Failed to fetch teams', error);
-      alert('Failed to fetch teams' + error)
+      alert('Failed to fetch teams' + error);
     }
   };
 
@@ -209,9 +210,9 @@ export default function AccessPage() {
       await updateModelAccessLevel(model_identifier, access_level, team_id);
   
       // Update the models state
-      const updatedModels = [...models];
-      updatedModels[index] = { ...model, type: selectedType };
-      setModels(updatedModels);
+      await getModels()
+      await getUsers()
+      await getTeams()
   
       // Reset editing state
       setEditingIndex(null);
@@ -252,8 +253,9 @@ export default function AccessPage() {
       }
 
       // Update the state
-      const newTeam: Team = { id: team_id, name: newTeamName, admin: newTeamAdmin, members: newTeamMembers };
-      setTeams([...teams, newTeam]);
+      await getModels()
+      await getUsers()
+      await getTeams()
 
       // Clear the input fields
       setNewTeamName('');
@@ -288,10 +290,10 @@ export default function AccessPage() {
       await addUserToTeam(user.email, team.id);
 
       // Optionally update the team members state (if needed)
-      const updatedTeams = teams.map(t =>
-        t.id === team.id ? { ...t, members: [...t.members, user.name] } : t
-      );
-      setTeams(updatedTeams)
+      await getModels()
+      await getUsers()
+      await getTeams()
+
       setSelectedTeamForAdd('');  // Clear the selected team
       setNewMember('');     // Clear the new member input
     } catch (error) {
@@ -322,10 +324,10 @@ export default function AccessPage() {
       await deleteUserFromTeam(user.email, team.id);
 
       // Optionally update the team members state (if needed)
-      const updatedTeams = teams.map(t =>
-        t.id === team.id ? { ...t, members: t.members.filter(m => m !== user.name) } : t
-      );
-      setTeams(updatedTeams)
+      await getModels()
+      await getUsers()
+      await getTeams()
+
       setSelectedTeamForRemove('');  // Clear the selected team
       setMemberToRemove(''); // Clear the member input
     } catch (error) {
@@ -408,304 +410,477 @@ export default function AccessPage() {
     getWorkflows();
   }, []);
 
+  const [newAdmin, setNewAdmin] = useState('');
+  const [adminToRemove, setAdminToRemove] = useState('');
+  const [selectedTeamForRemoveAdmin, setSelectedTeamForRemoveAdmin] = useState('');
+  const [selectedTeamForAddAdmin, setSelectedTeamForAddAdmin] = useState('');
+
+  const assignAdminToTeam = async () => {
+    if (selectedTeamForAddAdmin && newAdmin) {
+      // Find the team ID based on the selected team name
+      const selectedTeam = teams.find(team => team.name === selectedTeamForAddAdmin);
+      
+      if (!selectedTeam) {
+        alert("Selected team not found.");
+        return;
+      }
+  
+      // Find the user email based on the selected admin's name
+      const user = users.find(u => u.name === newAdmin);
+      if (!user) {
+        alert("User not found.");
+        return;
+      }
+  
+      try {
+        // Use the team ID and user email in the API call
+        await assignTeamAdmin(user.email, selectedTeam.id);
+
+        // Update state or UI by calling these functions
+        await getModels();
+        await getUsers();
+        await getTeams();
+      } catch (error) {
+        console.error("Error adding admin:", error);
+        alert("Failed to add admin.");
+      }
+    } else {
+      alert("Please select a team and enter an admin name.");
+    }
+  };
+  
+  const removeAdminFromTeam = async () => {
+    if (selectedTeamForRemoveAdmin && adminToRemove) {
+      // Find the team ID based on the selected team name
+      const selectedTeam = teams.find(team => team.name === selectedTeamForRemoveAdmin);
+      
+      if (!selectedTeam) {
+        alert("Selected team not found.");
+        return;
+      }
+  
+      // Find the user email based on the admin's name to be removed
+      const user = users.find(u => u.name === adminToRemove);
+      if (!user) {
+        alert("User not found.");
+        return;
+      }
+  
+      try {
+        // Use the team ID and user email in the API call
+        await removeTeamAdmin(user.email, selectedTeam.id);
+
+        // Update state or UI by calling these functions
+        await getModels();
+        await getUsers();
+        await getTeams();
+
+        setSelectedTeamForRemoveAdmin('');  // Clear the selected team
+        setAdminToRemove('');               // Clear the admin input
+      } catch (error) {
+        console.error("Error removing admin:", error);
+        alert("Failed to remove admin.");
+      }
+    } else {
+      alert("Please select a team and enter the admin name.");
+    }
+  };
+  
+  // For single string values
+  const handleSingleChange = (setter: React.Dispatch<React.SetStateAction<string>>) => {
+    return (value: string | string[]) => {
+      if (typeof value === 'string') {
+        setter(value);
+      }
+    };
+  };
+
+  // For multiple string values
+  const handleMultipleChange = (setter: React.Dispatch<React.SetStateAction<string[]>>) => {
+    return (value: string | string[]) => {
+      if (Array.isArray(value)) {
+        setter(value);
+      }
+    };
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Manage Access</CardTitle>
-        <CardDescription>View all personnel and their access.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-4">
-          <h2 className="text-xl font-semibold">{userRole}</h2>
-          <p>{roleDescription}</p>
-        </div>
-
-        {/* Models Section */}
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold">Models</h3>
-          <table className="min-w-full bg-white mb-8">
-            <thead>
-              <tr>
-                <th className="py-2 px-4 text-left">Model Name</th>
-                <th className="py-2 px-4 text-left">Model Type</th>
-                <th className="py-2 px-4 text-left">Access Details</th>
-                <th className="py-2 px-4 text-left">Edit Model Access</th>
-              </tr>
-            </thead>
-            <tbody>
-              {models.map((model, index) => (
-                <tr key={index} className="border-t">
-                  <td className="py-2 px-4">{model.name}</td>
-                  <td className="py-2 px-4">{model.type}</td>
-                  <td className="py-2 px-4">
-                    {model.type === 'Private Model' && (
-                      <div>
-                        <div>Owner: {model.owner}</div>
-                        <div>Users: {model.users?.join(', ') || 'None'}</div>
-                      </div>
-                    )}
-                    {model.type === 'Protected Model' && (
-                      <div>
-                        <div>Owner: {model.owner}</div>
-                        <div>Team: {teams.find(team => team.id === model.team)?.name || 'None'}</div>
-                        <div>Team Admin: {model.teamAdmin || 'None'}</div>
-                      </div>
-                    )}
-                    {model.type === 'Public Model' && (
-                      <div>
-                        <div>Owner: {model.owner}</div>
-                      </div>
-                    )}
-                  </td>
-                  <td className="py-2 px-4">
-                    {editingIndex === index ? (
-                      <div>
-                        <select
-                          value={selectedType || model.type}
-                          onChange={(e) => setSelectedType(e.target.value as 'Private Model' | 'Protected Model' | 'Public Model')}
-                          className="border border-gray-300 rounded px-2 py-1"
-                        >
-                          <option value="Private Model">Private Model</option>
-                          <option value="Protected Model">Protected Model</option>
-                          <option value="Public Model">Public Model</option>
-                        </select>
-                        {selectedType === 'Protected Model' && (
-                          <select
-                            value={selectedTeam || ''}
-                            onChange={(e) => setSelectedTeam(e.target.value)}
-                            className="border border-gray-300 rounded px-2 py-1 mt-2"
-                          >
-                            <option value="" disabled>Select Team</option>
-                            {teams.map((team) => (
-                              <option key={team.id} value={team.id}>
-                                {team.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                        <button
-                          onClick={() => handleModelTypeChange(index)}
-                          className="ml-2 bg-blue-500 text-white px-2 py-1 rounded"
-                        >
-                          Confirm
-                        </button>
-                        <button
-                          onClick={() => setEditingIndex(null)}
-                          className="ml-2 bg-gray-500 text-white px-2 py-1 rounded"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setEditingIndex(index)}
-                        className="bg-blue-500 text-white px-2 py-1 rounded"
-                      >
-                        Change Access
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Workflows Section */}
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold">Workflows</h3>
-          <table className="min-w-full bg-white mb-8">
-            <thead>
-              <tr>
-                <th className="py-2 px-4 text-left">Workflow Name</th>
-                <th className="py-2 px-4 text-left">Type</th>
-                <th className="py-2 px-4 text-left">Status</th>
-                <th className="py-2 px-4 text-left">Created By</th>
-                <th className="py-2 px-4 text-left">Models</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workflows.map((workflow, index) => (
-                <tr key={index} className="border-t">
-                  <td className="py-2 px-4">{workflow.name}</td>
-                  <td className="py-2 px-4">{workflow.type}</td>
-                  <td className="py-2 px-4">{workflow.status}</td>
-                  <td className="py-2 px-4">
-                    <div>Username: {workflow.created_by.username}</div>
-                    <div>Email: {workflow.created_by.email}</div>
-                  </td>
-                  <td className="py-2 px-4">
-                    {workflow.models.length > 0 ? (
-                      workflow.models.map((model, i) => (
-                        <div key={i} className="mb-2">
-                          <div>Model Name: {model.model_name}</div>
-                          <div>Type: {model.type}</div>
-                          {/* <div>Domain: {model.domain}</div> */}
-                          {/* <div>Latency: {model.latency}</div> */}
-                          <div>Published On: {model.publish_date}</div>
-                        </div>
-                      ))
-                    ) : (
-                      <div>No models associated with this workflow</div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Teams Section */}
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold">Teams</h3>
-          {teams.map((team, index) => (
-            <div key={index} className="mb-8">
-              <h4 className="text-md font-semibold">{team.name}</h4>
-              <div className="mb-2">Admin: {team.admin}</div>
-              <div className="mb-2">Members: {team.members.join(', ')}</div>
-              <div>
-                <h5 className="text-sm font-semibold">Protected Models</h5>
-                <ul className="list-disc pl-5">
-                  {models
-                    .filter(model => model.type === 'Protected Model' && model.team === team.name)
-                    .map((model, modelIndex) => (
-                      <li key={modelIndex}>{model.name}</li>
-                    ))}
-                </ul>
-              </div>
-              <button
-                onClick={() => deleteTeam(team.name)}
-                className="mt-2 bg-red-500 text-white px-2 py-1 rounded"
-              >
-                Delete Team
-              </button>
-            </div>
-          ))}
-
-          {/* Create New Team */}
+    <div className="max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen">
+      <Card className="shadow-lg">
+        <CardHeader className="bg-blue-500 text-white p-6 rounded-t-lg">
+          <CardTitle className="text-2xl font-bold">Manage Access</CardTitle>
+          <CardDescription>View all personnel and their access.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-6 bg-white rounded-b-lg">
           <div className="mb-8">
-            <h4 className="text-md font-semibold">Create New Team</h4>
-            <div className="mb-2">
-              <input
-                type="text"
-                placeholder="Team Name"
-                value={newTeamName}
-                onChange={(e) => setNewTeamName(e.target.value)}
-                className="border border-gray-300 rounded px-2 py-1 mb-2"
-              />
-              <input
-                type="text"
-                placeholder="Team Admin"
-                value={newTeamAdmin}
-                onChange={(e) => setNewTeamAdmin(e.target.value)}
-                className="border border-gray-300 rounded px-2 py-1 mb-2"
-              />
-              <input
-                type="text"
-                placeholder="Team Members (comma separated)"
-                value={newTeamMembers.join(', ')}
-                onChange={(e) => setNewTeamMembers(e.target.value.split(',').map(member => member.trim()))}
-                className="border border-gray-300 rounded px-2 py-1 mb-2"
-              />
-              <button
-                onClick={createNewTeam}
-                className="bg-blue-500 text-white px-2 py-1 rounded"
-              >
-                Create Team
-              </button>
-            </div>
+            <h2 className="text-2xl font-semibold text-gray-800">{userRole}</h2>
+            <p className="text-gray-600">{roleDescription}</p>
           </div>
-
-          {/* Add Member to Team */}
-          <div>
-            <h4 className="text-md font-semibold">Add Member to Team</h4>
-            <div className="mb-2">
-              <select
-                value={selectedTeamForAdd}
-                onChange={(e) => setSelectedTeamForAdd(e.target.value)}
-                className="border border-gray-300 rounded px-2 py-1 mb-2"
-              >
-                <option value="">Select Team</option>
-                {teams.map((team) => (
-                  <option key={team.name} value={team.name}>
-                    {team.name}
-                  </option>
+  
+          {/* Models Section */}
+          <div className="mb-12">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">Models</h3>
+            <table className="w-full bg-white rounded-lg shadow-md overflow-hidden">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="py-3 px-4 text-left text-gray-700">Model Name</th>
+                  <th className="py-3 px-4 text-left text-gray-700">Model Type</th>
+                  <th className="py-3 px-4 text-left text-gray-700">Access Details</th>
+                  <th className="py-3 px-4 text-left text-gray-700">Edit Model Access</th>
+                </tr>
+              </thead>
+              <tbody>
+                {models.map((model, index) => (
+                  <tr key={index} className="border-t">
+                    <td className="py-3 px-4 text-gray-800">{model.name}</td>
+                    <td className="py-3 px-4 text-gray-800">{model.type}</td>
+                    <td className="py-3 px-4 text-gray-800">
+                      {model.type === 'Private Model' && (
+                        <div>
+                          <div>Owner: {model.owner}</div>
+                          <div>Users: {model.users?.join(', ') || 'None'}</div>
+                        </div>
+                      )}
+                      {model.type === 'Protected Model' && (
+                        <div>
+                          <div>Owner: {model.owner}</div>
+                          <div>Team: {teams.find(team => team.id === model.team)?.name || 'None'}</div>
+                        </div>
+                      )}
+                      {model.type === 'Public Model' && (
+                        <div>Owner: {model.owner}</div>
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      {editingIndex === index ? (
+                        <div className="flex flex-col space-y-2">
+                          <select
+                            value={selectedType || model.type}
+                            onChange={(e) => setSelectedType(e.target.value as 'Private Model' | 'Protected Model' | 'Public Model')}
+                            className="border border-gray-300 rounded px-4 py-2"
+                          >
+                            <option value="Private Model">Private Model</option>
+                            <option value="Protected Model">Protected Model</option>
+                            <option value="Public Model">Public Model</option>
+                          </select>
+                          {selectedType === 'Protected Model' && (
+                            <select
+                              value={selectedTeam || ''}
+                              onChange={(e) => setSelectedTeam(e.target.value)}
+                              className="border border-gray-300 rounded px-4 py-2"
+                            >
+                              <option value="" disabled>Select Team</option>
+                              {teams.map((team) => (
+                                <option key={team.id} value={team.id}>
+                                  {team.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          <div className="flex space-x-2 mt-2">
+                            <button
+                              onClick={() => handleModelTypeChange(index)}
+                              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => setEditingIndex(null)}
+                              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setEditingIndex(index)}
+                          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                        >
+                          Change Access
+                        </button>
+                      )}
+                    </td>
+                  </tr>
                 ))}
-              </select>
-              <input
-                type="text"
-                placeholder="New Member"
-                value={newMember}
-                onChange={(e) => setNewMember(e.target.value)}
-                className="border border-gray-300 rounded px-2 py-1 mb-2"
-              />
-              <button
-                onClick={addMemberToTeam}
-                className="bg-green-500 text-white px-2 py-1 rounded"
-              >
-                Add Member
-              </button>
-            </div>
+              </tbody>
+            </table>
           </div>
-
-          {/* Remove Member from Team */}
-          <div>
-            <h4 className="text-md font-semibold">Remove Member from Team</h4>
-            <div className="mb-2">
-              <select
-                value={selectedTeamForRemove}
-                onChange={(e) => setSelectedTeamForRemove(e.target.value)}
-                className="border border-gray-300 rounded px-2 py-1 mb-2"
-              >
-                <option value="">Select Team</option>
-                {teams.map((team) => (
-                  <option key={team.id} value={team.name}>
-                    {team.name}
-                  </option>
+  
+          {/* Workflows Section */}
+          <div className="mb-12">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">Workflows</h3>
+            <table className="w-full bg-white rounded-lg shadow-md overflow-hidden">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="py-3 px-4 text-left text-gray-700">Workflow Name</th>
+                  <th className="py-3 px-4 text-left text-gray-700">Type</th>
+                  <th className="py-3 px-4 text-left text-gray-700">Status</th>
+                  <th className="py-3 px-4 text-left text-gray-700">Created By</th>
+                  <th className="py-3 px-4 text-left text-gray-700">Models</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workflows.map((workflow, index) => (
+                  <tr key={index} className="border-t">
+                    <td className="py-3 px-4 text-gray-800">{workflow.name}</td>
+                    <td className="py-3 px-4 text-gray-800">{workflow.type}</td>
+                    <td className="py-3 px-4 text-gray-800">{workflow.status}</td>
+                    <td className="py-3 px-4 text-gray-800">
+                      <div>Username: {workflow.created_by.username}</div>
+                      <div>Email: {workflow.created_by.email}</div>
+                    </td>
+                    <td className="py-3 px-4 text-gray-800">
+                      {workflow.models.length > 0 ? (
+                        workflow.models.map((model, i) => (
+                          <div key={i} className="mb-2">
+                            <div>Model Name: {model.model_name}</div>
+                            <div>Type: {model.type}</div>
+                            <div>Published On: {model.publish_date}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div>No models associated with this workflow</div>
+                      )}
+                    </td>
+                  </tr>
                 ))}
-              </select>
-              <input
-                type="text"
-                placeholder="Member to Remove"
-                value={memberToRemove}
-                onChange={(e) => setMemberToRemove(e.target.value)}
-                className="border border-gray-300 rounded px-2 py-1 mb-2"
-              />
-              <button
-                onClick={removeMemberFromTeam}
-                className="bg-red-500 text-white px-2 py-1 rounded"
-              >
-                Remove Member
-              </button>
-            </div>
+              </tbody>
+            </table>
           </div>
-        </div>
-
-        {/* Users Section */}
-        <div>
-          <h3 className="text-lg font-semibold">Users</h3>
-          {users.map((user, index) => (
-            <div key={index} className="mb-8">
-              <h4 className="text-md font-semibold">{user.name}</h4>
-              <div className="mb-2">Role: {user.role}</div>
-              {user.teams.filter(team => team.role === 'team_admin').length > 0 && (
-                <div className="mb-2">
-                  Admin Teams: {user.teams.filter(team => team.role === 'team_admin').map(team => team.name).join(', ')}
+  
+          {/* Teams Section */}
+          <div className="mb-12">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">Teams</h3>
+            {teams.map((team, index) => (
+              <div key={index} className="bg-gray-100 p-4 rounded-lg shadow-md mb-8">
+                <h4 className="text-lg font-semibold text-gray-800">{team.name}</h4>
+                <div className="text-gray-700 mb-2">
+                  <span className="font-semibold">Admins:</span> {team.admins.join(', ')}
                 </div>
-              )}
-              {user.ownedModels.length > 0 && (
-                <div>Owned Models: {user.ownedModels.join(', ')}</div>
-              )}
-              <button
-                onClick={() => deleteUser(user.name)}
-                className="mt-2 bg-red-500 text-white px-2 py-1 rounded"
-              >
-                Delete User
-              </button>
+                <div className="text-gray-700 mb-2">
+                  <span className="font-semibold">Members:</span> {team.members.join(', ')}
+                </div>
+                <div className="text-gray-700">
+                  <h5 className="text-md font-semibold text-gray-800">Protected Models</h5>
+                  <ul className="list-disc pl-5">
+                    {models
+                      .filter(model => model.type === 'Protected Model' && model.team === team.name)
+                      .map((model, modelIndex) => (
+                        <li key={modelIndex}>{model.name}</li>
+                      ))}
+                  </ul>
+                </div>
+                <button
+                  onClick={() => deleteTeam(team.name)}
+                  className="mt-4 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+                >
+                  Delete Team
+                </button>
+              </div>
+            ))}
+  
+            {/* Create New Team */}
+            <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
+              <h4 className="text-lg font-semibold text-gray-800">Create New Team</h4>
+              <div className="grid grid-cols-1 gap-4 mt-4">
+                <input
+                  type="text"
+                  placeholder="Team Name"
+                  value={newTeamName}
+                  onChange={(e) => setNewTeamName(e.target.value)}
+                  className="border border-gray-300 rounded px-4 py-2"
+                />
+                <AutocompleteInput
+                  key={newTeamAdmin}  // Use a dynamic key to force re-render
+                  value={newTeamAdmin}
+                  onChange={handleSingleChange(setNewTeamAdmin)}
+                  options={users.map(user => user.name)}
+                  placeholder="Team Admin"
+                />
+                <AutocompleteInput
+                  value={newTeamMembers}
+                  onChange={handleMultipleChange(setNewTeamMembers)}
+                  options={users.map(user => user.name)}
+                  multiple={true}
+                  placeholder="Team Members"
+                />
+                <button
+                  onClick={() => {
+                    if (newTeamAdmin && newTeamMembers.length > 0) {
+                      createNewTeam();
+                    } else {
+                      alert("Please enter both Team Admin and at least one Team Member.");
+                    }
+                  }}
+                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                >
+                  Create Team
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+  
+            {/* Add Member to Team */}
+            <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
+              <h4 className="text-lg font-semibold text-gray-800">Add Member to Team</h4>
+              <div className="grid grid-cols-1 gap-4 mt-4">
+                <select
+                  value={selectedTeamForAdd}
+                  onChange={(e) => setSelectedTeamForAdd(e.target.value)}
+                  className="border border-gray-300 rounded px-4 py-2"
+                >
+                  <option value="">Select Team</option>
+                  {teams.map((team) => (
+                    <option key={team.name} value={team.name}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+                <AutocompleteInput
+                  key={selectedTeamForAdd + newMember}  // Use a key to force re-render
+                  value={newMember}
+                  onChange={handleSingleChange(setNewMember)}
+                  options={
+                    selectedTeamForAdd
+                      ? users
+                          .map(user => user.name)
+                          .filter(userName => !teams.find(team => team.name === selectedTeamForAdd)?.members.includes(userName))
+                      : []
+                  }
+                  placeholder="New Member"
+                />
+                <button
+                  onClick={addMemberToTeam}
+                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                >
+                  Add Member
+                </button>
+              </div>
+            </div>
+  
+            {/* Remove Member from Team */}
+            <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
+              <h4 className="text-lg font-semibold text-gray-800">Remove Member from Team</h4>
+              <div className="grid grid-cols-1 gap-4 mt-4">
+                <select
+                  value={selectedTeamForRemove}
+                  onChange={(e) => setSelectedTeamForRemove(e.target.value)}
+                  className="border border-gray-300 rounded px-4 py-2"
+                >
+                  <option value="">Select Team</option>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.name}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+                <AutocompleteInput
+                  key={selectedTeamForRemove + memberToRemove}  // Use a dynamic key to force re-render
+                  value={memberToRemove}
+                  onChange={handleSingleChange(setMemberToRemove)}
+                  options={selectedTeamForRemove ? teams.find(team => team.name === selectedTeamForRemove)?.members || [] : []}
+                  placeholder="Member to Remove"
+                />
+                <button
+                  onClick={removeMemberFromTeam}
+                  className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+                >
+                  Remove Member
+                </button>
+              </div>
+            </div>
+  
+            {/* Add Admin to Team */}
+            <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
+              <h4 className="text-lg font-semibold text-gray-800">Add Admin to Team</h4>
+              <div className="grid grid-cols-1 gap-4 mt-4">
+                <select
+                  value={selectedTeamForAddAdmin}
+                  onChange={(e) => setSelectedTeamForAddAdmin(e.target.value)}
+                  className="border border-gray-300 rounded px-4 py-2"
+                >
+                  <option value="">Select Team</option>
+                  {teams.map((team) => (
+                    <option key={team.name} value={team.name}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+                <AutocompleteInput
+                  key={selectedTeamForAddAdmin + newAdmin}  // Use a dynamic key to force re-render
+                  value={newAdmin}
+                  onChange={handleSingleChange(setNewAdmin)}
+                  options={users.map(user => user.name)}
+                  placeholder="New Admin"
+                />
+                <button
+                  onClick={assignAdminToTeam}
+                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                >
+                  Add Admin
+                </button>
+              </div>
+            </div>
+  
+            {/* Remove Admin from Team */}
+            <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
+              <h4 className="text-lg font-semibold text-gray-800">Remove Admin from Team</h4>
+              <div className="grid grid-cols-1 gap-4 mt-4">
+                <select
+                  value={selectedTeamForRemoveAdmin}
+                  onChange={(e) => setSelectedTeamForRemoveAdmin(e.target.value)}
+                  className="border border-gray-300 rounded px-4 py-2"
+                >
+                  <option value="">Select Team</option>
+                  {teams.map((team) => (
+                    <option key={team.name} value={team.name}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+                <AutocompleteInput
+                  key={selectedTeamForRemoveAdmin + adminToRemove}  // Use a dynamic key to force re-render
+                  value={adminToRemove}
+                  onChange={handleSingleChange(setAdminToRemove)}
+                  options={selectedTeamForRemoveAdmin ? teams.find(team => team.name === selectedTeamForRemoveAdmin)?.members || [] : []}
+                  placeholder="Admin to Remove"
+                />
+                <button
+                  onClick={removeAdminFromTeam}
+                  className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+                >
+                  Remove Admin
+                </button>
+              </div>
+            </div>
+          </div>
+  
+          {/* Users Section */}
+          <div className="mb-12">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">Users</h3>
+            {users.map((user, index) => (
+              <div key={index} className="bg-gray-100 p-4 rounded-lg shadow-md mb-8">
+                <h4 className="text-lg font-semibold text-gray-800">{user.name}</h4>
+                <div className="text-gray-700 mb-2">Role: {user.role}</div>
+                {user.teams.filter(team => team.role === 'team_admin').length > 0 && (
+                  <div className="text-gray-700 mb-2">
+                    Admin Teams: {user.teams.filter(team => team.role === 'team_admin').map(team => team.name).join(', ')}
+                  </div>
+                )}
+                {user.ownedModels.length > 0 && (
+                  <div className="text-gray-700">Owned Models: {user.ownedModels.join(', ')}</div>
+                )}
+                <button
+                  onClick={() => deleteUser(user.name)}
+                  className="mt-4 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+                >
+                  Delete User
+                </button>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

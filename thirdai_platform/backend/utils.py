@@ -11,6 +11,7 @@ from urllib.parse import urljoin
 import bcrypt
 import requests
 from database import schema
+from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
 from jinja2 import Template
 from pydantic import BaseModel, Field, root_validator, validator
@@ -98,6 +99,7 @@ def get_high_level_model_info(result: schema.Model):
         "access_level": result.access_level,
         "domain": result.domain,
         "type": result.type,
+        "train_status": result.train_status,
         "deploy_status": result.deploy_status,
         "team_id": str(result.team_id),
         "model_id": str(result.id),
@@ -329,6 +331,7 @@ class NDBExtraOptions(BaseModel):
 
     class Config:
         extra = "forbid"
+        protected_namespaces = ()
 
     @root_validator(pre=True)
     def validate_version_restrictions(cls, values):
@@ -493,6 +496,9 @@ def submit_nomad_job(filepath, nomad_endpoint, **kwargs):
     json_payload_response = requests.post(
         json_payload_url, headers=headers, json=hcl_payload
     )
+
+    json_payload_response.raise_for_status()
+
     json_payload = json_payload_response.json()
 
     # Submit the JSON job spec to Nomad
@@ -675,3 +681,24 @@ def list_workflow_models(workflow: schema.Workflow):
         model_info["component"] = workflow_model.component  # Append the component info
         models_info.append(model_info)
     return models_info
+
+
+def get_workflow(session, workflow_id, authenticated_user):
+    workflow: schema.Workflow = session.query(schema.Workflow).get(workflow_id)
+
+    if not workflow:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workflow not found.",
+        )
+
+    if (
+        workflow.user_id != authenticated_user.user.id
+        and not authenticated_user.user.is_global_admin()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have owner permissions to this workflow",
+        )
+
+    return workflow

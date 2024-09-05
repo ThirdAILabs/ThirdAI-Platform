@@ -273,6 +273,9 @@ export default function SearchBar({
           .then(data => {
             setSuggestions(data.suggestions); // Storing the suggestions in state
             console.log('suggestions:', data.suggestions); // Adjust according to actual data structure
+            if (data.suggestions.length === 0) {
+                setShowSuggestionBar(false) // don't show suggestion bar if 0 suggestions
+            }
           })
           .catch(err => console.error('Failed to fetch suggestions:', err));
       }, 300); // Adjust debounce time as needed
@@ -285,6 +288,7 @@ export default function SearchBar({
           debouncedFetch(query);
         } else {
             setSuggestions([])
+            setShowSuggestionBar(false) // don't show suggestion bar if 0 suggestions
         }
       }, [query, cacheEnabled]);
 
@@ -315,7 +319,7 @@ export default function SearchBar({
                 <SaveButton onClick={handleSaveClick} />
             </SearchArea>
             <div className="w-full mt-2" style={{backgroundColor: 'white'}}>
-                {cacheEnabled && showSuggestionBar && suggestions.map(suggestion => (
+                {cacheEnabled && showSuggestionBar && suggestions.slice(0, 3).map(suggestion => (
                     <button key={suggestion.query_id}
                             onClick={() => {
                                 // When a user hits enter (to trigger generation) or 

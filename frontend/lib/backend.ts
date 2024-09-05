@@ -299,6 +299,37 @@ export function add_models_to_workflow({ workflowId, modelIdentifiers, component
   });
 }
 
+interface SetGenAIProviderParams {
+  workflowId: string;
+  provider: string;
+}
+
+export function set_gen_ai_provider({ workflowId, provider }: SetGenAIProviderParams): Promise<any> {
+  const accessToken = getAccessToken();
+
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  return new Promise((resolve, reject) => {
+    axios
+      .post(`${thirdaiPlatformBaseUrl}/api/workflow/set-gen-ai-provider`, {
+        workflow_id: workflowId,
+        provider,
+      })
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        if (err.response && err.response.data) {
+          reject(new Error(err.response.data.detail || 'Failed to set generation AI provider'));
+        } else {
+          reject(new Error('Failed to set generation AI provider'));
+        }
+      });
+  });
+}
+
+
+
 export interface CreatedBy {
   id: string;
   username: string;
@@ -313,6 +344,7 @@ export interface Workflow {
   publish_date: string;
   created_by: CreatedBy;
   models: WorkflowModel[];
+  gen_ai_provider: string;
 }
 
 export function fetchWorkflows(): Promise<Workflow[]> {
@@ -471,6 +503,7 @@ interface WorkflowModel {
   thirdai_version: string;
   training_time: string;
   type: string;
+  train_status: string;
   user_email: string;
   username: string;
 }
@@ -484,6 +517,7 @@ interface WorkflowDetailsResponse {
     type: string;
     type_id: string;
     status: string;
+    gen_ai_provider: string;
     models: WorkflowModel[];
   };
 }
@@ -977,6 +1011,27 @@ export async function assignTeamAdmin(email: string, team_id: string) {
       });
   });
 }
+
+export async function removeTeamAdmin(email: string, team_id: string) {
+  const accessToken = getAccessToken();
+
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  const params = new URLSearchParams({ email, team_id });
+
+  return new Promise((resolve, reject) => {
+    axios
+      .post(`${thirdaiPlatformBaseUrl}/api/team/remove-team-admin?${params.toString()}`)
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        reject(err);
+      });
+  });
+}
+
+
 
 
 export async function deleteUserFromTeam(email: string, team_id: string): Promise<void> {

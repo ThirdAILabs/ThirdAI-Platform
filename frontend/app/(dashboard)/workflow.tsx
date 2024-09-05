@@ -15,6 +15,8 @@ import { MoreHorizontal } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Workflow, validate_workflow, start_workflow, stop_workflow, delete_workflow } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
+import { Modal } from '@/components/ui/Modal'
+import { InformationCircleIcon } from '@heroicons/react/solid';
 
 export function WorkFlow({ workflow }: { workflow: Workflow }) {
   const router = useRouter();
@@ -26,7 +28,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
     // Active
     // Starting
     // Error: Underlying model not present
-
+  const [isTrainingIncomplete, setIsTrainingIncomplete] = useState<boolean>(false);
   const [deployType, setDeployType] = useState<string>('');
 
   function goToEndpoint() {
@@ -44,7 +46,9 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       }
       case "rag": {
         let ifGenerationOn = true; // false if semantic search, true if RAG
-        const newUrl = `/semantic-search/${workflow.id}?workflowId=${workflow.id}&ifGenerationOn=${ifGenerationOn}`;
+        const genAiProvider = `${workflow.gen_ai_provider}`;
+        // TODO don't use url params
+        const newUrl = `/semantic-search/${workflow.id}?workflowId=${workflow.id}&ifGenerationOn=${ifGenerationOn}&genAiProvider=${genAiProvider}`;
         window.open(newUrl, '_blank');
         break;
       }
@@ -85,6 +89,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
   const handleDeploy = async () => {
     try {
       if (isValid) {
+        setDeployStatus('Starting'); // set to starting because user intends to start workflow
         await start_workflow(workflow.id);
       }
     } catch (e) {
@@ -94,16 +99,17 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
   };
 
   useEffect(() => {
-    if (workflow.status === 'inactive' && deployStatus != 'Starting') {
-      // If the workflow is inactive, we always say it's inactive regardless of model statuses
-        // AND If user hasn't tried to start deploy the workflow AND
-      setDeployStatus('Inactive');
-    } else if (workflow.models && workflow.models.length > 0) {
+    if (workflow.models && workflow.models.length > 0) {
       let hasFailed = false;
       let isInProgress = false;
       let allComplete = true;
+      let trainingIncomplete = false;
   
       for (const model of workflow.models) {
+        if (model.train_status !== 'complete') {
+          trainingIncomplete = true; // Training is still ongoing for at least one model
+        }
+        
         if (model.deploy_status === 'failed') {
           hasFailed = true;
           break; // If any model has failed, no need to check further
@@ -121,14 +127,19 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
         }
       }
   
-      if (hasFailed) {
+      setIsTrainingIncomplete(trainingIncomplete);
+
+      if (trainingIncomplete) {
+        setDeployStatus('Training...');
+      } else if (hasFailed) {
         setDeployStatus('Failed');
       } else if (isInProgress) {
         setDeployStatus('Starting');
       } else if (allComplete) {
         setDeployStatus('Active'); // Models are complete and workflow is active
-      } else {
-        setDeployStatus('Starting');
+      } else if (deployStatus !== 'Starting') {
+        // if user hasn't chosen to start the workflow, we want to set it to Inactive
+        setDeployStatus('Inactive');
       }
     } else {
       // If no models are present, the workflow is ready to deploy
@@ -154,6 +165,8 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
         return 'bg-yellow-500 text-white'; // Yellow for in-progress status
       case 'Inactive':
         return 'bg-gray-500 text-white'; // Gray for inactive status
+      case 'Training...':
+        return 'bg-blue-500 text-white'; // New color for training
       case 'Failed':
       case 'Error: Underlying model not present':
         return 'bg-red-500 text-white'; // Red for error statuses
@@ -161,6 +174,16 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
         return 'bg-gray-500 text-white'; // Default to gray if status is unknown
     }
   };  
+
+  const [showModal, setShowModal] = useState(false);
+
+  const toggleModal = () => {
+    setShowModal(!showModal);
+  };
+
+  const formatBytesToMB = (bytes: string) => {
+    return (parseInt(bytes) / (1024 * 1024)).toFixed(2) + ' MB';
+  };
 
   return (
     <TableRow>
@@ -173,37 +196,45 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
           width="64"
         />
       </TableCell>
-      <TableCell className="font-medium text-center font-medium">{workflow.name}</TableCell>
-      <TableCell className='text-center font-medium'>
+      <TableCell className="font-medium text-center">{workflow.name}</TableCell>
+      <TableCell className="text-center font-medium">
         <Badge variant="outline" className={`capitalize ${getBadgeColor(deployStatus)}`}>
           {deployStatus}
         </Badge>
       </TableCell>
       <TableCell className="hidden md:table-cell text-center font-medium">{deployType}</TableCell>
       <TableCell className="hidden md:table-cell text-center font-medium">
-        {
-          new Date(workflow.publish_date).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })
-        }
+        {new Date(workflow.publish_date).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })}
       </TableCell>
       <TableCell className="hidden md:table-cell text-center font-medium">
         <Button
           onClick={deployStatus === 'Active' ? goToEndpoint : handleDeploy}
           className="text-white focus:ring-4 focus:outline-none font-medium text-sm p-2.5 text-center inline-flex items-center me-2"
           style={{ width: '100px' }}
-          disabled={['Failed', 'Starting', 'Error: Underlying model not present'].includes(deployStatus)}
+          disabled={isTrainingIncomplete || ['Failed', 'Starting', 'Error: Underlying model not present'].includes(deployStatus)}
         >
-          {deployStatus === 'Active' 
-            ? 'Endpoint' 
-            : deployStatus === 'Inactive' 
-            ? 'Start' 
+          {isTrainingIncomplete 
+            ? 'Training...' // New text when training is incomplete
+            : deployStatus === 'Active'
+            ? 'Endpoint'
+            : deployStatus === 'Inactive'
+            ? 'Start'
             : deployStatus === 'Failed' || deployStatus === 'Error: Underlying model not present'
             ? 'Start'
             : 'Endpoint'}
         </Button>
+      </TableCell>
+      <TableCell className="text-center font-medium">
+        <button 
+          onClick={toggleModal} 
+          className="text-gray-400 hover:text-gray-600 text-sm"
+        >
+          <InformationCircleIcon className="h-6 w-6" />
+        </button>
       </TableCell>
       <TableCell className='text-center font-medium'>
         <DropdownMenu>
@@ -268,6 +299,22 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>
+
+      {/* Modal for displaying model details */}
+      {showModal && (
+        <Modal onClose={toggleModal}>
+          <div className="p-4">
+            <h2 className="text-lg font-bold mb-4">App Details</h2>
+            {workflow.models.map((model, index) => (
+              <div key={index} className="mb-4">
+                <p><strong>Model Name:</strong> {model.model_name}</p>
+                <p><strong>Size on Disk:</strong> {formatBytesToMB(model.size)}</p>
+                <p><strong>Size in Memory:</strong> {formatBytesToMB(model.size_in_memory)}</p>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
     </TableRow>
   );
 }

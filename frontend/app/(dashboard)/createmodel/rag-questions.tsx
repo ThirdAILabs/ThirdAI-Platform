@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SelectModel } from '@/lib/db';
 import NERQuestions from './nlp-questions/ner-questions';
 import SemanticSearchQuestions from './semantic-search-questions';
-import { create_workflow, add_models_to_workflow } from '@/lib/backend';
+import { create_workflow, add_models_to_workflow, set_gen_ai_provider } from '@/lib/backend';
 import { CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -106,6 +106,33 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
       } else {
         console.error('No models to add to the workflow');
         alert('No models to add to the workflow')
+      }
+
+      // Step 4: Set the generation AI provider based on the selected LLM type
+      let provider = '';
+      switch (llmType) {
+        case 'OpenAI':
+          provider = 'openai';
+          break;
+        case 'On-prem':
+          provider = 'on-prem';
+          break;
+        case 'Self-host':
+          provider = 'self-host';
+          break;
+        default:
+          // handle 
+      }
+
+      if (provider) {
+        const setProviderResponse = await set_gen_ai_provider({
+          workflowId,
+          provider,
+        });
+        console.log('Generation AI provider set:', setProviderResponse);
+      } else {
+        console.error('Invalid LLM type selected');
+        alert('Invalid LLM type selected');
       }
 
       // Go back home page
@@ -356,10 +383,10 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
                 OpenAI
               </Button>
               <Button
-                variant={llmType ? (llmType === 'Llama' ? 'secondary' : 'outline') : 'default'}
-                onClick={() => setLlmType('Llama')}
+                variant={llmType ? (llmType === 'On-prem' ? 'secondary' : 'outline') : 'default'}
+                onClick={() => setLlmType('On-prem')}
               >
-                Llama
+                On-prem
               </Button>
               <Button
                 variant={llmType ? (llmType === 'Self-host' ? 'secondary' : 'outline') : 'default'}

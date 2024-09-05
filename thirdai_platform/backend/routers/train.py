@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 import uuid
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -402,6 +401,9 @@ def train_udt(
 class TrainComplete(BaseModel):
     model_id: str
     metadata: Dict[str, str]
+
+    class Config:
+        protected_namespaces = ()
 
 
 @train_router.post("/complete")

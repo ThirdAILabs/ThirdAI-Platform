@@ -1,0 +1,84 @@
+job "on-prem-llm-generation" {
+  datacenters = ["dc1"]
+
+  type = "service"
+
+  group "on-prem-generation" {
+    count = "{{ initial_allocations }}"
+
+    scaling {
+      enabled = true
+      min = {{ min_allocations }}
+      max = {{ max_allocations }}
+
+      {# 
+        We choose the target value of 35 because anecdotally on blade we were seeing core usage
+        between 35 and 55. We aim to be on the lower end because we ideally have some idle time
+        on each service.
+
+        However, this scaling based on CPU MHz is slightly flaky and we'll want
+        to move to something more consistent. Probably based on number of requests or idle
+        time. One idea would be to always have some X% of services idle. This is 
+        not natively available in nomad and we'll have to set up some other means for this. 
+      #}
+      policy {
+        cooldown = "1m"
+        evaluation_interval = "10s"
+
+        check "cpu" {
+          source = "nomad-apm"
+          query = "avg_cpu"
+          query_window = "3m"
+          strategy "target-value" {
+            target = 35
+          }
+        }
+      }
+    }
+
+    network {
+      port "on-prem-generation-http" {
+      }
+    }
+
+    service {
+      name = "on-prem-generation"
+      port = "on-prem-generation-http"
+      provider = "nomad"
+
+      {# This code adds the prefix 'on-prem-llm' to all endpoints in this service. #}
+      tags = [
+        "traefik.enable=true",
+        "traefik.http.routers.on-prem-generation-http.rule=PathPrefix(`/on-prem-llm`)",
+        "traefik.http.routers.on-prem-generation-http.middlewares=on-prem-llm-stripprefix",
+        "traefik.http.middlewares.on-prem-llm-stripprefix.stripprefix.prefixes=/on-prem-llm",
+        "traefik.http.routers.on-prem-generation-http.priority=10"
+      ]
+    }
+
+    task "backend" {
+      driver = "docker"
+
+      config {
+        image = "ghcr.io/ggerganov/llama.cpp:server"
+        image_pull_timeout = "15m"
+        ports = ["on-prem-generation-http"]
+        volumes = ["{{ mount_dir }}:/gen-ai-models"]
+        auth {
+          server_address = "ghrc.io"
+        }
+        args = [
+          "-m", "/gen-ai-models/{{ model_name }}",
+          "--host", "0.0.0.0",
+          "--port", "${NOMAD_PORT_on_prem_generation_http}",
+          "--threads-http", {{ threads_http }}
+        ]
+      }
+
+      resources {
+        cores = {{ cores_per_allocation }}
+        memory = {{ memory_per_allocation }}
+      }
+    }
+  }
+}

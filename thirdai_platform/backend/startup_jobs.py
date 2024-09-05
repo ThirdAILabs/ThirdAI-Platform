@@ -41,9 +41,8 @@ async def restart_generate_job():
     platform = get_platform()
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
-        filepath=str(cwd / "backend" / "nomad_jobs" / "generation_job.hcl.j2"),
+        filepath=str(cwd / "backend" / "nomad_jobs" / "llm_dispatch_job.hcl.j2"),
         platform=platform,
-        port=None if platform == "docker" else get_empty_port(),
         tag=os.getenv("TAG"),
         registry=os.getenv("DOCKER_REGISTRY"),
         docker_username=os.getenv("DOCKER_USERNAME"),
@@ -51,7 +50,50 @@ async def restart_generate_job():
         image_name=os.getenv("GENERATION_IMAGE_NAME"),
         model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
         python_path=get_python_path(),
-        generate_app_dir=str(get_root_absolute_path() / "llm_generation_job"),
+        generate_app_dir=str(get_root_absolute_path() / "llm_dispatch_job"),
+    )
+
+
+ON_PREM_GENERATE_JOB_ID = "on-prem-llm-generation"
+
+
+async def start_on_prem_generate_job(
+    model_name="qwen2-0_5b-instruct-fp16.gguf",
+    restart_if_exists=True,
+):
+    """
+    Restart the LLM generation job.
+
+    Returns:
+    - Response: The response from the Nomad API.
+    """
+    nomad_endpoint = os.getenv("NOMAD_ENDPOINT")
+    if nomad_job_exists(ON_PREM_GENERATE_JOB_ID, nomad_endpoint):
+        if not restart_if_exists:
+            return
+        delete_nomad_job(ON_PREM_GENERATE_JOB_ID, nomad_endpoint)
+    share_dir = os.getenv("SHARE_DIR")
+    if not share_dir:
+        raise ValueError("SHARE_DIR variable is not set.")
+    MODEL_BAZAAR_PATH = (
+        "/model_bazaar" if os.path.exists("/.dockerenv") else os.getenv("SHARE_DIR")
+    )
+    cwd = Path(os.getcwd())
+    mount_dir = os.path.join(MODEL_BAZAAR_PATH, "gen-ai-models")
+    model_path = os.path.join(mount_dir, model_name)
+    if not os.path.exists(model_path):
+        raise ValueError(f"Cannot find model at location: {model_path}.")
+    return submit_nomad_job(
+        nomad_endpoint=nomad_endpoint,
+        filepath=str(cwd / "backend" / "nomad_jobs" / "on_prem_generation_job.hcl.j2"),
+        mount_dir=os.path.join(share_dir, "gen-ai-models"),
+        initial_allocations=1,
+        min_allocations=1,
+        max_allocations=5,
+        threads_http=2,
+        cores_per_allocation=10,
+        memory_per_allocation=4000,
+        model_name=model_name,
     )
 
 

@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 
 load_dotenv()
+
 import os
 from urllib.parse import urljoin
 
@@ -22,79 +23,26 @@ app.add_middleware(
 )
 
 
-@app.websocket("/generate")
+@app.websocket("/llm-dispatch/generate")
 async def generate(websocket: WebSocket):
     """
     WebSocket endpoint to generate text using a specified generative AI model.
+    Will keep sending content until "end_of_stream" is True.
+    If an error is found, "status" will be "error".
 
-    Parameters:
-    - WebSocket connection.
+    Expected Input Message Format:
+     ```
+     {
+         "query": "Your input text",
+         "model": "Model name",
+         "provider": "AI provider",
+         "key": "Optional API key"
+     }
+     ```
 
-    Expected Message Format:
-    ```
-    {
-        "query": "Your input text",
-        "model": "Model name",
-        "provider": "AI provider",
-        "key": "Optional API key"
-    }
-    ```
+    Example Success:
 
-    Response Messages:
-    - Success message with generated content:
-    ```
-    {
-        "status": "success",
-        "content": "Generated text",
-        "end_of_stream": False
-    }
-    ```
-    - Error message in case of invalid arguments:
-    ```
-    {
-        "status": "error",
-        "detail": "Invalid arguments",
-        "errors": [{"loc": ["field"], "msg": "Error message", "type": "error type"}],
-        "end_of_stream": True
-    }
-    ```
-    - Error message in case of missing API key:
-    ```
-    {
-        "status": "error",
-        "detail": "No generative AI key provided",
-        "end_of_stream": True
-    }
-    ```
-    - Error message in case of unsupported provider:
-    ```
-    {
-        "status": "error",
-        "detail": "Unsupported provider",
-        "end_of_stream": True
-    }
-    ```
-    - Error message in case of an unexpected error:
-    ```
-    {
-        "status": "error",
-        "detail": "Unexpected error",
-        "end_of_stream": True
-    }
-    ```
-
-    Example:
-    1. Client sends:
-    ```
-    {
-        "query": "Tell me a story",
-        "model": "gpt-3",
-        "provider": "openai",
-        "key": "your-api-key"
-    }
-    ```
-
-    2. Server sends (multiple messages as content is generated):
+    Server sends (multiple messages as content is generated):
     ```
     {
         "status": "success",
@@ -108,6 +56,19 @@ async def generate(websocket: WebSocket):
         "end_of_stream": True
     }
     ```
+
+    Example Error:
+     ```
+     {
+         "status": "error",
+         "detail": "No generative AI key provided",
+         "end_of_stream": True
+     }
+     ```
+
+    Providers should be one of on-prem, openai, or cohere
+    Other errors include missing genai key, unsupported provider, invalid
+    arguments, or internal error
     """
     await websocket.accept()
     while True:

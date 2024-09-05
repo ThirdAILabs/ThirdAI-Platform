@@ -147,15 +147,19 @@ function App() {
     const [ifGenerationOn, setIfGenerationOn] = useState(false);
     const [cacheEnabled, setCacheEnabled] = useState(true); // default generation cache is on
     const [ifGuardRailOn, setIfGuardRailOn] = useState(false);
+    const [genAiProvider, setGenAiProvider] = useState<string | null>(null);
 
     useEffect(() => {
         const workflowId = searchParams.get('workflowId');
         const generationOn = searchParams.get('ifGenerationOn') === 'true';
+        const provider = searchParams.get('genAiProvider');
 
         console.log('workflowId', workflowId)
         console.log('generationOn', generationOn)
+        console.log('genAiProvider', provider);
 
         setIfGenerationOn(generationOn);
+        setGenAiProvider(provider);
 
         const fetchWorkflowDetails = async () => {
             try {
@@ -402,6 +406,7 @@ function App() {
                                 return replacedAnswer;
                             });
                         },
+                        genAiProvider || undefined, // Convert null to undefined
                     );
                 }
             } else {
@@ -455,6 +460,7 @@ function App() {
                         results.references,
                         websocketRef,
                         (next) => setAnswer((prev) => prev + next),
+                        genAiProvider || undefined, // Convert null to undefined
                     );
                 }
             }
@@ -473,6 +479,7 @@ function App() {
             results!.references.filter((ref) => checkedIds.has(ref.id)),
             websocketRef,
             (next) => setAnswer((prev) => prev + next),
+            genAiProvider || undefined, // Convert null to undefined
         );
     }
 
@@ -482,6 +489,10 @@ function App() {
     }
 
     function openSource(ref: ReferenceInfo) {
+        if (ref.sourceURL.includes("amazonaws.com")) {
+            modelService!.openAWSReference(ref);
+            return;
+        }
         if (!ref.sourceName.toLowerCase().endsWith(".pdf")) {
             modelService!.openReferenceSource(ref);
             return;

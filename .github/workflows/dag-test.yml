@@ -64,7 +64,7 @@ jobs:
         pip install -r deployment_job/requirements.txt
         pip install -r docs/requirements.txt
         pip install -r headless/requirements.txt
-        pip install -r llm_generation_job/requirements.txt
+        pip install -r llm_dispatch_job/requirements.txt
         pip install -r thirdai_platform/requirements.txt
         pip install -r train_job/requirements.txt
         echo "PYTHON_PATH=${{ github.workspace }}/venv/bin/python" >> $GITHUB_ENV
@@ -134,6 +134,15 @@ jobs:
         source ${{ github.workspace }}/venv/bin/activate
         cd $GITHUB_WORKSPACE/thirdai_platform
         nohup uvicorn main:app --reload --host 0.0.0.0 --port 8000 > uvicorn.log 2>&1 &
+    
+    - name: List files in local_setup
+      run: ls -la local_setup
+    
+    - name: Launch Autoscaler and Redis job
+      run: |
+        cd local_setup
+        NOMAD_PATH=$(which nomad)
+        sudo bash launch_nomad_jobs.sh $NOMAD_PATH
 
     - name: Run Tests
       run: |
