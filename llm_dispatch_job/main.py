@@ -2,15 +2,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import uvicorn
 import os
 from urllib.parse import urljoin
 
 import requests
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from llms import default_keys, model_classes
 from pydantic import ValidationError
-from pydantic_models import GenerateArgs
+from typing import Optional
+
+from pydantic import BaseModel
+
 
 app = FastAPI()
 
@@ -21,6 +25,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class GenerateArgs(BaseModel):
+    query: str
+    key: Optional[str] = None
+    model: str = "gpt-3.5-turbo"
+    provider: str = "openai"
+
+    # For caching we want just the query, not the entire prompt.
+    original_query: Optional[str] = None
+    cache_access_token: Optional[str] = None
 
 
 @app.websocket("/llm-dispatch/generate")
@@ -71,10 +86,12 @@ async def generate(websocket: WebSocket):
     arguments, or internal error
     """
     await websocket.accept()
+
     while True:
         data = await websocket.receive_text()
         try:
             generate_args = GenerateArgs.parse_raw(data)
+            print(f"Received args from client: {data}", flush=True)
             break
         except ValidationError as e:
             await websocket.send_json(
@@ -116,6 +133,8 @@ async def generate(websocket: WebSocket):
 
     llm = llm_class()
 
+    print(f"Starting generation with provider '{generate_args.provider.lower()}':", flush=True)
+
     generated_response = ""
     try:
         async for next_word in llm.stream(
@@ -125,15 +144,20 @@ async def generate(websocket: WebSocket):
             await websocket.send_json(
                 {"status": "success", "content": next_word, "end_of_stream": False}
             )
+            print(next_word, end ="", flush=True)
     except Exception as e:
-        print("Error", e)
+        print("Error during generation", e, flush=True)
         await websocket.send_json(
             {
                 "status": "error",
                 "detail": "Error while generating content",
+                "errors": e.errors(),
                 "end_of_stream": True,
             }
         )
+        return
+
+    print("Completed generation", flush=True)
     await websocket.send_json(
         {"status": "success", "content": "", "end_of_stream": True}
     )
@@ -142,24 +166,40 @@ async def generate(websocket: WebSocket):
         generate_args.original_query is not None
         and generate_args.cache_access_token is not None
     ):
-        try:
-            res = requests.post(
-                urljoin(os.environ["MODEL_BAZAAR_ENDPOINT"], "/cache/insert"),
-                params={
-                    "query": generate_args.original_query,
-                    "llm_res": generated_response,
-                },
-                headers={
-                    "Authorization": f"Bearer {generate_args.cache_access_token}",
-                },
-            )
-            if res.status_code != 200:
-                print(f"LLM Cache Insertion failed: {res}")
-        except Exception as e:
-            print("LLM Cache Insert Error", e)
+        await insert_into_cache(
+            generate_args.original_query,
+            generated_response,
+            generate_args.cache_access_token,
+        )
+
+
+async def insert_into_cache(
+    original_query: str, generated_response: str, cache_access_token: str
+):
+    try:
+        res = requests.post(
+            urljoin(os.environ["MODEL_BAZAAR_ENDPOINT"], "/cache/insert"),
+            params={
+                "query": original_query,
+                "llm_res": generated_response,
+            },
+            headers={
+                "Authorization": f"Bearer {cache_access_token}",
+            },
+        )
+        if res.status_code != 200:
+            print(f"LLM Cache Insertion failed: {res}", flush=True)
+    except Exception as e:
+        print("LLM Cache Insert Error", e, flush=True)
+
+
+@app.get("/llm-dispatch/health")
+async def health_check():
+    """
+    Returns {"status": "healthy"} if successful.
+    """
+    return {"status": "healthy"}
 
 
 if __name__ == "__main__":
-    import uvicorn
-
     uvicorn.run(app, host="localhost", port=8000)
