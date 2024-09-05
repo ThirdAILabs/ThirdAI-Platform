@@ -60,12 +60,12 @@ job "on-prem-llm-generation" {
       driver = "docker"
 
       config {
-        image = "ghcr.io/ggerganov/llama.cpp:server"
+        image = "thirdaipublic.azurecr.io/llama.cpp:server"
         image_pull_timeout = "15m"
         ports = ["on-prem-generation-http"]
         volumes = ["{{ mount_dir }}:/gen-ai-models"]
         auth {
-          server_address = "ghrc.io"
+          server_address = "thirdaipublic.azurecr.io"
         }
         args = [
           "-m", "/gen-ai-models/{{ model_name }}",
