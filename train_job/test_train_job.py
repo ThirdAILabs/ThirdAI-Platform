@@ -52,6 +52,13 @@ def create_tmp_model_bazaar_dir():
 )
 def test_ndb_train(ndb_options):
     licensing.activate(THIRDAI_LICENSE)
+
+    source_id = ndb.CSV(
+        os.path.join(file_dir(), "articles.csv"),
+        weak_columns=["text"],
+        metadata={"a": 140},
+    ).hash
+
     config = TrainConfig(
         model_bazaar_dir=MODEL_BAZAAR_DIR,
         license_key=THIRDAI_LICENSE,
@@ -77,6 +84,20 @@ def test_ndb_train(ndb_options):
                     location="local",
                     metadata={"file_type": "pdf"},
                 ),
+            ],
+            supervised_files=[
+                FileInfo(
+                    path=os.path.join(file_dir(), "supervised.csv"),
+                    location="local",
+                    doc_id=source_id,
+                    options={"csv_query_column": "query", "csv_id_column": "id"},
+                )
+            ],
+            test_files=[
+                FileInfo(
+                    path=os.path.join(file_dir(), "supervised.csv"),
+                    location="local",
+                )
             ],
         ),
     )
