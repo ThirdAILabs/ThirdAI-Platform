@@ -606,25 +606,39 @@ export class ModelService {
             const cache_access_token = await temporaryCacheToken(this.getModelID());
             const args = {
                 query: genaiQuery(question, references, genaiPrompt),
-                key: "sk-PYTWB6gs_ofO44-teXA2rIRGRbJfzqDyNXBalHXKcvT3BlbkFJk5905SK2RVE6_ME8i4Lnp9qULbyPZSyOU0vh2fZfQA", // fill in openai key
+                key: "sk-PYTWB6gs_ofO44-teXA2rIRGRbJfzqDyNXBalHXKcvT3BlbkFJk5905SK2RVE6_ME8i4Lnp9qULbyPZSyOU0vh2fZfQA",
                 original_query: question,
                 cache_access_token: cache_access_token.access_token,
                 provider: genAiProvider
             };
 
             const uri = deploymentBaseUrl + "/llm-dispatch/genpost"
-            const response = await axios.post(uri, args, {
-            responseType: 'text',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            onDownloadProgress: (progressEvent) => {
-                const xhr = progressEvent.target as XMLHttpRequest;
-                const newData = xhr.responseText.slice(finalAnswer.length);
+            const response = await fetch(uri, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(args)
+            });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+    
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+    
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    break;
+                }
+    
+                const newData = decoder.decode(value, { stream: true });
                 finalAnswer += newData;
+    
                 onNextWord(newData);
             }
-        });
 
             if (typeof onComplete === 'function') {
                 onComplete(finalAnswer);

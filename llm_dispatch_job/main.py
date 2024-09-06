@@ -69,9 +69,9 @@ async def generate(generate_args: GenerateArgs):
             ):
                 generated_response += next_word
                 yield next_word
-                print(next_word, end="")
+                print(next_word, end="", flush=True)
                 await asyncio.sleep(0)  # do we need this?
-            print("Completed generation", flush=True)
+            print("\nCompleted generation", flush=True)
         except Exception as e:
             print(f"Error during generation: {e}", flush=True)
             raise HTTPException(status_code=500, detail="Error while generating content")
