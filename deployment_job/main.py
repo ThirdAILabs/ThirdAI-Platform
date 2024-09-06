@@ -1,8 +1,6 @@
 import asyncio
-import time
+from datetime import datetime
 from functools import wraps
-from queue import Queue
-from threading import Lock, Thread
 from typing import Any
 
 import uvicorn
@@ -10,11 +8,12 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from reporter import Reporter
-from routers.ndb import create_ndb_router, process_tasks
+from routers.model import ModelManager, get_model
+from routers.ndb import ndb_router
 from routers.telemetry import telemetry_router  # Import the telemetry router
 from routers.udt import udt_router
 from utils import delete_deployment_job
-from variables import GeneralVariables, TypeEnum
+from variables import GeneralVariables, ModelType
 
 general_variables = GeneralVariables.load_from_env()
 reporter = Reporter(general_variables.model_bazaar_endpoint)
@@ -37,6 +36,8 @@ app.add_middleware(
 # with @reset_timer is called, in which case the timer restarts.
 reset_event = asyncio.Event()
 
+model = get_model()
+
 
 def reset_timer(endpoint_func):
     """
@@ -58,34 +59,67 @@ async def async_timer() -> None:
     """
     while True:
         try:
-            await asyncio.wait_for(
-                reset_event.wait(), timeout=900  # 15 minutes = 900 seconds
-            )
-            reset_event.clear()  # clear the event if the endpoint was hit within the timeout period
+            await asyncio.wait_for(reset_event.wait(), timeout=900)
+            reset_event.clear()  # Clear the event if the endpoint was hit within the timeout period
         except asyncio.TimeoutError:
-            response, job_id = delete_deployment_job(
-                general_variables.model_id, general_variables.task_runner_token
+            # Timer expired, initiate shutdown
+            active_workflows_count = reporter.active_workflow_count(
+                model_id=general_variables.model_id
             )
-            if response.status_code == 200:
-                print(f"Job {job_id} stopped successfully")
-            else:
-                print(
-                    f"Failed to stop job {job_id}. Status code: {response.status_code}, Response: {response.text}"
+            if active_workflows_count == 0:
+                response, job_id = delete_deployment_job(
+                    general_variables.get_nomad_endpoint(),
+                    general_variables.model_id,
+                    general_variables.task_runner_token,
                 )
-            reset_event.clear()
+                if response.status_code == 200:
+                    model.logger.info(f"Job {job_id} stopped successfully")
+                else:
+                    model.logger.error(
+                        f"Failed to stop job {job_id}. Status code: {response.status_code}, Response: {response.text}"
+                    )
+                reporter.update_deploy_status(general_variables.model_id, "stopped")
+            reset_event.clear()  # Clear event after handling timeout
 
 
-task_queue = Queue()
-tasks = {}
-task_lock = Lock()
+async def check_for_model_updates():
+    global model
+    last_loaded_timestamp = None
+    model_id = general_variables.model_id
+
+    while True:
+        try:
+            # Get the current model update timestamp from Redis using model_id
+            current_timestamp = model.redis_client.get(f"model_last_updated:{model_id}")
+            if current_timestamp:
+                current_timestamp = current_timestamp.decode()
+
+                # If the timestamp is newer than the last loaded one, reload the model
+                if not last_loaded_timestamp or datetime.fromisoformat(
+                    current_timestamp
+                ) > datetime.fromisoformat(last_loaded_timestamp):
+                    model.logger.info(
+                        f"New model update detected at {current_timestamp}. Reloading model..."
+                    )
+                    # when we rest the instance will be cleared, so forcing to load the latest model instance.
+                    ModelManager.reset_instances()
+                    model = get_model()
+                    last_loaded_timestamp = current_timestamp
+                    model.logger.info("Model successfully reloaded.")
+
+        except Exception as e:
+            model.logger.error(f"Error checking for model update: {str(e)}")
+
+        # Sleep for a short period before checking again
+        await asyncio.sleep(10)  # Adjust the sleep time according to your needs
+
 
 # Include the telemetry router for all deployments
 app.include_router(telemetry_router, prefix=f"/{general_variables.model_id}/telemetry")
 
-if general_variables.type == TypeEnum.NDB:
-    ndb_router = create_ndb_router(task_queue, task_lock, tasks)
+if general_variables.type == ModelType.NDB:
     app.include_router(ndb_router, prefix=f"/{general_variables.model_id}")
-elif general_variables.type == TypeEnum.UDT:
+elif general_variables.type == ModelType.UDT:
     app.include_router(udt_router, prefix=f"/{general_variables.model_id}")
 
 
@@ -108,17 +142,13 @@ async def startup_event() -> None:
     Event handler for application startup.
     """
     try:
-        time.sleep(10)
+        await asyncio.sleep(10)
         reporter.update_deploy_status(general_variables.model_id, "complete")
-        if general_variables.type == TypeEnum.NDB:
-            # TODO(Yash/Kartik): Separate Job for write modifications for NDB.
-            # As we are going with on-disk index we could only have one instance of model with write mode.
-            thread = Thread(
-                target=process_tasks, args=(task_queue, task_lock, tasks), daemon=True
-            )
-            thread.start()
+        asyncio.create_task(async_timer())
+        asyncio.create_task(check_for_model_updates())
     except Exception as e:
         reporter.update_deploy_status(general_variables.model_id, "failed")
+        model.logger.error(f"Failed to startup the application, {e}")
         raise e  # Re-raise the exception to propagate it to the main block
 
 
@@ -126,5 +156,5 @@ if __name__ == "__main__":
     try:
         uvicorn.run(app, host="localhost", port=8000)
     except Exception as e:
-        print(f"Uvicorn failed to start: {str(e)}")
+        model.logger.error(f"Uvicorn failed to start: {str(e)}")
         reporter.update_deploy_status(general_variables.model_id, "failed")

@@ -14,7 +14,6 @@ from auth.jwt import (
 from backend.auth_dependencies import is_model_owner
 from backend.utils import (
     delete_nomad_job,
-    get_empty_port,
     get_model_from_identifier,
     get_platform,
     get_python_path,
@@ -23,8 +22,6 @@ from backend.utils import (
     model_accessible,
     response,
     submit_nomad_job,
-    update_json,
-    update_json_list,
 )
 from database import schema
 from database.session import get_session
@@ -32,7 +29,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from licensing.verify.verify_license import valid_job_allocation, verify_license
 from pydantic import BaseModel
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 deploy_router = APIRouter()
@@ -246,7 +242,6 @@ def deploy_model(
             docker_username=os.getenv("DOCKER_USERNAME"),
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("DEPLOY_IMAGE_NAME"),
-            port=None if platform == "docker" else get_empty_port(),
             deployment_app_dir=str(get_root_absolute_path() / "deployment_job"),
             model_id=str(model.id),
             model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
@@ -261,6 +256,7 @@ def deploy_model(
             python_path=get_python_path(),
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
+            worker_enabled=("true" if model.type == "ndb" else "false"),
         )
 
         model.deploy_status = schema.Status.starting
@@ -416,6 +412,9 @@ class LogData(BaseModel):
     train_samples: List[Dict[str, str]]
     used: bool
 
+    class Config:
+        protected_namespaces = ()
+
 
 @deploy_router.post("/log")
 def log_results(
@@ -455,34 +454,20 @@ def log_results(
             message="No model with this id",
         )
 
-    log_entry = (
-        session.query(schema.Log)
-        .filter(
-            schema.Log.model_id == log_data.model_id,
-            schema.Log.user_id == user.id,
-            schema.Log.action == log_data.action,
-        )
-        .first()
-    )
-
     new_log = {
         "train_samples": log_data.train_samples,
         "used": str(log_data.used),
         "timestamp": str(datetime.utcnow().isoformat()),
     }
 
-    if not log_entry:
-        log_entry = schema.Log(
-            model_id=model.id,
-            user_id=user.id,
-            action=log_data.action,
-        )
-        session.add(log_entry)
-        session.commit()
-        session.refresh(log_entry)
-
-    log_entry.log_entries = update_json_list(log_entry.log_entries, new_log)
-    log_entry.count += len(log_data.train_samples)
+    log_entry = schema.Log(
+        model_id=model.id,
+        user_id=user.id,
+        action=log_data.action,
+        count=len(log_data.train_samples),
+        data=new_log,
+    )
+    session.add(log_entry)
     session.commit()
 
     return {"message": "Log entry added successfully"}
@@ -517,22 +502,33 @@ def get_deployment_info(
             message=str(error),
         )
 
-    logs = session.query(schema.Log).filter_by(schema.Log.model_id == model.id)
+    # Fetch all logs for the model
+    logs = session.query(schema.Log).filter(schema.Log.model_id == model.id).all()
+
+    # Aggregate logs by user_id, action
+    aggregated_logs = {}
+    for log in logs:
+        key = (log.user_id, log.action)
+        if key not in aggregated_logs:
+            aggregated_logs[key] = {
+                "user_id": str(log.user_id),
+                "action": log.action,
+                "count": 0,
+                "log_entries": [] if require_raw_logs else None,
+            }
+
+        aggregated_logs[key]["count"] += log.count
+        if require_raw_logs:
+            aggregated_logs[key]["log_entries"].extend(
+                log.data.get("train_samples", [])
+            )
 
     # Prepare the response data
     deployment_info = {
         "name": model.name,
         "status": model.deploy_status,
         "model_id": str(model.id),
-        "logs": [
-            {
-                "user_id": str(log.user_id),
-                "action": log.action,
-                "count": log.count,
-                **({"log_entries": log.log_entries} if require_raw_logs else {}),
-            }
-            for log in logs
-        ],
+        "logs": list(aggregated_logs.values()),
     }
 
     return response(

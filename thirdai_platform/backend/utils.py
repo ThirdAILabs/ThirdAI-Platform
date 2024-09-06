@@ -99,6 +99,7 @@ def get_high_level_model_info(result: schema.Model):
         "access_level": result.access_level,
         "domain": result.domain,
         "type": result.type,
+        "train_status": result.train_status,
         "deploy_status": result.deploy_status,
         "team_id": str(result.team_id),
         "model_id": str(result.id),
@@ -330,6 +331,7 @@ class NDBExtraOptions(BaseModel):
 
     class Config:
         extra = "forbid"
+        protected_namespaces = ()
 
     @root_validator(pre=True)
     def validate_version_restrictions(cls, values):

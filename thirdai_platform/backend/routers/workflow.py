@@ -13,7 +13,6 @@ from backend.auth_dependencies import (
 from backend.startup_jobs import start_on_prem_generate_job
 from backend.utils import (
     delete_nomad_job,
-    get_empty_port,
     get_platform,
     get_python_path,
     get_root_absolute_path,
@@ -166,13 +165,15 @@ class WorkflowParams(BaseModel):
     components: List[str]  # Added to match components with models
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "workflow_id": "f84b8f1d-76e1-4d9b-bb1a-8f8d5d6f1a3c",
                 "model_ids": ["model1_id", "model2_id"],
                 "components": ["search", "guardrail"],  # Example components
             }
         }
+
+        protected_namespaces = ()
 
 
 @workflow_router.post("/add-models")
@@ -705,7 +706,6 @@ async def start_workflow(
                     docker_username=os.getenv("DOCKER_USERNAME"),
                     docker_password=os.getenv("DOCKER_PASSWORD"),
                     image_name=os.getenv("DEPLOY_IMAGE_NAME"),
-                    port=None if platform == "docker" else get_empty_port(),
                     deployment_app_dir=str(get_root_absolute_path() / "deployment_job"),
                     model_id=str(model.id),
                     model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
@@ -717,14 +717,15 @@ async def start_workflow(
                         )
                     )["boltLicenseKey"],
                     genai_key=(os.getenv("GENAI_KEY", "")),
-                    autoscaling_enabled="false",
-                    autoscaler_max_count="1",
+                    autoscaling_enabled=os.getenv("AUTOSCALING_ENABLED", "false"),
+                    autoscaler_max_count=os.getenv("AUTOSCALER_MAX_COUNT", "1"),
                     memory=memory,
                     type=model.type,
                     sub_type=model.sub_type,
                     python_path=get_python_path(),
                     aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
                     aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
+                    worker_enabled=("true" if model.type == "ndb" else "false"),
                 )
 
                 model.deploy_status = schema.Status.starting
@@ -751,7 +752,7 @@ class WorkflowTypeParams(BaseModel):
     model_requirements: List[List[dict]]  # Updated to list of list of dictionaries
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "name": "semantic_search",
                 "description": "Semantic search workflow",
@@ -767,6 +768,8 @@ class WorkflowTypeParams(BaseModel):
                 ],
             }
         }
+
+        protected_namespaces = ()
 
 
 @workflow_router.post("/add-type", dependencies=[Depends(global_admin_only)])
@@ -1152,4 +1155,62 @@ def get_workflow_type_details(
         status_code=status.HTTP_200_OK,
         message="Workflow type details retrieved successfully.",
         data=jsonable_encoder(workflow_type_data),
+    )
+
+
+@workflow_router.get("/active-count")
+def get_active_workflows_count(
+    model_id: str,
+    session: Session = Depends(get_session),
+):
+    """
+    Get the count of active workflows associated with a specific model by its identifier.
+    - **Parameters**:
+      - `model_id` (str): The identifier of the model to check.
+    - **Returns**:
+      - `status_code` (int): HTTP status code.
+      - `message` (str): Response message.
+      - `data` (dict): Count of active workflows associated with the model.
+    **Example Request**:
+    ```json
+    {
+        "model_id": "UUID of the model"
+    }
+    ```
+    **Example Response**:
+    ```json
+    {
+        "status_code": 200,
+        "message": "Active workflows count retrieved successfully.",
+        "data": {
+            "active_workflows_count": 3
+        }
+    }
+    ```
+    """
+    model: schema.Model = session.query(schema.Model).get(model_id)
+
+    if not model:
+        return response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Model not found.",
+        )
+
+    # Count the active workflows that are using the model
+    active_workflows_count = (
+        session.query(schema.Workflow)
+        .join(schema.Workflow.workflow_models)
+        .filter(
+            schema.WorkflowModel.model_id == model.id,
+            schema.Workflow.status == schema.WorkflowStatus.active,
+        )
+        .count()
+    )
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Active workflows count retrieved successfully.",
+        data={
+            "active_workflows_count": active_workflows_count,
+        },
     )

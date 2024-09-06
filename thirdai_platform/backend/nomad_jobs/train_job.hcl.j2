@@ -1,8 +1,5 @@
-{% if sub_type == "shard_train" %}
-job "train-{{ model_id }}-{{ type }}-{{ sub_type }}-{{ shard_num }}" {
-{% else %}
-job "train-{{ model_id }}-{{ type }}-{{ sub_type }}" {
-{% endif %}
+job "{{ train_job_name }}" {
+
   datacenters = ["dc1"]
 
   type = "batch"
@@ -19,26 +16,8 @@ job "train-{{ model_id }}-{{ type }}-{{ sub_type }}" {
       {% endif %}
 
       env {
-        MODEL_ID = "{{ model_id }}"
-        DATA_ID = "{{ data_id }}"
-        MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
-        LICENSE_KEY = "{{ license_key }}"
-        BASE_MODEL_ID = "{{ base_model_id }}"
         AWS_ACCESS_KEY = "{{ aws_access_key }}"
         AWS_ACCESS_SECRET = "{{ aws_access_secret }}"
-        TYPE = "{{ type }}"
-        SUB_TYPE = "{{ sub_type }}"
-        SHARD_NUM = "{{ shard_num }}"
-
-        {%- for key, value in extra_options.items() %}
-        {{ key | upper }} = "{{ value }}"
-        {%- endfor %}
-
-        {% if platform == "docker" %}
-          MODEL_BAZAAR_DIR = "/model_bazaar"
-        {% elif platform == "local" %}
-          MODEL_BAZAAR_DIR = "{{ share_dir }}"
-        {% endif %}
       }
 
       config {
@@ -53,15 +32,17 @@ job "train-{{ model_id }}-{{ type }}-{{ sub_type }}" {
           volumes = [
             "{{ share_dir }}:/model_bazaar"
           ]
+          command = "python3"
+          args    = ["run.py", "--config", "{{ config_path }}"]
         {% elif platform == "local" %}
           command = "{{ python_path }}"
-          args    = ["{{ train_script }}"]
+          args    = ["{{ train_script }}", "--config", "{{ config_path }}"]
         {% endif %}
       }
 
       resources {
-        cpu = {{ extra_options.get('allocation__cores', 1) * 2400 }}
-        memory = {{ extra_options.get('allocation_memory', '6800') }}
+        cpu = {{ allocation_cores * 2400 }}
+        memory = {{ allocation_memory }}
 
       }
     }

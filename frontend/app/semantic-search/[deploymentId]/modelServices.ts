@@ -504,6 +504,13 @@ export class ModelService {
         }
     }
 
+    openAWSReference(ref: ReferenceInfo): void {
+        const [start, end] = startAndEnd(ref.content);
+        const highlightedSourceURL =
+            "https://" + ref.sourceURL.replace(/^(https?:\/\/)?/, "") + "#:~:text=" + start + "," + end;
+        window.open(highlightedSourceURL);
+    }
+
     async upvote(
         queryId: string,
         queryText: string,

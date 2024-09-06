@@ -503,6 +503,7 @@ interface WorkflowModel {
   thirdai_version: string;
   training_time: string;
   type: string;
+  train_status: string;
   user_email: string;
   username: string;
 }
@@ -631,16 +632,17 @@ export function trainTokenClassifier(
   const targetColumn = "target";
 
   const formData = new FormData();
-  formData.append("files", samplesToFile(samples, sourceColumn, targetColumn));
-  formData.append("files_details_list", JSON.stringify({
-    file_details: [{ mode: 'supervised', location: 'local', is_folder: false }]
+  const samplesFile = samplesToFile(samples, sourceColumn, targetColumn)
+  formData.append("files", samplesFile);
+  formData.append("file_info", JSON.stringify({
+    supervised_files: [{ path: samplesFile.name, location: "local" }]
   }));
-  formData.append("extra_options_form", JSON.stringify({
-    sub_type: "token",
+  formData.append("model_options", JSON.stringify({ udt_options: {
+    udt_sub_type: "token",
     source_column: sourceColumn,
     target_column: targetColumn,
     target_labels: tags,
-  }))
+  }}))
 
   return new Promise((resolve, reject) => {
     axios
@@ -1009,6 +1011,27 @@ export async function assignTeamAdmin(email: string, team_id: string) {
       });
   });
 }
+
+export async function removeTeamAdmin(email: string, team_id: string) {
+  const accessToken = getAccessToken();
+
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  const params = new URLSearchParams({ email, team_id });
+
+  return new Promise((resolve, reject) => {
+    axios
+      .post(`${thirdaiPlatformBaseUrl}/api/team/remove-team-admin?${params.toString()}`)
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        reject(err);
+      });
+  });
+}
+
+
 
 
 export async function deleteUserFromTeam(email: string, team_id: string): Promise<void> {

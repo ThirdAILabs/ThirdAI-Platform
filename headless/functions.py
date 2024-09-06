@@ -40,7 +40,8 @@ class UDTFunctions:
             supervised_docs=[
                 os.path.join(config.base_path, config.unsupervised_paths[0])
             ],
-            train_extra_options=UDTFunctions.build_extra_options(config),
+            model_options=UDTFunctions.build_model_options(config),
+            job_options=UDTFunctions.build_job_options(config),
             doc_type=config.doc_type,
         )
 
@@ -60,25 +61,30 @@ class UDTFunctions:
             f"udt_{model.model_identifier}_deployment_{run_name}",
         )
 
-    def build_extra_options(config: Config) -> Dict[str, Any]:
+    def build_model_options(config: Config) -> Dict[str, Any]:
         if config.sub_type == "text":
             return {
-                "sub_type": config.sub_type,
-                "text_column": config.query_column,
-                "label_column": config.id_column,
-                "allocation_memory": config.allocation_memory,
-                "allocation_cores": config.allocation_cores,
-                "n_target_classes": config.n_classes,
+                "udt_options": {
+                    "udt_sub_type": "text",
+                    "text_column": config.query_column,
+                    "label_column": config.id_column,
+                    "n_target_classes": config.n_classes,
+                }
             }
-        else:
-            return {
-                "sub_type": config.sub_type,
+        return {
+            "udt_options": {
+                "udt_sub_type": "token",
+                "target_labels": config.target_labels,
                 "source_column": config.query_column,
                 "target_column": config.id_column,
-                "allocation_memory": config.allocation_memory,
-                "allocation_cores": config.allocation_cores,
-                "target_labels": config.target_labels,
             }
+        }
+
+    def build_job_options(config: Config) -> Dict[str, Any]:
+        return {
+            "allocation_memory": config.allocation_memory,
+            "allocation_cores": config.allocation_cores,
+        }
 
 
 class CommonFunctions:
@@ -204,7 +210,6 @@ class NDBFunctions:
     @staticmethod
     def check_unsupervised(inputs: Dict[str, Any]) -> Any:
         logging.info(f"Running unsupervised with {inputs}")
-        sharded = inputs.get("sharded")
         run_name = inputs.get("run_name")
         config: Config = inputs.get("config")
         base_model = inputs.get("base_model", None)
@@ -214,25 +219,28 @@ class NDBFunctions:
 
         base_model_identifier = base_model.model_identifier if base_model else None
 
-        type = "single" if not sharded else "multiple"
+        unsup_docs = [
+            os.path.join(config.base_path, config.unsupervised_paths[file_num])
+        ]
         return flow.train(
-            model_name=f"{run_name}_{dag_name}_{config.name}_{type}_unsupervised",
-            unsupervised_docs=[
-                os.path.join(config.base_path, config.unsupervised_paths[file_num])
-            ],
-            extra_options=NDBFunctions.build_extra_options(config, sharded),
+            model_name=f"{run_name}_{dag_name}_{config.name}_unsupervised",
+            unsupervised_docs=unsup_docs,
+            model_options=NDBFunctions.build_model_options(config),
             doc_type=config.doc_type,
             nfs_base_path=config.nfs_original_base_path,
             base_model_identifier=base_model_identifier,
             test_doc=(
                 os.path.join(config.base_path, config.test_paths[0]) if test else None
             ),
+            doc_options={
+                doc: NDBFunctions.build_doc_options(config) for doc in unsup_docs
+            },
+            job_options=NDBFunctions.build_job_options(config),
         )
 
     @staticmethod
     def check_unsupervised_supervised(inputs: Dict[str, Any]) -> Any:
         logging.info(f"Running unsupervised supervised with {inputs}")
-        sharded = inputs.get("sharded")
         run_name = inputs.get("run_name")
         config: Config = inputs.get("config")
         base_model = inputs.get("base_model", None)
@@ -242,25 +250,31 @@ class NDBFunctions:
 
         base_model_identifier = base_model.model_identifier if base_model else None
 
-        type = "single" if not sharded else "multiple"
+        unsup_docs = [
+            os.path.join(config.base_path, config.unsupervised_paths[file_num])
+        ]
+        sup_docs = [
+            (
+                os.path.join(config.base_path, config.supervised_paths[file_num]),
+                os.path.join(config.base_path, config.unsupervised_paths[file_num]),
+            )
+        ]
         return flow.train(
-            model_name=f"{run_name}_{dag_name}_{config.name}_{type}_unsupervised_supervised",
-            unsupervised_docs=[
-                os.path.join(config.base_path, config.unsupervised_paths[file_num])
-            ],
-            supervised_docs=[
-                (
-                    os.path.join(config.base_path, config.supervised_paths[file_num]),
-                    os.path.join(config.base_path, config.unsupervised_paths[file_num]),
-                )
-            ],
-            extra_options=NDBFunctions.build_extra_options(config, sharded),
+            model_name=f"{run_name}_{dag_name}_{config.name}_unsupervised_supervised",
+            unsupervised_docs=unsup_docs,
+            supervised_docs=sup_docs,
+            model_options=NDBFunctions.build_model_options(config),
             doc_type=config.doc_type,
             nfs_base_path=config.nfs_original_base_path,
             base_model_identifier=base_model_identifier,
             test_doc=(
                 os.path.join(config.base_path, config.test_paths[0]) if test else None
             ),
+            doc_options={
+                doc: NDBFunctions.build_doc_options(config)
+                for doc in unsup_docs + [sup_docs[0][0]]
+            },
+            job_options=NDBFunctions.build_job_options(config),
         )
 
     @staticmethod
@@ -274,36 +288,39 @@ class NDBFunctions:
 
         return flow.bazaar_client.deploy(model.model_identifier)
 
-    def build_extra_options(config: Config, sharded: bool = False) -> Dict[str, Any]:
-        """
-        Builds a dictionary of extra options for training.
-
-        Parameters:
-        config (Config): Configuration object containing various settings.
-        sharded (bool, optional): Whether to use sharded training.
-
-        Returns:
-        dict[str, Any]: Dictionary of extra training options.
-        """
+    def build_model_options(config: Config) -> Dict[str, Any]:
+        if config.retriever == "mach":
+            mach_options = {
+                "fhr": config.input_dim,
+                "embedding_dim": config.hidden_dim,
+                "output_dim": config.output_dim,
+                "unsupervised_epochs": config.epochs,
+                "supervised_epochs": config.epochs,
+            }
+        else:
+            mach_options = None
         return {
-            "model_cores": config.model_cores,
-            "model_memory": config.model_memory,
+            "ndb_options": {
+                "ndb_sub_type": "v1",
+                "retriever": config.retriever,
+                "mach_options": mach_options,
+                "checkpoint_interval": config.checkpoint_interval,
+            }
+        }
+
+    def build_doc_options(config: Config) -> Dict[str, Any]:
+        return {
             "csv_id_column": config.id_column,
             "csv_strong_columns": config.strong_columns,
             "csv_weak_columns": config.weak_columns,
             "csv_reference_columns": config.reference_columns,
-            "fhr": config.input_dim,
-            "embedding_dim": config.hidden_dim,
-            "output_dim": config.output_dim,
             "csv_query_column": config.query_column,
             "csv_id_delimiter": config.id_delimiter,
-            "num_models_per_shard": 2 if sharded else 1,
-            "num_shards": 2 if sharded else 1,
+        }
+
+    def build_job_options(config: Config) -> Dict[str, Any]:
+        return {
             "allocation_memory": config.allocation_memory,
-            "unsupervised_epochs": config.epochs,
-            "supervised_epochs": config.epochs,
-            "retriever": config.retriever,
-            "checkpoint_interval": config.checkpoint_interval,
         }
 
 

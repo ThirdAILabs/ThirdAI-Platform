@@ -1,6 +1,6 @@
 import datetime
 from threading import Lock
-from typing import Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 import fastapi
 from variables import GeneralVariables
@@ -103,57 +103,47 @@ class Permissions:
         permissions = self.cache[token]
         return permissions["read"], permissions["write"], permissions["override"]
 
-    def verify_read_permission(
-        self, token: str = fastapi.Depends(optional_token_bearer)
-    ) -> str:
+    def verify_permission(self, permission_type: str = "read") -> Callable[[str], str]:
         """
-        Verifies read permission for the token.
+        Creates a function that verifies a specific permission type for the token.
+
+        Args:
+            permission_type (str): The type of permission to verify (read, write, override).
+
+        Returns:
+            Callable: A function that takes the token and checks the permission.
+        """
+
+        def dependency(token: str = fastapi.Depends(optional_token_bearer)) -> str:
+            with self.cache_lock:
+                permissions = self._get_permissions(token)
+                permission_map = {
+                    "read": permissions[0],
+                    "write": permissions[1],
+                    "override": permissions[2],
+                }
+                if not permission_map.get(permission_type):
+                    raise CREDENTIALS_EXCEPTION
+                return token
+
+        return dependency
+
+    def check_permission(self, token: str, permission_type: str = "read") -> bool:
+        """
+        Checks if a specific permission type is granted for the token.
 
         Args:
             token (str): The access token.
+            permission_type (str): The type of permission to check (read, write, override).
 
         Returns:
-            str: The access token if permission is granted.
-
-        Raises:
-            HTTPException: If the token does not have read permission.
+            bool: True if the token has the required permission, False otherwise.
         """
         with self.cache_lock:
-            if not self._get_permissions(token)[0]:
-                raise CREDENTIALS_EXCEPTION
-        return token
-
-    def verify_write_permission(
-        self, token: str = fastapi.Depends(optional_token_bearer)
-    ) -> str:
-        """
-        Verifies write permission for the token.
-
-        Args:
-            token (str): The access token.
-
-        Returns:
-            str: The access token if permission is granted.
-
-        Raises:
-            HTTPException: If the token does not have write permission.
-        """
-        with self.cache_lock:
-            if not self._get_permissions(token)[1]:
-                raise CREDENTIALS_EXCEPTION
-        return token
-
-    def get_owner_permission(
-        self, token: str = fastapi.Depends(optional_token_bearer)
-    ) -> bool:
-        """
-        Checks if the token has owner permission.
-
-        Args:
-            token (str): The access token.
-
-        Returns:
-            bool: True if the token has owner permission, False otherwise.
-        """
-        with self.cache_lock:
-            return self._get_permissions(token)[2]
+            permissions = self._get_permissions(token)
+            permission_map = {
+                "read": permissions[0],
+                "write": permissions[1],
+                "override": permissions[2],
+            }
+            return permission_map.get(permission_type, False)

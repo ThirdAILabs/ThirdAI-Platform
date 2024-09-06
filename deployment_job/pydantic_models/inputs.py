@@ -93,6 +93,9 @@ class SaveModel(BaseModel):
     override: bool
     model_name: Optional[str] = None
 
+    class Config:
+        protected_namespaces = ()
+
 
 def convert_reference_to_pydantic(input: Any, context_radius: int) -> Reference:
     """

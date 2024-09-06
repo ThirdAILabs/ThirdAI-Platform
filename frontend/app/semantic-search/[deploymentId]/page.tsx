@@ -185,7 +185,7 @@ function App() {
 
                 const newModelService = new ModelService(serviceUrl, tokenModelUrl, uuidv4());
                 setModelService(newModelService);
-                newModelService.sources().then(setSources);
+                newModelService.sources().then((fetchedSources) => setSources(fetchedSources));
             } catch (error) {
                 console.error('Failed to fetch workflow details:', error);
                 alert('Failed to fetch workflow details:' + error)
@@ -489,6 +489,10 @@ function App() {
     }
 
     function openSource(ref: ReferenceInfo) {
+        if (ref.sourceURL.includes("amazonaws.com")) {
+            modelService!.openAWSReference(ref);
+            return;
+        }
         if (!ref.sourceName.toLowerCase().endsWith(".pdf")) {
             modelService!.openReferenceSource(ref);
             return;

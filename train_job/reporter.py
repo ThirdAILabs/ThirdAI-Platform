@@ -1,11 +1,21 @@
-import json
+from abc import ABC, abstractmethod
 from typing import Dict, Optional
 from urllib.parse import urljoin
 
 import requests
 
 
-class Reporter:
+class Reporter(ABC):
+    @abstractmethod
+    def report_complete(self, model_id: str, metadata: Dict[str, str]):
+        raise NotImplementedError
+
+    @abstractmethod
+    def report_status(self, model_id: str, status: str, message: str = ""):
+        raise NotImplementedError
+
+
+class HttpReporter(Reporter):
     def __init__(self, api_url: str):
         """
         Initialize the Reporter with the given API URL.
@@ -64,74 +74,5 @@ class Reporter:
             "post",
             "api/train/update-status",
             params={"model_id": model_id, "status": status, "message": message},
-        )
-        print(content)
-
-    def create_shard(
-        self,
-        shard_num: int,
-        model_id: str,
-        data_id: str,
-        base_model_id: Optional[str] = None,
-        extra_options: Optional[Dict] = None,
-    ):
-        """
-        Create a new shard for training.
-        Args:
-            shard_num (int): The shard number.
-            model_id (str): The ID of the model.
-            data_id (str): The ID of the data.
-            base_model_id (Optional[str], optional): The base model ID. Defaults to None.
-            extra_options (Optional[Dict], optional): Extra options for the shard creation. Defaults to None.
-        """
-        if extra_options is None:
-            extra_options = {}
-        content = self._request(
-            "post",
-            "api/train/create-shard",
-            params={
-                "shard_num": shard_num,
-                "model_id": model_id,
-                "data_id": data_id,
-                "base_model_id": base_model_id,
-            },
-            data={"extra_options_form": json.dumps(extra_options)},
-        )
-        print(content)
-
-    def get_model_shard_train_status(self, model_id: str) -> Optional[Dict]:
-        """
-        Get the training status of a model shard.
-        Args:
-            model_id (str): The ID of the model.
-        Returns:
-            Optional[Dict]: The status of the model shard training.
-        """
-        content = self._request(
-            "get", "api/train/model-shard-train-status", params={"model_id": model_id}
-        )
-        print(content)
-        return content
-
-    def report_shard_train_status(
-        self, model_id: str, shard_num: int, status: str, message: str = ""
-    ):
-        """
-        Report the training status of a specific shard.
-        Args:
-            model_id (str): The ID of the model.
-            shard_num (int): The shard number.
-            status (str): The status of the shard training.
-            message (str, optional): Additional message. Defaults to "".
-        """
-        content = self._request(
-            "post",
-            "api/train/update-shard-train-status",
-            params={
-                "shard_num": shard_num,
-                "model_id": model_id,
-                "status": status,
-                "message": message,
-            },
         )
         print(content)

@@ -4,25 +4,31 @@ from pathlib import Path
 from typing import List
 
 import thirdai
+from config import FileInfo, NDBv1Options, TrainConfig
 from exceptional_handler import apply_exception_handler
 from models.model import Model
+from reporter import Reporter
 from thirdai import neural_db as ndb
-from utils import convert_supervised_to_ndb_file, get_directory_size
-from variables import NeuralDBVariables
+from utils import (
+    check_csv_only,
+    convert_supervised_to_ndb_file,
+    expand_s3_buckets_and_directories,
+    get_directory_size,
+)
 
 
 @apply_exception_handler
 class NDBModel(Model):
     report_failure_method = "report_status"
 
-    def __init__(self):
+    def __init__(self, config: TrainConfig, reporter: Reporter):
         """
-        Initialize the NDBModel with general and NeuralDB-specific variables.
+        Initialize the NDBModel with general and NeuralDB-specific options.
         """
-        super().__init__()
-        self.ndb_variables: NeuralDBVariables = NeuralDBVariables.load_from_env()
+        super().__init__(config=config, reporter=reporter)
+        self.ndb_options: NDBv1Options = self.config.model_options.ndb_options
         self.model_save_path: Path = self.model_dir / "model.ndb"
-        self.logger.info("NDBModel initialized with NeuralDB variables.")
+        self.logger.info("NDBModel initialized with NeuralDB options.")
 
         self.unsupervised_checkpoint_config = self.create_checkpoint_config(
             self.get_checkpoint_dir(self.unsupervised_checkpoint_dir)
@@ -34,15 +40,28 @@ class NDBModel(Model):
         )
         self.logger.info(f"Supervised checkpoint config created")
 
+    def unsupervised_files(self) -> List[FileInfo]:
+        return expand_s3_buckets_and_directories(self.config.data.unsupervised_files)
+
+    def supervised_files(self) -> List[FileInfo]:
+        all_files = expand_s3_buckets_and_directories(self.config.data.supervised_files)
+        check_csv_only(all_files)
+        return all_files
+
+    def test_files(self) -> List[FileInfo]:
+        all_files = expand_s3_buckets_and_directories(self.config.data.test_files)
+        check_csv_only(all_files)
+        return all_files
+
     def create_checkpoint_config(self, dir_path: Path):
         self.logger.info(f"Creating checkpoint config for directory: {dir_path}")
         return (
             ndb.CheckpointConfig(
                 checkpoint_dir=dir_path,
-                checkpoint_interval=self.train_variables.checkpoint_interval,
+                checkpoint_interval=self.ndb_options.checkpoint_interval,
                 resume_from_checkpoint=dir_path.exists(),
             )
-            if self.train_variables.checkpoint_interval
+            if self.ndb_options.checkpoint_interval
             else None
         )
 
@@ -50,33 +69,17 @@ class NDBModel(Model):
         self.logger.info(f"Getting checkpoint directory: {base_checkpoint_dir}")
         return base_checkpoint_dir
 
-    def get_supervised_files(self, files: List[str]) -> List[ndb.Sup]:
+    def get_supervised_files(self, files: List[FileInfo]) -> List[ndb.Sup]:
         """
         Convert files to supervised NDB files.
         Args:
-            files (List[str]): List of file paths for supervised training data.
+            files (List[FileInfo]): List of file infos for supervised training data.
         Returns:
             List[ndb.Sup]: List of converted supervised NDB files.
         """
         self.logger.info("Converting supervised files.")
-        relations_path = self.data_dir / "relations.json"
-        if relations_path.exists():
-            self.logger.info(f"Loading relations from {relations_path}")
-            with relations_path.open("r") as file:
-                relations_data = json.load(file)
-            relations_dict = {
-                entry["supervised_file"]: entry["source_id"] for entry in relations_data
-            }
-        else:
-            self.logger.warning(f"Relations file not found at {relations_path}")
-            relations_dict = {}
 
-        supervised_source_ids = [relations_dict[Path(file).name] for file in files]
-
-        return [
-            convert_supervised_to_ndb_file(file, supervised_source_ids[i])
-            for i, file in enumerate(files)
-        ]
+        return [convert_supervised_to_ndb_file(file) for file in files]
 
     def get_ndb_path(self, model_id: str) -> Path:
         """
@@ -86,12 +89,7 @@ class NDBModel(Model):
         Returns:
             Path: The path to the NeuralDB checkpoint.
         """
-        path = (
-            Path(self.general_variables.model_bazaar_dir)
-            / "models"
-            / model_id
-            / "model.ndb"
-        )
+        path = Path(self.config.model_bazaar_dir) / "models" / model_id / "model.ndb"
         self.logger.info(f"NeuralDB path for model {model_id}: {path}")
         return path
 
@@ -112,11 +110,9 @@ class NDBModel(Model):
         Returns:
             ndb.NeuralDB: The NeuralDB instance.
         """
-        if self.general_variables.base_model_id:
-            self.logger.info(
-                f"Loading base model {self.general_variables.base_model_id}"
-            )
-            return self.load_db(self.general_variables.base_model_id)
+        if self.config.base_model_id:
+            self.logger.info(f"Loading base model {self.config.base_model_id}")
+            return self.load_db(self.config.base_model_id)
         self.logger.info("Initializing a new NeuralDB instance.")
         return self.initialize_db()
 
@@ -175,7 +171,7 @@ class NDBModel(Model):
         latency = self.get_latency(db)
 
         self.reporter.report_complete(
-            model_id=self.general_variables.model_id,
+            model_id=self.config.model_id,
             metadata={
                 "num_params": str(num_params),
                 "size": str(size),
