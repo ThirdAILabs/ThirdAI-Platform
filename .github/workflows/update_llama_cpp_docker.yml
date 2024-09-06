@@ -2,7 +2,7 @@ name: Weekly Llama.cpp Image Update
 
 on:
   schedule:
-    - cron: '0 0 * * 0'  # This will run the job at 00:00 UTC every Sunday
+    - cron: '0 18 * * 1'  # This will run the job at 18:00 UTC (6:00 PM UTC) every Monday
   
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
