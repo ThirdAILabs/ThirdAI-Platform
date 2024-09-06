@@ -3,6 +3,7 @@ Main module to initialize and retrieve the appropriate model instance.
 """
 
 import os
+import threading
 
 import thirdai
 from models.classification_models import (
@@ -10,7 +11,7 @@ from models.classification_models import (
     TokenClassificationModel,
 )
 from models.ndb_models import ShardedNDB, SingleNDB
-from variables import GeneralVariables, NDBSubtype, TypeEnum, UDTSubtype
+from variables import GeneralVariables, ModelType, NDBSubType, UDTSubType
 
 # Initialize thirdai license
 general_variables: GeneralVariables = GeneralVariables.load_from_env()
@@ -25,12 +26,17 @@ else:
 
 # Singleton Practice for Model instances.
 class ModelManager:
-    _model_instance = None
+    _read_instance = None
+    _write_instance = None
+    _lock = threading.Lock()  # Initialize a lock for thread safety
 
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls, write_mode: bool = False):
         """
-        Retrieves the appropriate model instance based on general variables.
+        Retrieves the appropriate model instance based on the mode requested.
+
+        Args:
+            write_mode (bool): Whether to retrieve the write-mode model instance.
 
         Returns:
             The initialized model instance.
@@ -38,24 +44,45 @@ class ModelManager:
         Raises:
             ValueError: If the model type is invalid.
         """
-        if cls._model_instance is None:
-            print("hahahah")
-            if general_variables.type == TypeEnum.NDB:
-                if general_variables.sub_type == NDBSubtype.sharded:
-                    cls._model_instance = ShardedNDB()
-                else:
-                    cls._model_instance = SingleNDB()
-            elif general_variables.type == TypeEnum.UDT:
-                if general_variables.sub_type == UDTSubtype.text:
-                    cls._model_instance = TextClassificationModel()
-                else:
-                    cls._model_instance = TokenClassificationModel()
+        with cls._lock:
+            if write_mode:
+                if cls._write_instance is None:
+                    cls._write_instance = cls._initialize_model(write_mode=True)
+                return cls._write_instance
             else:
-                raise ValueError("Invalid model type")
+                if cls._read_instance is None:
+                    cls._read_instance = cls._initialize_model(write_mode=False)
+                return cls._read_instance
 
-        print(cls._model_instance, type(cls._model_instance))
-        return cls._model_instance
+    @classmethod
+    def _initialize_model(cls, write_mode: bool):
+        """
+        Initializes and returns the appropriate model instance based on general variables.
+        """
+        if general_variables.type == ModelType.NDB:
+            if general_variables.sub_type == NDBSubType.v1:
+                return SingleNDB(write_mode=write_mode)
+            else:
+                raise ValueError("NDBv2 is not yet supported")
+        elif general_variables.type == ModelType.UDT:
+            if general_variables.sub_type == UDTSubType.text:
+                return TextClassificationModel()
+            elif general_variables.sub_type == UDTSubType.token:
+                return TokenClassificationModel()
+            else:
+                raise ValueError("Invalid UDT sub type.")
+        else:
+            raise ValueError("Invalid model type")
+
+    @classmethod
+    def reset_instances(cls):
+        """
+        Resets both read and write model instances to force reloading of the models.
+        """
+        with cls._lock:
+            cls._read_instance = None
+            cls._write_instance = None
 
 
-def get_model():
-    return ModelManager.get_instance()
+def get_model(write_mode: bool = False):
+    return ModelManager.get_instance(write_mode=write_mode)

@@ -42,6 +42,7 @@ class PDF(Document):
     emphasize_first_words: int = 0
     ignore_header_footer: bool = True
     ignore_nonstandard_orientation: bool = True
+    save_extra_info: bool = False
 
 
 class CSV(Document):
@@ -55,7 +56,7 @@ class CSV(Document):
     strong_columns: Optional[List[str]] = None
     weak_columns: Optional[List[str]] = None
     reference_columns: Optional[List[str]] = None
-    save_extra_info: bool = True
+    save_extra_info: bool = False
     metadata: Optional[dict[str, Any]] = None
     has_offset: bool = False
 
@@ -77,7 +78,7 @@ class URL(Document):
 
     document_type: Literal["URL"]
     url: str
-    save_extra_info: bool = True
+    save_extra_info: bool = False
     title_is_strong: bool = False
     metadata: Optional[dict[str, Any]] = None
 
@@ -90,6 +91,7 @@ class SentenceLevelPDF(Document):
     document_type: Literal["SentenceLevelPDF"]
     path: str
     metadata: Optional[dict[str, Any]] = None
+    save_extra_info: bool = False
 
 
 class SentenceLevelDOCX(Document):
@@ -109,7 +111,7 @@ class Unstructured(Document):
 
     document_type: Literal["Unstructured"]
     path: str
-    save_extra_info: bool = True
+    save_extra_info: bool = False
     metadata: Optional[dict[str, Any]] = None
 
 

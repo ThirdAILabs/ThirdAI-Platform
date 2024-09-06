@@ -134,6 +134,15 @@ jobs:
         source ${{ github.workspace }}/venv/bin/activate
         cd $GITHUB_WORKSPACE/thirdai_platform
         nohup uvicorn main:app --reload --host 0.0.0.0 --port 8000 > uvicorn.log 2>&1 &
+    
+    - name: List files in local_setup
+      run: ls -la local_setup
+    
+    - name: Launch Autoscaler and Redis job
+      run: |
+        cd local_setup
+        NOMAD_PATH=$(which nomad)
+        sudo bash launch_nomad_jobs.sh $NOMAD_PATH
 
     - name: Run Tests
       run: |

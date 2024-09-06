@@ -24,7 +24,7 @@ queries_ingested_bytes = Throughput()
 @propagate_error
 def udt_query(
     base_params: BaseQueryParams,
-    token=Depends(permissions.verify_read_permission),
+    token=Depends(permissions.verify_permission("read")),
 ):
     """
     Predicts the output based on the provided query parameters.
@@ -66,7 +66,7 @@ def udt_query(
 
 @udt_router.get("/stats")
 @propagate_error
-def udt_query(_=Depends(permissions.verify_read_permission)):
+def udt_query(_=Depends(permissions.verify_permission("read"))):
     """
     Returns statistics about the deployment such as the number of tokens identified, number of
     queries ingested, and total size of queries ingested.

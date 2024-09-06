@@ -318,26 +318,24 @@ class ModelShard(SQLDeclarativeBase):
 class Log(SQLDeclarativeBase):
     __tablename__ = "logs"
 
+    id = Column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
     model_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("models.id", ondelete="CASCADE"),
-        primary_key=True,
+        UUID(as_uuid=True), ForeignKey("models.id", ondelete="CASCADE"), nullable=False
     )
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    action = Column(String, primary_key=True)
+    action = Column(String, nullable=False)
     count = Column(Integer, nullable=False, default=0)
-    log_entries = Column(JSON, nullable=True)
+    data = Column(JSON, nullable=True)
 
     user = relationship("User", back_populates="logs")
 
     __table_args__ = (
         Index("log_model_index", "model_id"),
         Index("log_user_index", "user_id"),
-        UniqueConstraint(
-            "model_id", "user_id", "action", name="unique_model_user_action"
-        ),
     )
 
 

@@ -88,13 +88,34 @@ Without this process, it is cumbersome to test out platform changes. We would ha
       uvicorn main:app --reload --host 0.0.0.0 --port 8000
       ```
 
-8. **Launch Autoscaler Job**
-    - Start the Autoscaler job using the following command, first cd into `local_setup` folder and run
+8. **Launch Nomad Jobs**
+    - Start the Autoscaler job and Redis job using the following command, first cd into `local_setup` folder and run
       ```
-      nomad job run -var="nomad_endpoint=$(nomad agent-info | grep 'known_servers' | awk '{print $3}' | sed 's/:4647//')" autoscaler.nomad
+      bash launch_nomad_jobs.sh
       ```
+    - Ensure Docker Desktop is running since the Autoscaler and Redis jobs use Docker as their driver. If you haven't installed Docker Desktop yet, you can download it [here](https://www.docker.com/products/docker-desktop/).
 
-9. **Insert existing datasets in DB:**
+    - Once Docker Desktop is installed, open it and follow these steps:
+      - Go to **Settings > Resources > File Sharing**.
+      - Change the ownership of the `/opt/nomad` directory to your user account, Add the `/opt/nomad` directory to the file-sharing list.
+      - You can change the ownership by running following command `sudo chown -R $(whoami) /opt/nomad`
+      - Once you have done these changes, restart the docker desktop.
+      - Now navigate to your nomad UI, go to clients and select your local client and see the driver status 
+        
+        ![screenshot](Nomad_driver_status.png)
+
+9. **Launch Frontend**
+
+    To run the frontend, follow these steps:
+    - Make sure you have `npm` installed to handle the dependencies. Navigate to the `frontend` directory and run `pnpm install` to install dependencies, if you dont have pnpm you can install it globally using `npm install -g pnpm`
+    - Modify the following variables in `.env.example` and copy them to `.env` and save it inside `frontend` folder
+      - Change `NEXT_PUBLIC_OPENAI_API_KEY` to openai-key you wanna use.
+      - Keep `NEXT_PUBLIC_DEPLOYMENT_BASE_URL` and `NEXT_PUBLIC_THIRDAI_PLATFORM_BASE_URL` same.
+    - Finally to start you can run `pnpm dev`.
+    - Your application should now be running, and you can access it in the browser at port 3006.
+
+
+10. **Insert existing datasets in DB:**
     - These existing datasets are present in the share directory of blade. 
     - Make sure you are on blade when you insert the datasets
     - Go to `thirdai_platform` folder and run
@@ -118,3 +139,35 @@ Extra steps that may help:
 ### Setting up HashiCorp Vault
 You can use the following instructions to set it up:
 https://waytohksharma.medium.com/install-hashicorp-vault-on-mac-fdbd8cd9113b
+
+
+### Generating static documentation
+
+We currently use Sphinx to generate our API documentation. However, Sphinx has known compatibility issues with the latest OpenAPI 3.1.0 specification, leading to problems in rendering the documentation correctly. Until this issue is resolved, we will use a temporary solution by generating static documentation using **ReDoc CLI**.
+
+### Temporary Solution: Generating Static Documentation with ReDoc CLI
+
+To generate static API documentation using **ReDoc CLI**, follow these steps:
+
+1. **Install ReDoc CLI:**
+
+   Make sure you have Node.js and npm installed. Then, install ReDoc CLI globally:
+
+   ```bash
+   npm install -g redoc-cli
+2. **Generate the Static HTML Documentation:**
+  
+    Run the following command to generate the static HTML documentation:
+
+    ```bash
+    redoc-cli bundle http://localhost:8000/openapi.json -o ./redoc-static.html
+    ```
+    This command fetches the OpenAPI schema from your running FastAPI instance and generates a redoc-static.html file.
+
+    http://localhost:8000/openapi.json: URL to your OpenAPI schema.
+-o ./redoc-static.html: Output file path where the static HTML will be saved.
+
+3. **See the documentation:**
+
+    Now you can see the documentation by running ```open redoc-static.html```
+    
