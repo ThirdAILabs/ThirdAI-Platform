@@ -393,7 +393,6 @@ function App() {
                         processedQuery,
                         `${genaiPrompt}. [TAG #id] is sensitive information replaced as a placeholder, use them in your response for consistency.`,
                         processedReferences,
-                        websocketRef,
                         (next) => {
                             setAnswer((prev) => {
                                 // Concatenate previous answer and the new part
@@ -458,7 +457,6 @@ function App() {
                         query,
                         genaiPrompt,
                         results.references,
-                        websocketRef,
                         (next) => setAnswer((prev) => prev + next),
                         genAiProvider || undefined, // Convert null to undefined
                     );
@@ -477,7 +475,6 @@ function App() {
             query,
             prompt,
             results!.references.filter((ref) => checkedIds.has(ref.id)),
-            websocketRef,
             (next) => setAnswer((prev) => prev + next),
             genAiProvider || undefined, // Convert null to undefined
         );

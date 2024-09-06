@@ -5,9 +5,11 @@ load_dotenv()
 import uvicorn
 import os
 from urllib.parse import urljoin
+import asyncio
 
 import requests
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from llms import default_keys, model_classes
 from pydantic import ValidationError
@@ -36,6 +38,54 @@ class GenerateArgs(BaseModel):
     # For caching we want just the query, not the entire prompt.
     original_query: Optional[str] = None
     cache_access_token: Optional[str] = None
+
+
+@app.post("/llm-dispatch/genpost")
+async def generate(generate_args: GenerateArgs):
+    """
+    POST endpoint to generate text using a specified generative AI model.
+    Will stream content until generation is complete.
+    If an error is found, it will be returned as an HTTPException.
+
+    Returns a StreamingResponse with chunks of generated text.
+    """
+    key = generate_args.key or default_keys.get(generate_args.provider.lower())
+    if not key:
+        raise HTTPException(status_code=400, detail="No generative AI key provided")
+
+    llm_class = model_classes.get(generate_args.provider.lower())
+    if llm_class is None:
+        raise HTTPException(status_code=400, detail="Unsupported provider")
+    
+    print(f"Starting generation with provider '{generate_args.provider.lower()}':", flush=True)
+
+    llm = llm_class()
+
+    async def generate_stream():
+        generated_response = ""
+        try:
+            async for next_word in llm.stream(
+                key=key, query=generate_args.query, model=generate_args.model
+            ):
+                generated_response += next_word
+                yield next_word
+                print(next_word, end="")
+                await asyncio.sleep(0)  # do we need this?
+            print("Completed generation", flush=True)
+        except Exception as e:
+            print(f"Error during generation: {e}", flush=True)
+            raise HTTPException(status_code=500, detail="Error while generating content")
+        finally:
+            if (generate_args.original_query is not None and 
+                generate_args.cache_access_token is not None):
+                await insert_into_cache(
+                    generate_args.original_query,
+                    generated_response,
+                    generate_args.cache_access_token,
+                )
+
+    return StreamingResponse(generate_stream(), media_type="text/plain")
+
 
 
 @app.websocket("/llm-dispatch/generate")

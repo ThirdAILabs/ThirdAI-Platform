@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { genaiQuery } from "./genai";
 import { Box, Chunk, DocChunks } from "./components/pdf_viewer/interfaces";
 import { temporaryCacheToken } from "@/lib/backend";
@@ -107,14 +108,12 @@ export type TelemetryEventPackage = {
 
 export class ModelService {
     url: string;
-    wsUrl: string;
     sessionId: string;
     authToken: string | null;
     tokenModelUrl: string;
 
     constructor(url: string, tokenModelUrl: string, sessionId: string) {
         this.url = url;
-        this.wsUrl = deploymentBaseUrl.replace("http", "ws");
         this.sessionId = sessionId;
         this.tokenModelUrl = tokenModelUrl;
         this.authToken = window.localStorage.getItem(
@@ -139,7 +138,7 @@ export class ModelService {
             return response;
         };
     }
-    
+
     getModelID(): string {
         function extractModelIdFromUrl(url: string) {
             const urlParts = new URL(url);
@@ -597,64 +596,44 @@ export class ModelService {
         question: string,
         genaiPrompt: string,
         references: ReferenceInfo[],
-        websocketRef: React.MutableRefObject<WebSocket | null>,
         onNextWord: (str: string) => void,
         genAiProvider?: string,
         onComplete?: (finalAnswer: string) => void
     ) {
-        let finalAnswer = ''; // Variable to accumulate the response
+        let finalAnswer = '';
 
-        const cache_access_token =  await temporaryCacheToken(this.getModelID());
-        const args: any = {
-            query: genaiQuery(question, references, genaiPrompt),
-            key: "sk-PYTWB6gs_ofO44-teXA2rIRGRbJfzqDyNXBalHXKcvT3BlbkFJk5905SK2RVE6_ME8i4Lnp9qULbyPZSyOU0vh2fZfQA", // fill in openai key
-            original_query: question,
-            cache_access_token: cache_access_token.access_token
-        };
+        try {
+            const cache_access_token = await temporaryCacheToken(this.getModelID());
+            const args = {
+                query: genaiQuery(question, references, genaiPrompt),
+                key: "sk-PYTWB6gs_ofO44-teXA2rIRGRbJfzqDyNXBalHXKcvT3BlbkFJk5905SK2RVE6_ME8i4Lnp9qULbyPZSyOU0vh2fZfQA", // fill in openai key
+                original_query: question,
+                cache_access_token: cache_access_token.access_token,
+                provider: genAiProvider
+            };
 
-        if (genAiProvider) {
-            args.provider = genAiProvider;
-        }
-
-        const uri = this.wsUrl + "/llm-dispatch/generate";
-        websocketRef.current = new WebSocket(uri);
-
-        websocketRef.current.onopen = async function (event) {
-            websocketRef.current!.send(JSON.stringify(args));
-        };
-
-        websocketRef.current.onmessage = function (event) {
-            const response = JSON.parse(event.data);
-            if (response["status"] === "error") {
-                onNextWord(response["detail"]);
+            const uri = deploymentBaseUrl + "/llm-dispatch/genpost"
+            const response = await axios.post(uri, args, {
+            responseType: 'text',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            onDownloadProgress: (progressEvent) => {
+                const xhr = progressEvent.target as XMLHttpRequest;
+                const newData = xhr.responseText.slice(finalAnswer.length);
+                finalAnswer += newData;
+                onNextWord(newData);
             }
-            if (response["status"] === "success") {
-                onNextWord(response["content"]);
-                finalAnswer += response["content"]; // Append each piece of content to the finalAnswer
-            }
-            if (response["end_of_stream"]) {
-                websocketRef.current!.close();
-            }
-        };
+        });
 
-        websocketRef.current.onerror = function (error) {
+            if (typeof onComplete === 'function') {
+                onComplete(finalAnswer);
+            }
+        } catch (error) {
             console.error("Generation Error:", error);
-            alert("Generation Error:" + error)
-        };
-
-        websocketRef.current.onclose = function (event) {
-            if (event.wasClean) {
-                console.log(
-                    `Closed cleanly, code=${event.code}, reason=${event.reason}`,
-                );
-                if (typeof onComplete === 'function') {
-                    onComplete(finalAnswer); // Call onComplete with the accumulated finalAnswer
-                }
-            } else {
-                console.error(`Connection died`);
-                alert(`Connection died`)
-            }
-        };
+            alert("Generation Error:" + error);
+            onNextWord("An error occurred during generation.");
+        }
     }
 
     getChatHistory(): Promise<ChatMessage[]> {
