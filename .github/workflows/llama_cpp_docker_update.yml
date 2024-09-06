@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: '0 0 * * 0'  # This will run the job at 00:00 UTC every Sunday
 
+# How to set up credentials for GH actions:
+# https://learn.microsoft.com/en-us/azure/container-instances/container-instances-github-action#configure-github-workflow
+
 jobs:
   update-llama-cpp:
     runs-on: ubuntu-latest
