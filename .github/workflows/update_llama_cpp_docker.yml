@@ -19,13 +19,6 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: 'Docker Login to ACR'
-        uses: azure/docker-login@v1
-        with:
-          login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
-
       - name: 'Pull Llama.cpp Image from GitHub Container Registry'
         run: docker pull ghcr.io/ggerganov/llama.cpp:server
 
@@ -33,4 +26,9 @@ jobs:
         run: docker tag ghcr.io/ggerganov/llama.cpp:server ${{ secrets.REGISTRY_LOGIN_SERVER }}/llama.cpp:server
 
       - name: 'Push Image to ACR'
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
         run: docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/llama.cpp:server
