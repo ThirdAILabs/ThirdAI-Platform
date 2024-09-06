@@ -13,7 +13,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
-import { Workflow, validate_workflow, start_workflow, stop_workflow, delete_workflow } from '@/lib/backend';
+import { Workflow, validate_workflow, start_workflow, stop_workflow, delete_workflow,
+        WorkflowModel, getDeployStatus
+ } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
 import { Modal } from '@/components/ui/Modal'
 import { InformationCircleIcon } from '@heroicons/react/solid';
@@ -323,6 +325,9 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
                 <p><strong>Model Name:</strong> {model.model_name}</p>
                 <p><strong>Size on Disk:</strong> {formatBytesToMB(model.size)}</p>
                 <p><strong>Size in Memory:</strong> {formatBytesToMB(model.size_in_memory)}</p>
+
+                {/* Button for viewing model status in Grafana */}
+                <ModelStatusButton model={model} />
               </div>
             ))}
           </div>
@@ -331,3 +336,66 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
     </TableRow>
   );
 }
+
+interface ModelStatusButtonProps {
+  model: WorkflowModel;
+}
+
+interface GetDeployStatusResponse {
+  model_id: string;
+  deploy_status: string;
+  weblink?: string;  // Optional since it might not always be present
+}
+
+const ModelStatusButton: React.FC<ModelStatusButtonProps> = ({ model }) => {
+  const [weblink, setWeblink] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [deployStatus, setDeployStatus] = useState<string>(model.deploy_status);
+
+  useEffect(() => {
+    // Fetch the deploy status and weblink
+    getDeployStatus({
+      deployment_identifier: `${model.model_id}:${model.model_id}`,
+      model_identifier: `${model.username}/${model.model_name}`,
+    })
+      .then((response: { data: GetDeployStatusResponse }) => {
+        setDeployStatus(response.data.deploy_status);
+
+        // Set weblink if available
+        if (response.data.weblink) {
+          console.log('weblink i got', response.data.weblink)
+          setWeblink(response.data.weblink);
+        }
+
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error('Error fetching deployment status:', error);
+        setLoading(false);
+      });
+  }, [model]);
+
+  return (
+    <div className="mt-2">
+      {loading ? (
+        <p>Loading status...</p>
+      ) : deployStatus === 'complete' && weblink ? (
+        <a
+          href={weblink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          View Model Status
+        </a>
+      ) : (
+        <button
+          disabled
+          className="px-4 py-2 bg-gray-300 text-gray-700 rounded"
+        >
+          Model not deployed
+        </button>
+      )}
+    </div>
+  );
+};

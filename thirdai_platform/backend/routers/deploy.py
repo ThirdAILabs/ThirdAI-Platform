@@ -13,6 +13,7 @@ from auth.jwt import (
 )
 from backend.auth_dependencies import is_model_owner
 from backend.utils import (
+    GRAFANA_DASHBOARDDS,
     delete_nomad_job,
     get_model_from_identifier,
     get_platform,
@@ -311,7 +312,15 @@ def deployment_status(
     return response(
         status_code=status.HTTP_200_OK,
         message="Successfully got the deployment status",
-        data={"deploy_status": model.deploy_status, "model_id": str(model.id)},
+        data={
+            "deploy_status": model.deploy_status,
+            "model_id": str(model.id),
+            "weblink": (
+                f"{os.getenv('PUBLIC_MODEL_BAZAAR_ENDPOINT').rstrip('/')}/grafana/d/{GRAFANA_DASHBOARDDS['allocations']}/allocations?orgId=1&var-workload=deployment-{str(model.id)}"
+                if model.deploy_status == schema.Status.complete
+                else ""
+            ),
+        },
     )
 
 

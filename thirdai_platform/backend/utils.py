@@ -19,6 +19,12 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger("ThirdAI_Platform")
 
+GRAFANA_DASHBOARDDS = {
+    "clients": "Y72kP0G4z",
+    "server": "xDnB_0G4z",
+    "allocations": "5XxwU0GVz",
+}
+
 
 def setup_logger(
     level=logging.DEBUG, format="%(asctime)s | [%(name)s] [%(levelname)s] %(message)s"

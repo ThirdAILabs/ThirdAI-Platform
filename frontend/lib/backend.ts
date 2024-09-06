@@ -486,7 +486,7 @@ export async function delete_workflow(workflowId: string): Promise<DeleteWorkflo
 
 
 
-interface WorkflowModel {
+export interface WorkflowModel {
   access_level: string;
   component: string;
   deploy_status: string;
