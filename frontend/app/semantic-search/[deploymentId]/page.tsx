@@ -155,7 +155,7 @@ function App() {
         const generationOn = searchParams.get('ifGenerationOn') === 'true';
         const provider = searchParams.get('genAiProvider');
 
-        console.log('workflowId', workflowId)
+        console.log('workflowId', receievedWorkflowId)
         console.log('generationOn', generationOn)
         console.log('genAiProvider', provider);
 
@@ -165,7 +165,7 @@ function App() {
 
         const fetchWorkflowDetails = async () => {
             try {
-                const details = await getWorkflowDetails(workflowId as string);
+                const details = await getWorkflowDetails(receievedWorkflowId as string);
                 console.log('Models:', details.data.models);
 
                 // Filter and find the model with component "search"
@@ -194,7 +194,7 @@ function App() {
             }
         };
 
-        if (workflowId) {
+        if (receievedWorkflowId) {
             fetchWorkflowDetails();
         }
     }, []);

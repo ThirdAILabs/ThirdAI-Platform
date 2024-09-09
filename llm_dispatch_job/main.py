@@ -2,21 +2,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-import uvicorn
-import os
-from urllib.parse import urljoin
 import asyncio
+import os
+from typing import Optional
+from urllib.parse import urljoin
 
 import requests
-from fastapi import FastAPI, WebSocket, HTTPException
-from fastapi.responses import StreamingResponse
+import uvicorn
+from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from llms import default_keys, model_classes
-from pydantic import ValidationError
-from typing import Optional
-
-from pydantic import BaseModel
-
+from pydantic import BaseModel, ValidationError
 
 app = FastAPI()
 
@@ -32,7 +29,7 @@ app.add_middleware(
 class GenerateArgs(BaseModel):
     query: str
     key: Optional[str] = None
-    model: str = "gpt-3.5-turbo"
+    model: str = "gpt-4o-mini"
     provider: str = "openai"
     workflow_id: Optional[str] = None
 
@@ -44,12 +41,44 @@ class GenerateArgs(BaseModel):
 @app.post("/llm-dispatch/genpost")
 async def generate(generate_args: GenerateArgs):
     """
-    POST endpoint to generate text using a specified generative AI model.
-    Will stream content until generation is complete.
-    If an error is found, it will be returned as an HTTPException.
-
+    Generate text using a specified generative AI model, with content streamed in real-time.
     Returns a StreamingResponse with chunks of generated text.
+
+    Parameters:
+        - query: str - The input query or prompt for text generation.
+        - key: Optional[str] - API key for the provider.
+        - model: str - The model to use for text generation (default: "gpt-4o-mini").
+        - provider: str - The AI provider to use (default: "openai").
+        - workflow_id: Optional[str] - Workflow ID for tracking the request.
+        - original_query: Optional[str] - The original query to be cached, used for cache lookup.
+        - cache_access_token: Optional[str] - Authorization token for caching responses.
+
+    Returns:
+    - StreamingResponse: A stream of generated text in chunks.
+
+    Example Request Body:
+    ```
+    {
+        "query": "Explain the theory of relativity",
+        "model": "gpt-4o-mini",
+        "provider": "openai",
+        "workflow_id": "12345",
+        "original_query": "Explain relativity",
+        "cache_access_token": "cache_token_abc"
+    }
+    ```
+
+    Errors:
+    - HTTP 400:
+        - No API key provided and no default key found for the provider.
+        - Unsupported provider.
+    - HTTP 500:
+        - Error during the text generation process.
+
+    Caching:
+    - If `original_query` and `cache_access_token` are provided, the generated content will be cached after completion.
     """
+
     key = generate_args.key or default_keys.get(generate_args.provider.lower())
     if not key:
         raise HTTPException(status_code=400, detail="No generative AI key provided")
@@ -57,9 +86,12 @@ async def generate(generate_args: GenerateArgs):
     llm_class = model_classes.get(generate_args.provider.lower())
     if llm_class is None:
         raise HTTPException(status_code=400, detail="Unsupported provider")
-    
-    print(f"Received request from workflow: '{generate_args.workflow_id}'. "
-          "Starting generation with provider '{generate_args.provider.lower()}':", flush=True)
+
+    print(
+        f"Received request from workflow: '{generate_args.workflow_id}'. "
+        "Starting generation with provider '{generate_args.provider.lower()}':",
+        flush=True,
+    )
 
     llm = llm_class()
 
@@ -75,10 +107,14 @@ async def generate(generate_args: GenerateArgs):
             print("\nCompleted generation", flush=True)
         except Exception as e:
             print(f"Error during generation: {e}", flush=True)
-            raise HTTPException(status_code=500, detail="Error while generating content")
-        finally:
-            if (generate_args.original_query is not None and 
-                generate_args.cache_access_token is not None):
+            raise HTTPException(
+                status_code=500, detail=f"Error while generating content: {e}"
+            )
+        else:
+            if (
+                generate_args.original_query is not None
+                and generate_args.cache_access_token is not None
+            ):
                 await insert_into_cache(
                     generate_args.original_query,
                     generated_response,
@@ -86,7 +122,6 @@ async def generate(generate_args: GenerateArgs):
                 )
 
     return StreamingResponse(generate_stream(), media_type="text/plain")
-
 
 
 @app.websocket("/llm-dispatch/generate")
@@ -184,7 +219,10 @@ async def generate(websocket: WebSocket):
 
     llm = llm_class()
 
-    print(f"Starting generation with provider '{generate_args.provider.lower()}':", flush=True)
+    print(
+        f"Starting generation with provider '{generate_args.provider.lower()}':",
+        flush=True,
+    )
 
     generated_response = ""
     try:
@@ -195,7 +233,7 @@ async def generate(websocket: WebSocket):
             await websocket.send_json(
                 {"status": "success", "content": next_word, "end_of_stream": False}
             )
-            print(next_word, end ="", flush=True)
+            print(next_word, end="", flush=True)
     except Exception as e:
         print("Error during generation", e, flush=True)
         await websocket.send_json(

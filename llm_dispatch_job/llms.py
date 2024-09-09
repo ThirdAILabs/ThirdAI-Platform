@@ -1,4 +1,3 @@
-import asyncio
 import json
 import os
 from typing import AsyncGenerator
@@ -115,16 +114,12 @@ class OnPremLLM(LLMBase):
             "prompt": query + "<|assistant|>",
             "stream": True,
         }
-        print("IN ON PREM LLM", flush=True)
         async with aiohttp.ClientSession() as session:
-            print(f"Sending request to {url}...", flush=True)
             async with session.post(url, headers=headers, json=data) as response:
                 if response.status != 200:
                     raise RuntimeError(
                         f"Failed to connect to LLM server: {response.status}"
                     )
-                print(f"Response status: {response.status} after some time", flush=True)
-
                 async for line in response.content.iter_chunked(1024):
                     line = line.decode("utf-8").strip()
                     if line and line.startswith("data: "):
@@ -135,7 +130,7 @@ class OnPremLLM(LLMBase):
                             continue
                         if "content" in data:
                             yield data["content"]
-                        
+
 
 model_classes = {
     "openai": OpenAILLM,
