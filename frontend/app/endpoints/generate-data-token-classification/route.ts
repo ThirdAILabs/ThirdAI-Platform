@@ -8,7 +8,7 @@ const openai = new OpenAI({
 
 const generateSentences = async (prompt: string) => {
   const response = await openai.chat.completions.create({
-    model: 'gpt-3.5-turbo',
+    model: 'gpt-4o-mini',
     messages: [
       {
         role: 'system',
@@ -42,7 +42,7 @@ const filterTemplates = (templates: string[], categories: { name: string }[]) =>
 
 const generateRealValues = async (entityValuePrompt: string) => {
   const response = await openai.chat.completions.create({
-    model: 'gpt-3.5-turbo',
+    model: 'gpt-4o-mini',
     messages: [
       {
         role: 'system',
