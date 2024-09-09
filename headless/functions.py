@@ -46,6 +46,22 @@ class UDTFunctions:
         )
 
     @staticmethod
+    def check_udt_train_with_datagen(inputs: Dict[str, Any]) -> Any:
+        logging.info(f"Running Udt with datagen with {inputs}")
+        run_name = inputs.get("run_name")
+        config: Config = inputs.get("config")
+        dag_name = inputs.get("dag_name")
+
+        return flow.bazaar_client.train_udt_with_datagen(
+            model_name=f"{run_name}_{dag_name}_{config.name}_udt_with_datagen_{config.sub_type}",
+            examples=config.examples,
+            task_prompt=config.task_prompt,
+            sub_type=config.sub_type,
+            datagen_job_options=UDTFunctions.build_job_options(config),
+            train_job_options=UDTFunctions.build_job_options(config),
+        )
+
+    @staticmethod
     def udt_deploy(inputs: Dict[str, Any]) -> Any:
         logging.info(f"inputs: {inputs}")
         model = inputs.get("model")

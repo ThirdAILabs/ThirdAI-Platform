@@ -43,6 +43,9 @@ def setup_logger(
     logger.info("Initialized console logging.")
 
 
+setup_logger()
+
+
 def response(status_code: int, message: str, data={}, success: bool = None):
     """
     Create a JSON response.
@@ -236,6 +239,16 @@ class UDTExtraOptions(BaseModel):
                     f"n_target_classes must be a positive integer: {v} is invalid"
                 )
         return v
+
+
+class UDTTrainArgs(BaseModel):
+    work_dir: str
+    model_id: str
+    data_id: str
+    bolt_license_key: str
+    extra_options: UDTExtraOptions
+    base_model_id: str
+    udt_subtype: str
 
 
 class NDBExtraOptions(BaseModel):

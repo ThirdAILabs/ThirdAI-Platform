@@ -102,9 +102,9 @@ const NLPQuestions = ({ workflowNames }: NLPQuestionsProps) => {
       {
         confirmedAnswer && answer && (
           answer.includes('Sentence classification') ? (
-            <SCQQuestions question={question} answer={answer} />
+            <SCQQuestions workflowNames={workflowNames} question={question} answer={answer} />
           ) : answer.includes('Token classification') ? (
-            <NERQuestions workflowNames = {workflowNames}/>
+            <NERQuestions workflowNames={workflowNames} modelGoal={question} />
           ) : null
         )
       }

@@ -32,7 +32,8 @@ job "{{ train_job_name }}" {
           volumes = [
             "{{ share_dir }}:/model_bazaar"
           ]
-          args    = ["--config", "{{ config_path }}"]
+          command = "python3"
+          args    = ["run.py", "--config", "{{ config_path }}"]
         {% elif platform == "local" %}
           command = "{{ python_path }}"
           args    = ["{{ train_script }}", "--config", "{{ config_path }}"]

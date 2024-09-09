@@ -22,13 +22,14 @@ const predefinedChoices = [
 ];
 
 interface NERQuestionsProps {
+  modelGoal: string;
   workflowNames: string[];
   onCreateModel?: (modelId: string) => void;
   stayOnPage?: boolean;
   appName?: string;
 };
 
-const NERQuestions = ({ workflowNames, onCreateModel, stayOnPage, appName }: NERQuestionsProps) => {
+const NERQuestions = ({ workflowNames, modelGoal, onCreateModel, stayOnPage, appName }: NERQuestionsProps) => {
   const [modelName, setModelName] = useState(!appName ? '' : appName);
   const [categories, setCategories] = useState([{ name: '', example: '', description: '' }]);
   const [isDataGenerating, setIsDataGenerating] = useState(false);
@@ -164,13 +165,14 @@ const NERQuestions = ({ workflowNames, onCreateModel, stayOnPage, appName }: NER
       alert("Please enter a model name.");
       return;
     }
-
-    const tags = Array.from(new Set(categories.map(cat => cat.name)));
-
+    if (warningMessage !== '') {
+      return;
+    }
+  
     setIsLoading(true);
 
     try {
-      const modelResponse = await trainTokenClassifier(modelName, generatedData, tags);
+      const modelResponse = await trainTokenClassifier(modelName, modelGoal, categories);
       const modelId = modelResponse.data.model_id;
 
       // This is called from RAG
@@ -225,12 +227,32 @@ const NERQuestions = ({ workflowNames, onCreateModel, stayOnPage, appName }: NER
         value={modelName}
         onChange={(e) => {
           const name = e.target.value;
-          if (workflowNames.includes(name)) {
-            setWarningMessage("An App with the same name has been created. Please choose a different name.");
-          } else {
-            setWarningMessage(""); // Clear the warning if the name is unique
-          }
           setModelName(name)
+        }}
+        onBlur={(e) => {
+          const name = e.target.value;
+          const regexPattern = /^[\w-]+$/;
+          let warningMessage = "";
+      
+          // Check if the name contains spaces
+          if (name.includes(" ")) {
+            warningMessage = "The app name cannot contain spaces. Please remove the spaces.";
+          } 
+          // Check if the name contains periods
+          else if (name.includes(".")) {
+            warningMessage = "The app name cannot contain periods ('.'). Please remove the periods.";
+          } 
+          // Check if the name contains invalid characters based on the regex pattern
+          else if (!regexPattern.test(name)) {
+            warningMessage = "The app name can only contain letters, numbers, underscores, and hyphens. Please modify the name.";
+          } 
+          // Check if the name already exists in the workflow
+          else if (workflowNames.includes(name)) {
+            warningMessage = "An app with the same name already exists. Please choose a different name.";
+          }
+          // Set the warning message or clear it if the name is valid
+          setWarningMessage(warningMessage);
+          setModelName(name);
         }}
         placeholder="Enter app name"
         style={{ marginTop: "10px" }}
@@ -249,7 +271,14 @@ const NERQuestions = ({ workflowNames, onCreateModel, stayOnPage, appName }: NER
             <div style={{ display: "flex", flexDirection: "column", marginTop: "10px" }}>
 
               {categories.map((category, index) => (
-                <div key={index} style={{ display: "flex", flexDirection: "row", gap: "10px", justifyContent: "space-between" }}>
+                <div  key={index} 
+                      style={{ 
+                        display: "flex", 
+                        flexDirection: "row", 
+                        gap: "10px", 
+                        justifyContent: "space-between",
+                        marginBottom: "10px", // Adds gap between rows
+                      }}>
                   <div style={{ width: "100%" }}>
                     <Input
                       list={`category-options-${index}`}
@@ -332,7 +361,7 @@ const NERQuestions = ({ workflowNames, onCreateModel, stayOnPage, appName }: NER
 
       {!isDataGenerating && generatedData.length > 0 && (
         <div className='mt-5'>
-          <h3 className='mb-3 text-lg font-semibold'>Generated Data</h3>
+          <h3 className='mb-3 text-lg font-semibold'>Example Generated Data</h3>
           <div>
             {generatedData.map((pair, index) => (
               <div key={index} className='my-2'>

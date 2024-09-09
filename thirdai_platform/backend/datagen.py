@@ -1,0 +1,256 @@
+import os
+import traceback
+from enum import Enum
+from pathlib import Path
+from typing import Dict, List, Optional
+
+from backend.config import DatagenOptions, JobOptions, LLMProvider, UDTSubType
+from backend.utils import (
+    get_platform,
+    get_python_path,
+    get_root_absolute_path,
+    response,
+    submit_nomad_job,
+)
+from database import schema
+from database.session import get_session
+from fastapi import Depends, status
+from licensing.verify.verify_license import valid_job_allocation, verify_license
+from pydantic import BaseModel, ValidationError
+from sqlalchemy.orm import Session
+
+
+def get_catalogs(task: schema.UDT_Task, session: Session):
+    return session.query(schema.Catalog).filter(schema.Catalog.task == task).all()
+
+
+def find_dataset(
+    catalogs: List[schema.Catalog], target_labels: str, cut_off: float = 0.75
+):
+    def similarity(dataset_labels: List[str], target_labels: List[str]) -> float:
+        if not dataset_labels:
+            return 0.0
+        match_count = len(set(dataset_labels) & set(target_labels))
+        return match_count / len(dataset_labels)
+
+    most_suited_dataset = None
+    max_similarity = -1
+    for catalog in catalogs:
+        if len(catalog.target_labels) >= len(target_labels):
+            sim = similarity(catalog.target_labels, target_labels)
+            if sim >= cut_off and sim > max_similarity:
+                max_similarity = sim
+                most_suited_dataset = catalog
+
+    return most_suited_dataset
+
+
+def generate_data_for_train_job(
+    data_id: str,
+    secret_token: str,
+    license_key: str,
+    options: DatagenOptions,
+    job_options: JobOptions,
+):
+    options_dict = options.datagen_options.model_dump()
+    del options_dict["sub_type"]
+    if options.datagen_options.sub_type == UDTSubType.text:
+        generate_text_data(
+            task_prompt=options.task_prompt,
+            data_id=data_id,
+            secret_token=secret_token,
+            license_key=license_key,
+            llm_provider=options.llm_provider,
+            options=TextClassificationGenerateArgs(
+                **options_dict, **job_options.model_dump()
+            ),
+        )
+    else:
+        generate_token_data(
+            task_prompt=options.task_prompt,
+            data_id=data_id,
+            secret_token=secret_token,
+            license_key=license_key,
+            llm_provider=options.llm_provider,
+            options=TokenClassificationGenerateArgs(
+                **options_dict, **job_options.model_dump()
+            ),
+        )
+
+
+class TextClassificationGenerateArgs(BaseModel):
+    samples_per_label: int
+    target_labels: List[str]
+    examples: Dict[str, List[str]]
+    labels_description: Dict[str, str]
+    user_vocab: Optional[List[str]] = None
+    user_prompts: Optional[List[str]] = None
+    vocab_per_sentence: int = 4
+    allocation_cores: Optional[int] = None
+    allocation_memory: Optional[int] = None
+
+
+def generate_text_data(
+    task_prompt: str,
+    data_id: str,
+    secret_token: str,
+    license_key: str,
+    llm_provider: LLMProvider,
+    options: TextClassificationGenerateArgs,
+):
+    try:
+        extra_options = TextClassificationGenerateArgs.model_validate(
+            options
+        ).model_dump()
+        extra_options = {k: v for k, v in extra_options.items() if v is not None}
+        if extra_options:
+            print(f"Extra options for training: {extra_options}")
+    except ValidationError as e:
+        raise ValueError(f"Invalid extra options format: {e}")
+
+    genai_key = os.getenv("GENAI_KEY")
+    if genai_key is None:
+        raise ValueError(f"Need gen_ai key for data-generation")
+
+    try:
+        nomad_response = submit_nomad_job(
+            str(
+                Path(os.getcwd())
+                / "backend"
+                / "nomad_jobs"
+                / "generate_data_job.hcl.j2"
+            ),
+            nomad_endpoint=os.getenv("NOMAD_ENDPOINT"),
+            platform=get_platform(),
+            tag=os.getenv("TAG"),
+            registry=os.getenv("DOCKER_REGISTRY"),
+            docker_username=os.getenv("DOCKER_USERNAME"),
+            docker_password=os.getenv("DOCKER_PASSWORD"),
+            image_name=os.getenv("DATA_GENERATION_IMAGE_NAME"),
+            train_script=str(get_root_absolute_path() / "data_generation_job/run.py"),
+            task_prompt=task_prompt,
+            data_id=data_id,
+            data_category="text",
+            llm_provider=llm_provider.value,
+            model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT", None),
+            share_dir=os.getenv("SHARE_DIR", None),
+            genai_key=os.getenv("GENAI_KEY", None),
+            secret_token=secret_token,
+            license_key=license_key,
+            extra_options=extra_options,
+            python_path=get_python_path(),
+        )
+        nomad_response.raise_for_status()
+    except Exception as e:
+        raise RuntimeError(f"Failed to generate data. {e}")
+
+
+class TokenClassificationGenerateArgs(BaseModel):
+    domain_prompt: str
+    tags: List[str]
+    tag_examples: Dict[str, List[str]]
+    num_sentences_to_generate: int
+    num_samples_per_tag: int = 4
+    allocation_cores: Optional[int] = None
+    allocation_memory: Optional[int] = None
+
+
+def generate_token_data(
+    task_prompt: str,
+    data_id: str,
+    secret_token: str,
+    license_key: str,
+    llm_provider: LLMProvider,
+    options: TokenClassificationGenerateArgs,
+):
+    try:
+        extra_options = TokenClassificationGenerateArgs.model_validate(
+            options
+        ).model_dump()
+        extra_options = {k: v for k, v in extra_options.items() if v is not None}
+        if extra_options:
+            print(f"Extra options for training: {extra_options}")
+    except ValidationError as e:
+        raise ValueError(f"Invalid extra options format: {e}")
+
+    genai_key = os.getenv("GENAI_KEY")
+    if genai_key is None:
+        raise ValueError(f"Need gen_ai key for data-generation")
+
+    try:
+        nomad_response = submit_nomad_job(
+            str(
+                Path(os.getcwd())
+                / "backend"
+                / "nomad_jobs"
+                / "generate_data_job.hcl.j2"
+            ),
+            nomad_endpoint=os.getenv("NOMAD_ENDPOINT"),
+            platform=get_platform(),
+            tag=os.getenv("TAG"),
+            registry=os.getenv("DOCKER_REGISTRY"),
+            docker_username=os.getenv("DOCKER_USERNAME"),
+            docker_password=os.getenv("DOCKER_PASSWORD"),
+            image_name=os.getenv("DATA_GENERATION_IMAGE_NAME"),
+            train_script=str(get_root_absolute_path() / "data_generation_job/run.py"),
+            task_prompt=task_prompt,
+            data_id=str(data_id),
+            data_category="token",
+            llm_provider=llm_provider.value,
+            model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT", None),
+            share_dir=os.getenv("SHARE_DIR", None),
+            genai_key=genai_key,
+            secret_token=secret_token,
+            license_key=license_key,
+            extra_options=extra_options,
+            python_path=get_python_path(),
+        )
+        nomad_response.raise_for_status()
+    except Exception as e:
+        raise RuntimeError(f"Failed to generate data. {e}")
+
+
+def find_datasets(
+    task: schema.UDT_Task,
+    target_labels: List[str],
+    session: Session = Depends(get_session),
+):
+
+    try:
+        catalogs = get_catalogs(task=task, session=session)
+        # Filtering catalogs based on the target_labels
+        most_suited_dataset_catalog = find_dataset(
+            catalogs, target_labels=target_labels
+        )
+
+        if most_suited_dataset_catalog:
+
+            data = {
+                "dataset_name": most_suited_dataset_catalog.name,
+                "catalog_id": str(most_suited_dataset_catalog.id),
+                "find_status": True,
+                "num_samples": most_suited_dataset_catalog.num_generated_samples,
+            }
+            # TODO(Pratyush/Gautam) convert the existing JSON files to CSV
+            # dataset location will be os.getenv("SHARE_DIR"), "datasets", "catalog_id", "train.csv"),
+
+        if not most_suited_dataset_catalog:
+            data = {
+                "dataset_name": None,
+                "catalog_id": None,
+                "find_status": False,
+                "num_samples": 0,
+            }
+
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successfully retrieved the preview of the data",
+            data=data,
+        )
+
+    except Exception as e:
+        traceback.print_exc()
+        return response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="unable to find a sample text-dataset",
+        )

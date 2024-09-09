@@ -5,15 +5,19 @@ import { SelectModel } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { add_models_to_workflow, create_workflow, trainSentenceClassifier } from '@/lib/backend';
+import { useRouter } from 'next/navigation';
 
 interface SCQQuestionsProps {
   question: string;
   answer: string;
+  workflowNames: string[];
 }
 
 type Category = {
   name: string;
   example: string;
+  description: string;
 };
 
 type GeneratedData = {
@@ -22,16 +26,20 @@ type GeneratedData = {
 };
 
 const predefinedChoices = [
-  'Positive Sentiment',
-  'Negative Sentiment',
+  'POSITIVE_SENTIMENT',
+  'NEGATIVE_SENTIMENT',
 ];
 
-const SCQQuestions = ({ question, answer }: SCQQuestionsProps) => {
-  const [categories, setCategories] = useState([{ name: '', example: '' }]);
+const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) => {
+  const [modelName, setModelName] = useState('');
+  const [warningMessage, setWarningMessage] = useState('');
+  const [categories, setCategories] = useState([{ name: '', example: '', description: '' }]);
   const [showReview, setShowReview] = useState(false);
   const [isDataGenerating, setIsDataGenerating] = useState(false);
   const [generatedData, setGeneratedData] = useState<GeneratedData[]>([]);
   const [generateDataPrompt, setGenerateDataPrompt] = useState('');
+
+  const router = useRouter();
 
   const handleCategoryChange = (index: number, field: string, value: string) => {
     const newCategories = categories.map((category, i) => {
@@ -44,7 +52,7 @@ const SCQQuestions = ({ question, answer }: SCQQuestionsProps) => {
   };
 
   const handleAddCategory = () => {
-    setCategories([...categories, { name: '', example: '' }]);
+    setCategories([...categories, { name: '', example: '', description: '' }]);
   };
 
   const handleRemoveCategory = (index: number) => {
@@ -54,7 +62,7 @@ const SCQQuestions = ({ question, answer }: SCQQuestionsProps) => {
   const validateCategories = () => {
     // Check if any category has an empty name or example
     return categories.every((category: Category) => {
-      return category.name && category.example
+      return category.name && category.example && category.description
     });
   };
 
@@ -135,28 +143,71 @@ const SCQQuestions = ({ question, answer }: SCQQuestionsProps) => {
     }
   };
 
-  const renderTaggedSentence = (pair: { sentence: string; nerData: string[] }) => {
-    return pair.sentence.split(' ').map((token, idx) => {
-      const tag = pair.nerData[idx];
-      if (tag === 'O') {
-        return (
-          <span key={idx} style={{ padding: '0 4px' }}>
-            {token}
-          </span>
-        );
-      }
-      return (
-        <span key={idx} style={{ padding: '0 4px', backgroundColor: tag === 'AGE' ? '#ffcccb' : '#ccffcc', borderRadius: '4px' }}>
-          {token} <span style={{ fontSize: '0.8em', fontWeight: 'bold', color: tag === 'AGE' ? '#ff0000' : '#00cc00' }}>{tag}</span>
-        </span>
-      );
-    });
+
+  const handleCreateSCModel = async () => {
+    if (!modelName) {
+      alert("Please enter a model name.");
+      return;
+    }
+    if (warningMessage !== '') {
+      return;
+    }
+  
+    try {
+      const modelResponse = await trainSentenceClassifier(modelName, /* modelGoal= */ question, /* examples= */ categories);
+      const modelId = modelResponse.data.model_id;
+
+      // Create workflow after model creation
+      const workflowName = modelName;
+      const workflowTypeName = "nlp"; // Assuming this is the type for NER workflows
+      const workflowResponse = await create_workflow({ name: workflowName, typeName: workflowTypeName });
+      const workflowId = workflowResponse.data.workflow_id;
+
+      // Add the model to the workflow with the appropriate component
+      const addModelsResponse = await add_models_to_workflow({
+        workflowId,
+        modelIdentifiers: [modelId],
+        components: ['nlp'], // Specific to this use case
+      });
+
+      console.log('Workflow and model addition successful:', addModelsResponse);
+
+      router.push("/");
+    } catch (e) {
+      console.log(e || 'Failed to create NER model and workflow');
+    }
   };
+
 
   return (
     <div>
-      <span className="block text-lg font-semibold">Specify Tokens</span>
-      <form onSubmit={handleSubmit} style={{ marginTop: "20px" }}>
+      <span className="block text-lg font-semibold">App Name</span>
+      <Input
+        className="text-md"
+        value={modelName}
+        onChange={(e) => {
+          const name = e.target.value;
+          setModelName(name)
+        }}
+        onBlur={
+          (e) => {
+            const name = e.target.value;
+            if (workflowNames.includes(name)) {
+              setWarningMessage("A workflow with the same name has been created. Please choose a different name.");
+            } else {
+              setWarningMessage(""); // Clear the warning if the name is unique
+            }
+        }}
+        placeholder="Enter app name"
+        style={{ marginTop: "10px" }}
+      />
+      {warningMessage && (
+        <span style={{ color: "red", marginTop: "10px" }}>
+          {warningMessage}
+        </span>
+      )}
+      <span className="block text-lg font-semibold" style={{marginTop: "20px"}}>Specify Classes</span>
+      <form onSubmit={handleSubmit} style={{ marginTop: "10px" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           {categories.map((category, index) => (
             <div
@@ -189,6 +240,13 @@ const SCQQuestions = ({ question, answer }: SCQQuestionsProps) => {
                 placeholder="Example"
                 value={category.example}
                 onChange={(e) => handleCategoryChange(index, "example", e.target.value)}
+              />
+              <Input
+                style={{ width: "100%" }}
+                className="text-md"
+                placeholder="Description"
+                value={category.description}
+                onChange={(e) => handleCategoryChange(index, "description", e.target.value)}
               />
               <Button
                 variant="destructive"
@@ -265,7 +323,7 @@ const SCQQuestions = ({ question, answer }: SCQQuestionsProps) => {
             >
               Redefine Tokens
             </Button>
-            <Button style={{ width: "100%" }} onClick={()=>{}}>
+            <Button style={{ width: "100%" }} onClick={handleCreateSCModel}>
               Create
             </Button>
           </div>

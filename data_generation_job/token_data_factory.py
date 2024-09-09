@@ -83,7 +83,14 @@ class TokenDataFactory(DataFactory):
                 tag,
                 num_samples=total_expected_sentences,
             )
+
+            def stringify_tuples(x):
+                if isinstance(x, tuple):
+                    return " ".join(x)
+                return x
+
             if samples:
+                samples = [stringify_tuples(x) for x in samples]
                 complete_tag_examples[tag].extend(samples)
                 continue
 
@@ -240,9 +247,11 @@ class TokenDataFactory(DataFactory):
             if match:
                 # word is a tag
                 word_tag = match.group(1)
-                assert word_tag in allowed_tags
+                if word_tag not in allowed_tags:
+                    return None
 
                 word_tag_value = random.choice(tag_values[word_tag])
+                word_tag_value = " ".join(word_tag_value.split())
                 source.append(word_tag_value)
 
                 """

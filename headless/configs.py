@@ -50,6 +50,7 @@ class Config(ABC):
     nfs_original_base_path: str = "/opt/neuraldb_enterprise/"
     unsupervised_paths: list[str] = []
     supervised_paths: list[str] = []
+    examples: list[tuple[str, str, str]] = []
     test_paths: list[str] = []
     insert_paths: list[str] = []
 
@@ -134,6 +135,34 @@ class Token(Config):
 
     target_labels: list[str] = ["PER", "ORG"]
     sub_type: str = "token"
+
+
+class TextWithDatagen(Config):
+    """
+    Configuration settings for text data.
+    """
+
+    sub_type: str = "text"
+    name: str = "text_with_datagen"
+    task_prompt: str = "Analyze the sentiment of product reviews"
+    examples: list[tuple[str, str, str]] = [
+        ("good", "This is a good product", "a good review"),
+        ("bad", "This is a bad product", "a bad review"),
+    ]
+
+
+class TokenWithDatagen(Config):
+    """
+    Configuration settings for token data.
+    """
+
+    sub_type: str = "token"
+    name: str = "token_with_datagen"
+    task_prompt: str = "Extract name and phone number from a text"
+    examples: list[tuple[str, str, str]] = [
+        ("name", "Tharun Medini", "a person's name"),
+        ("phone", "9876543210", "a phone number"),
+    ]
 
 
 class Dummy(Config):

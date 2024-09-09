@@ -1,4 +1,3 @@
-import os
 import sys
 
 from dotenv import load_dotenv
@@ -7,7 +6,6 @@ load_dotenv()
 
 import fastapi
 import uvicorn
-from backend.routers.data import data_router as data
 from backend.routers.deploy import deploy_router as deploy
 from backend.routers.models import model_router as model
 from backend.routers.recovery import recovery_router as recovery
@@ -39,7 +37,6 @@ app.add_middleware(
 )
 
 app.include_router(user, prefix="/api/user", tags=["user"])
-app.include_router(data, prefix="/api/data", tags=["data"])
 app.include_router(train, prefix="/api/train", tags=["train"])
 app.include_router(model, prefix="/api/model", tags=["model"])
 app.include_router(deploy, prefix="/api/deploy", tags=["deploy"])

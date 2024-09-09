@@ -170,12 +170,27 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
           value={modelName}
           onChange={(e) => {
             const name = e.target.value;
-            if (workflowNames.includes(name)) {
-              setWarningMessage("An App with the same name has been created. Please choose a different name.");
-            } else {
-              setWarningMessage(""); // Clear the warning if the name is unique
+            const regexPattern = /^[\w-]+$/;
+            let warningMessage = "";
+        
+            // Check if the name contains spaces or periods
+            if (name.includes(" ")) {
+              warningMessage = "The app name cannot contain spaces. Please remove the spaces.";
+            } else if (name.includes(".")) {
+              warningMessage = "The app name cannot contain periods ('.'). Please remove the periods.";
+            } 
+            // Check if the name contains invalid characters (not matching the regex)
+            else if (!regexPattern.test(name)) {
+              warningMessage = "The app name can only contain letters, numbers, underscores, and hyphens. Please modify the name.";
+            } 
+            // Check if the name is already taken
+            else if (workflowNames.includes(name)) {
+              warningMessage = "An app with the same name already exists. Please choose a different name.";
             }
-            setModelName(name)
+        
+            // Update the warning message or clear it if valid
+            setWarningMessage(warningMessage);
+            setModelName(name);
           }}
           placeholder="Enter app name"
           style={{marginTop: "10px"}}

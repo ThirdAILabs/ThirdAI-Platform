@@ -37,7 +37,7 @@ export const POST = async (req: NextRequest) => {
 
   try {
     const chatCompletion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
     });
 
@@ -49,7 +49,6 @@ export const POST = async (req: NextRequest) => {
     return NextResponse.json({ answer: answerContent });
   } catch (error) {
     console.error('Error during fetch:', error);
-    alert('Error during fetch:' + error)
     return NextResponse.json({ error: 'Error during fetch: ' + error }, { status: 500 });
   }
 };

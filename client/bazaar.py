@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import time
 from pathlib import Path
@@ -338,6 +339,123 @@ class ModelBazaar:
                 "base_model_identifier": base_model_identifier,
             },
             files=files,
+            headers=auth_header(self._access_token),
+        )
+        print(response.content)
+        response_content = json.loads(response.content)
+        if response_content["status"] != "success":
+            raise Exception(response_content["message"])
+
+        model = Model(
+            model_identifier=create_model_identifier(
+                model_name=model_name, author_username=self._username
+            ),
+            model_id=response_content["data"]["model_id"],
+        )
+
+        if is_async:
+            return model
+
+        self.await_train(model)
+        return model
+
+    def train_udt_with_datagen(
+        self,
+        model_name: str,
+        task_prompt: str,
+        sub_type: str,
+        examples: List[Tuple[str, str, str]],
+        is_async: bool = False,
+        base_model_identifier: Optional[str] = None,
+        datagen_job_options: Optional[dict] = None,
+        train_job_options: Optional[dict] = None,
+    ):
+        """
+        Initiates training for a model with datagen and returns a Model instance.
+
+        Args:
+            model_name (str): The name of the model.
+            task_prompt (str): A prompt that describes the downstream task to the LLM.
+            sub_type (str): "text" or "token" for text and token classification respectively.
+            examples (List[Tuple[str, str, str]]): A list of examples for training as (category, example, description) triplets.
+            is_async (bool): Whether training should be asynchronous (default is False).
+            base_model_identifier (Optional[str]): The identifier of the base model.
+            datagen_job_options (Dict[str, Any]): Resource allocation options for the datagen job.
+            train_job_options (Dict[str, Any]): Resource allocation options for the training job.
+
+        Returns:
+            Model: A Model instance.
+        """
+        url = urljoin(self._base_url, f"train/nlp-datagen")
+
+        form = []
+
+        category_examples = {}
+        category_descriptions = {}
+        for category, example, description in examples:
+            if category not in category_examples:
+                category_examples[category] = [example]
+                category_descriptions[category] = description
+            else:
+                category_examples[category].append(example)
+
+        if sub_type == "text":
+            datagen_options = {
+                "sub_type": "text",
+                "samples_per_label": max(
+                    math.ceil(10_000 / len(category_examples)), 50
+                ),
+                "target_labels": list(category_examples.keys()),
+                "examples": category_examples,
+                "labels_description": category_descriptions,
+            }
+        else:
+            datagen_options = {
+                "sub_type": "token",
+                "domain_prompt": task_prompt,
+                "tags": list(category_examples.keys()),
+                "tag_examples": category_examples,
+                "num_sentences_to_generate": 10_000,
+                "num_samples_per_tag": max(
+                    math.ceil(10_000 / len(category_examples)), 50
+                ),
+            }
+
+        form.append(
+            (
+                "datagen_options",
+                (
+                    None,
+                    json.dumps(
+                        {"task_prompt": task_prompt, "datagen_options": datagen_options}
+                    ),
+                    "application/json",
+                ),
+            )
+        )
+
+        if datagen_job_options:
+            form.append(
+                (
+                    "datagen_job_options",
+                    (None, json.dumps(datagen_job_options), "application/json"),
+                )
+            )
+        if train_job_options:
+            form.append(
+                (
+                    "train_job_options",
+                    (None, json.dumps(train_job_options), "application/json"),
+                )
+            )
+
+        response = http_post_with_error(
+            url,
+            params={
+                "model_name": model_name,
+                "base_model_identifier": base_model_identifier,
+            },
+            files=form,
             headers=auth_header(self._access_token),
         )
         print(response.content)

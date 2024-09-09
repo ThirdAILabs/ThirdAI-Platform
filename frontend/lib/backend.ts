@@ -592,19 +592,32 @@ export function userRegister(email: string, password: string, username: string) 
   });
 }
 
-interface TokenClassificationSample {
-  nerData: string[];
-  sentence: string;
+
+interface TokenClassificationExample {
+  name: string;
+  example: string;
+  description: string;
 }
 
-function samplesToFile(samples: TokenClassificationSample[], sourceColumn: string, targetColumn: string) {
-  const rows: string[] = [`${sourceColumn},${targetColumn}`];
-  for (const { nerData, sentence } of samples) {
-    rows.push('"' + sentence.replace('"', '""') + '",' + nerData.join(' '));
+
+function tokenClassifierDatagenForm(modelGoal: string, examples: TokenClassificationExample[]) {
+  let tagExamples: Record<string, string[]> = {};
+  examples.forEach(example => {
+    if (!tagExamples[example.name]) {
+      tagExamples[example.name] = [example.example];
+    } else {
+      tagExamples[example.name].push(example.example);
+    }
+  })
+  const numSentences = 10_000;
+  return {
+    "sub_type": "token",
+    'domain_prompt': modelGoal,
+    'tags': Object.keys(tagExamples),
+    'tag_examples': tagExamples,
+    'num_sentences_to_generate': numSentences,
+    'num_samples_per_tag': Math.max(Math.ceil(numSentences / Object.keys(tagExamples).length), 50),
   }
-  const csvContent = rows.join("\n");
-  const blob = new Blob([csvContent], { type: "text/csv" });
-  return new File([blob], "data.csv", { type: "text/csv" });
 }
 
 interface TrainTokenClassifierResponse {
@@ -619,8 +632,8 @@ interface TrainTokenClassifierResponse {
 
 export function trainTokenClassifier(
   modelName: string,
-  samples: TokenClassificationSample[],
-  tags: string[]
+  modelGoal: string,
+  examples: TokenClassificationExample[],
 ): Promise<TrainTokenClassifierResponse> {
   // Retrieve the access token from local storage
   const accessToken = getAccessToken()
@@ -628,35 +641,98 @@ export function trainTokenClassifier(
   // Set the default authorization header for axios
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-  const sourceColumn = "source";
-  const targetColumn = "target";
-
   const formData = new FormData();
-  const samplesFile = samplesToFile(samples, sourceColumn, targetColumn)
-  formData.append("files", samplesFile);
-  formData.append("file_info", JSON.stringify({
-    supervised_files: [{ path: samplesFile.name, location: "local" }]
-  }));
-  formData.append("model_options", JSON.stringify({ udt_options: {
-    udt_sub_type: "token",
-    source_column: sourceColumn,
-    target_column: targetColumn,
-    target_labels: tags,
-  }}))
+  formData.append("datagen_options", JSON.stringify({
+    task_prompt: modelGoal,
+    datagen_options: tokenClassifierDatagenForm(modelGoal, examples),
+  }))
 
   return new Promise((resolve, reject) => {
-    axios
-      .post(`${thirdaiPlatformBaseUrl}/api/train/udt?model_name=${modelName}`, formData)
-      .then((res) => {
-        resolve(res.data);
-      })
-      .catch((err) => {
-        if (err.response && err.response.data) {
-          reject(new Error(err.response.data.detail || 'Failed to run model'));
-        } else {
-          reject(new Error('Failed to run model'));
-        }
-      });
+      axios
+          .post(`${thirdaiPlatformBaseUrl}/api/train/nlp-datagen?model_name=${modelName}`, formData)
+          .then((res) => {
+              resolve(res.data);
+          })
+          .catch((err) => {
+              if (err.response && err.response.data) {
+                  reject(new Error(err.response.data.detail || 'Failed to run model'));
+              } else {
+                  reject(new Error('Failed to run model'));
+              }
+          });
+  });
+};
+
+
+interface SentenceClassificationExample {
+  name: string;
+  example: string;
+  description: string;
+}
+
+
+function sentenceClassifierDatagenForm(examples: SentenceClassificationExample[]) {
+  let labelExamples: Record<string, string[]> = {};
+  let labelDescriptions: Record<string, string> = {};
+  examples.forEach(example => {
+    if (!labelExamples[example.name]) {
+      labelExamples[example.name] = [example.example];
+      labelDescriptions[example.name] = example.description;
+    } else {
+      labelExamples[example.name].push(example.example);
+    }
+  })
+  const numSentences = 10_000;
+  return {
+    "sub_type": "text",
+    "samples_per_label": Math.max(Math.ceil(numSentences / Object.keys(labelExamples).length), 50),
+    "target_labels": Object.keys(labelExamples),
+    "examples": labelExamples,
+    "labels_description": labelDescriptions,
+  }
+}
+
+interface TrainSentenceClassifierResponse {
+  status_code: number;
+  message: string;
+  data: {
+    model_id: string;
+    user_id: string;
+  };
+}
+
+
+export function trainSentenceClassifier(
+  modelName: string,
+  modelGoal: string,
+  examples: SentenceClassificationExample[],
+): Promise<TrainSentenceClassifierResponse> {
+  // Retrieve the access token from local storage
+  const accessToken = getAccessToken()
+
+  // Set the default authorization header for axios
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  const formData = new FormData();
+  formData.append("datagen_options", JSON.stringify({
+    task_prompt: modelGoal,
+    datagen_options: sentenceClassifierDatagenForm(examples),
+  }))
+  
+  return new Promise((resolve, reject) => {
+      axios
+      .post(`${thirdaiPlatformBaseUrl}/api/train/nlp-datagen?model_name=${modelName}`, formData)
+          .then((res) => {
+              console.log(res);
+              resolve(res.data);
+          })
+          .catch((err) => {
+              if (err.response && err.response.data) {
+                  reject(new Error(err.response.data.detail || 'Failed to run model'));
+              } else {
+                  reject(new Error('Failed to run model'));
+              }
+          });
   });
 };
 
@@ -806,6 +882,67 @@ export function useTokenClassificationEndpoints() {
     workflowName,
     predict,
     getStats,
+  };
+}
+
+interface TextClassificationResult {
+  query_text: string;
+  predicted_classes: [string, number][];
+};
+
+export function useTextClassificationEndpoints() {
+  const accessToken = useAccessToken();
+  const params = useParams();
+  const workflowId = params.deploymentId as string;
+  const [workflowName, setWorkflowName] = useState<string>("");
+  const [deploymentUrl, setDeploymentUrl] = useState<string | undefined>();
+  
+  console.log("PARAMS", params);
+
+  useEffect(() => {
+    const init = async () => {
+      const accessToken = getAccessToken();
+      axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+  
+      const params = new URLSearchParams({ workflow_id: workflowId });
+      
+
+      axios
+          .get<WorkflowDetailsResponse>(`${thirdaiPlatformBaseUrl}/api/workflow/details?${params.toString()}`)
+          .then((res) => {
+            setWorkflowName(res.data.data.name)
+            for (const model of res.data.data.models) {
+              if (model.component === 'nlp') {
+                setDeploymentUrl(`${deploymentBaseUrl}/${model.model_id}`);
+              }
+            }
+          })
+          .catch((err) => {
+            console.error('Error fetching workflow details:', err);
+            alert('Error fetching workflow details:' + err)
+          });
+    };
+    init();
+  }, []);
+  
+  const predict = async (query: string): Promise<TextClassificationResult> => {
+    // Set the default authorization header for axios
+    axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+    try {
+      const response = await axios.post(`${deploymentUrl}/predict`, {
+        query, top_k: 5
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error('Error predicting tokens:', error);
+      alert('Error predicting tokens:' + error)
+      throw new Error('Failed to predict tokens');
+    }
+  };
+
+  return {
+    workflowName,
+    predict,
   };
 }
 

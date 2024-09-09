@@ -67,6 +67,7 @@ jobs:
         pip install -r llm_dispatch_job/requirements.txt
         pip install -r thirdai_platform/requirements.txt
         pip install -r train_job/requirements.txt
+        pip install -r data_generation_job/requirements.txt
         echo "PYTHON_PATH=${{ github.workspace }}/venv/bin/python" >> $GITHUB_ENV
 
     - name: Setup `nomad`
@@ -122,7 +123,7 @@ jobs:
         echo "LICENSE_PATH=${{ github.workspace }}/local_setup/ndb_enterprise_license.json" >> $GITHUB_ENV
         echo "JWT_SECRET=CsnCr3lebs9eJQ" >> $GITHUB_ENV
         echo "SENDGRID_KEY=sendgrid-key" >> $GITHUB_ENV
-        echo "GENAI_KEY=your-openai-key" >> $GITHUB_ENV
+        echo "GENAI_KEY=${{ secrets.GENAI_KEY }}" >> $GITHUB_ENV
         echo "ADMIN_USERNAME=admin" >> $GITHUB_ENV
         echo "ADMIN_MAIL=admin@mail.com" >> $GITHUB_ENV
         echo "ADMIN_PASSWORD=password" >> $GITHUB_ENV
@@ -161,6 +162,8 @@ jobs:
         cat vault.log
         echo "Uvicorn Logs:"
         cat $GITHUB_WORKSPACE/thirdai_platform/uvicorn.log
+
+        bash local_setup/fetch_nomad_logs.sh
 
     - name: Stop Services
       if: always()

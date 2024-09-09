@@ -12,7 +12,6 @@ from sqlalchemy import UUID
 
 
 class DataType:
-
     @abstractmethod
     def serialize(self) -> str:
         # can encode the data

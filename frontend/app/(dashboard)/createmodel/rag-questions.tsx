@@ -157,12 +157,29 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
             value={modelName}
             onChange={(e) => {
               const name = e.target.value;
-              if (workflowNames.includes(name)) {
-                setWarningMessage("An App with the same name has been created. Please choose a different name.");
-              } else {
-                setWarningMessage(""); // Clear the warning if the name is unique
+              const regexPattern = /^[\w-]+$/;
+              let warningMessage = "";
+        
+              // Check if the name contains spaces
+              if (name.includes(" ")) {
+                warningMessage = "The app name cannot contain spaces. Please remove the spaces.";
+              } 
+              // Check if the name contains periods
+              else if (name.includes(".")) {
+                warningMessage = "The app name cannot contain periods ('.'). Please remove the periods.";
+              } 
+              // Check if the name contains invalid characters (doesn't match the regex pattern)
+              else if (!regexPattern.test(name)) {
+                warningMessage = "The app name can only contain letters, numbers, underscores, and hyphens. Please modify the name.";
+              } 
+              // Check if the name is already in use
+              else if (workflowNames.includes(name)) {
+                warningMessage = "An app with the same name already exists. Please choose a different name.";
               }
-              setModelName(name)
+        
+              // Set the warning message or clear it if the name is valid
+              setWarningMessage(warningMessage);
+              setModelName(name);
             }}
             placeholder="Enter app name"
             style={{ marginTop: '10px' }}
@@ -348,6 +365,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
                         <div>
                           <NERQuestions
                             workflowNames = {workflowNames}
+                            modelGoal="Model to detect sensitive PII"
                             onCreateModel={(modelID) => {
                               setGrModelId(modelID);
                               setCreatedGR(true);

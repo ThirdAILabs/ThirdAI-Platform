@@ -5,6 +5,7 @@ from typing import Dict
 import pytest
 from config import (
     FileInfo,
+    JobOptions,
     NDBData,
     NDBOptions,
     NDBv1Options,
@@ -100,6 +101,7 @@ def test_ndb_train(ndb_options):
                 )
             ],
         ),
+        job_options=JobOptions(),
     )
 
     model = get_model(config, DummyReporter())
@@ -138,6 +140,7 @@ def test_udt_text_train():
                 )
             ],
         ),
+        job_options=JobOptions(),
     )
 
     model = get_model(config, DummyReporter())
@@ -173,6 +176,7 @@ def test_udt_token_train():
                 FileInfo(path=os.path.join(file_dir(), "ner.csv"), location="local")
             ],
         ),
+        job_options=JobOptions(),
     )
 
     model = get_model(config, DummyReporter())

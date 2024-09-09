@@ -33,6 +33,7 @@ class ImageNames:
 # Dockerfile that defines this image is assumed to be found in
 # train_job/.
 image_base_names = ImageNames(
+    DATA_GENERATION_IMAGE_NAME="data_generation_job",
     TRAIN_IMAGE_NAME="train_job",
     DEPLOY_IMAGE_NAME="deployment_job",
     GENERATION_IMAGE_NAME="llm_dispatch_job",

@@ -19,7 +19,10 @@ job "GenerateData-{{ data_id }}" {
         DATA_CATEGORY = "{{ data_category }}"
         LLM_PROVIDER = "{{ llm_provider }}"
         GENAI_KEY = "{{ genai_key }}"
+        SECRET_TOKEN = "{{ secret_token }}"
         TASK_PROMPT = "{{ task_prompt }}"
+        TRAIN_ARGS = "{{ train_args }}"
+        MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
 
         {%- for key, value in extra_options.items() %}
         {{ key | upper }} = "{{ value }}"
@@ -51,7 +54,7 @@ job "GenerateData-{{ data_id }}" {
       }
 
       resources {
-        cpu = {{ extra_options.get('allocation__cores', 1) * 2400 }}
+        cpu = {{ extra_options.get('allocation_cores', 1) * 2400 }}
         memory = {{ extra_options.get('allocation_memory', '6800') }}
       }
     }

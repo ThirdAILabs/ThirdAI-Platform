@@ -93,8 +93,29 @@ Without this process, it is cumbersome to test out platform changes. We would ha
       ```
       bash launch_nomad_jobs.sh
       ```
+    - Ensure Docker Desktop is running since the Autoscaler and Redis jobs use Docker as their driver. If you haven't installed Docker Desktop yet, you can download it [here](https://www.docker.com/products/docker-desktop/).
 
-9. **Insert existing datasets in DB:**
+    - Once Docker Desktop is installed, open it and follow these steps:
+      - Go to **Settings > Resources > File Sharing**.
+      - Change the ownership of the `/opt/nomad` directory to your user account, Add the `/opt/nomad` directory to the file-sharing list.
+      - You can change the ownership by running following command `sudo chown -R $(whoami) /opt/nomad`
+      - Once you have done these changes, restart the docker desktop.
+      - Now navigate to your nomad UI, go to clients and select your local client and see the driver status 
+        
+        ![screenshot](Nomad_driver_status.png)
+
+9. **Launch Frontend**
+
+    To run the frontend, follow these steps:
+    - Make sure you have `npm` installed to handle the dependencies. Navigate to the `frontend` directory and run `pnpm install` to install dependencies, if you dont have pnpm you can install it globally using `npm install -g pnpm`
+    - Modify the following variables in `.env.example` and copy them to `.env` and save it inside `frontend` folder
+      - Change `NEXT_PUBLIC_OPENAI_API_KEY` to openai-key you wanna use.
+      - Keep `NEXT_PUBLIC_DEPLOYMENT_BASE_URL` and `NEXT_PUBLIC_THIRDAI_PLATFORM_BASE_URL` same.
+    - Finally to start you can run `pnpm dev`.
+    - Your application should now be running, and you can access it in the browser at port 3006.
+
+
+10. **Insert existing datasets in DB:**
     - These existing datasets are present in the share directory of blade. 
     - Make sure you are on blade when you insert the datasets
     - Go to `thirdai_platform` folder and run

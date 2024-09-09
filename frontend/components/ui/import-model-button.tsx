@@ -19,7 +19,7 @@ const ImportModelButton = () => {
 
   return (
     <>
-        <Button size="sm" variant="outline" className="h-8 gap-1" onClick={()=>{
+        {/* <Button size="sm" variant="outline" className="h-8 gap-1" onClick={()=>{
             if (fileInputRef.current) {
               fileInputRef.current.click();
             }
@@ -28,7 +28,7 @@ const ImportModelButton = () => {
             <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
               Import App
             </span>
-        </Button>
+        </Button> */}
         <input
             type="file"
             ref={fileInputRef}

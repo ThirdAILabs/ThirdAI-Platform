@@ -13,6 +13,7 @@ import { userEmailLogin } from '@/lib/backend';
 import Link from 'next/link'
 import { UserContext } from '../user_wrapper';
 import { EyeIcon, EyeOffIcon } from '@heroicons/react/solid';
+import axios from 'axios';
 
 export default function LoginPage() {
   const [email, setEmail] = useState<string>('');
@@ -34,9 +35,15 @@ export default function LoginPage() {
       console.log('User logged in successfully:', data);
       // Redirect to the home page
       window.location.href = '/';
-    } catch (err) {
+    } catch (err: any) {
       console.log(err);
-      setError('Login failed. Please check your email and password.');
+      if (axios.isAxiosError(err) && err.response) {
+        // If it's an Axios error and we have a response
+        setError(err.response.data.message || 'Login failed. Please check your email and password.');
+      } else {
+        // Fallback to generic error if it's not an Axios error or no response is available
+        setError('Login failed. Please check your email and password.');
+      }
     }
   };
 
