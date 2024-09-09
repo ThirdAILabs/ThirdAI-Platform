@@ -38,7 +38,7 @@ class GenerateArgs(BaseModel):
     cache_access_token: Optional[str] = None
 
 
-@app.post("/llm-dispatch/genpost")
+@app.post("/llm-dispatch/generate")
 async def generate(generate_args: GenerateArgs):
     """
     Generate text using a specified generative AI model, with content streamed in real-time.
@@ -65,21 +65,6 @@ async def generate(generate_args: GenerateArgs):
         "workflow_id": "12345",
         "original_query": "Explain relativity",
         "cache_access_token": "cache_token_abc"
-    }
-    ```
-
-    Server sends (multiple messages as content is generated):
-    ```
-    {
-        "status": "success",
-        "content": "Once upon a time, ",
-        "end_of_stream": False
-    }
-    ...
-    {
-        "status": "success",
-        "content": "they lived happily ever after.",
-        "end_of_stream": True
     }
     ```
 

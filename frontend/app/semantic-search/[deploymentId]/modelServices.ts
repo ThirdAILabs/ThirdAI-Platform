@@ -613,7 +613,7 @@ export class ModelService {
                 workflow_id: workflowId,
             };
 
-            const uri = deploymentBaseUrl + "/llm-dispatch/genpost"
+            const uri = deploymentBaseUrl + "/llm-dispatch/generate"
             const response = await fetch(uri, {
                 method: 'POST',
                 headers: {
