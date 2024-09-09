@@ -89,7 +89,7 @@ async def generate(generate_args: GenerateArgs):
 
     print(
         f"Received request from workflow: '{generate_args.workflow_id}'. "
-        "Starting generation with provider '{generate_args.provider.lower()}':",
+        f"Starting generation with provider '{generate_args.provider.lower()}':",
         flush=True,
     )
 
@@ -104,7 +104,10 @@ async def generate(generate_args: GenerateArgs):
                 generated_response += next_word
                 yield next_word
                 await asyncio.sleep(0)
-            print("\nCompleted generation", flush=True)
+            print(
+                f"\nCompleted generation for workflow '{generate_args.workflow_id}'.",
+                flush=True,
+            )
         except Exception as e:
             print(f"Error during generation: {e}", flush=True)
             raise HTTPException(
