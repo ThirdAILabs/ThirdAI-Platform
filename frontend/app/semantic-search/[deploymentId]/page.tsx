@@ -148,9 +148,10 @@ function App() {
     const [cacheEnabled, setCacheEnabled] = useState(true); // default generation cache is on
     const [ifGuardRailOn, setIfGuardRailOn] = useState(false);
     const [genAiProvider, setGenAiProvider] = useState<string | null>(null);
+    const [workflowId, setWorkflowId] = useState<string | null>(null);
 
     useEffect(() => {
-        const workflowId = searchParams.get('workflowId');
+        const receievedWorkflowId = searchParams.get('workflowId');
         const generationOn = searchParams.get('ifGenerationOn') === 'true';
         const provider = searchParams.get('genAiProvider');
 
@@ -160,6 +161,7 @@ function App() {
 
         setIfGenerationOn(generationOn);
         setGenAiProvider(provider);
+        setWorkflowId(receievedWorkflowId)
 
         const fetchWorkflowDetails = async () => {
             try {
@@ -406,6 +408,7 @@ function App() {
                             });
                         },
                         genAiProvider || undefined, // Convert null to undefined
+                        workflowId || undefined,
                     );
                 }
             } else {
@@ -459,6 +462,7 @@ function App() {
                         results.references,
                         (next) => setAnswer((prev) => prev + next),
                         genAiProvider || undefined, // Convert null to undefined
+                        workflowId || undefined,
                     );
                 }
             }
@@ -477,6 +481,7 @@ function App() {
             results!.references.filter((ref) => checkedIds.has(ref.id)),
             (next) => setAnswer((prev) => prev + next),
             genAiProvider || undefined, // Convert null to undefined
+            workflowId || undefined,
         );
     }
 

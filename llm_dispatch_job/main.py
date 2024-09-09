@@ -34,6 +34,7 @@ class GenerateArgs(BaseModel):
     key: Optional[str] = None
     model: str = "gpt-3.5-turbo"
     provider: str = "openai"
+    workflow_id: Optional[str] = None
 
     # For caching we want just the query, not the entire prompt.
     original_query: Optional[str] = None
@@ -57,7 +58,8 @@ async def generate(generate_args: GenerateArgs):
     if llm_class is None:
         raise HTTPException(status_code=400, detail="Unsupported provider")
     
-    print(f"Starting generation with provider '{generate_args.provider.lower()}':", flush=True)
+    print(f"Received request from workflow: '{generate_args.workflow_id}'. "
+          "Starting generation with provider '{generate_args.provider.lower()}':", flush=True)
 
     llm = llm_class()
 
@@ -69,8 +71,7 @@ async def generate(generate_args: GenerateArgs):
             ):
                 generated_response += next_word
                 yield next_word
-                print(next_word, end="", flush=True)
-                await asyncio.sleep(0)  # do we need this?
+                await asyncio.sleep(0)
             print("\nCompleted generation", flush=True)
         except Exception as e:
             print(f"Error during generation: {e}", flush=True)

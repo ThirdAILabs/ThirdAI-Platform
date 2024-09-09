@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { genaiQuery } from "./genai";
 import { Box, Chunk, DocChunks } from "./components/pdf_viewer/interfaces";
 import { temporaryCacheToken } from "@/lib/backend";
@@ -598,6 +597,7 @@ export class ModelService {
         references: ReferenceInfo[],
         onNextWord: (str: string) => void,
         genAiProvider?: string,
+        workflowId?: string,
         onComplete?: (finalAnswer: string) => void
     ) {
         let finalAnswer = '';
@@ -609,7 +609,8 @@ export class ModelService {
                 key: "sk-PYTWB6gs_ofO44-teXA2rIRGRbJfzqDyNXBalHXKcvT3BlbkFJk5905SK2RVE6_ME8i4Lnp9qULbyPZSyOU0vh2fZfQA",
                 original_query: question,
                 cache_access_token: cache_access_token.access_token,
-                provider: genAiProvider
+                provider: genAiProvider,
+                workflow_id: workflowId,
             };
 
             const uri = deploymentBaseUrl + "/llm-dispatch/genpost"
