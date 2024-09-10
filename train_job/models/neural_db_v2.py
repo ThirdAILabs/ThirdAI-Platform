@@ -1,10 +1,8 @@
 import multiprocessing as mp
 import os
 import shutil
-import threading
 import time
 import uuid
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Tuple
 
 import thirdai
@@ -86,10 +84,7 @@ def preload_chunks(
         metadata=metadata,
         options=options,
     )
-    return (
-        ndbv2.documents.PrebatchedDoc(list(doc.chunks()), doc_id=doc.doc_id()),
-        display_path,
-    )
+    return ndbv2.documents.PrebatchedDoc(list(doc.chunks()), doc_id=doc.doc_id())
 
 
 def process_file(
@@ -99,7 +94,6 @@ def process_file(
     Process a file, downloading it from S3 if necessary, and convert it to an NDB file.
     """
     if doc.path.startswith("s3://"):
-        # print(f"{os.getpid()} Starting to download {doc.path} from s3", flush=True)
         try:
             s3_client = create_s3_client()
             bucket_name, prefix = doc.path.replace("s3://", "").split("/", 1)
@@ -110,7 +104,6 @@ def process_file(
             print(f"Error downloading file '{doc.path}' from s3 : {error}")
             raise ValueError(f"Error downloading file '{doc.path}' from s3 : {error}")
 
-        # print(f"{os.getpid()} Finished downloading {doc.path} from s3", flush=True)
         ndb_doc = preload_chunks(
             resource_path=local_file_path,
             display_path=f"/{bucket_name}.s3.amazonaws.com/{prefix}",
@@ -119,10 +112,8 @@ def process_file(
             options=doc.options,
         )
 
-        # print(f"{os.getpid()} Finished loading chunks {doc.path}", flush=True)
         os.remove(local_file_path)
-        # print(f"{os.getpid()} Returning results {doc.path}", flush=True)
-        return ndb_doc[0]
+        return ndb_doc
 
     save_artifact_uuid = str(uuid.uuid4())
     doc_dir = os.path.join(doc_save_dir, save_artifact_uuid)
@@ -135,62 +126,6 @@ def process_file(
         doc_id=doc.doc_id,
         metadata=doc.metadata,
         options=doc.options,
-    )[0]
-
-
-def parse_docs(
-    docs: List[FileInfo],
-    doc_save_dir: str,
-    tmp_dir: str,
-    task_queue: mp.Queue,
-    job_id: int,
-):
-    s3_client = None
-
-    print(f"Starting worker process {job_id}")
-    start = time.perf_counter()
-    for doc in docs:
-        if doc.path.startswith("s3://"):
-            try:
-                if s3_client is None:
-                    s3_client = create_s3_client()
-                bucket_name, prefix = doc.path.replace("s3://", "").split("/", 1)
-                local_file_path = os.path.join(tmp_dir, os.path.basename(prefix))
-
-                s3_client.download_file(bucket_name, prefix, local_file_path)
-            except Exception as error:
-                print(f"Error downloading file '{doc.path}' from s3 : {error}")
-                raise ValueError(
-                    f"Error downloading file '{doc.path}' from s3 : {error}"
-                )
-
-            ndb_doc, _ = preload_chunks(
-                resource_path=local_file_path,
-                display_path=f"/{bucket_name}.s3.amazonaws.com/{prefix}",
-                doc_id=doc.doc_id,
-                metadata=doc.metadata,
-                options=doc.options,
-            )
-            os.remove(local_file_path)
-            task_queue.put(ndb_doc)
-        else:
-            save_artifact_uuid = str(uuid.uuid4())
-            doc_dir = os.path.join(doc_save_dir, save_artifact_uuid)
-            os.makedirs(doc_dir, exist_ok=True)
-            shutil.copy(src=doc.path, dst=doc_dir)
-
-            ndb_doc, _ = preload_chunks(
-                resource_path=local_file_path,
-                display_path=f"/{bucket_name}.s3.amazonaws.com/{prefix}",
-                doc_id=doc.doc_id,
-                metadata=doc.metadata,
-                options=doc.options,
-            )
-            task_queue.put(ndb_doc)
-    end = time.perf_counter()
-
-    print(
-        f"Finishing worker process {job_id} parsed {len(docs)} docs in {end-start:.3f} s"
     )
 
 
@@ -289,106 +224,6 @@ class NeuralDBV2(Model):
                 )
 
         self.logger.info("Completed unsupervised training.")
-
-    # def start_parsing_jobs(self, files: List[FileInfo], task_queue: mp.Queue):
-    #     n_jobs = max(1, min(os.cpu_count() - 6, 20))
-    #     chunksize = (len(files) + n_jobs - 1) // n_jobs
-
-    #     doc_save_dir = self.doc_save_path()
-    #     tmp_dir = self.data_dir / "unsupervised"
-
-    #     self.logger.info(f"Starting {n_jobs} parsing jobs")
-
-    #     processes = []
-    #     for i in range(0, len(files), chunksize):
-    #         p = mp.Process(
-    #             target=parse_docs, args=(files[i:i+chunksize], doc_save_dir, tmp_dir, task_queue, len(processes))
-    #         )
-    #         p.start()
-    #         processes.append(p)
-
-    #     for p in processes:
-    #         p.join()
-
-    #     task_queue.put(None)
-    #     self.logger.info("Parsing jobs completed")
-
-    # def unsupervised_train(self, files: List[FileInfo], batch_size=100):
-    #     self.logger.info("Starting unsupervised training.")
-
-    #     os.makedirs(self.data_dir / "unsupervised", exist_ok=True)
-
-    #     docs_indexed = 0
-
-    #     task_queue = mp.Queue(maxsize=4 * batch_size)
-
-    #     parsing_jobs = threading.Thread(target=self.start_parsing_jobs, args=(files, task_queue))
-    #     parsing_jobs.start()
-
-    #     batch = []
-    #     while 1:
-    #         doc = task_queue.get()
-    #         if doc is None:
-    #             if batch:
-    #                 self.db.insert(batch)
-    #                 docs_indexed += len(batch)
-    #                 self.logger.info(f"Inserted {docs_indexed} docs")
-    #             break
-    #         batch.append(doc)
-    #         if len(batch) == batch_size:
-    #             self.db.insert(batch)
-    #             docs_indexed += len(batch)
-    #             batch.clear()
-    #             self.logger.info(f"Inserted {docs_indexed} docs")
-
-    #     parsing_jobs.join()
-
-    #     self.logger.info("Completed unsupervised training.")
-
-    # def unsupervised_train(self, files: List[FileInfo], batch_size=100):
-    #     self.logger.info("Starting unsupervised training.")
-
-    #     os.makedirs(self.data_dir / "unsupervised", exist_ok=True)
-
-    #     num_workers = max(1, min(os.cpu_count() - 6, 20))
-    #     self.logger.info(f"Starting {num_workers} parsing processes")
-
-    #     doc_save_dir = self.doc_save_path()
-    #     tmp_dir = self.data_dir / "unsupervised"
-
-    #     docs_indexed = 0
-
-    #     with ProcessPoolExecutor(max_workers=num_workers) as executor:
-    #         futures = [
-    #             executor.submit(process_file, file, doc_save_dir, tmp_dir)
-    #             for file in files
-    #         ]
-
-    #         self.logger.info(f"n_futures = {len(futures)}")
-
-    #         batch = []
-    #         for future in as_completed(futures):
-    #             try:
-    #                 ndb_doc, filename = future.result()
-    #                 batch.append(ndb_doc)
-    #                 self.logger.debug(
-    #                     f"Parsed document: doc_id={ndb_doc.doc_id()} {filename=}"
-    #                 )
-    #             except Exception as e:
-    #                 self.logger.error(f"Error processing file: {e}")
-
-    #             if len(batch) == batch_size:
-    #                 self.db.insert(batch)
-    #                 docs_indexed += len(batch)
-    #                 self.logger.info(f"Inserted {docs_indexed} docs")
-    #                 batch.clear()
-
-    #         if len(batch) > 0:
-    #             self.db.insert(batch)
-    #             docs_indexed += len(batch)
-    #             self.logger.info(f"Inserted {docs_indexed} docs")
-
-    #     self.logger.info("Completed unsupervised training.")
 
     def supervised_train(self, files: List[FileInfo]):
         self.logger.info("Starting supervised training.")
