@@ -128,3 +128,32 @@ jobs:
     - name: run unit tests
       run: |
         python3 -m pytest ./train_job -v
+  
+  llm-cache-job-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: install dependencies
+      run: |
+        pip3 install -r llm_cache_job/requirements.txt
+        pip3 install pytest
+
+    - name: run unit tests
+      run: |
+        python3 -m pytest ./llm_cache_job -v
+  
+  llm-dispatch-job-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: install dependencies
+      run: |
+        pip3 install -r llm_dispatch_job/requirements.txt
+        pip3 install pytest
+        pip3 install pytest-asyncio
+
+    - name: run unit tests
+      run: |
+        python3 -m pytest ./llm_dispatch_job -v
