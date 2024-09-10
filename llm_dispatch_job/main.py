@@ -8,12 +8,11 @@ from typing import Optional
 from urllib.parse import urljoin
 
 import requests
-import uvicorn
-from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from llms import default_keys, model_classes
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -156,4 +155,6 @@ async def health_check():
 
 
 if __name__ == "__main__":
+    import uvicorn
+
     uvicorn.run(app, host="localhost", port=8000)
