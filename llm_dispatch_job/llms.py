@@ -120,7 +120,7 @@ class OnPremLLM(LLMBase):
                     raise RuntimeError(
                         f"Failed to connect to LLM server: {response.status}"
                     )
-                async for line in response.content.iter_chunked(1024):
+                async for line in response.content.iter_any():
                     line = line.decode("utf-8").strip()
                     if line and line.startswith("data: "):
                         offset = len("data: ")
