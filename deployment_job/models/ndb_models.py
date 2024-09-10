@@ -404,13 +404,6 @@ class ShardedNDB(NDBV1Model):
             raise
 
 
-def try_convert_to_json(value: Any) -> str:
-    try:
-        return json.dumps(value)
-    except TypeError:
-        return str(value)
-
-
 class NDBV2Model(NDBModel):
     def __init__(self, write_mode: bool = False):
         super().__init__()
@@ -431,7 +424,7 @@ class NDBV2Model(NDBModel):
             id=chunk.chunk_id,
             text=chunk.keywords + " " + chunk.text,
             source=self.full_source_path(chunk.document),
-            metadata={k: try_convert_to_json(v) for k, v in chunk.metadata.items()},
+            metadata=chunk.metadata,
             context="",
             source_id=chunk.doc_id,
             score=score,

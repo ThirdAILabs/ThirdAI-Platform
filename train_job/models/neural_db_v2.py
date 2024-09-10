@@ -116,12 +116,12 @@ def process_file(
         return ndb_doc
 
     save_artifact_uuid = str(uuid.uuid4())
-    doc_dir = os.path.join(doc_save_dir, save_artifact_uuid)
-    os.makedirs(doc_dir, exist_ok=True)
-    shutil.copy(src=doc.path, dst=doc_dir)
+    artifact_dir = os.path.join(doc_save_dir, save_artifact_uuid)
+    os.makedirs(artifact_dir, exist_ok=True)
+    shutil.copy(src=doc.path, dst=artifact_dir)
 
     return preload_chunks(
-        resource_path=os.path.join(doc_dir, os.path.basename(doc.path)),
+        resource_path=os.path.join(artifact_dir, os.path.basename(doc.path)),
         display_path=os.path.join(save_artifact_uuid, os.path.basename(doc.path)),
         doc_id=doc.doc_id,
         metadata=doc.metadata,
@@ -145,6 +145,9 @@ class NeuralDBV2(Model):
                 "model.ndb",
             )
             self.logger.info(f"Starting training from base model: {base_model_path}")
+            # It seems like this can cause an issue if it runs at the same time as
+            # a deployment job starts because the DB files are modified by the deployment
+            # job which can cause errors during copying.
             shutil.copytree(
                 base_model_path,
                 self.ndb_save_path(),
