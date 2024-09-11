@@ -179,6 +179,8 @@ class ModelBazaar:
         if not unsupervised_docs and not supervised_docs:
             raise ValueError("Both the unsupervised and supervised docs are empty.")
 
+        unsupervised_docs = unsupervised_docs or []
+
         if metadata and unsupervised_docs:
             if len(metadata) != len(unsupervised_docs):
                 raise ValueError("Metadata is not provided for all unsupervised files.")

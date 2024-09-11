@@ -278,6 +278,15 @@ def main() -> None:
                 "username": push_username,
                 "password": push_password,
             }
+        else:
+            provider.update_credentials(
+                name=f"thirdaiplatform-push-{sanitized_branch}",
+                image_names=[
+                    image_name_for_branch(name, args.branch)
+                    for name in image_base_names.to_list()
+                ],
+                push_access=True,
+            )
 
         if not pull_username or not pull_password:
             new_pull_credentials = provider.create_credentials(
@@ -295,6 +304,15 @@ def main() -> None:
                 "username": pull_username,
                 "password": pull_password,
             }
+        else:
+            provider.update_credentials(
+                name=f"thirdaiplatform-pull-{sanitized_branch}",
+                image_names=[
+                    image_name_for_branch(name, args.branch)
+                    for name in image_base_names.to_list()
+                ],
+                push_access=False,
+            )
 
         # Write back the configuration to ensure it is up-to-date
         save_config(args.config, config)

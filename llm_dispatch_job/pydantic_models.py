@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class GenerateArgs(BaseModel):
     query: str
     key: Optional[str] = None
-    model: str = "gpt-3.5-turbo"
+    model: str = "gpt-4o-mini"
     provider: str = "openai"
 
     # For caching we want just the query, not the entire prompt.
