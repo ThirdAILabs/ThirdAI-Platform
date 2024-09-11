@@ -1329,7 +1329,7 @@ export async function temporaryCacheToken(modelId: string) {
 
   try {
       const response = await axios.get(`${deploymentBaseUrl}/cache/token?${params.toString()}`);
-      return response.data; // Assuming the backend returns the data directly
+      return response.data.access_token; // Assuming the backend returns the data directly
   } catch (err) {
       console.error('Error getting temporary cache access token:', err);
       throw err; // Re-throwing the error to handle it in the component

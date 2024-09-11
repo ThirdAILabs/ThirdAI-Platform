@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import asyncio
+import logging
 import os
 from typing import Optional
 from urllib.parse import urljoin
@@ -22,6 +23,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
 
@@ -86,10 +91,9 @@ async def generate(generate_args: GenerateArgs):
     if llm_class is None:
         raise HTTPException(status_code=400, detail="Unsupported provider")
 
-    print(
+    logging.info(
         f"Received request from workflow: '{generate_args.workflow_id}'. "
         f"Starting generation with provider '{generate_args.provider.lower()}':",
-        flush=True,
     )
 
     llm = llm_class()
@@ -103,12 +107,11 @@ async def generate(generate_args: GenerateArgs):
                 generated_response += next_word
                 yield next_word
                 await asyncio.sleep(0)
-            print(
+            logging.info(
                 f"\nCompleted generation for workflow '{generate_args.workflow_id}'.",
-                flush=True,
             )
         except Exception as e:
-            print(f"Error during generation: {e}", flush=True)
+            logging.error(f"Error during generation: {e}")
             raise HTTPException(
                 status_code=500, detail=f"Error while generating content: {e}"
             )
@@ -141,9 +144,9 @@ async def insert_into_cache(
             },
         )
         if res.status_code != 200:
-            print(f"LLM Cache Insertion failed: {res}", flush=True)
+            logging.error(f"LLM Cache Insertion failed: {res}")
     except Exception as e:
-        print("LLM Cache Insert Error", e, flush=True)
+        logging.error("LLM Cache Insert Error", e)
 
 
 @app.get("/llm-dispatch/health")
