@@ -1,4 +1,3 @@
-import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -11,8 +10,7 @@ client = TestClient(app)
 pytestmark = [pytest.mark.unit]
 
 
-@pytest.mark.asyncio
-async def test_generate_text_stream():
+def test_generate_text_stream():
     async def mock_stream(*args, **kwargs):
         yield "This "
         yield "is "
@@ -32,6 +30,40 @@ async def test_generate_text_stream():
 
         assert response.status_code == 200
         assert response.text == "This is a test."
+
+
+def test_missing_api_key():
+    request_data = {
+        "query": "test query",
+        "provider": "openai",
+    }
+
+    response = client.post("/llm-dispatch/generate", json=request_data)
+    assert response.status_code == 400
+    assert response.json() == {"detail": "No generative AI key provided"}
+
+
+def test_unsupported_provider():
+    request_data = {
+        "query": "test query",
+        "provider": "unknown_provider",
+        "key": "dummy key",
+    }
+
+    response = client.post("/llm-dispatch/generate", json=request_data)
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Unsupported provider"}
+
+
+def test_invalid_request_body():
+    request_data = {
+        # missing 'query' which is required
+        "provider": "openai",
+        "key": "dummy key",
+    }
+
+    response = client.post("/llm-dispatch/generate", json=request_data)
+    assert response.status_code == 422
 
 
 def test_health_check():
