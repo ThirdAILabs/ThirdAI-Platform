@@ -43,7 +43,7 @@ job "{{ train_job_name }}" {
       resources {
         cpu = {{ allocation_cores * 2400 }}
         memory = {{ allocation_memory }}
-
+        memory_max = {{ allocation_memory_max }}
       }
     }
   }
