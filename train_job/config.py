@@ -29,6 +29,10 @@ class FileInfo(BaseModel):
     options: Dict[str, Any] = {}
     metadata: Optional[Dict[str, Any]] = None
 
+    def ext(self) -> str:
+        _, ext = os.path.splitext(self.path)
+        return ext
+
 
 class MachOptions(BaseModel):
     fhr: int = 50_000

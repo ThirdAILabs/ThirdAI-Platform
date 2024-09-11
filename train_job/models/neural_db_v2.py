@@ -1,3 +1,4 @@
+import json
 import multiprocessing as mp
 import os
 import shutil
@@ -12,7 +13,6 @@ from models.model import Model
 from reporter import Reporter
 from thirdai import neural_db_v2 as ndbv2
 from utils import (
-    check_csv_only,
     check_disk,
     create_s3_client,
     expand_s3_buckets_and_directories,
@@ -174,7 +174,11 @@ class NeuralDBV2(Model):
 
     def supervised_files(self) -> List[FileInfo]:
         all_files = expand_s3_buckets_and_directories(self.config.data.supervised_files)
-        check_csv_only(all_files)
+        for file in all_files:
+            if file.ext() != ".csv" and file.ext() != ".jsonl":
+                raise ValueError(
+                    "Only CSV or jsonl files are supported for NDB supervised training."
+                )
         return all_files
 
     def unsupervised_train(self, files: List[FileInfo], batch_size=500):
@@ -230,18 +234,40 @@ class NeuralDBV2(Model):
 
         self.logger.info("Completed unsupervised training.")
 
+    def rlhf_retraining(self, path: str):
+        with open(path, "r") as file:
+            for line in file:
+                data = json.loads(line)
+                action = data["action"]
+                train_samples = data["train_samples"]
+                if action == "upvote":
+                    self.db.upvote(
+                        queries=[sample["query_text"] for sample in train_samples],
+                        chunk_ids=[sample["reference_id"] for sample in train_samples],
+                    )
+                elif action == "associate":
+                    self.db.associate(
+                        sources=[sample["source"] for sample in train_samples],
+                        targets=[sample["target"] for sample in train_samples],
+                    )
+                else:
+                    raise ValueError(f"Unsupported rlhf action '{action}'.")
+
     def supervised_train(self, files: List[FileInfo]):
         self.logger.info("Starting supervised training.")
 
         for file in files:
-            supervised_dataset = ndbv2.supervised.CsvSupervised(
-                file.path,
-                query_column=file.options.get("csv_query_column"),
-                id_column=file.options.get("csv_id_column"),
-                id_delimiter=file.options.get("csv_id_delimiter"),
-            )
+            if file.ext() == ".jsonl":
+                self.rlhf_retraining(file.path)
+            else:
+                supervised_dataset = ndbv2.supervised.CsvSupervised(
+                    file.path,
+                    query_column=file.options.get("csv_query_column"),
+                    id_column=file.options.get("csv_id_column"),
+                    id_delimiter=file.options.get("csv_id_delimiter"),
+                )
 
-            self.db.supervised_train(supervised_dataset)
+                self.db.supervised_train(supervised_dataset)
 
         self.logger.info("Completed supervised training.")
 
