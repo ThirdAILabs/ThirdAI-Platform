@@ -69,7 +69,9 @@ class NDBv1Options(BaseModel):
         ) or (
             self.retriever == RetrieverType.finetunable_retriever and self.mach_options
         ):
-            raise ValueError("mach_options must be provided if using mach or hybrid")
+            raise ValueError(
+                "mach_options must be provided if using mach or hybrid, and must not be provided if using finetunable_retriever"
+            )
         return self
 
 
@@ -83,21 +85,29 @@ class NDBOptions(BaseModel):
     model_type: Literal[ModelType.NDB] = ModelType.NDB
 
     ndb_options: Union[NDBv1Options, NDBv2Options] = Field(
-        NDBv1Options(), discriminator="ndb_sub_type"
+        NDBv2Options(), discriminator="ndb_sub_type"
     )
+
+    class Config:
+        protected_namespaces = ()
 
 
 class NDBData(BaseModel):
     model_data_type: Literal[ModelDataType.NDB] = ModelDataType.NDB
 
-    unsupervised_files: List[FileInfo]
+    unsupervised_files: List[FileInfo] = []
     supervised_files: List[FileInfo] = []
     test_files: List[FileInfo] = []
 
+    class Config:
+        protected_namespaces = ()
+
     @model_validator(mode="after")
     def check_nonempty(self):
-        if len(self.unsupervised_files) == 0:
-            raise ValueError("Unsupervised files must not be empty for NDB training.")
+        if len(self.unsupervised_files) + len(self.supervised_files) == 0:
+            raise ValueError(
+                "Unsupervised or supervised files must not be non empty for NDB training."
+            )
         return self
 
 
@@ -143,12 +153,18 @@ class UDTOptions(BaseModel):
 
     train_options: UDTTrainOptions = UDTTrainOptions()
 
+    class Config:
+        protected_namespaces = ()
+
 
 class UDTData(BaseModel):
     model_data_type: Literal[ModelDataType.UDT] = ModelDataType.UDT
 
     supervised_files: List[FileInfo]
     test_files: List[FileInfo] = []
+
+    class Config:
+        protected_namespaces = ()
 
     @model_validator(mode="after")
     def check_nonempty(self):
@@ -226,6 +242,9 @@ class TrainConfig(BaseModel):
     data: Union[NDBData, UDTData, UDTGeneratedData] = Field(
         ..., discriminator="model_data_type"
     )
+
+    class Config:
+        protected_namespaces = ()
 
     @model_validator(mode="after")
     def check_model_data_match(self):

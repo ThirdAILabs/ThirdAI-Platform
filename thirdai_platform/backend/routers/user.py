@@ -221,6 +221,19 @@ def demote_global_admin(
             detail="User is not a global admin.",
         )
 
+    # Check if there is more than one global admin
+    another_admin_exists = (
+        session.query(schema.User)
+        .filter(schema.User.global_admin == True, schema.User.id != user.id)
+        .first()
+    )
+
+    if not another_admin_exists:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="There must be at least one global admin.",
+        )
+
     # Update the user's role to normal user
     user.global_admin = False
     session.commit()

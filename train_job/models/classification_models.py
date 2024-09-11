@@ -148,7 +148,6 @@ class TextClassificationModel(ClassificationModel):
         )
 
     def get_latency(self, model) -> float:
-
         self.logger.info("Measuring latency of the UDT instance.")
 
         start_time = time.time()
@@ -216,7 +215,6 @@ class TokenClassificationModel(ClassificationModel):
         )
 
     def get_latency(self, model) -> float:
-
         self.logger.info("Measuring latency of the UDT instance.")
 
         start_time = time.time()

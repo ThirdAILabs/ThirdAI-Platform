@@ -125,7 +125,6 @@ def extract_static_methods(cls: Type) -> Dict[str, Callable]:
 
 
 def download_from_s3_if_not_exists(s3_uri, local_dir):
-
     from botocore.client import Config
 
     if not os.path.exists(local_dir):

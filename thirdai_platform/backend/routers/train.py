@@ -206,6 +206,9 @@ def train_ndb(
             config_path=config_path,
             allocation_cores=job_options.allocation_cores,
             allocation_memory=job_options.allocation_memory,
+            # TODO(Nicholas): Find a more graceful way to handle memory allocation for
+            # larger training jobs
+            allocation_memory_max=60_000,
         )
 
         new_model.train_status = schema.Status.starting
@@ -487,6 +490,7 @@ def datagen_callback(
             config_path=config_path,
             allocation_cores=config.job_options.allocation_cores,
             allocation_memory=config.job_options.allocation_memory,
+            allocation_memory_max=config.job_options.allocation_memory,
         )
 
         model.train_status = schema.Status.starting
@@ -668,6 +672,7 @@ def train_udt(
             config_path=config_path,
             allocation_cores=job_options.allocation_cores,
             allocation_memory=job_options.allocation_memory,
+            allocation_memory_max=job_options.allocation_memory,
         )
 
         new_model.train_status = schema.Status.starting

@@ -6,7 +6,7 @@ from colorlog import ColoredFormatter
 class LoggerConfig:
     _is_configured = False
 
-    def __init__(self, log_file, level=logging.DEBUG):
+    def __init__(self, log_file, level=logging.INFO):
         self.log_file = log_file
         self.level = level
         self.setup_logging()

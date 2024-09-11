@@ -82,13 +82,21 @@ Without this process, it is cumbersome to test out platform changes. We would ha
 
 6. If you are running this dev environment on a Mac, navigate to the `thirdai_platform/backend/nomad_jobs` directory and make sure any hcl or hcl.j2 file doesn't have a line that is in the form of `cores = x`. If those lines exist, change the lines to be `cpu = x * 2500` (put the actual value of the multiplication, not x * 2500). Doing this will fix any issues related to resource allocation of Nomad jobs on MacOS, because running Docker on MacOS does funky things when trying to reserve CPUs.
 
-7. **Launch Backend:**
+7. **Alembic DB Upgrade**
+    - After creating the Database apply alembic migrations to your DB by running the following command
+      ```bash
+      cd thirdai_platform
+      export DATABASE_URI="your local database postgresql connection string"
+      alembic upgrade head
+      ```
+
+8. **Launch Backend:**
     - Start the backend service using Uvicorn:
       ```
       uvicorn main:app --reload --host 0.0.0.0 --port 8000
       ```
 
-8. **Launch Nomad Jobs**
+9. **Launch Nomad Jobs**
     - Start the Autoscaler job and Redis job using the following command, first cd into `local_setup` folder and run
       ```
       bash launch_nomad_jobs.sh
@@ -104,7 +112,7 @@ Without this process, it is cumbersome to test out platform changes. We would ha
         
         ![screenshot](Nomad_driver_status.png)
 
-9. **Launch Frontend**
+10. **Launch Frontend**
 
     To run the frontend, follow these steps:
     - Make sure you have `npm` installed to handle the dependencies. Navigate to the `frontend` directory and run `pnpm install` to install dependencies, if you dont have pnpm you can install it globally using `npm install -g pnpm`
@@ -115,7 +123,7 @@ Without this process, it is cumbersome to test out platform changes. We would ha
     - Your application should now be running, and you can access it in the browser at port 3006.
 
 
-10. **Insert existing datasets in DB:**
+11. **Insert existing datasets in DB:**
     - These existing datasets are present in the share directory of blade. 
     - Make sure you are on blade when you insert the datasets
     - Go to `thirdai_platform` folder and run
