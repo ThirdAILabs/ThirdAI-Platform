@@ -87,7 +87,7 @@ def preload_chunks(
     return ndbv2.documents.PrebatchedDoc(list(doc.chunks()), doc_id=doc.doc_id())
 
 
-def process_file(
+def parse_doc(
     doc: FileInfo, doc_save_dir: str, tmp_dir: str
 ) -> Tuple[ndbv2.Document, str]:
     """
@@ -182,6 +182,8 @@ class NeuralDBV2(Model):
 
         n_jobs = max(1, min(os.cpu_count() - 6, 20))
 
+        self.logger.info(f"Using {n_jobs} parsing jobs")
+
         doc_save_dir = self.doc_save_path()
         tmp_dir = self.data_dir / "unsupervised"
 
@@ -191,20 +193,20 @@ class NeuralDBV2(Model):
         with mp.Pool(processes=n_jobs) as pool:
             first_batch_start = time.perf_counter()
             curr_batch = pool.starmap(
-                process_file,
+                parse_doc,
                 [(doc, doc_save_dir, tmp_dir) for doc in batches[0]],
                 chunksize=10,
             )
             first_batch_end = time.perf_counter()
             self.logger.info(
-                f"Parsed first batch {first_batch_end - first_batch_start:.3f}s"
+                f"Parsed first batch time={first_batch_end - first_batch_start:.3f}s"
             )
 
             for i in range(len(batches)):
                 start = time.perf_counter()
                 if i + 1 < len(batches):
                     next_batch = pool.starmap_async(
-                        process_file,
+                        parse_doc,
                         [(doc, doc_save_dir, tmp_dir) for doc in batches[i + 1]],
                         chunksize=10,
                     )
