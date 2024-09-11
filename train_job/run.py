@@ -13,40 +13,45 @@ from models.classification_models import (
     TokenClassificationModel,
 )
 from models.finetunable_retriever import FinetunableRetriever
+from models.neural_db_v2 import NeuralDBV2
 from models.single_mach import SingleMach
 from reporter import HttpReporter, Reporter
 
 
-def get_model(options: TrainConfig, reporter: Reporter):
-    model_type = options.model_options.model_type
+def get_model(config: TrainConfig, reporter: Reporter):
+    model_type = config.model_options.model_type
 
     if model_type == ModelType.NDB:
-        if options.model_options.ndb_options.ndb_sub_type == NDBSubType.v1:
-            retriever = options.model_options.ndb_options.retriever
+        if config.model_options.ndb_options.ndb_sub_type == NDBSubType.v1:
+            retriever = config.model_options.ndb_options.retriever
 
             if retriever == RetrieverType.finetunable_retriever:
-                return FinetunableRetriever(options, reporter)
+                return FinetunableRetriever(config, reporter)
             elif retriever == RetrieverType.hybrid or retriever == RetrieverType.mach:
-                return SingleMach(options, reporter)
+                return SingleMach(config, reporter)
             else:
                 raise ValueError(f"Unsupported NDB retriever '{retriever.value}'")
 
+        elif config.model_options.ndb_options.ndb_sub_type == NDBSubType.v2:
+            return NeuralDBV2(config, reporter)
         else:
-            raise ValueError("NeuralDB v2 is not yet supported")
+            raise ValueError(
+                f"Invalid NDB sub type {config.model_options.ndb_options.ndb_sub_type}"
+            )
     elif model_type == ModelType.UDT:
-        udt_type = options.model_options.udt_options.udt_sub_type
+        udt_type = config.model_options.udt_options.udt_sub_type
 
         if udt_type == UDTSubType.text:
-            return TextClassificationModel(options, reporter)
+            return TextClassificationModel(config, reporter)
         elif udt_type == UDTSubType.token:
-            return TokenClassificationModel(options, reporter)
+            return TokenClassificationModel(config, reporter)
         else:
             raise ValueError(f"Unsupported UDT subtype '{udt_type.value}'")
 
     raise ValueError(f"Unsupported model type {model_type.value}")
 
 
-def load_options():
+def load_config():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True)
 
@@ -57,28 +62,28 @@ def load_options():
 
 
 def main():
-    options = load_options()
+    config = load_config()
 
-    reporter = HttpReporter(options.model_bazaar_endpoint)
+    reporter = HttpReporter(config.model_bazaar_endpoint)
 
     try:
-
-        if options.license_key == "file_license":
+        if config.license_key == "file_license":
             thirdai.licensing.set_path(
-                os.path.join(options.model_bazaar_dir, "license/license.serialized")
+                os.path.join(config.model_bazaar_dir, "license/license.serialized")
             )
         else:
-            thirdai.licensing.activate(options.license_key)
+            thirdai.licensing.activate(config.license_key)
 
-        model = get_model(options, reporter)
+        model = get_model(config, reporter)
 
         model.train()
     except Exception as error:
         reporter.report_status(
-            options.model_id,
+            config.model_id,
             status="failed",
             message=f"Training failed with error {error}",
         )
+        raise error
 
 
 if __name__ == "__main__":

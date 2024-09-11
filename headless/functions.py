@@ -255,6 +255,42 @@ class NDBFunctions:
         )
 
     @staticmethod
+    def check_supervised(inputs: Dict[str, Any]) -> Any:
+        logging.info(f"Running supervised with {inputs}")
+        run_name = inputs.get("run_name")
+        config: Config = inputs.get("config")
+        base_model = inputs.get("base_model", None)
+        file_num = inputs.get("file_num", 0)
+        test = inputs.get("test", False)
+        dag_name = inputs.get("dag_name")
+
+        base_model_identifier = base_model.model_identifier if base_model else None
+
+        sup_docs = [
+            (
+                os.path.join(config.base_path, config.supervised_paths[file_num]),
+                os.path.join(config.base_path, config.unsupervised_paths[file_num]),
+            )
+        ]
+
+        return flow.train(
+            model_name=f"{run_name}_{dag_name}_{config.name}_supervised",
+            supervised_docs=sup_docs,
+            model_options=NDBFunctions.build_model_options(config),
+            doc_type=config.doc_type,
+            nfs_base_path=config.nfs_original_base_path,
+            base_model_identifier=base_model_identifier,
+            test_doc=(
+                os.path.join(config.base_path, config.test_paths[0]) if test else None
+            ),
+            doc_options={
+                doc: NDBFunctions.build_doc_options(config)
+                for doc in [sup_docs[0][0], sup_docs[0][1]]
+            },
+            job_options=NDBFunctions.build_job_options(config),
+        )
+
+    @staticmethod
     def check_unsupervised_supervised(inputs: Dict[str, Any]) -> Any:
         logging.info(f"Running unsupervised supervised with {inputs}")
         run_name = inputs.get("run_name")
@@ -315,14 +351,15 @@ class NDBFunctions:
             }
         else:
             mach_options = None
-        return {
-            "ndb_options": {
-                "ndb_sub_type": "v1",
-                "retriever": config.retriever,
-                "mach_options": mach_options,
-                "checkpoint_interval": config.checkpoint_interval,
-            }
-        }
+        return {"ndb_options": {"ndb_sub_type": "v2"}}
+        # return {
+        #     "ndb_options": {
+        #         "ndb_sub_type": "v1",
+        #         "retriever": config.retriever,
+        #         "mach_options": mach_options,
+        #         "checkpoint_interval": config.checkpoint_interval,
+        #     }
+        # }
 
     def build_doc_options(config: Config) -> Dict[str, Any]:
         return {
@@ -495,7 +532,6 @@ class TeamAdminFunctions:
 
     @staticmethod
     def test_ta_add_user_to_team(inputs: Dict[str, str]):
-
         logging.info(f"inputs: {inputs}")
         flow.bazaar_client.log_in(
             email="ta_team_admin@mail.com",

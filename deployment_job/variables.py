@@ -109,7 +109,7 @@ class GeneralVariables(EnvLoader):
     license_key: str
     task_runner_token: str
     type: ModelType = ModelType.NDB
-    sub_type: Union[UDTSubType, NDBSubType] = NDBSubType.v1
+    sub_type: Union[UDTSubType, NDBSubType] = NDBSubType.v2
 
     def deployment_permissions(self, token: str):
         deployment_permissions_endpoint = urljoin(

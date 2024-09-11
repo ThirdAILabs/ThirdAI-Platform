@@ -191,7 +191,7 @@ def process_file(doc: FileInfo, tmp_dir: str) -> ndb.Document:
     return ndb_file
 
 
-def producer(files: list[FileInfo], buffer, tmp_dir: str):
+def producer(files: List[FileInfo], buffer, tmp_dir: str):
     """
     Process files in parallel and add the resulting NDB files to a buffer.
     """
@@ -237,7 +237,7 @@ def consumer(buffer, db, epochs: int = 5, batch_size: int = 10):
             batch.clear()
 
 
-def check_disk(db, model_bazaar_dir: str, files: list[FileInfo]):
+def check_disk(db, model_bazaar_dir: str, files: List[FileInfo]):
     """
     Check if there is enough disk space to process the files.
     """

@@ -367,7 +367,6 @@ class NeuralDBClient(BaseClient):
 
     @check_deployment_decorator
     def save_model(self, override: bool = True, model_name: Optional[str] = None):
-
         response = http_post_with_error(
             urljoin(self.base_url, "save"),
             json={"override": override, "model_name": model_name},

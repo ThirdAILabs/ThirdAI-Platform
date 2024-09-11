@@ -106,7 +106,6 @@ class SQLiteConnector(Connector):
         session.commit()
 
     def get_sample_count(self, name: str, with_feedback: bool = None):
-
         session = self.Session()
         if with_feedback is None:
             return (

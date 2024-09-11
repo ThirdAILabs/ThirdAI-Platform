@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from .utils import (
     add_user_to_team,
+    assign_team_admin,
     auth_header,
     create_team,
     create_user,
@@ -22,14 +23,6 @@ def create_new_users(client):
         assert res.status_code == 200
 
     return users
-
-
-def assign_team_admin(client, team, user, access_token):
-    return client.post(
-        "/api/team/assign-team-admin",
-        headers=auth_header(access_token),
-        params={"email": user, "team_id": team},
-    )
 
 
 def check_create_teams(client, global_admin, user):
