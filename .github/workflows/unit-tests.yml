@@ -137,6 +137,7 @@ jobs:
     - name: install dependencies
       run: |
         pip3 install -r llm_dispatch_job/requirements.txt
+        pip3 install httpx
         pip3 install pytest
 
     - name: run unit tests
