@@ -602,15 +602,21 @@ export class ModelService {
     ) {
         let finalAnswer = '';
 
+        let cache_access_token = null;
         try {
-            const cache_access_token = await temporaryCacheToken(this.getModelID());
+            cache_access_token = await temporaryCacheToken(this.getModelID());
+        } catch (error) {
+            console.error("Error getting cache access token:", error);
+        }
+
+        try {
             const args = {
                 query: genaiQuery(question, references, genaiPrompt),
                 key: "sk-PYTWB6gs_ofO44-teXA2rIRGRbJfzqDyNXBalHXKcvT3BlbkFJk5905SK2RVE6_ME8i4Lnp9qULbyPZSyOU0vh2fZfQA",
-                original_query: question,
-                cache_access_token: cache_access_token.access_token,
                 provider: genAiProvider,
                 workflow_id: workflowId,
+                original_query: question,
+                cache_access_token: cache_access_token,
             };
 
             const uri = deploymentBaseUrl + "/llm-dispatch/generate"
@@ -641,7 +647,7 @@ export class ModelService {
                 onNextWord(newData);
             }
 
-            if (typeof onComplete === 'function') {
+            if (onComplete) {
                 onComplete(finalAnswer);
             }
         } catch (error) {

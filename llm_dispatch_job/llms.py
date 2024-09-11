@@ -118,7 +118,7 @@ class OnPremLLM(LLMBase):
             async with session.post(url, headers=headers, json=data) as response:
                 if response.status != 200:
                     raise RuntimeError(
-                        f"Failed to connect to LLM server: {response.status}"
+                        f"Failed to connect to On Prem LLM server: {response.status}"
                     )
                 async for line in response.content.iter_any():
                     line = line.decode("utf-8").strip()
