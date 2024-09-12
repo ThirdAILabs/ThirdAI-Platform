@@ -57,6 +57,17 @@ class UpvoteInput(BaseModel):
     text_id_pairs: List[UpvoteInputSingle]
 
 
+class ImplicitFeedbackInput(BaseModel):
+    """
+    Represents a implicit feedback sample for upvoting based on user interations.
+    """
+
+    query_text: str
+    reference_id: int = Field(..., ge=0)
+
+    event_desc: str
+
+
 class SearchResultsNDB(BaseModel):
     """
     Represents the search results including the query and references.

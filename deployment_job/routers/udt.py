@@ -3,6 +3,7 @@ import time
 from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
 from permissions import Permissions
+from prometheus_client import Summary
 from pydantic_models.inputs import BaseQueryParams, SearchResultsTokenClassification
 from routers.model import get_model
 from throughput import Throughput
@@ -20,8 +21,18 @@ queries_ingested = Throughput()
 queries_ingested_bytes = Throughput()
 
 
+def make_prometheus_metric(name, desc):
+    return Summary(name, desc, labelnames=["model_id"]).labels(
+        general_variables.model_id
+    )
+
+
+udt_predict_metric = make_prometheus_metric("udt_predict", "UDT predictions")
+
+
 @udt_router.post("/predict")
 @propagate_error
+@udt_predict_metric.time()
 def udt_query(
     base_params: BaseQueryParams,
     token=Depends(permissions.verify_permission("read")),

@@ -9,9 +9,10 @@ import fitz
 import thirdai
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
-from feedback_logger import AssociateLog, FeedbackLog, UpvoteLog
+from feedback_logger import AssociateLog, FeedbackLog, ImplicitUpvoteLog, UpvoteLog
 from file_handler import validate_files
 from permissions import Permissions
+from prometheus_client import Summary
 from pydantic import ValidationError, parse_obj_as
 from pydantic_models import inputs
 from pydantic_models.documents import DocumentList
@@ -22,16 +23,7 @@ from pydantic_models.inputs import (
     UpvoteInputSingle,
 )
 from routers.model import get_model
-from utils import (
-    Status,
-    highlighted_pdf_bytes,
-    new_pdf_chunks,
-    now,
-    old_pdf_chunks,
-    propagate_error,
-    response,
-    validate_name,
-)
+from utils import Status, now, propagate_error, response, validate_name
 from variables import GeneralVariables
 
 permissions = Permissions()
@@ -40,7 +32,24 @@ general_variables = GeneralVariables.load_from_env()
 ndb_router = APIRouter()
 
 
+def make_prometheus_metric(name, desc):
+    return Summary(name, desc, labelnames=["model_id"]).labels(
+        general_variables.model_id
+    )
+
+
+ndb_query_metric = make_prometheus_metric("ndb_query", "NDB Queries")
+ndb_upvote_metric = make_prometheus_metric("ndb_upvote", "NDB upvotes")
+ndb_associate_metric = make_prometheus_metric("ndb_associate", "NDB associations")
+ndb_implicit_feedback_metric = make_prometheus_metric(
+    "ndb_implicit_feedback", "NDB implicit feedback"
+)
+ndb_insert_metric = make_prometheus_metric("ndb_insert", "NDB insertions")
+ndb_delete_metric = make_prometheus_metric("ndb_delete", "NDB deletions")
+
+
 @ndb_router.post("/predict")
+@ndb_query_metric.time()
 @propagate_error
 def ndb_query(
     base_params: BaseQueryParams,
@@ -113,6 +122,7 @@ def ndb_query(
 
 @ndb_router.post("/upvote")
 @propagate_error
+@ndb_upvote_metric.time()
 def ndb_upvote(
     input: inputs.UpvoteInput,
     token: str = Depends(permissions.verify_permission("read")),
@@ -138,21 +148,10 @@ def ndb_upvote(
     ```
     """
     model = get_model()
-    train_samples = [
-        {
-            "query_text": text_id_pair.query_text,
-            "reference_id": str(text_id_pair.reference_id),
-            "reference_text": "TODO(Nicholas): fix this",
-            # "reference_text": model.db._get_text(text_id_pair.reference_id),
-        }
-        for text_id_pair in input.text_id_pairs
-    ]
 
     write_permission = model.permissions.check_permission(
         token=token, permission_type="write"
     )
-
-    # TODO(Logging): Log upvote call
 
     if not write_permission:
         model.feedback_logger.log(
@@ -192,6 +191,7 @@ def ndb_upvote(
 
 @ndb_router.post("/associate")
 @propagate_error
+@ndb_associate_metric.time()
 def ndb_associate(
     input: inputs.AssociateInput,
     token: str = Depends(permissions.verify_permission("read")),
@@ -217,12 +217,9 @@ def ndb_associate(
     ```
     """
     model = get_model()
-    train_samples = [pair.dict() for pair in input.text_pairs]
     write_permission = model.permissions.check_permission(
         token=token, permission_type="write"
     )
-
-    # TODO(Logging): Log upvote
 
     if not write_permission:
         model.feedback_logger.log(
@@ -260,6 +257,30 @@ def ndb_associate(
     )
 
 
+@ndb_router.post("/implicit-feedback")
+@propagate_error
+@ndb_implicit_feedback_metric.time()
+def implicit_feedback(
+    feedback: inputs.ImplicitFeedbackInput,
+    _: str = Depends(permissions.verify_permission("read")),
+):
+    model = get_model()
+    model.feedback_logger.log(
+        FeedbackLog(
+            event=ImplicitUpvoteLog(
+                chunk_id=feedback.reference_id,
+                query=feedback.query_text,
+                event_desc=feedback.event_desc,
+            )
+        )
+    )
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Implicit feedback logged successfully.",
+    )
+
+
 @ndb_router.get("/sources")
 @propagate_error
 def get_sources(_=Depends(permissions.verify_permission("read"))):
@@ -292,6 +313,7 @@ def get_sources(_=Depends(permissions.verify_permission("read"))):
 
 @ndb_router.post("/delete")
 @propagate_error
+@ndb_delete_metric.time()
 def delete(
     input: inputs.DeleteInput,
     token: str = Depends(permissions.verify_permission("write")),
@@ -416,6 +438,7 @@ def save(
 
 @ndb_router.post("/insert")
 @propagate_error
+@ndb_insert_metric.time()
 def insert(
     documents: str = Form(...),
     files: List[UploadFile] = [],

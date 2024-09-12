@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class ActionType(str, Enum):
     upvote = "upvote"
     associate = "associate"
+    implicit_upvote = "implicit_upvote"
 
 
 class UpvoteLog(BaseModel):
@@ -23,5 +24,16 @@ class AssociateLog(BaseModel):
     targets: List[str]
 
 
+class ImplicitUpvoteLog(BaseModel):
+    action: Literal[ActionType.implicit_upvote] = ActionType.implicit_upvote
+
+    chunk_id: int
+    query: str
+
+    event_desc: str
+
+
 class FeedbackLog(BaseModel):
-    event: Union[UpvoteLog, AssociateLog] = Field(..., discriminator="action")
+    event: Union[UpvoteLog, AssociateLog, ImplicitUpvoteLog] = Field(
+        ..., discriminator="action"
+    )

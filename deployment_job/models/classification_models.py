@@ -48,8 +48,6 @@ class TextClassificationModel(ClassificationModel):
             for class_id, activation in zip(*prediction)
         ]
 
-        # TODO(Logging): Log inference call
-
         return inputs.SearchResultsTextClassification(
             query_text=query,
             predicted_classes=predicted_classes,
@@ -69,8 +67,6 @@ class TokenClassificationModel(ClassificationModel):
         predictions = []
         for predicted_tag in predicted_tags:
             predictions.append([x[0] for x in predicted_tag])
-
-        # TODO(Logging): Log inference call
 
         return inputs.SearchResultsTokenClassification(
             query_text=query,

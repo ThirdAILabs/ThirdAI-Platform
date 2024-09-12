@@ -11,6 +11,7 @@ unidecode
 pydantic>=2.0.0
 aiohttp
 pyjwt
+prometheus-client
 langchain
 langchain-openai
 unstructured[pptx,eml,txt]

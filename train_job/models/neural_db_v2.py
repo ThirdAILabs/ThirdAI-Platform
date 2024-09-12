@@ -240,14 +240,20 @@ class NeuralDBV2(Model):
             for line in file:
                 feedback = FeedbackLog.model_validate_json(line)
                 if feedback.event.action == ActionType.upvote:
+                    weight = 2  # Extra weighting for explicit upvotes
                     self.db.upvote(
-                        queries=feedback.event.queries,
-                        chunk_ids=feedback.event.chunk_ids,
+                        queries=feedback.event.queries * weight,
+                        chunk_ids=feedback.event.chunk_ids * weight,
                     )
                 elif feedback.event.action == ActionType.associate:
                     self.db.associate(
                         sources=feedback.event.sources,
                         targets=feedback.event.targets,
+                    )
+                elif feedback.event.action == ActionType.implicit_upvote:
+                    self.db.upvote(
+                        queries=[feedback.event.query],
+                        chunk_ids=[feedback.event.chunk_id],
                     )
 
     def supervised_train(self, files: List[FileInfo]):

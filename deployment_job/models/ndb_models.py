@@ -135,6 +135,8 @@ class NDBV1Model(NDBModel):
             ]
         )
 
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
+
     def predict(self, query: str, top_k: int, **kwargs: Any) -> inputs.SearchResultsNDB:
         """
         Makes a prediction using the NDB model.
@@ -161,8 +163,6 @@ class NDBV1Model(NDBModel):
             for ref in references
         ]
 
-        # TODO(Logging): Log inference call
-
         return inputs.SearchResultsNDB(
             query_text=query,
             references=pydantic_references,
@@ -179,6 +179,8 @@ class NDBV1Model(NDBModel):
                 (text_pair.source, text_pair.target) for text_pair in text_pairs
             ]
         )
+
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
     def sources(self) -> List[Dict[str, str]]:
         """
@@ -201,7 +203,7 @@ class NDBV1Model(NDBModel):
         """
         self.db.delete(source_ids=source_ids)
 
-        # TODO(Logging): Log delete call
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
     def insert(self, **kwargs: Any) -> List[Dict[str, str]]:
         """
@@ -213,7 +215,7 @@ class NDBV1Model(NDBModel):
 
         source_ids = self.db.insert(sources=ndb_docs)
 
-        # TODO(Logging): Log insert call
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
         return [
             {
@@ -434,8 +436,6 @@ class NDBV2Model(NDBModel):
 
         results = [self.chunk_to_pydantic_ref(chunk, score) for chunk, score in results]
 
-        # TODO(Logging): Log inference call
-
         return inputs.SearchResultsNDB(query_text=query, references=results)
 
     def insert(
@@ -448,9 +448,7 @@ class NDBV2Model(NDBModel):
             data_dir=self.data_dir,
         )
 
-        source_ids = self.db.insert(ndb_docs)
-
-        # TODO(Logging): Log insert call
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
         return [
             {
@@ -469,14 +467,7 @@ class NDBV2Model(NDBModel):
 
         chunks = self.db.chunk_store.get_chunks(chunk_ids=chunk_ids)
 
-        train_samples = [
-            {
-                "query_text": query,
-                "reference_id": str(id),
-                "reference_text": chunk.keywords + " " + chunk.text,
-            }
-            for query, id, chunk in zip(queries, chunk_ids, chunks)
-        ]
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
     def associate(
         self, text_pairs: List[inputs.AssociateInputSingle], token: str, **kwargs: Any
@@ -485,11 +476,13 @@ class NDBV2Model(NDBModel):
         targets = [t.target for t in text_pairs]
         self.db.associate(sources=sources, targets=targets, **kwargs)
 
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
+
     def delete(self, source_ids: List[str], token: str, **kwargs: Any) -> None:
         for id in source_ids:
             self.db.delete_doc(doc_id=id)
 
-        # TODO(Logging): Log delete call
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
     def sources(self) -> List[Dict[str, str]]:
         return sorted(

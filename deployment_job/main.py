@@ -7,10 +7,10 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_client import make_asgi_app
 from reporter import Reporter
 from routers.model import ModelManager, get_model
 from routers.ndb import ndb_router
-from routers.telemetry import telemetry_router  # Import the telemetry router
 from routers.udt import udt_router
 from utils import delete_deployment_job
 from variables import GeneralVariables, ModelType
@@ -121,6 +121,9 @@ if general_variables.type == ModelType.NDB:
     app.include_router(ndb_router, prefix=f"/{general_variables.model_id}")
 elif general_variables.type == ModelType.UDT:
     app.include_router(udt_router, prefix=f"/{general_variables.model_id}")
+
+
+app.mount("/metrics", make_asgi_app())
 
 
 @app.exception_handler(404)
