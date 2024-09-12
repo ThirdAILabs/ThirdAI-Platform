@@ -16,7 +16,7 @@ from config import (
     UDTData,
     UDTOptions,
 )
-from feedback_logs import UpvoteLog, AssociateLog, ImplicitUpvoteLog, FeedbackLog
+from feedback_logs import AssociateLog, FeedbackLog, ImplicitUpvoteLog, UpvoteLog
 from reporter import Reporter
 from run import get_model
 from thirdai import bolt, licensing
