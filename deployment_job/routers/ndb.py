@@ -20,6 +20,7 @@ from pydantic_models.inputs import (
     NDBExtraParams,
     UpvoteInputSingle,
 )
+from feedback_logger import AssociateLog, UpvoteLog, FeedbackLog
 from routers.model import get_model
 from utils import (
     Status,
@@ -151,15 +152,18 @@ def ndb_upvote(
         token=token, permission_type="write"
     )
 
-    model.reporter.log(
-        action="upvote",
-        model_id=model.general_variables.model_id,
-        train_samples=train_samples,
-        access_token=token,
-        used=True if write_permission else False,
-    )
+    # TODO(Logging): Log upvote call
 
-    if write_permission:
+    if not write_permission:
+        model.feedback_logger.log(
+            FeedbackLog(
+                event=UpvoteLog(
+                    chunk_ids=[sample.reference_id for sample in input.text_id_pairs],
+                    queries=[sample.query_text for sample in input.text_id_pairs],
+                )
+            )
+        )
+    else:
         task_id = str(uuid.uuid4())
         task_data = {
             "task_id": task_id,
@@ -217,14 +221,19 @@ def ndb_associate(
     write_permission = model.permissions.check_permission(
         token=token, permission_type="write"
     )
-    model.reporter.log(
-        action="associate",
-        model_id=model.general_variables.model_id,
-        train_samples=train_samples,
-        access_token=token,
-        used=True if write_permission else False,
-    )
-    if write_permission:
+
+    # TODO(Logging): Log upvote
+
+    if not write_permission:
+        model.feedback_logger.log(
+            FeedbackLog(
+                event=AssociateLog(
+                    sources=[sample.source for sample in input.text_pairs],
+                    targets=[sample.target for sample in input.text_pairs],
+                )
+            )
+        )
+    else:
         task_id = str(uuid.uuid4())
         task_data = {
             "task_id": task_id,

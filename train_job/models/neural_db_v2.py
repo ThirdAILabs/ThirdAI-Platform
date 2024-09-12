@@ -7,6 +7,7 @@ import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 import thirdai
+from feedback_logs import FeedbackLog, ActionType
 from config import FileInfo, NDBv2Options, TrainConfig
 from fastapi import Response
 from models.model import Model
@@ -237,21 +238,17 @@ class NeuralDBV2(Model):
     def rlhf_retraining(self, path: str):
         with open(path, "r") as file:
             for line in file:
-                data = json.loads(line)
-                action = data["action"]
-                train_samples = data["train_samples"]
-                if action == "upvote":
+                feedback = FeedbackLog.model_validate_json(line)
+                if feedback.event.action == ActionType.upvote:
                     self.db.upvote(
-                        queries=[sample["query_text"] for sample in train_samples],
-                        chunk_ids=[sample["reference_id"] for sample in train_samples],
+                        queries=feedback.event.queries,
+                        chunk_ids=feedback.event.chunk_ids,
                     )
-                elif action == "associate":
+                elif feedback.event.action == ActionType.associate:
                     self.db.associate(
-                        sources=[sample["source"] for sample in train_samples],
-                        targets=[sample["target"] for sample in train_samples],
+                        sources=feedback.event.sources,
+                        targets=feedback.event.targets,
                     )
-                else:
-                    raise ValueError(f"Unsupported rlhf action '{action}'.")
 
     def supervised_train(self, files: List[FileInfo]):
         self.logger.info("Starting supervised training.")

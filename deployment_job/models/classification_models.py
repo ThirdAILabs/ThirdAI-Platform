@@ -48,20 +48,7 @@ class TextClassificationModel(ClassificationModel):
             for class_id, activation in zip(*prediction)
         ]
 
-        self.reporter.log(
-            action="predict",
-            model_id=self.general_variables.model_id,
-            access_token=kwargs.get("token"),
-            train_samples=[
-                {
-                    "query": query,
-                    "top_k": str(top_k),
-                    "predicted_classes": ",".join(
-                        [class_name for class_name, _ in predicted_classes]
-                    ),
-                }
-            ],
-        )
+        # TODO(Logging): Log inference call
 
         return inputs.SearchResultsTextClassification(
             query_text=query,
@@ -83,12 +70,7 @@ class TokenClassificationModel(ClassificationModel):
         for predicted_tag in predicted_tags:
             predictions.append([x[0] for x in predicted_tag])
 
-        self.reporter.log(
-            action="predict",
-            model_id=self.general_variables.model_id,
-            access_token=kwargs.get("token"),
-            train_samples=[{"query": query, "predictions": ",".join(predictions[0])}],
-        )
+        # TODO(Logging): Log inference call
 
         return inputs.SearchResultsTokenClassification(
             query_text=query,

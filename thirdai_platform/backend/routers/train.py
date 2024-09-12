@@ -4,6 +4,7 @@ import secrets
 import uuid
 from pathlib import Path
 from typing import Dict, List, Optional
+import shutil
 
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
@@ -12,7 +13,11 @@ from backend.config import (
     JobOptions,
     ModelType,
     NDBData,
+    FileLocation,
     NDBOptions,
+    FileInfo,
+    NDBSubType,
+    NDBv2Options,
     TextClassificationOptions,
     TokenClassificationOptions,
     TrainConfig,
@@ -179,12 +184,176 @@ def train_ndb(
             message=str(err),
         )
 
-    config_path = os.path.join(
-        config.model_bazaar_dir, "models", str(model_id), "train_config.json"
+    try:
+        submit_nomad_job(
+            str(Path(os.getcwd()) / "backend" / "nomad_jobs" / "train_job.hcl.j2"),
+            nomad_endpoint=os.getenv("NOMAD_ENDPOINT"),
+            platform=get_platform(),
+            tag=os.getenv("TAG"),
+            registry=os.getenv("DOCKER_REGISTRY"),
+            docker_username=os.getenv("DOCKER_USERNAME"),
+            docker_password=os.getenv("DOCKER_PASSWORD"),
+            image_name=os.getenv("TRAIN_IMAGE_NAME"),
+            train_script=str(get_root_absolute_path() / "train_job/run.py"),
+            model_id=str(model_id),
+            share_dir=os.getenv("SHARE_DIR", None),
+            python_path=get_python_path(),
+            aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
+            aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
+            train_job_name=new_model.get_train_job_name(),
+            config_path=config.save_train_config(),
+            allocation_cores=job_options.allocation_cores,
+            allocation_memory=job_options.allocation_memory,
+            # TODO(Nicholas): Find a more graceful way to handle memory allocation for
+            # larger training jobs
+            allocation_memory_max=60_000,
+        )
+
+        new_model.train_status = schema.Status.starting
+        session.commit()
+    except Exception as err:
+        new_model.train_status = schema.Status.failed
+        session.commit()
+        logger.info(str(err))
+        return response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=str(err),
+        )
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Successfully submitted the job",
+        data={
+            "model_id": str(model_id),
+            "user_id": str(user.id),
+        },
     )
-    os.makedirs(os.path.dirname(config_path), exist_ok=True)
-    with open(config_path, "w") as file:
-        file.write(config.model_dump_json(indent=4))
+
+
+@train_router.post("/ndb-retrain")
+def retrain(
+    model_name: str,
+    base_model_identifier: str,
+    job_options: JobOptions = JobOptions(),
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
+    try:
+        license_info = verify_license(
+            os.getenv(
+                "LICENSE_PATH", "/model_bazaar/license/ndb_enterprise_license.json"
+            )
+        )
+        if not valid_job_allocation(license_info, os.getenv("NOMAD_ENDPOINT")):
+            return response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Resource limit reached, cannot allocate new jobs.",
+            )
+    except Exception as e:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"License is not valid. {str(e)}",
+        )
+
+    user: schema.User = authenticated_user.user
+
+    try:
+        validate_name(model_name)
+    except:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"{model_name} is not a valid model name.",
+        )
+
+    duplicate_model = get_model(session, username=user.username, model_name=model_name)
+    if duplicate_model:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"Model with name {model_name} already exists for user {user.username}.",
+        )
+
+    model_id = uuid.uuid4()
+    data_id = str(model_id)
+
+    base_model = None
+    if base_model_identifier:
+        try:
+            base_model = get_model_from_identifier(base_model_identifier, session)
+            if not base_model.get_user_permission(user):
+                return response(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message="You do not have access to the specified base model.",
+                )
+        except Exception as error:
+            return response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message=str(error),
+            )
+
+    if base_model.type != ModelType.NDB or base_model.sub_type != NDBSubType.v2:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"NDB retraining can only be performed on NDBv2 base models.",
+        )
+
+    feedback_dir = os.path.join(
+        model_bazaar_path(),
+        "models",
+        str(base_model.id),
+        "deployments",
+        "data",
+        "feedback",
+    )
+    if not os.path.exists(feedback_dir) or len(os.listdir(feedback_dir)) == 0:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"No feedback found for base model {base_model_identifier}. Unable to perform retraining.",
+        )
+
+    supervised_train_dir = os.path.join(
+        model_bazaar_path(), "data", data_id, "supervised"
+    )
+
+    shutil.copytree(feedback_dir, supervised_train_dir)
+
+    config = TrainConfig(
+        model_bazaar_dir=model_bazaar_path(),
+        license_key=license_info["boltLicenseKey"],
+        model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT", None),
+        model_id=str(model_id),
+        data_id=data_id,
+        base_model_id=(None if not base_model_identifier else str(base_model.id)),
+        model_options=NDBOptions(ndb_options=NDBv2Options()),
+        data=NDBData(
+            supervised_files=[
+                FileInfo(path=supervised_train_dir, location=FileLocation.nfs)
+            ]
+        ),
+        job_options=job_options,
+    )
+
+    try:
+        new_model = schema.Model(
+            id=model_id,
+            user_id=user.id,
+            train_status=schema.Status.not_started,
+            deploy_status=schema.Status.not_started,
+            name=model_name,
+            type=config.model_options.model_type.value,
+            sub_type=config.model_options.ndb_options.ndb_sub_type.value,
+            domain=user.domain,
+            access_level=schema.Access.private,
+            parent_id=base_model.id,
+        )
+
+        session.add(new_model)
+        session.commit()
+        session.refresh(new_model)
+    except Exception as err:
+        return response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=str(err),
+        )
 
     try:
         submit_nomad_job(
@@ -203,12 +372,10 @@ def train_ndb(
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
             train_job_name=new_model.get_train_job_name(),
-            config_path=config_path,
+            config_path=config.save_train_config(),
             allocation_cores=job_options.allocation_cores,
             allocation_memory=job_options.allocation_memory,
-            # TODO(Nicholas): Find a more graceful way to handle memory allocation for
-            # larger training jobs
-            allocation_memory_max=60_000,
+            allocation_memory_max=2 * job_options.allocation_memory,
         )
 
         new_model.train_status = schema.Status.starting

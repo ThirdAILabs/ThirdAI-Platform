@@ -13,6 +13,7 @@ from logger import LoggerConfig
 from permissions import Permissions
 from reporter import Reporter
 from variables import GeneralVariables
+from feedback_logger import FeedbackLogger
 
 
 class Model(ABC):
@@ -32,11 +33,7 @@ class Model(ABC):
         self.data_dir: Path = self.model_dir / "deployments" / "data"
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
-        self.telemetry_path = self.data_dir / "telemetry_logs.json"
-
-        if not self.telemetry_path.exists():
-            with open(self.telemetry_path, "w") as f:
-                json.dump([], f)
+        self.feedback_logger = FeedbackLogger(self.data_dir)
 
         redis_host = os.getenv("REDIS_HOST")
         redis_port = int(os.getenv("REDIS_PORT"))

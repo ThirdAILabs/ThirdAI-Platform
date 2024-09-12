@@ -161,12 +161,7 @@ class NDBV1Model(NDBModel):
             for ref in references
         ]
 
-        self.reporter.log(
-            action="predict",
-            model_id=self.general_variables.model_id,
-            access_token=kwargs.get("token"),
-            train_samples=[{"query": query}],
-        )
+        # TODO(Logging): Log inference call
 
         return inputs.SearchResultsNDB(
             query_text=query,
@@ -206,13 +201,7 @@ class NDBV1Model(NDBModel):
         """
         self.db.delete(source_ids=source_ids)
 
-        self.reporter.log(
-            action="delete",
-            model_id=self.general_variables.model_id,
-            access_token=token,
-            train_samples=[{"source_ids": " ".join(source_ids)}],
-            used=True,
-        )
+        # TODO(Logging): Log delete call
 
     def insert(self, **kwargs: Any) -> List[Dict[str, str]]:
         """
@@ -224,13 +213,7 @@ class NDBV1Model(NDBModel):
 
         source_ids = self.db.insert(sources=ndb_docs)
 
-        self.reporter.log(
-            action="insert",
-            model_id=self.general_variables.model_id,
-            access_token=kwargs.get("token"),
-            train_samples=[({"sources_ids": " ".join(source_ids)})],
-            used=True,
-        )
+        # TODO(Logging): Log insert call
 
         return [
             {
@@ -451,12 +434,7 @@ class NDBV2Model(NDBModel):
 
         results = [self.chunk_to_pydantic_ref(chunk, score) for chunk, score in results]
 
-        self.reporter.log(
-            action="predict",
-            model_id=self.general_variables.model_id,
-            access_token=token,
-            train_samples=[{"query": query}],
-        )
+        # TODO(Logging): Log inference call
 
         return inputs.SearchResultsNDB(query_text=query, references=results)
 
@@ -472,12 +450,7 @@ class NDBV2Model(NDBModel):
 
         source_ids = self.db.insert(ndb_docs)
 
-        self.reporter.log(
-            action="insert",
-            model_id=self.general_variables.model_id,
-            access_token=token,
-            train_samples=[{"sources_ids": " ".join([x.doc_id for x in source_ids])}],
-        )
+        # TODO(Logging): Log insert call
 
         return [
             {
@@ -505,13 +478,6 @@ class NDBV2Model(NDBModel):
             for query, id, chunk in zip(queries, chunk_ids, chunks)
         ]
 
-        self.reporter.log(
-            action="upvote",
-            model_id=self.general_variables.model_id,
-            train_samples=train_samples,
-            access_token=token,
-        )
-
     def associate(
         self, text_pairs: List[inputs.AssociateInputSingle], token: str, **kwargs: Any
     ) -> None:
@@ -519,23 +485,11 @@ class NDBV2Model(NDBModel):
         targets = [t.target for t in text_pairs]
         self.db.associate(sources=sources, targets=targets, **kwargs)
 
-        self.reporter.log(
-            action="associate",
-            model_id=self.general_variables.model_id,
-            train_samples=[pair.model_dump() for pair in text_pairs],
-            access_token=token,
-        )
-
     def delete(self, source_ids: List[str], token: str, **kwargs: Any) -> None:
         for id in source_ids:
             self.db.delete_doc(doc_id=id)
 
-        self.reporter.log(
-            action="delete",
-            model_id=self.general_variables.model_id,
-            access_token=token,
-            train_samples=[{"source_ids": " ".join(source_ids)}],
-        )
+        # TODO(Logging): Log delete call
 
     def sources(self) -> List[Dict[str, str]]:
         return sorted(
