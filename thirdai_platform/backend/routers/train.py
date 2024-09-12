@@ -1,21 +1,21 @@
 import json
 import os
 import secrets
+import shutil
 import uuid
 from pathlib import Path
 from typing import Dict, List, Optional
-import shutil
 
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
 from backend.config import (
     DatagenOptions,
+    FileInfo,
+    FileLocation,
     JobOptions,
     ModelType,
     NDBData,
-    FileLocation,
     NDBOptions,
-    FileInfo,
     NDBSubType,
     NDBv2Options,
     TextClassificationOptions,

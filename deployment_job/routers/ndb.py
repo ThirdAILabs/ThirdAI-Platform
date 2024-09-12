@@ -9,6 +9,7 @@ import fitz
 import thirdai
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
+from feedback_logger import AssociateLog, FeedbackLog, UpvoteLog
 from file_handler import validate_files
 from permissions import Permissions
 from pydantic import ValidationError, parse_obj_as
@@ -20,7 +21,6 @@ from pydantic_models.inputs import (
     NDBExtraParams,
     UpvoteInputSingle,
 )
-from feedback_logger import AssociateLog, UpvoteLog, FeedbackLog
 from routers.model import get_model
 from utils import (
     Status,

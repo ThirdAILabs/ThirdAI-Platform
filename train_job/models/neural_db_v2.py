@@ -7,9 +7,9 @@ import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 import thirdai
-from feedback_logs import FeedbackLog, ActionType
 from config import FileInfo, NDBv2Options, TrainConfig
 from fastapi import Response
+from feedback_logs import ActionType, FeedbackLog
 from models.model import Model
 from reporter import Reporter
 from thirdai import neural_db_v2 as ndbv2

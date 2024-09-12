@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import Dict
 
 import redis  # type: ignore
+from feedback_logger import FeedbackLogger
 from logger import LoggerConfig
 from permissions import Permissions
 from reporter import Reporter
 from variables import GeneralVariables
-from feedback_logger import FeedbackLogger
 
 
 class Model(ABC):
