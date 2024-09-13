@@ -623,19 +623,19 @@ export class ModelService {
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
-    
+
             const reader = response.body!.getReader();
             const decoder = new TextDecoder('utf-8');
-    
+
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) {
                     break;
                 }
-    
+
                 const newData = decoder.decode(value, { stream: true });
                 finalAnswer += newData;
-    
+
                 onNextWord(newData);
             }
 
@@ -702,7 +702,7 @@ export class ModelService {
         } catch (e) {
             console.error(e);
             alert(e)
-            throw new Error('Failed to record feedback');
+            throw new Error('Failed to record feedback: ' + e);
         }
     }
 }
