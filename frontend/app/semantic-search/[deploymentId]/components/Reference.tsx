@@ -220,29 +220,22 @@ export default function Reference({
                 <Header onClick={(e)=>{
                     onOpen(e)
 
-                    // Create a telemetry event
-                    const event = {
-                        UserAction: 'Open Reference Source',
-                        UIComponent: 'Header',
-                        UI: 'Reference',
-                        data: {
-                            id: info.id,
-                            sourceURL: info.sourceURL,
-                            sourceName: info.sourceName,
-                            content: info.content,
-                            metadata: info.metadata
-                        }
-                    };
+                    // TODO(Any): use update query text and uncomment below to record implicit-feedback
+                    // const feedback = {
+                    //     reference_id: info.id,
+                    //     query_text: "", // TODO 
+                    //     event_desc: "open_reference_source",
+                    // };
 
-                    // Record the event
-                    modelService.recordEvent(event)
-                        .then(data => {
-                            console.log("Event recorded successfully:", data);
-                        })
-                        .catch(error => {
-                            console.error("Error recording event:", error);
-                            alert("Error recording event:" + error)
-                        });
+                    // modelService.recordImplicitFeedback(feedback)
+                    //     .then(data => {
+                    //         console.log("Implicit feedback recorded successfully:", data)
+                    //     })
+                    //     .catch(error => {
+                    //         console.error("Error recording implicit feedback:", error)
+                    //         alert("Error recording implicit feedback:" + error)
+                    //     })
+
                 }} target={"_blank"}>
                     {info.sourceName}
                     <Spacer $width="10px" />

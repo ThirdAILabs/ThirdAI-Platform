@@ -90,18 +90,10 @@ function startAndEnd(text: string, n_words: number = 2) {
     return [trimmed.substring(0, startEnd), trimmed.substring(endStart + 1)];
 }
 
-type TelemetryEvent = {
-    UserAction: string // e.g., 'click', 'hover', 'input', etc.
-    UIComponent: string // 'search button' 'model card', etc.
-    UI: string // e.g., 'SelectFileButton', 'SearchBar', etc.
-    data?: any // Additional data for the event, e.g., input value, details about the event, etc.
-}
-
-export type TelemetryEventPackage = {
-    UserName: string // Consistent pseudoname
-    timestamp: string
-    UserMachine: string
-    event: TelemetryEvent
+type ImplicitFeecback = {
+    reference_id: number
+    query_text: string
+    event_desc: string
 }
 
 
@@ -139,7 +131,7 @@ export class ModelService {
             return response;
         };
     }
-    
+
     getModelID(): string {
         function extractModelIdFromUrl(url: string) {
             const urlParts = new URL(url);
@@ -604,7 +596,7 @@ export class ModelService {
     ) {
         let finalAnswer = ''; // Variable to accumulate the response
 
-        const cache_access_token =  await temporaryCacheToken(this.getModelID());
+        const cache_access_token = await temporaryCacheToken(this.getModelID());
         const args: any = {
             query: genaiQuery(question, references, genaiPrompt),
             key: "sk-PYTWB6gs_ofO44-teXA2rIRGRbJfzqDyNXBalHXKcvT3BlbkFJk5905SK2RVE6_ME8i4Lnp9qULbyPZSyOU0vh2fZfQA", // fill in openai key
@@ -690,28 +682,15 @@ export class ModelService {
             .then((response) => response["data"] as ChatResponse);
     }
 
-    async recordEvent(event: TelemetryEvent) {
-        const userName = 'PSEUDONAME UNSET';
-        const timestamp = new Date().toISOString();
-        const userAgent = navigator.userAgent;
-        const machineType = userAgent;
-
-        const telemetryPackage: TelemetryEventPackage = {
-            UserName: userName,
-            timestamp: timestamp,
-            UserMachine: machineType,
-            event: event
-        };
-
-        const serializedData = JSON.stringify(telemetryPackage);
-
+    async recordImplicitFeedback(feedback: ImplicitFeecback) {
         try {
-            const response = await fetch(this.url + '/telemetry/record-event', {
+            const response = await fetch(this.url + "/implicit-feedback", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    ...this.authHeader()
                 },
-                body: serializedData,
+                body: JSON.stringify(feedback)
             });
 
             if (response.ok) {
@@ -723,8 +702,7 @@ export class ModelService {
         } catch (e) {
             console.error(e);
             alert(e)
-            throw new Error('Failed to record event');
+            throw new Error('Failed to record feedback');
         }
     }
-
 }
