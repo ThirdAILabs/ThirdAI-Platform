@@ -25,7 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       # We need postgres because generate_random_uuid does not work with sqlite since 
-      # it requires pg-crypto. 
+      # it requires pg-crypto. Since these tests are just testing individual backend
+      # endpoints, they do not require nomad, traefik, vault, etc. These are available
+      # in the integration tests.
       # TODO(Nicholas): refactor out generate_random_uuid so we can use in simple
       # sqlite DB for unit tests
       postgres:
