@@ -24,6 +24,10 @@ jobs:
   backend-unit-tests:
     runs-on: ubuntu-latest
     services:
+      # We need postgres because generate_random_uuid does not work with sqlite since 
+      # it requires pg-crypto. 
+      # TODO(Nicholas): refactor out generate_random_uuid so we can use in simple
+      # sqlite DB for unit tests
       postgres:
         image: postgres:latest
         env:
@@ -46,49 +50,6 @@ jobs:
           pip3 install pytest
           pip3 install pyopenssl --upgrade
 
-      # - name: Setup `nomad`
-      #   uses: hashicorp/setup-nomad@main
-      #   id: setup
-      #   with:
-      #     version: ${{ env.PRODUCT_VERSION }}
-
-      # - name: Start Nomad in Development Mode
-      #   run: |
-      #     NOMAD_PATH=$(which nomad)
-      #     nohup sudo $NOMAD_PATH agent -dev -config="local_setup/agent.hcl" > nomad.log 2>&1 &
-      #     echo "NOMAD_ENDPOINT=http://localhost:4646/" >> $GITHUB_ENV
-      
-      # - name: Verify Nomad Cluster
-      #   run: |
-      #     NOMAD_PATH=$(which nomad)
-      #     echo $NOMAD_PATH
-      #     sleep 10 && $NOMAD_PATH node status
-
-      # - name: Install Traefik
-      #   run: |
-      #     wget https://github.com/traefik/traefik/releases/download/v3.1.2/traefik_v3.1.2_linux_amd64.tar.gz
-      #     sudo tar -xf traefik_v3.1.2_linux_amd64.tar.gz -C /usr/local/bin
-
-      # - name: Run Traefik
-      #   run: |
-      #     cd local_setup
-      #     nohup sudo bash launch_traefik.sh > traefik.log 2>&1 &
-      #     cd ..
-      #     echo "PUBLIC_MODEL_BAZAAR_ENDPOINT=http://localhost:80/" >> $GITHUB_ENV
-      #     echo "PRIVATE_MODEL_BAZAAR_ENDPOINT=http://localhost:80/" >> $GITHUB_ENV
-
-      # - name: Install Vault
-      #   run: |
-      #     curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-      #     sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
-      #     sudo apt-get update
-      #     sudo apt-get install -y vault
-      #     echo "HASHICORP_VAULT_ENDPOINT=http://127.0.0.1:8200" >> $GITHUB_ENV
-      #     echo "HASHICORP_VAULT_TOKEN=00000000-0000-0000-0000-000000000000" >> $GITHUB_ENV
-
-      # - name: Start Vault Server
-      #   run: nohup vault server --dev --dev-root-token-id="00000000-0000-0000-0000-000000000000" > vault.log 2>&1 &
-
       - name: Wait for PostgreSQL to be ready
         run: |
           until pg_isready -h localhost -U postgres; do
@@ -110,9 +71,6 @@ jobs:
         if: always()
         run: |
           sudo systemctl stop postgresql
-          # sudo killall nomad
-          # sudo killall vault
-          # sudo killall traefik
 
   train-job-unit-tests:
     runs-on: ubuntu-latest
