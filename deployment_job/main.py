@@ -114,9 +114,6 @@ async def check_for_model_updates():
         await asyncio.sleep(10)  # Adjust the sleep time according to your needs
 
 
-# Include the telemetry router for all deployments
-app.include_router(telemetry_router, prefix=f"/{general_variables.model_id}/telemetry")
-
 if general_variables.type == ModelType.NDB:
     app.include_router(ndb_router, prefix=f"/{general_variables.model_id}")
 elif general_variables.type == ModelType.UDT:

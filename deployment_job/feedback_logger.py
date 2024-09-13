@@ -51,3 +51,4 @@ class FeedbackLogger:
 
     def log(self, event: FeedbackLog):
         self.stream.write(event.model_dump_json() + "\n")
+        self.stream.flush()
