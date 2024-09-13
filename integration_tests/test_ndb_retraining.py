@@ -1,12 +1,12 @@
-import pytest
 import os
+import uuid
+from urllib.parse import urljoin
+
+import pytest
 import requests
 
-from client.bazaar import ModelBazaar, Model
-import requests
+from client.bazaar import Model, ModelBazaar
 from client.utils import auth_header, create_model_identifier
-from urllib.parse import urljoin
-import uuid
 
 
 @pytest.mark.unit
