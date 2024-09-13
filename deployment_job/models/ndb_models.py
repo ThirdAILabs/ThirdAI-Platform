@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import fitz
 import thirdai.neural_db_v2.chunk_stores.constraints as ndbv2_constraints
+from chat import llm_providers
 from file_handler import create_ndb_docs, create_ndbv2_docs
 from models.model import Model
 from pydantic_models import inputs
@@ -101,6 +102,24 @@ class NDBModel(Model):
         """
         raise NotImplementedError
 
+    def set_chat(self, **kwargs):
+        try:
+            sqlite_db_path = os.path.join(self.model_dir, "chat_history.db")
+
+            chat_history_sql_uri = f"sqlite:///{sqlite_db_path}"
+
+            llm_chat_interface = llm_providers.get(kwargs.get("provider", "openai"))
+
+            self.chat = llm_chat_interface(
+                db=self.db,
+                chat_history_sql_uri=chat_history_sql_uri,
+                key=self.general_variables.genai_key,
+                **kwargs,
+            )
+        except Exception as err:
+            traceback.print_exc()
+            self.chat = None
+
 
 class NDBV1Model(NDBModel):
     """
@@ -114,6 +133,7 @@ class NDBV1Model(NDBModel):
         super().__init__()
         self.model_path: Path = self.model_dir / "model.ndb"
         self.db: ndb.NeuralDB = self.load(write_mode=write_mode)
+        self.set_chat()
 
     def get_ndb_path(self, model_id: str) -> Path:
         """
@@ -394,6 +414,7 @@ class NDBV2Model(NDBModel):
         super().__init__()
 
         self.db = self.load(write_mode=write_mode)
+        self.set_chat()
 
     def ndb_save_path(self):
         return os.path.join(self.model_dir, "model.ndb")

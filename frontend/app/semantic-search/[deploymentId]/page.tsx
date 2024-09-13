@@ -148,22 +148,24 @@ function App() {
     const [cacheEnabled, setCacheEnabled] = useState(true); // default generation cache is on
     const [ifGuardRailOn, setIfGuardRailOn] = useState(false);
     const [genAiProvider, setGenAiProvider] = useState<string | null>(null);
+    const [workflowId, setWorkflowId] = useState<string | null>(null);
 
     useEffect(() => {
-        const workflowId = searchParams.get('workflowId');
+        const receievedWorkflowId = searchParams.get('workflowId');
         const generationOn = searchParams.get('ifGenerationOn') === 'true';
         const provider = searchParams.get('genAiProvider');
 
-        console.log('workflowId', workflowId)
+        console.log('workflowId', receievedWorkflowId)
         console.log('generationOn', generationOn)
         console.log('genAiProvider', provider);
 
         setIfGenerationOn(generationOn);
         setGenAiProvider(provider);
+        setWorkflowId(receievedWorkflowId)
 
         const fetchWorkflowDetails = async () => {
             try {
-                const details = await getWorkflowDetails(workflowId as string);
+                const details = await getWorkflowDetails(receievedWorkflowId as string);
                 console.log('Models:', details.data.models);
 
                 // Filter and find the model with component "search"
@@ -192,7 +194,7 @@ function App() {
             }
         };
 
-        if (workflowId) {
+        if (receievedWorkflowId) {
             fetchWorkflowDetails();
         }
     }, []);
@@ -393,7 +395,6 @@ function App() {
                         processedQuery,
                         `${genaiPrompt}. [TAG #id] is sensitive information replaced as a placeholder, use them in your response for consistency.`,
                         processedReferences,
-                        websocketRef,
                         (next) => {
                             setAnswer((prev) => {
                                 // Concatenate previous answer and the new part
@@ -407,6 +408,7 @@ function App() {
                             });
                         },
                         genAiProvider || undefined, // Convert null to undefined
+                        workflowId || undefined,
                     );
                 }
             } else {
@@ -458,9 +460,9 @@ function App() {
                         query,
                         genaiPrompt,
                         results.references,
-                        websocketRef,
                         (next) => setAnswer((prev) => prev + next),
                         genAiProvider || undefined, // Convert null to undefined
+                        workflowId || undefined,
                     );
                 }
             }
@@ -477,9 +479,9 @@ function App() {
             query,
             prompt,
             results!.references.filter((ref) => checkedIds.has(ref.id)),
-            websocketRef,
             (next) => setAnswer((prev) => prev + next),
             genAiProvider || undefined, // Convert null to undefined
+            workflowId || undefined,
         );
     }
 

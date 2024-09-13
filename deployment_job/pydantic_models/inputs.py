@@ -157,3 +157,24 @@ class NDBExtraParams(BaseModel):
     rerank_threshold: float = 1.5
     top_k_threshold: Optional[int] = None
     constraints: Constraints = Field(default_factory=Constraints)
+
+
+class ChatInput(BaseModel):
+    user_input: str
+    session_id: Optional[str] = None
+
+
+class ChatHistoryInput(BaseModel):
+    session_id: Optional[str] = None
+
+
+class ChatSettings(BaseModel):
+    top_k: int = 5
+    model: str = "gpt-4o-mini"
+    provider: str = "openai"
+    key: str = None
+    temperature: float = 0.2
+    chat_prompt: str = "Answer the user's questions based on the below context:"
+    query_reformulation_prompt: str = (
+        "Given the above conversation, generate a search query that would help retrieve relevant sources for responding to the last message."
+    )

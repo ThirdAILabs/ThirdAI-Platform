@@ -2,15 +2,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import asyncio
+import logging
 import os
+from typing import Optional
 from urllib.parse import urljoin
 
 import requests
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from llms import default_keys, model_classes
-from pydantic import ValidationError
-from pydantic_models import GenerateArgs
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -22,141 +25,136 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
-@app.websocket("/llm-dispatch/generate")
-async def generate(websocket: WebSocket):
+
+class GenerateArgs(BaseModel):
+    query: str
+    key: Optional[str] = None
+    model: str = "gpt-4o-mini"
+    provider: str = "openai"
+    workflow_id: Optional[str] = None
+
+    # For caching we want just the query, not the entire prompt.
+    original_query: Optional[str] = None
+    cache_access_token: Optional[str] = None
+
+
+@app.post("/llm-dispatch/generate")
+async def generate(generate_args: GenerateArgs):
     """
-    WebSocket endpoint to generate text using a specified generative AI model.
-    Will keep sending content until "end_of_stream" is True.
-    If an error is found, "status" will be "error".
+    Generate text using a specified generative AI model, with content streamed in real-time.
+    Returns a StreamingResponse with chunks of generated text.
 
-    Expected Input Message Format:
-     ```
-     {
-         "query": "Your input text",
-         "model": "Model name",
-         "provider": "AI provider",
-         "key": "Optional API key"
-     }
-     ```
+    Parameters:
+        - query: str - The input query or prompt for text generation.
+        - key: Optional[str] - API key for the provider.
+        - model: str - The model to use for text generation (default: "gpt-4o-mini").
+        - provider: str - The AI provider to use (default: "openai"). Providers should be one of on-prem, openai, or cohere
+        - workflow_id: Optional[str] - Workflow ID for tracking the request.
+        - original_query: Optional[str] - The original query to be cached, used for cache lookup.
+        - cache_access_token: Optional[str] - Authorization token for caching responses.
 
-    Example Success:
+    Returns:
+    - StreamingResponse: A stream of generated text in chunks.
 
-    Server sends (multiple messages as content is generated):
+    Example Request Body:
     ```
     {
-        "status": "success",
-        "content": "Once upon a time, ",
-        "end_of_stream": False
-    }
-    ...
-    {
-        "status": "success",
-        "content": "they lived happily ever after.",
-        "end_of_stream": True
+        "query": "Explain the theory of relativity",
+        "model": "gpt-4o-mini",
+        "provider": "openai",
+        "workflow_id": "12345",
+        "original_query": "Explain relativity",
+        "cache_access_token": "cache_token_abc"
     }
     ```
 
-    Example Error:
-     ```
-     {
-         "status": "error",
-         "detail": "No generative AI key provided",
-         "end_of_stream": True
-     }
-     ```
+    Errors:
+    - HTTP 400:
+        - No API key provided and no default key found for the provider.
+        - Unsupported provider.
+    - HTTP 500:
+        - Error during the text generation process.
 
-    Providers should be one of on-prem, openai, or cohere
-    Other errors include missing genai key, unsupported provider, invalid
-    arguments, or internal error
+    Caching:
+    - If `original_query` and `cache_access_token` are provided, the generated content will be cached after completion.
     """
-    await websocket.accept()
-    while True:
-        data = await websocket.receive_text()
-        try:
-            generate_args = GenerateArgs.parse_raw(data)
-            break
-        except ValidationError as e:
-            await websocket.send_json(
-                {
-                    "status": "error",
-                    "detail": "Invalid arguments",
-                    "errors": e.errors(),
-                    "end_of_stream": True,
-                }
-            )
-            return
-        except Exception as e:
-            await websocket.send_json(
-                {"status": "error", "detail": "Unexpected error", "end_of_stream": True}
-            )
-            return
 
     key = generate_args.key or default_keys.get(generate_args.provider.lower())
     if not key:
-        await websocket.send_json(
-            {
-                "status": "error",
-                "detail": "No generative AI key provided",
-                "end_of_stream": True,
-            }
-        )
-        return
+        raise HTTPException(status_code=400, detail="No generative AI key provided")
 
     llm_class = model_classes.get(generate_args.provider.lower())
     if llm_class is None:
-        await websocket.send_json(
-            {
-                "status": "error",
-                "detail": "Unsupported provider",
-                "end_of_stream": True,
-            }
-        )
-        return
+        raise HTTPException(status_code=400, detail="Unsupported provider")
+
+    logging.info(
+        f"Received request from workflow: '{generate_args.workflow_id}'. "
+        f"Starting generation with provider '{generate_args.provider.lower()}':",
+    )
 
     llm = llm_class()
 
-    generated_response = ""
-    try:
-        async for next_word in llm.stream(
-            key=key, query=generate_args.query, model=generate_args.model
-        ):
-            generated_response += next_word
-            await websocket.send_json(
-                {"status": "success", "content": next_word, "end_of_stream": False}
-            )
-    except Exception as e:
-        print("Error", e)
-        await websocket.send_json(
-            {
-                "status": "error",
-                "detail": "Error while generating content",
-                "end_of_stream": True,
-            }
-        )
-    await websocket.send_json(
-        {"status": "success", "content": "", "end_of_stream": True}
-    )
-
-    if (
-        generate_args.original_query is not None
-        and generate_args.cache_access_token is not None
-    ):
+    async def generate_stream():
+        generated_response = ""
         try:
-            res = requests.post(
-                urljoin(os.environ["MODEL_BAZAAR_ENDPOINT"], "/cache/insert"),
-                params={
-                    "query": generate_args.original_query,
-                    "llm_res": generated_response,
-                },
-                headers={
-                    "Authorization": f"Bearer {generate_args.cache_access_token}",
-                },
+            async for next_word in llm.stream(
+                key=key, query=generate_args.query, model=generate_args.model
+            ):
+                generated_response += next_word
+                yield next_word
+                await asyncio.sleep(0)
+            logging.info(
+                f"\nCompleted generation for workflow '{generate_args.workflow_id}'.",
             )
-            if res.status_code != 200:
-                print(f"LLM Cache Insertion failed: {res}")
         except Exception as e:
-            print("LLM Cache Insert Error", e)
+            logging.error(f"Error during generation: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Error while generating content: {e}"
+            )
+        else:
+            if (
+                generate_args.original_query is not None
+                and generate_args.cache_access_token is not None
+            ):
+                await insert_into_cache(
+                    generate_args.original_query,
+                    generated_response,
+                    generate_args.cache_access_token,
+                )
+
+    return StreamingResponse(generate_stream(), media_type="text/plain")
+
+
+async def insert_into_cache(
+    original_query: str, generated_response: str, cache_access_token: str
+):
+    try:
+        res = requests.post(
+            urljoin(os.environ["MODEL_BAZAAR_ENDPOINT"], "/cache/insert"),
+            params={
+                "query": original_query,
+                "llm_res": generated_response,
+            },
+            headers={
+                "Authorization": f"Bearer {cache_access_token}",
+            },
+        )
+        if res.status_code != 200:
+            logging.error(f"LLM Cache Insertion failed: {res}")
+    except Exception as e:
+        logging.error("LLM Cache Insert Error", e)
+
+
+@app.get("/llm-dispatch/health")
+async def health_check():
+    """
+    Returns {"status": "healthy"} if successful.
+    """
+    return {"status": "healthy"}
 
 
 if __name__ == "__main__":

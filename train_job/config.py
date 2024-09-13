@@ -190,7 +190,7 @@ class TextClassificationDatagenOptions(BaseModel):
 class TokenClassificationDatagenOptions(BaseModel):
     sub_type: Literal[UDTSubType.token] = UDTSubType.token
 
-    domain_prompt: str
+    task_prompt: str
     tags: List[str]
     tag_examples: Dict[str, List[str]]
     num_sentences_to_generate: int

@@ -110,6 +110,8 @@ class GeneralVariables(EnvLoader):
     task_runner_token: str
     type: ModelType = ModelType.NDB
     sub_type: Union[UDTSubType, NDBSubType] = NDBSubType.v2
+    llm_provider: str = "openai"
+    genai_key: Optional[str] = None
 
     def deployment_permissions(self, token: str):
         deployment_permissions_endpoint = urljoin(

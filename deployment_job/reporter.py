@@ -182,11 +182,12 @@ class Reporter:
     ):
         content = self._request(
             "get",
-            "api/workflow/active-count",
+            "api/workflow/count",
             params={
                 "model_id": model_id,
+                "status_filter": "active",
             },
         )
         print(content)
 
-        return content["data"]["active_workflows_count"]
+        return content["data"]["workflows_count"]

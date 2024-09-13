@@ -88,6 +88,9 @@ class NDBOptions(BaseModel):
         NDBv2Options(), discriminator="ndb_sub_type"
     )
 
+    class Config:
+        protected_namespaces = ()
+
 
 class NDBData(BaseModel):
     model_data_type: Literal[ModelDataType.NDB] = ModelDataType.NDB
@@ -95,6 +98,9 @@ class NDBData(BaseModel):
     unsupervised_files: List[FileInfo] = []
     supervised_files: List[FileInfo] = []
     test_files: List[FileInfo] = []
+
+    class Config:
+        protected_namespaces = ()
 
     @model_validator(mode="after")
     def check_nonempty(self):
@@ -147,12 +153,18 @@ class UDTOptions(BaseModel):
 
     train_options: UDTTrainOptions = UDTTrainOptions()
 
+    class Config:
+        protected_namespaces = ()
+
 
 class UDTData(BaseModel):
     model_data_type: Literal[ModelDataType.UDT] = ModelDataType.UDT
 
     supervised_files: List[FileInfo]
     test_files: List[FileInfo] = []
+
+    class Config:
+        protected_namespaces = ()
 
     @model_validator(mode="after")
     def check_nonempty(self):
@@ -185,8 +197,7 @@ class TextClassificationDatagenOptions(BaseModel):
 
 class TokenClassificationDatagenOptions(BaseModel):
     sub_type: Literal[UDTSubType.token] = UDTSubType.token
-
-    domain_prompt: str
+    task_prompt: str
     tags: List[str]
     tag_examples: Dict[str, List[str]]
     num_sentences_to_generate: int
@@ -230,6 +241,9 @@ class TrainConfig(BaseModel):
     data: Union[NDBData, UDTData, UDTGeneratedData] = Field(
         ..., discriminator="model_data_type"
     )
+
+    class Config:
+        protected_namespaces = ()
 
     @model_validator(mode="after")
     def check_model_data_match(self):

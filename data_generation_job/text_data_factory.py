@@ -4,7 +4,8 @@ from typing import Dict, List, Optional
 
 from data_factory_interface import DataFactory
 from tqdm import tqdm
-from utils import assert_sufficient_descriptions, assert_sufficient_examples, save_dict
+from utils import save_dict, shuffle_and_filter, train_test_split, write_to_csv
+from variables import Entity
 
 
 class TextDataFactory(DataFactory):
@@ -14,64 +15,83 @@ class TextDataFactory(DataFactory):
     def __init__(self):
         super().__init__()
 
-    def generate_data(
+    def collect_arguments(
         self,
         task_prompt: str,
-        samples_per_label: int,
-        target_labels: List[str],
-        examples: Dict[str, List[str]],
-        labels_description: Dict[str, str],
+        target_labels: List[Entity],
+        sentence_to_generate_per_target_label: int,
         user_vocab: Optional[List[str]] = None,
         user_prompts: Optional[List[str]] = None,
-        vocab_per_sentence=4,
-        sentences_generated=0,  # To resume the generate function incase of midway failure. TODO(Gautam): Incorporate resuming the data_generation task
+        vocab_per_sentence: int = 4,
     ):
-        total_expected_sentences = samples_per_label * len(target_labels)
-        assert sentences_generated < total_expected_sentences
+        extended_tag_description = self.get_extended_description(entities=target_labels)
 
-        assert_sufficient_examples(target_labels, examples)
-        assert_sufficient_descriptions(target_labels, labels_description)
-
-        prompt_tasks = []
-
+        arguments = []
         for target_label in target_labels:
             for current_sentence_idx in range(
-                0, samples_per_label, self.generate_at_a_time
+                0, sentence_to_generate_per_target_label, self.generate_at_a_time
             ):
                 samples_to_generate = min(
-                    self.generate_at_a_time, samples_per_label - current_sentence_idx
+                    self.generate_at_a_time,
+                    sentence_to_generate_per_target_label - current_sentence_idx,
                 )
-                random_vocab = self.get_random_vocab(
-                    user_vocab, k=vocab_per_sentence * samples_to_generate
-                )
+                random_vocab = (
+                    user_vocab if user_vocab is not None else []
+                ) + self.get_random_vocab(k=vocab_per_sentence * samples_to_generate)
 
                 label_examples = "\n".join(
                     random.sample(
-                        examples[target_label],
-                        min(2, len(examples[target_label])),
+                        target_label.examples,
+                        min(2, len(target_label.examples)),
                     )
                 )
+
+                min_sample_len = random.randint(10, 20)
+                offset = random.randint(5, 20)
 
                 prompt = datagen_prompt.format(
                     task_prompt=task_prompt,
                     samples_to_generate=samples_to_generate,
-                    label_to_generate=target_label,
-                    label_description=labels_description[target_label],
+                    label_name=target_label.name,
+                    label_description=f"{target_label.description}. {extended_tag_description[target_label.name]}",
                     examples=label_examples,
                     user_prompts=(
                         ("\n".join(user_prompts) + "\n\n") if user_prompts else ""
                     ),
                     random_prompts="\n".join(self.get_random_prompts()),
                     random_vocab=str(random_vocab),
+                    min_sample_len=min_sample_len,
+                    max_sample_len=min_sample_len + offset,
                 )
-                prompt_tasks.append(
-                    {"prompt": prompt, "kwargs": {"target_label": target_label}}
+                arguments.append(
+                    {"prompt": prompt, "kwargs": {"target_label": target_label.name}}
                 )
+        return arguments
 
-        # Shuffling
+    def generate_data(
+        self,
+        task_prompt: str,
+        samples_per_label: int,
+        target_labels: List[Entity],
+        user_vocab: Optional[List[str]] = None,
+        user_prompts: Optional[List[str]] = None,
+        vocab_per_sentence: int = 4,
+    ):
+        total_expected_sentences = samples_per_label * len(target_labels)
+        sentence_to_generate_per_target_label = (
+            total_expected_sentences - self.train_sentences_generated
+        ) // len(target_labels)
+
+        prompt_tasks = self.collect_arguments(
+            task_prompt=task_prompt,
+            target_labels=target_labels,
+            sentence_to_generate_per_target_label=sentence_to_generate_per_target_label,
+            user_vocab=user_vocab,
+            user_prompts=user_prompts,
+            vocab_per_sentence=vocab_per_sentence,
+        )
+
         random.shuffle(prompt_tasks)
-
-        prompt_tasks = prompt_tasks[: total_expected_sentences - sentences_generated]
 
         total_chunks = len(prompt_tasks) // self.write_chunk_size + 1
         for idx in tqdm(
@@ -93,25 +113,39 @@ class TextDataFactory(DataFactory):
                     target_label=data_point["kwargs"]["target_label"],
                 )
             ]
-            # filtering to remove 'None'
-            transformed_data_points = list(
-                filter(lambda x: x is not None, transformed_data_points)
+            transformed_data_points = shuffle_and_filter(transformed_data_points)
+
+            train_data_points, test_data_points = train_test_split(
+                transformed_data_points, test_size=self.general_variables.test_size
             )
 
-            random.shuffle(transformed_data_points)
+            if train_data_points:
+                write_to_csv(
+                    self.train_file_location,
+                    train_data_points,
+                    fieldnames=[
+                        TextDataFactory.SOURCE_COLUMN,
+                        TextDataFactory.TARGET_COLUMN,
+                    ],
+                    newline="",
+                    encoding="utf-8",
+                )
 
-            self.write_on_training_file(
-                transformed_data_points,
-                fieldnames=[
-                    TextDataFactory.SOURCE_COLUMN,
-                    TextDataFactory.TARGET_COLUMN,
-                ],
-                write_fields=sentences_generated == 0,
-                newline="",
-                encoding="utf-8",
-            )
+                self.train_sentences_generated += len(transformed_data_points)
 
-            sentences_generated += len(transformed_data_points)
+            if test_data_points:
+                write_to_csv(
+                    self.test_file_location,
+                    test_data_points,
+                    fieldnames=[
+                        TextDataFactory.SOURCE_COLUMN,
+                        TextDataFactory.TARGET_COLUMN,
+                    ],
+                    newline="",
+                    encoding="utf-8",
+                )
+
+                self.test_sentences_generated += len(transformed_data_points)
 
         dataset_config = {
             "filepath": str(self.train_file_location),
@@ -119,8 +153,8 @@ class TextDataFactory(DataFactory):
             "task": "TEXT_CLASSIFICATION",
             "input_feature": TextDataFactory.SOURCE_COLUMN,
             "target_feature": TextDataFactory.TARGET_COLUMN,
-            "target_labels": target_labels,
-            "num_samples": sentences_generated,
+            "target_labels": [t.name for t in target_labels],
+            "num_samples": self.train_sentences_generated,
         }
         save_dict(self.config_file_location, **dataset_config)
 

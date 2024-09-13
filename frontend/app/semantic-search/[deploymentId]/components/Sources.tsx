@@ -187,18 +187,28 @@ export default function Sources(props: SourcesProps) {
 
     return (
         fuse && (
-            <DropdownMenuContent style={{width: "300px"}} align="start">
+            <DropdownMenuContent 
+                style={{ width: "300px", maxHeight: "300px", overflowY: "auto" }} 
+                align="start" 
+                side="bottom" // Ensure the dropdown opens downward
+            >
                 <Input
                     autoFocus
                     className="font-medium"
                     placeholder="Filter documents by name..."
                     onChange={handleSearchBarChangeEvent}
                     style={{ marginBottom: '5px' }}
+                    onKeyDown={(e) => {
+                        e.stopPropagation();  // Stop the event from propagating to other elements in the dropdown
+                    }}
                 />
+                <Button style={{width: "100%", marginTop: "15px"}} onClick={() => {setOpen(true);}}>
+                    Add Documents
+                </Button>
                 <Scrollable>
                     <Spacer $height="10px" />
                     {matches.map((source, i) => (
-                        <DropdownMenuItem key={i} style={{display: "flex", justifyContent: "space-between"}} onClick={() =>
+                        <DropdownMenuItem key={i} style={{display: "flex", paddingRight: "10px", justifyContent: "space-between"}} onClick={() =>
                         {
                             console.log("Propagated");
                             modelService!.openSource(
@@ -206,29 +216,28 @@ export default function Sources(props: SourcesProps) {
                             )}
                         }>
                             {formatSource(source.source)}
-                            <Button
-                                className="bg-transparent hover:bg-red-500 text-red-500 hover:text-white"
-                                style={{height: "2rem", width: "2rem", border: "1px solid red"}}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    modelService!.deleteSources([
-                                        source.source_id,
-                                    ]);
-                                    props.setSources(
-                                        props.sources.filter(
-                                            (x) =>
-                                                x.source_id !==
-                                                source.source_id,
-                                        ),
-                                    );
-                                }}
-                            >✕</Button>
+                            <div style={{ marginLeft: "auto", marginRight: "10px" }}> {/* Add margin here */}
+                                <Button
+                                    className="bg-transparent hover:bg-red-500 text-red-500 hover:text-white"
+                                    style={{height: "2rem", width: "2rem", border: "1px solid red"}}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        modelService!.deleteSources([
+                                            source.source_id,
+                                        ]);
+                                        props.setSources(
+                                            props.sources.filter(
+                                                (x) =>
+                                                    x.source_id !==
+                                                    source.source_id,
+                                            ),
+                                        );
+                                    }}
+                                >✕</Button>
+                            </div>
                         </DropdownMenuItem>
                     ))}
                 </Scrollable>
-                <Button style={{width: "100%", marginTop: "15px"}} onClick={() => {setOpen(true);}}>
-                    Add Documents
-                </Button>
                 <FileUploadModal
                     isOpen={open}
                     handleCloseModal={() => setOpen(false)}
