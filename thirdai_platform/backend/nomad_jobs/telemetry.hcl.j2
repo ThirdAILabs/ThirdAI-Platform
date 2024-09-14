@@ -69,6 +69,14 @@ scrape_configs:
         regex: "([^:]+):.+"
         target_label: "hostname"
         replacement: "nomad-agent-$1"
+  - job_name: "deployment-jobs"
+    metrics_path: "/metrics"
+    http_sd_configs:
+      {% if platform == "local" -%}
+      - url: "http://host.docker.internal:80/api/telemetry/deployment-services"
+      {%- else -%}
+      - url: "{{ model_bazaar_endpoint }}api/telemetry/deployment-services"
+      {%- endif %}
 EOF
         destination = "${NOMAD_TASK_DIR}/prometheus.yaml"
       }

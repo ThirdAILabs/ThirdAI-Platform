@@ -178,6 +178,7 @@ async def restart_telemetry_jobs():
     response = submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "telemetry.hcl.j2"),
+        model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
         VM_DATA_DIR=os.path.join(
             MODEL_BAZAAR_PATH, "monitoring-data", "victoriametric"
         ),

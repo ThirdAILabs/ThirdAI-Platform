@@ -12,6 +12,7 @@ from routers.model import ModelManager, get_model
 from routers.ndb import ndb_router
 from routers.udt import udt_router
 from utils import delete_deployment_job
+from prometheus_client import make_asgi_app
 from variables import GeneralVariables, ModelType
 
 general_variables = GeneralVariables.load_from_env()
@@ -117,6 +118,8 @@ if general_variables.type == ModelType.NDB:
     app.include_router(ndb_router, prefix=f"/{general_variables.model_id}")
 elif general_variables.type == ModelType.UDT:
     app.include_router(udt_router, prefix=f"/{general_variables.model_id}")
+
+app.mount("/metrics", make_asgi_app())
 
 
 @app.exception_handler(404)
