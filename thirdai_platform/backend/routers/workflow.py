@@ -24,7 +24,7 @@ from backend.utils import (
 )
 from database import schema
 from database.session import get_session
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
 from licensing.verify.verify_license import verify_license
 from pydantic import BaseModel, validator
@@ -684,9 +684,8 @@ async def start_workflow(
                 meta_data = json.loads(model.meta_data.train)
                 size_in_memory = int(meta_data["size_in_memory"])
             except (json.JSONDecodeError, KeyError) as e:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Failed to parse model metadata or missing 'size_in_memory'.",
+                raise Exception(
+                    "Failed to parse model metadata or missing 'size_in_memory'."
                 )
             memory = (size_in_memory // 1000000) + 1000  # MB required for deployment
 
