@@ -21,13 +21,7 @@ queries_ingested = Throughput()
 queries_ingested_bytes = Throughput()
 
 
-def make_prometheus_metric(name, desc):
-    return Summary(name, desc, labelnames=["model_id"]).labels(
-        general_variables.model_id
-    )
-
-
-udt_predict_metric = make_prometheus_metric("udt_predict", "UDT predictions")
+udt_predict_metric = Summary("udt_predict", "UDT predictions")
 
 
 @udt_router.post("/predict")

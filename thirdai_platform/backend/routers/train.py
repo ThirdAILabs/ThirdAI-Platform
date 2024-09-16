@@ -42,12 +42,45 @@ from backend.utils import (
 )
 from database import schema
 from database.session import get_session
-from fastapi import APIRouter, Depends, Form, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
 from licensing.verify.verify_license import valid_job_allocation, verify_license
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
 train_router = APIRouter()
+
+
+def validate_license_info():
+    try:
+        license_info = verify_license(
+            os.getenv(
+                "LICENSE_PATH", "/model_bazaar/license/ndb_enterprise_license.json"
+            )
+        )
+        if not valid_job_allocation(license_info, os.getenv("NOMAD_ENDPOINT")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Resource limit reached, cannot allocate new jobs.",
+            )
+        return license_info
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"License is not valid. {str(e)}",
+        )
+
+
+def get_base_model(base_model_identifier: str, user: schema.User, session: Session):
+    try:
+        base_model = get_model_from_identifier(base_model_identifier, session)
+        if not base_model.get_user_permission(user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have access to the specified base model.",
+            )
+        return base_model
+    except Exception as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
 
 @train_router.post("/ndb")
@@ -73,22 +106,7 @@ def train_ndb(
             message="Invalid options format: " + str(e),
         )
 
-    try:
-        license_info = verify_license(
-            os.getenv(
-                "LICENSE_PATH", "/model_bazaar/license/ndb_enterprise_license.json"
-            )
-        )
-        if not valid_job_allocation(license_info, os.getenv("NOMAD_ENDPOINT")):
-            return response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                message="Resource limit reached, cannot allocate new jobs.",
-            )
-    except Exception as e:
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"License is not valid. {str(e)}",
-        )
+    license_info = validate_license_info()
 
     try:
         validate_name(model_name)
@@ -136,18 +154,7 @@ def train_ndb(
     # Base model checks
     base_model = None
     if base_model_identifier:
-        try:
-            base_model = get_model_from_identifier(base_model_identifier, session)
-            if not base_model.get_user_permission(user):
-                return response(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    message="You do not have access to the specified base model.",
-                )
-        except Exception as error:
-            return response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                message=str(error),
-            )
+        base_model = get_base_model(base_model_identifier, user=user, session=session)
 
     config = TrainConfig(
         model_bazaar_dir=model_bazaar_path(),
@@ -231,29 +238,14 @@ def train_ndb(
 
 
 @train_router.post("/ndb-retrain")
-def retrain(
+def retrain_ndb(
     model_name: str,
     base_model_identifier: str,
     job_options: JobOptions = JobOptions(),
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
-    try:
-        license_info = verify_license(
-            os.getenv(
-                "LICENSE_PATH", "/model_bazaar/license/ndb_enterprise_license.json"
-            )
-        )
-        if not valid_job_allocation(license_info, os.getenv("NOMAD_ENDPOINT")):
-            return response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                message="Resource limit reached, cannot allocate new jobs.",
-            )
-    except Exception as e:
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"License is not valid. {str(e)}",
-        )
+    license_info = validate_license_info()
 
     user: schema.User = authenticated_user.user
 
@@ -275,20 +267,7 @@ def retrain(
     model_id = uuid.uuid4()
     data_id = str(model_id)
 
-    base_model = None
-    if base_model_identifier:
-        try:
-            base_model = get_model_from_identifier(base_model_identifier, session)
-            if not base_model.get_user_permission(user):
-                return response(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    message="You do not have access to the specified base model.",
-                )
-        except Exception as error:
-            return response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                message=str(error),
-            )
+    base_model = get_base_model(base_model_identifier, user=user, session=session)
 
     if base_model.type != ModelType.NDB or base_model.sub_type != NDBSubType.v2:
         return response(
@@ -421,22 +400,7 @@ def nlp_datagen(
             message="Invalid options format: " + str(e),
         )
 
-    try:
-        license_info = verify_license(
-            os.getenv(
-                "LICENSE_PATH", "/model_bazaar/license/ndb_enterprise_license.json"
-            )
-        )
-        if not valid_job_allocation(license_info, os.getenv("NOMAD_ENDPOINT")):
-            return response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                message="Resource limit reached, cannot allocate new jobs.",
-            )
-    except Exception as e:
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"License is not valid. {str(e)}",
-        )
+    license_info = validate_license_info()
 
     try:
         validate_name(model_name)
@@ -460,18 +424,7 @@ def nlp_datagen(
     # Base model checks
     base_model = None
     if base_model_identifier:
-        try:
-            base_model = get_model_from_identifier(base_model_identifier, session)
-            if not base_model.get_user_permission(user):
-                return response(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    message="You do not have access to the specified base model.",
-                )
-        except Exception as error:
-            return response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                message=str(error),
-            )
+        base_model = get_base_model(base_model_identifier, user=user, session=session)
 
     try:
         data = UDTGeneratedData(secret_token=secret_token)
@@ -578,22 +531,7 @@ def datagen_callback(
             message="Invalid options format: " + str(e),
         )
 
-    try:
-        license_info = verify_license(
-            os.getenv(
-                "LICENSE_PATH", "/model_bazaar/license/ndb_enterprise_license.json"
-            )
-        )
-        if not valid_job_allocation(license_info, os.getenv("NOMAD_ENDPOINT")):
-            return response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                message="Resource limit reached, cannot allocate new jobs.",
-            )
-    except Exception as e:
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"License is not valid. {str(e)}",
-        )
+    license_info = validate_license_info()
 
     # We know this mapping is true because we set this in the nlp-datagen endpoint.
     model_id = data_id
@@ -760,18 +698,7 @@ def train_udt(
     # Base model checks
     base_model = None
     if base_model_identifier:
-        try:
-            base_model = get_model_from_identifier(base_model_identifier, session)
-            if not base_model.get_user_permission(user):
-                return response(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    message="You do not have access to the specified base model.",
-                )
-        except Exception as error:
-            return response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                message=str(error),
-            )
+        base_model = get_base_model(base_model_identifier, user=user, session=session)
 
     config = TrainConfig(
         model_bazaar_dir=model_bazaar_path(),

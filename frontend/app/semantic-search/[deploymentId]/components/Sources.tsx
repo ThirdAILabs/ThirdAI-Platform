@@ -210,10 +210,16 @@ export default function Sources(props: SourcesProps) {
                     {matches.map((source, i) => (
                         <DropdownMenuItem key={i} style={{display: "flex", paddingRight: "10px", justifyContent: "space-between"}} onClick={() =>
                         {
-                            console.log("Propagated");
-                            modelService!.openSource(
-                                source.source,
-                            )}
+                            if (source.source) { // Ensure source.source is defined
+                                const fileExtension = source.source.split('.').pop()?.toLowerCase();  // Get file extension
+                                
+                                if (fileExtension === 'pdf' || fileExtension === 'docx') {
+                                    // If file is a .pdf or .docx, proceed to open the source
+                                    console.log("Opening source:", source.source);
+                                    modelService!.openSource(source.source);
+                                }
+                            }
+                        }
                         }>
                             {formatSource(source.source)}
                             <div style={{ marginLeft: "auto", marginRight: "10px" }}> {/* Add margin here */}
@@ -238,6 +244,7 @@ export default function Sources(props: SourcesProps) {
                         </DropdownMenuItem>
                     ))}
                 </Scrollable>
+                <Spacer $height="70px" />
                 <FileUploadModal
                     isOpen={open}
                     handleCloseModal={() => setOpen(false)}

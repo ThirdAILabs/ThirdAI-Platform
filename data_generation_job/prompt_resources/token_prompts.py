@@ -34,3 +34,23 @@ Output format:
       Incorrect template: My [MEDICAL_INFO] should remain confidential to protect my personal interest.
       Correct template: My condition due to [MEDICAL_INFO] should remain confidential to protect my personal interest.
 """
+
+
+dataset_generation_prompt_with_sample = """The goal is to create a dataset for entity recognition. Please generate {num_to_generate} templates associated with given below tags for {task_prompt}
+            
+Tags with their description and example:
+{tags_info}
+Here is a sample with the specified tags :
+{sample}
+Key Requirements:
+- Include words that could be interpreted as tag but are actually not, as depicted in the above examples.
+- Generate samples that are somewhat similar in grammatical or semantical structure but not exactly the same as the example given above.
+- {value_requirements}
+Output format:
+-  Each template should be in a newline.
+-  DO NOT include any bulleting, header/footer or enumeration. Do not include any quotes or emojis.
+** IMPORTANT POINT:
+-  These templates would be filled later so make sure these templates would make sense after being filled. Here is one incorrect & correct templates for the tags [MEDICAL_INFO]
+      Incorrect templates: My [MEDICAL_INFO] should remain confidential to protect my personal interest.
+      Correct templates: My condition due to [MEDICAL_INFO] should remain confidential to protect my personal interest.
+"""

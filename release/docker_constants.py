@@ -39,4 +39,5 @@ image_base_names = ImageNames(
     GENERATION_IMAGE_NAME="llm_dispatch_job",
     FRONTEND_IMAGE_NAME="frontend",
     LLM_CACHE_IMAGE_NAME="llm_cache_job",
+    NODE_DISCOVERY_IMAGE_NAME="node_discovery",
 )
