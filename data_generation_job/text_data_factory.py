@@ -1,8 +1,8 @@
 import random
+from resource.text_prompts import datagen_prompt
 from typing import Dict, List, Optional
 
 from data_factory_interface import DataFactory
-from prompt_resources.text_prompts import datagen_prompt
 from tqdm import tqdm
 from utils import save_dict, shuffle_and_filter, train_test_split, write_to_csv
 from variables import Entity
