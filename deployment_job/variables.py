@@ -6,7 +6,7 @@ from dataclasses import MISSING, asdict, dataclass, fields
 from enum import Enum
 from typing import Dict, Optional, Type, TypeVar, Union, get_args, get_origin
 from urllib.parse import urljoin
-
+from pathlib import Path
 import requests
 from fastapi import status
 from utils import now
@@ -112,9 +112,8 @@ class GeneralVariables(EnvLoader):
     sub_type: Union[UDTSubType, NDBSubType] = NDBSubType.v1
     llm_provider: str = "openai"
     genai_key: Optional[str] = None
-    # How long the tasks in redis will be kept after its done.
-    # https://www.dragonflydb.io/guides/redis-best-practices#:~:text=Redis%20TTL%20(Time%2Dto%2DLive)%20Best%20Practices
-    task_ttl_seconds: int = 86400  # 24hrs
+
+    production: bool = False
 
     def deployment_permissions(self, token: str):
         deployment_permissions_endpoint = urljoin(
@@ -156,6 +155,12 @@ class GeneralVariables(EnvLoader):
 
         # Rebuild the URL while keeping the original scheme and hostname
         return urlunparse((parsed_url.scheme, nomad_netloc, "", "", "", ""))
+
+    def get_model_dir(self) -> Path:
+        return Path(self.general_variables.model_bazaar_dir) / "models" / self.model_id
+
+    def get_data_dir(self) -> Path:
+        return self.get_model_dir() / "deployments" / "data"
 
 
 def merge_dataclasses_to_dict(*instances) -> dict:

@@ -11,7 +11,16 @@ import jwt
 import thirdai
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
-from feedback_logger import AssociateLog, FeedbackLog, ImplicitUpvoteLog, UpvoteLog
+from deployment_job.update_logger import (
+    AssociateLog,
+    FeedbackLog,
+    ImplicitUpvoteLog,
+    UpvoteLog,
+    DeleteLog,
+    InsertLog,
+    FileInfo,
+    FileLocation,
+)
 from file_handler import validate_files
 from permissions import Permissions
 from prometheus_client import Summary
@@ -27,11 +36,17 @@ from pydantic_models.inputs import (
 from routers.model import get_model
 from utils import Status, now, propagate_error, response, validate_name
 from variables import GeneralVariables
+from update_logger import UpdateLogger
 
 permissions = Permissions()
 general_variables = GeneralVariables.load_from_env()
 
 ndb_router = APIRouter()
+
+
+feedback_logger = UpdateLogger.get_feedback_logger(general_variables.get_data_dir())
+insertion_logger = UpdateLogger.get_insertion_logger(general_variables.get_data_dir())
+deletion_logger = UpdateLogger.get_deletion_logger(general_variables.get_data_dir())
 
 
 ndb_query_metric = Summary("ndb_query", "NDB Queries")
@@ -228,8 +243,8 @@ def ndb_upvote(
         token=token, permission_type="write"
     )
 
-    if not write_permission:
-        model.feedback_logger.log(
+    if not write_permission or general_variables.production:
+        feedback_logger.log(
             FeedbackLog(
                 event=UpvoteLog(
                     chunk_ids=[sample.reference_id for sample in input.text_id_pairs],
@@ -237,31 +252,17 @@ def ndb_upvote(
                 )
             )
         )
-    else:
-        task_id = str(uuid.uuid4())
-        task_data = {
-            "task_id": task_id,
-            "model_id": general_variables.model_id,
-            "action": "upvote",
-            "text_id_pairs": json.dumps(jsonable_encoder(input.text_id_pairs)),
-            "token": token,
-            "status": Status.not_started,
-            "last_modified": now(),
-            "message": "",
-        }
-
-        model.redis_publish(task_id=task_id, task_data=task_data)
-
         return response(
             status_code=status.HTTP_202_ACCEPTED,
-            message="Upvote task queued successfully.",
-            data={"task_id": task_id},
+            message="Upvote task logged successfully.",
         )
+    else:
+        model.upvote(input.text_id_pairs)
 
-    return response(
-        status_code=status.HTTP_200_OK,
-        message="Upvote task logged successfully.",
-    )
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Upvote applied successfully.",
+        )
 
 
 @ndb_router.post("/associate")
@@ -296,7 +297,7 @@ def ndb_associate(
         token=token, permission_type="write"
     )
 
-    if not write_permission:
+    if not write_permission or general_variables.production:
         model.feedback_logger.log(
             FeedbackLog(
                 event=AssociateLog(
@@ -305,31 +306,17 @@ def ndb_associate(
                 )
             )
         )
-    else:
-        task_id = str(uuid.uuid4())
-        task_data = {
-            "task_id": task_id,
-            "model_id": general_variables.model_id,
-            "action": "associate",
-            "text_pairs": json.dumps(jsonable_encoder(input.text_pairs)),
-            "token": token,
-            "status": Status.not_started,
-            "last_modified": now(),
-            "message": "",
-        }
-
-        model.redis_publish(task_id=task_id, task_data=task_data)
-
         return response(
             status_code=status.HTTP_202_ACCEPTED,
-            message="Associate task queued successfully.",
-            data={"task_id": task_id},
+            message="Associate task logged successfully.",
         )
+    else:
+        model.associate(input.text_pairs)
 
-    return response(
-        status_code=status.HTTP_200_OK,
-        message="Associate task logged successfully.",
-    )
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Associate applied successfully.",
+        )
 
 
 @ndb_router.post("/implicit-feedback")
@@ -410,26 +397,22 @@ def delete(
     }
     ```
     """
-    model = get_model()
-    task_id = str(uuid.uuid4())
-    task_data = {
-        "task_id": task_id,
-        "model_id": general_variables.model_id,
-        "action": "delete",
-        "source_ids": json.dumps(jsonable_encoder(input.source_ids)),
-        "token": token,
-        "status": Status.not_started,
-        "last_modified": now(),
-        "message": "",
-    }
 
-    model.redis_publish(task_id=task_id, task_data=task_data)
+    if general_variables.production:
+        deletion_logger.log(DeleteLog(doc_ids=input.source_ids))
 
-    return response(
-        status_code=status.HTTP_202_ACCEPTED,
-        message="Delete task queued successfully.",
-        data={"task_id": task_id},
-    )
+        return response(
+            status_code=status.HTTP_202_ACCEPTED,
+            message="Delete task logged successfully.",
+        )
+    else:
+        model = get_model()
+        model.delete(input.source_ids)
+
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Delete applied successfully.",
+        )
 
 
 @ndb_router.post("/save")
@@ -591,88 +574,6 @@ def insert(
     )
 
 
-@ndb_router.post("/task-status")
-@propagate_error
-def task_status(
-    task_id: str,
-    _=Depends(permissions.verify_permission("write")),
-):
-    """
-    Get the status of a specific task, including the remaining time before the task data expires.
-
-    Parameters:
-    - task_id: str - The ID of the task.
-
-    Returns:
-    - JSONResponse: The status of the task along with ttl.
-
-    Example Request Body:
-    ```
-    {
-        "task_id": "1234-5678-91011-1213"
-    }
-    ```
-
-    Example Response Body:
-    ```
-    {
-        "status": "success",
-        "message": "Information for task 1234-5678-91011-1213",
-        "data": {
-            "task": {
-                "status": "complete",
-                "action": "insert",
-                "last_modified": "2024-07-31T12:34:56.789Z",
-                "documents": [...],
-                "message": "",
-                "data": null
-                // 'token' field is removed for security
-            },
-            "ttl": "23:59:59"
-        }
-    }
-    ```
-    """
-    model = get_model()
-    task_key = f"task:{task_id}"
-    task_data = model.redis_client.hgetall(task_key)
-    if task_data:
-        # Deserialize fields that were stored as JSON strings
-        for key in task_data:
-            try:
-                task_data[key] = json.loads(task_data[key])
-            except (TypeError, json.JSONDecodeError):
-                pass
-
-        # Remove sensitive fields
-        sensitive_fields = ["token"]
-        for field in sensitive_fields:
-            task_data.pop(field, None)
-
-        # Get the remaining TTL for the task key
-        ttl_seconds = model.redis_client.ttl(task_key)
-        if ttl_seconds >= 0:
-            # Convert seconds to HH:MM:SS format
-            ttl_info = str(datetime.timedelta(seconds=ttl_seconds))
-        elif ttl_seconds == -1:
-            # Key exists but has no expiration (unlikely since we set TTL)
-            ttl_info = "Does not expire"
-        else:
-            # ttl_seconds == -2, key does not exist (should not reach here as task_data exists)
-            ttl_info = None
-
-        return response(
-            status_code=status.HTTP_200_OK,
-            message=f"Information for task {task_id}",
-            data={"task": jsonable_encoder(task_data), "ttl": ttl_info},
-        )
-    else:
-        return response(
-            status_code=status.HTTP_404_NOT_FOUND,
-            message="Task ID not found or has expired.",
-        )
-
-
 @ndb_router.get("/highlighted-pdf")
 @propagate_error
 def highlighted_pdf(
@@ -752,96 +653,3 @@ def pdf_chunks(reference_id: int, _=Depends(permissions.verify_permission("read"
     )
 
 
-def process_ndb_task(task):
-    """
-    Process a single task based on the task action.
-
-    Args:
-        task (dict): The task data fetched from Redis.
-    """
-    model = get_model(write_mode=True)
-    task_id = task.get("task_id")
-    try:
-        # Update task status to "in_progress"
-        task["status"] = Status.in_progress  # Use the enum value for status
-        task["last_modified"] = now()  # Convert datetime to string
-        model.redis_client.hset(
-            f"task:{task_id}",
-            mapping={
-                k: json.dumps(v) if isinstance(v, (list, dict)) else v
-                for k, v in task.items()
-            },
-        )
-
-        action = task.get("action")
-        model_id = task.get("model_id")
-
-        if action == "upvote":
-            # Deserialize and load back into Pydantic model
-            text_id_pairs = parse_obj_as(
-                List[UpvoteInputSingle], task.get("text_id_pairs", "[]")
-            )
-            model.upvote(text_id_pairs=text_id_pairs, token=task.get("token"))
-            model.logger.info(
-                f"Successfully upvoted for model_id: {model_id}, task_id: {task_id} and task_data: {task}"
-            )
-
-        elif action == "associate":
-            # Deserialize and load back into Pydantic model
-            text_pairs = parse_obj_as(
-                List[AssociateInputSingle], task.get("text_pairs", "[]")
-            )
-            model.associate(text_pairs=text_pairs, token=task.get("token"))
-            model.logger.info(
-                f"Successfully associated text pairs for model_id: {model_id}, task_id: {task_id} and task_data: {task}"
-            )
-
-        elif action == "delete":
-            # Deserialize and load back into Pydantic model
-            source_ids = task.get("source_ids", "[]")
-            model.delete(source_ids=source_ids, token=task.get("token"))
-            model.logger.info(
-                f"Successfully deleted sources for model_id: {model_id}, task_id: {task_id} and task_data: {task}"
-            )
-
-        elif action == "insert":
-            documents = task.get("documents", "[]")  # Decode JSON
-            model.insert(documents=documents, token=task.get("token"))
-            model.logger.info(
-                f"Successfully inserted documents for model_id: {model_id}, task_id: {task_id} and task_data: {task}"
-            )
-
-        # Mark task as completed
-        task["status"] = Status.complete
-        task["last_modified"] = now()
-        model.redis_client.hset(
-            f"task:{task_id}",
-            mapping={
-                k: json.dumps(v) if isinstance(v, (list, dict)) else v
-                for k, v in task.items()
-            },
-        )
-        model.logger.info(
-            f"Successfully updated the status of the task {task_id} to complete"
-        )
-
-    except Exception as e:
-        model.logger.error(f"Failed to process task {task_id}: {str(e)}")
-        traceback.print_exc()
-        # Update task status to "failed" and log the error
-        task["status"] = Status.failed
-        task["last_modified"] = now()
-        task["message"] = str(e)
-        model.redis_client.hset(
-            f"task:{task_id}",
-            mapping={
-                k: json.dumps(v) if isinstance(v, (list, dict)) else v
-                for k, v in task.items()
-            },
-        )
-    finally:
-        model.redis_client.srem(f"tasks_by_model:{model_id}", task_id)
-        model.redis_client.expire(
-            f"task:{task_id}", model.general_variables.task_ttl_seconds
-        )
-        model.logger.info(f"Task {task_id} removed from Redis.")

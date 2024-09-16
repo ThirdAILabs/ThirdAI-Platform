@@ -48,9 +48,7 @@ class NDBModel(Model):
         raise NotImplementedError
 
     @abstractmethod
-    def upvote(
-        self, text_pairs: List[inputs.UpvoteInputSingle], token: str, **kwargs: Any
-    ) -> None:
+    def upvote(self, text_pairs: List[inputs.UpvoteInputSingle], **kwargs: Any) -> None:
         """
         Upvotes entries in the NDB model.
         """
@@ -58,7 +56,7 @@ class NDBModel(Model):
 
     @abstractmethod
     def associate(
-        self, text_pairs: List[inputs.AssociateInputSingle], token: str, **kwargs: Any
+        self, text_pairs: List[inputs.AssociateInputSingle], **kwargs: Any
     ) -> None:
         """
         Associates entries in the NDB model.
@@ -66,7 +64,7 @@ class NDBModel(Model):
         raise NotImplementedError
 
     @abstractmethod
-    def delete(self, source_ids: List[str], token: str, **kwargs: Any) -> None:
+    def delete(self, source_ids: List[str], **kwargs: Any) -> None:
         """
         Deletes entries from the NDB model.
         """
@@ -217,7 +215,7 @@ class NDBV1Model(NDBModel):
             key=lambda source: source["source"],
         )
 
-    def delete(self, source_ids: List[str], token: str, **kwargs: Any) -> None:
+    def delete(self, source_ids: List[str], **kwargs: Any) -> None:
         """
         Deletes entries from the NDB model.
         """
@@ -441,7 +439,6 @@ class NDBV2Model(NDBModel):
         query: str,
         top_k: int,
         constraints: Dict[str, Dict[str, Any]],
-        token: str,
         **kwargs: Any,
     ) -> inputs.SearchResultsNDB:
         constraints = {
@@ -460,7 +457,7 @@ class NDBV2Model(NDBModel):
         return inputs.SearchResultsNDB(query_text=query, references=results)
 
     def insert(
-        self, documents: List[Dict[str, Any]], token: str, **kwargs: Any
+        self, documents: List[Dict[str, Any]], **kwargs: Any
     ) -> List[Dict[str, str]]:
         # TODO(V2 Support): add flag for upsert
         ndb_docs = create_ndbv2_docs(
@@ -480,7 +477,7 @@ class NDBV2Model(NDBModel):
         ]
 
     def upvote(
-        self, text_id_pairs: List[inputs.UpvoteInputSingle], token: str, **kwargs: Any
+        self, text_id_pairs: List[inputs.UpvoteInputSingle], **kwargs: Any
     ) -> None:
         queries = [t.query_text for t in text_id_pairs]
         chunk_ids = [t.reference_id for t in text_id_pairs]
@@ -491,7 +488,7 @@ class NDBV2Model(NDBModel):
         # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
     def associate(
-        self, text_pairs: List[inputs.AssociateInputSingle], token: str, **kwargs: Any
+        self, text_pairs: List[inputs.AssociateInputSingle], **kwargs: Any
     ) -> None:
         sources = [t.source for t in text_pairs]
         targets = [t.target for t in text_pairs]
@@ -499,7 +496,7 @@ class NDBV2Model(NDBModel):
 
         # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
-    def delete(self, source_ids: List[str], token: str, **kwargs: Any) -> None:
+    def delete(self, source_ids: List[str], **kwargs: Any) -> None:
         for id in source_ids:
             self.db.delete_doc(doc_id=id)
 
