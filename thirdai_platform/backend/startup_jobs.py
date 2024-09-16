@@ -83,6 +83,8 @@ async def start_on_prem_generate_job(
     model_path = os.path.join(mount_dir, model_name)
     if not os.path.exists(model_path):
         raise ValueError(f"Cannot find model at location: {model_path}.")
+    model_size = int(os.path.get_size(model_path) / 1e6)
+    job_memory_mb = model_size * 2  # give some leeway
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "on_prem_generation_job.hcl.j2"),
@@ -91,8 +93,8 @@ async def start_on_prem_generate_job(
         min_allocations=1,
         max_allocations=5,
         threads_http=2,
-        cores_per_allocation=10,
-        memory_per_allocation=4000,
+        cores_per_allocation=8,
+        memory_per_allocation=job_memory_mb,
         model_name=model_name,
     )
 
