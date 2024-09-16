@@ -25,6 +25,7 @@ def test_ndb_retraining():
                 "train_job/sample_docs/articles.csv",
             )
         ],
+        model_options={"ndb_options": {"ndb_sub_type": "v2"}},
         supervised_docs=[],
     )
     admin_client.await_train(base_model)
