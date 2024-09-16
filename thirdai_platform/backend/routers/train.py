@@ -238,7 +238,7 @@ def train_ndb(
 
 
 @train_router.post("/ndb-retrain")
-def retrain(
+def retrain_ndb(
     model_name: str,
     base_model_identifier: str,
     job_options: JobOptions = JobOptions(),
