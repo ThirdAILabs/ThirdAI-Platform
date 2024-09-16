@@ -33,20 +33,12 @@ general_variables = GeneralVariables.load_from_env()
 ndb_router = APIRouter()
 
 
-def make_prometheus_metric(name, desc):
-    return Summary(name, desc, labelnames=["model_id"]).labels(
-        general_variables.model_id
-    )
-
-
-ndb_query_metric = make_prometheus_metric("ndb_query", "NDB Queries")
-ndb_upvote_metric = make_prometheus_metric("ndb_upvote", "NDB upvotes")
-ndb_associate_metric = make_prometheus_metric("ndb_associate", "NDB associations")
-ndb_implicit_feedback_metric = make_prometheus_metric(
-    "ndb_implicit_feedback", "NDB implicit feedback"
-)
-ndb_insert_metric = make_prometheus_metric("ndb_insert", "NDB insertions")
-ndb_delete_metric = make_prometheus_metric("ndb_delete", "NDB deletions")
+ndb_query_metric = Summary("ndb_query", "NDB Queries")
+ndb_upvote_metric = Summary("ndb_upvote", "NDB upvotes")
+ndb_associate_metric = Summary("ndb_associate", "NDB associations")
+ndb_implicit_feedback_metric = Summary("ndb_implicit_feedback", "NDB implicit feedback")
+ndb_insert_metric = Summary("ndb_insert", "NDB insertions")
+ndb_delete_metric = Summary("ndb_delete", "NDB deletions")
 
 
 @ndb_router.post("/predict")

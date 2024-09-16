@@ -64,6 +64,11 @@ def test_ndb_retraining():
     )
     assert res.status_code == 200
 
+    res = ndb_client.search("a query to upvote", top_k=1)
+    assert res["references"][0]["id"] != 0
+
+    admin_client.undeploy(ndb_client)
+
     retrained_model_name = "retrained_" + base_model_name
     res = requests.post(
         urljoin(admin_client._base_url, "train/ndb-retrain"),
@@ -85,4 +90,11 @@ def test_ndb_retraining():
     admin_client.await_train(retrained_model)
 
     ndb_client.login_instance = admin_client._login_instance
+
+    ndb_client = admin_client.deploy(retrained_model.model_identifier)
+    admin_client.await_deploy(ndb_client)
+
+    res = ndb_client.search("a query to upvote", top_k=1)
+    assert res["references"][0]["id"] == 0
+
     admin_client.undeploy(ndb_client)
