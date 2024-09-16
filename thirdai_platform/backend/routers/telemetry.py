@@ -1,11 +1,11 @@
 import os
 
 from backend.utils import (
+    get_platform,
     get_service_info,
     list_services,
     logger,
     response,
-    get_platform,
 )
 from fastapi import APIRouter, status
 from fastapi.encoders import jsonable_encoder

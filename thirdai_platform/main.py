@@ -12,11 +12,11 @@ from backend.routers.deploy import deploy_router as deploy
 from backend.routers.models import model_router as model
 from backend.routers.recovery import recovery_router as recovery
 from backend.routers.team import team_router as team
+from backend.routers.telemetry import telemetry_router as telemetry
 from backend.routers.train import train_router as train
 from backend.routers.user import user_router as user
 from backend.routers.vault import vault_router as vault
 from backend.routers.workflow import workflow_router as workflow
-from backend.routers.telemetry import telemetry_router as telemetry
 from backend.startup_jobs import (
     restart_generate_job,
     restart_llm_cache_job,

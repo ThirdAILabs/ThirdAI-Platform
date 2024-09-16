@@ -7,12 +7,12 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_client import make_asgi_app
 from reporter import Reporter
 from routers.model import ModelManager, get_model
 from routers.ndb import ndb_router
 from routers.udt import udt_router
 from utils import delete_deployment_job
-from prometheus_client import make_asgi_app
 from variables import GeneralVariables, ModelType
 
 general_variables = GeneralVariables.load_from_env()
