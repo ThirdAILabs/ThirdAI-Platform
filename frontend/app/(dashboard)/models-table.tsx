@@ -165,8 +165,10 @@ export function ModelsTable({
             {/* {workflows.map((workflow, index) => (
                 <WorkFlow key={index + 200} workflow={workflow} />
             ))} */}
-            {displayedWorkflows.map((workflow, index) => (
-              <WorkFlow key={index + 200} workflow={workflow} />
+            {displayedWorkflows
+              .sort((a, b) => a.name.localeCompare(b.name)) // Sort by name alphabetically
+              .map((workflow, index) => (
+                <WorkFlow key={index + 200} workflow={workflow} />
             ))}
           </TableBody>
         </Table>

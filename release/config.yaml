@@ -1,5 +1,13 @@
 azure:
   branches:
+    mshift:
+      pull_credentials:
+        password: uGpzj1Ylkgc+PBbQ5e3r1nEFC+BtiQK2cNeFdRW1NP+ACRCsrcq2
+        username: thirdaiplatform-pull-mshift
+      push_credentials:
+        password: 6DSwbtoUZpFEsAEdV6bL9VpVK+8qJoRcn8li7VRgAz+ACRDNRKRx
+        username: thirdaiplatform-push-mshift
+      version: 0.0.12
     on-prem-llm:
       pull_credentials:
         password: lZit7mOLUB2e7j/Ak50OXCHer4EdaCUDZ8EVHbQnJj+ACRAP/xev

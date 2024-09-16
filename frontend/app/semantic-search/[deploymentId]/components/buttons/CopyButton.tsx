@@ -30,25 +30,21 @@ export default function CopyButton({ toCopy }: { toCopy: string }) {
             onClick={()=>{
                 copyToClipboard()
 
-                // Create a telemetry event
-                const event = {
-                    UserAction: 'Copy',
-                    UIComponent: 'CopyButton',
-                    UI: 'Clipboard',
-                    data: {
-                        copiedText: toCopy
-                    }
-                };
+                // TODO(Any): use update query text and uncomment below to record implicit-feedback
+                // const feedback = {
+                //     reference_id: 0, // TODO
+                //     query_text: "", // TODO 
+                //     event_desc: "copy_reference_text",
+                // };
 
-                // Record the event
-                modelService?.recordEvent(event)
-                    .then(data => {
-                        console.log("Event recorded successfully:", data);
-                    })
-                    .catch(error => {
-                        console.error("Error recording event:", error);
-                        alert("Error recording event:" + error)
-                    });
+                // modelService?.recordImplicitFeedback(feedback)
+                //     .then(data => {
+                //         console.log("Implicit feedback recorded successfully:", data)
+                //     })
+                //     .catch(error => {
+                //         console.error("Error recording implicit feedback:", error)
+                //         alert("Error recording implicit feedback:" + error)
+                //     })
                     }}
                     text="Copied to clipboard!"
         >

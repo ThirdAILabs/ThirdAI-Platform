@@ -15,24 +15,16 @@ job "GenerateData-{{ data_id }}" {
       {% endif %}
 
       env {
-        DATA_ID = "{{ data_id }}"
         DATA_CATEGORY = "{{ data_category }}"
         LLM_PROVIDER = "{{ llm_provider }}"
         GENAI_KEY = "{{ genai_key }}"
-        SECRET_TOKEN = "{{ secret_token }}"
         TASK_PROMPT = "{{ task_prompt }}"
-        TRAIN_ARGS = "{{ train_args }}"
         MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
+        STORAGE_DIR = "{{ storage_dir }}"
 
         {%- for key, value in extra_options.items() %}
         {{ key | upper }} = "{{ value }}"
         {%- endfor %}
-
-        {% if platform == "docker" %}
-        MODEL_BAZAAR_DIR = "/model_bazaar"
-        {% elif platform == "local" %}
-        MODEL_BAZAAR_DIR = "{{ share_dir }}"
-        {% endif %}
       }
 
       config {

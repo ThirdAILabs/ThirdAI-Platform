@@ -85,7 +85,7 @@ class NDBOptions(BaseModel):
     model_type: Literal[ModelType.NDB] = ModelType.NDB
 
     ndb_options: Union[NDBv1Options, NDBv2Options] = Field(
-        NDBv2Options(), discriminator="ndb_sub_type"
+        NDBv1Options(), discriminator="ndb_sub_type"
     )
 
     class Config:
@@ -197,8 +197,7 @@ class TextClassificationDatagenOptions(BaseModel):
 
 class TokenClassificationDatagenOptions(BaseModel):
     sub_type: Literal[UDTSubType.token] = UDTSubType.token
-
-    domain_prompt: str
+    task_prompt: str
     tags: List[str]
     tag_examples: Dict[str, List[str]]
     num_sentences_to_generate: int
@@ -251,3 +250,13 @@ class TrainConfig(BaseModel):
         if self.model_options.model_type.value not in self.data.model_data_type.value:
             raise ValueError("Model and data fields don't match")
         return self
+
+    def save_train_config(self):
+        config_path = os.path.join(
+            self.model_bazaar_dir, "models", str(self.model_id), "train_config.json"
+        )
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        with open(config_path, "w") as file:
+            file.write(self.model_dump_json(indent=4))
+
+        return config_path

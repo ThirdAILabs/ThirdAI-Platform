@@ -137,6 +137,7 @@ def deploy_model(
     memory: Optional[int] = None,
     autoscaling_enabled: bool = False,
     autoscaler_max_count: int = 1,
+    llm_provider: Optional[str] = None,
     genai_key: Optional[str] = None,
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
@@ -248,6 +249,7 @@ def deploy_model(
             share_dir=os.getenv("SHARE_DIR", None),
             license_key=license_info["boltLicenseKey"],
             genai_key=(genai_key or os.getenv("GENAI_KEY", "")),
+            llm_provider=(llm_provider or os.getenv("LLM_PROVIDER", "openai")),
             autoscaling_enabled=("true" if autoscaling_enabled else "false"),
             autoscaler_max_count=str(autoscaler_max_count),
             memory=memory,
@@ -416,67 +418,9 @@ class LogData(BaseModel):
         protected_namespaces = ()
 
 
-@deploy_router.post("/log")
-def log_results(
-    log_data: LogData,
-    session: Session = Depends(get_session),
-    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
-):
-    """
-    Log training results for a deployment.
-
-    Parameters:
-    - log_data: The log data to save (body).
-    - session: The database session (dependency).
-    - authenticated_user: The authenticated user (dependency).
-
-    Example Usage:
-    ```json
-    {
-        "model_id": "model_id",
-        "action": "train",
-        "train_samples": [
-            {"input": "data1", "output": "label1"},
-            {"input": "data2", "output": "label2"}
-        ],
-        "used": true
-    }
-    ```
-    """
-    user: schema.User = authenticated_user.user
-    model: schema.Model = (
-        session.query(schema.Model).filter(schema.Model.id == log_data.model_id).first()
-    )
-
-    if not model:
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message="No model with this id",
-        )
-
-    new_log = {
-        "train_samples": log_data.train_samples,
-        "used": str(log_data.used),
-        "timestamp": str(datetime.utcnow().isoformat()),
-    }
-
-    log_entry = schema.Log(
-        model_id=model.id,
-        user_id=user.id,
-        action=log_data.action,
-        count=len(log_data.train_samples),
-        data=new_log,
-    )
-    session.add(log_entry)
-    session.commit()
-
-    return {"message": "Log entry added successfully"}
-
-
 @deploy_router.get("/info", dependencies=[Depends(is_model_owner)])
 def get_deployment_info(
     model_identifier: str,
-    require_raw_logs: bool = False,
     session: Session = Depends(get_session),
 ):
     """
@@ -484,13 +428,11 @@ def get_deployment_info(
 
     Parameters:
     - model_identifier: The identifier of the model.
-    - require_raw_logs: Whether to include raw logs in the response (query parameter).
 
     Example Usage:
     ```json
     {
         "model_identifier": "username/modelname",
-        "require_raw_logs": false
     }
     ```
     """
@@ -502,33 +444,11 @@ def get_deployment_info(
             message=str(error),
         )
 
-    # Fetch all logs for the model
-    logs = session.query(schema.Log).filter(schema.Log.model_id == model.id).all()
-
-    # Aggregate logs by user_id, action
-    aggregated_logs = {}
-    for log in logs:
-        key = (log.user_id, log.action)
-        if key not in aggregated_logs:
-            aggregated_logs[key] = {
-                "user_id": str(log.user_id),
-                "action": log.action,
-                "count": 0,
-                "log_entries": [] if require_raw_logs else None,
-            }
-
-        aggregated_logs[key]["count"] += log.count
-        if require_raw_logs:
-            aggregated_logs[key]["log_entries"].extend(
-                log.data.get("train_samples", [])
-            )
-
     # Prepare the response data
     deployment_info = {
         "name": model.name,
         "status": model.deploy_status,
         "model_id": str(model.id),
-        "logs": list(aggregated_logs.values()),
     }
 
     return response(

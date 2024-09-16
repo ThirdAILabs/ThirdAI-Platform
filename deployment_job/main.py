@@ -10,7 +10,6 @@ from fastapi.responses import JSONResponse
 from reporter import Reporter
 from routers.model import ModelManager, get_model
 from routers.ndb import ndb_router
-from routers.telemetry import telemetry_router  # Import the telemetry router
 from routers.udt import udt_router
 from utils import delete_deployment_job
 from variables import GeneralVariables, ModelType
@@ -113,9 +112,6 @@ async def check_for_model_updates():
         # Sleep for a short period before checking again
         await asyncio.sleep(10)  # Adjust the sleep time according to your needs
 
-
-# Include the telemetry router for all deployments
-app.include_router(telemetry_router, prefix=f"/{general_variables.model_id}/telemetry")
 
 if general_variables.type == ModelType.NDB:
     app.include_router(ndb_router, prefix=f"/{general_variables.model_id}")

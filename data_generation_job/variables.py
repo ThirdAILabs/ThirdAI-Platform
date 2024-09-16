@@ -1,9 +1,12 @@
 import ast
 import html
 import os
-from dataclasses import MISSING, dataclass, fields
+from collections import defaultdict
+from dataclasses import MISSING, asdict, dataclass, fields
 from enum import Enum
 from typing import Dict, List, Optional, Type, TypeVar, Union, get_args, get_origin
+
+from pydantic import BaseModel
 
 T = TypeVar("T", bound="EnvLoader")
 
@@ -91,31 +94,87 @@ class EnvLoader:
 
 @dataclass
 class GeneralVariables(EnvLoader):
-    model_bazaar_dir: str
+    task_prompt: str
+    storage_dir: str
     model_bazaar_endpoint: str
-    data_id: str
-    secret_token: str
     data_category: DataCategory
     genai_key: str
     llm_provider: LLMProvider = LLMProvider.openai
+    test_size: float = 0.05
 
 
-@dataclass
-class TextGenerationVariables(EnvLoader):
-    task_prompt: str
+class Entity(BaseModel):
+    name: str
+    examples: List[str]
+    description: str
+    status: str = "untrained"
+
+
+class TextGenerationVariables(BaseModel):
     samples_per_label: int
-    target_labels: List[str]
-    examples: Dict[str, List[str]]
-    labels_description: Dict[str, str]
+    target_labels: List[Entity]
     user_vocab: Optional[List[str]] = None
     user_prompts: Optional[List[str]] = None
     vocab_per_sentence: int = 4
 
+    def to_dict(self):
+        result = self.model_dump()
+        result["target_labels"] = self.target_labels
+        return result
 
-@dataclass
-class TokenGenerationVariables(EnvLoader):
-    domain_prompt: str
+
+class NERSample(BaseModel):
+    tokens: List[str]
     tags: List[str]
-    tag_examples: Dict[str, List[str]]
+
+    def get_example_template(self) -> str:
+        # templatizes the sample for passing to LLM
+        # Example -> My name is [NAME]
+        example = []
+
+        for index, (token, tag) in enumerate(zip(self.tokens, self.tags)):
+            if tag == "O":
+                example.append(token)
+            elif index + 1 == len(self.tokens) or tag != self.tags[index + 1]:
+                example.append(f"[{tag}]")
+
+        return " ".join(example)
+
+    def get_tags(self) -> set:
+        # returns all the unique non-default tags in the LLM
+        return set([tag for tag in self.tags if tag != "O"])
+
+    def get_values(self) -> dict:
+        # returns a map of tag to values present for the tag.
+        # concatenates consecutive tokens with the same tag into a single value.
+
+        examples = defaultdict(list)
+        past_tokens = []
+
+        for index, (token, tag) in enumerate(zip(self.tokens, self.tags)):
+            if index + 1 >= len(self.tokens) or tag != self.tags[index + 1]:
+                past_tokens.append(token)
+                if tag != "O":
+                    examples[tag].append(" ".join(past_tokens))
+
+                past_tokens = []
+
+            else:
+                past_tokens.append(token)
+
+        return examples
+
+
+class TokenGenerationVariables(BaseModel):
+    tags: List[Entity]
     num_sentences_to_generate: int
-    num_samples_per_tag: int = 4
+    num_samples_per_tag: Optional[int] = None
+    # example NER samples
+    samples: List[NERSample] = None
+    templates_per_sample: int = 10
+
+    def to_dict(self):
+        result = self.model_dump()
+        result["tags"] = self.tags
+        result["samples"] = self.samples
+        return result

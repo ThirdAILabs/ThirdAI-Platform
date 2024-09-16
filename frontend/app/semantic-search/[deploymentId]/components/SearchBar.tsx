@@ -237,27 +237,6 @@ export default function SearchBar({
         setShowSuggestionBar(false)
 
         onSubmit(query, prompt)
-
-        // Create a telemetry event
-        const event = {
-            UserAction: 'Searched query',
-            UIComponent: 'SearchTextInput',
-            UI: 'SearchBar',
-            data: {
-                query: query
-            }
-        };
-
-        // Record the event
-        modelService!.recordEvent(event)
-            .then(data => {
-                console.log("Event recorded successfully:", data);
-            })
-            .catch(error => {
-                console.error("Error recording event:", error);
-                alert("Error recording event:" + error)
-            });
-
     };
 
     const [showSuggestionBar, setShowSuggestionBar] = useState<boolean>(false);
@@ -330,29 +309,6 @@ export default function SearchBar({
                                 const suggestionQuery = suggestion.query
                                 setQuery(suggestionQuery)
                                 onSubmit(suggestionQuery, prompt)
-
-
-                                // Record the fact that cache is clicked by user: //
-                                // Create a telemetry event
-                                const event = {
-                                    UserAction: 'User clicked cache query',
-                                    UIComponent: 'SearchTextInput',
-                                    UI: 'SearchBar',
-                                    data: {
-                                        user_query: query,
-                                        cached_query: suggestionQuery
-                                    }
-                                };
-
-                                // Record the event
-                                modelService!.recordEvent(event)
-                                    .then(data => {
-                                        console.log("Event recorded successfully:", data);
-                                    })
-                                    .catch(error => {
-                                        console.error("Error recording event:", error);
-                                        alert("Error recording event:" + error)
-                                    }); 
                             }}
                             className="block w-full text-left p-2 hover:bg-gray-100 cursor-pointer">
                         {suggestion.query}

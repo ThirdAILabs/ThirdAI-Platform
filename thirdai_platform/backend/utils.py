@@ -502,3 +502,8 @@ def get_workflow(session, workflow_id, authenticated_user):
         )
 
     return workflow
+
+
+def save_dict(obj: dict, path: str):
+    with open(path, "w") as fp:
+        json.dump(obj, fp, indent=4)

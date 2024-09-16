@@ -1,4 +1,5 @@
 import sys
+import traceback
 
 from dotenv import load_dotenv
 
@@ -6,6 +7,7 @@ load_dotenv()
 
 import fastapi
 import uvicorn
+from backend.routers.data import data_router
 from backend.routers.deploy import deploy_router as deploy
 from backend.routers.models import model_router as model
 from backend.routers.recovery import recovery_router as recovery
@@ -44,6 +46,7 @@ app.include_router(workflow, prefix="/api/workflow", tags=["workflow"])
 app.include_router(vault, prefix="/api/vault", tags=["vault"])
 app.include_router(team, prefix="/api/team", tags=["team"])
 app.include_router(recovery, prefix="/api/recovery", tags=["recovery"])
+app.include_router(data_router, prefix="/api/data", tags=["data"])
 
 
 @app.on_event("startup")
@@ -62,6 +65,7 @@ async def startup_event():
             await restart_telemetry_jobs()
             print("Successfully started telemetry Job!")
         except Exception as error:
+            traceback.print_exc()
             print(f"Failed to start the telemetry Job : {error}", file=sys.stderr)
 
         try:

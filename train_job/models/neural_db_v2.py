@@ -1,18 +1,20 @@
+import json
 import multiprocessing as mp
 import os
 import shutil
 import time
 import uuid
+from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
 import thirdai
 from config import FileInfo, NDBv2Options, TrainConfig
 from fastapi import Response
+from feedback_logs import ActionType, FeedbackLog
 from models.model import Model
 from reporter import Reporter
 from thirdai import neural_db_v2 as ndbv2
 from utils import (
-    check_csv_only,
     check_disk,
     create_s3_client,
     expand_s3_buckets_and_directories,
@@ -174,7 +176,11 @@ class NeuralDBV2(Model):
 
     def supervised_files(self) -> List[FileInfo]:
         all_files = expand_s3_buckets_and_directories(self.config.data.supervised_files)
-        check_csv_only(all_files)
+        for file in all_files:
+            if file.ext() != ".csv" and file.ext() != ".jsonl":
+                raise ValueError(
+                    "Only CSV or jsonl files are supported for NDB supervised training."
+                )
         return all_files
 
     def unsupervised_train(self, files: List[FileInfo], batch_size=500):
@@ -228,20 +234,56 @@ class NeuralDBV2(Model):
                     f"Inserted batch time={end-start:.3f} insert_time={index_end-index_start:.3f} total_docs={docs_indexed}"
                 )
 
-        self.logger.info("Completed unsupervised training.")
+        total_chunks = self.db.retriever.retriever.size()
+        self.logger.info(
+            f"Completed unsupervised training total_docs={docs_indexed} total_chunks={total_chunks}."
+        )
+
+    def rlhf_retraining(self, path: str):
+        feedback_samples = defaultdict(int)
+        with open(path, "r") as file:
+            for line in file:
+                feedback = FeedbackLog.model_validate_json(line)
+                feedback_samples[feedback.event.action] += 1
+                if feedback.event.action == ActionType.upvote:
+                    weight = 2  # Extra weighting for explicit upvotes
+                    self.db.upvote(
+                        queries=feedback.event.queries * weight,
+                        chunk_ids=feedback.event.chunk_ids * weight,
+                    )
+                elif feedback.event.action == ActionType.associate:
+                    self.db.associate(
+                        sources=feedback.event.sources,
+                        targets=feedback.event.targets,
+                    )
+                elif feedback.event.action == ActionType.implicit_upvote:
+                    self.db.upvote(
+                        queries=[feedback.event.query],
+                        chunk_ids=[feedback.event.chunk_id],
+                    )
+        sample_counts = " ".join(f"{k}={v}" for k, v in feedback_samples.items())
+        self.logger.info(
+            "Completed RLHF supervised training. Samples per feedback type: "
+            + sample_counts
+        )
 
     def supervised_train(self, files: List[FileInfo]):
         self.logger.info("Starting supervised training.")
 
         for file in files:
-            supervised_dataset = ndbv2.supervised.CsvSupervised(
-                file.path,
-                query_column=file.options.get("csv_query_column"),
-                id_column=file.options.get("csv_id_column"),
-                id_delimiter=file.options.get("csv_id_delimiter"),
-            )
+            if file.ext() == ".jsonl":
+                self.rlhf_retraining(file.path)
+            else:
+                supervised_dataset = ndbv2.supervised.CsvSupervised(
+                    file.path,
+                    query_column=file.options.get("csv_query_column"),
+                    id_column=file.options.get("csv_id_column"),
+                    id_delimiter=file.options.get("csv_id_delimiter"),
+                )
 
-            self.db.supervised_train(supervised_dataset)
+                self.db.supervised_train(supervised_dataset)
+
+                self.logger.info(f"Completed CSV supervised training on {file.path}.")
 
         self.logger.info("Completed supervised training.")
 
@@ -272,13 +314,11 @@ class NeuralDBV2(Model):
             self.logger.info(f"Found {len(unsupervised_files)} unsupervised files.")
             check_disk(self.db, self.config.model_bazaar_dir, unsupervised_files)
             self.unsupervised_train(unsupervised_files)
-            self.logger.info("Completed Unsupervised Training")
 
         if supervised_files:
             self.logger.info(f"Found {len(supervised_files)} supervised files.")
             check_disk(self.db, self.config.model_bazaar_dir, supervised_files)
             self.supervised_train(supervised_files)
-            self.logger.info("Completed Supervised Training")
 
         train_time = time.time() - start_time
         self.logger.info(f"Total training time: {train_time} seconds")

@@ -146,7 +146,7 @@ def generate_text_data(
 
 
 class TokenClassificationGenerateArgs(BaseModel):
-    domain_prompt: str
+    task_prompt: str
     tags: List[str]
     tag_examples: Dict[str, List[str]]
     num_sentences_to_generate: int

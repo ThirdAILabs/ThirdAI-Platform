@@ -116,6 +116,7 @@ jobs:
     - name: Create Directories for Share and Test
       run: |
         mkdir -p $HOME/nfs/dir
+        sudo chmod -R 777 $HOME/nfs/dir/
         echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_ENV
 
     - name: Setup additional environment variables

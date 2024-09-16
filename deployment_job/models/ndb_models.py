@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import fitz
 import thirdai.neural_db_v2.chunk_stores.constraints as ndbv2_constraints
+from chat import llm_providers
 from file_handler import create_ndb_docs, create_ndbv2_docs
 from models.model import Model
 from pydantic_models import inputs
@@ -101,6 +102,24 @@ class NDBModel(Model):
         """
         raise NotImplementedError
 
+    def set_chat(self, **kwargs):
+        try:
+            sqlite_db_path = os.path.join(self.model_dir, "chat_history.db")
+
+            chat_history_sql_uri = f"sqlite:///{sqlite_db_path}"
+
+            llm_chat_interface = llm_providers.get(kwargs.get("provider", "openai"))
+
+            self.chat = llm_chat_interface(
+                db=self.db,
+                chat_history_sql_uri=chat_history_sql_uri,
+                key=self.general_variables.genai_key,
+                **kwargs,
+            )
+        except Exception as err:
+            traceback.print_exc()
+            self.chat = None
+
 
 class NDBV1Model(NDBModel):
     """
@@ -114,6 +133,7 @@ class NDBV1Model(NDBModel):
         super().__init__()
         self.model_path: Path = self.model_dir / "model.ndb"
         self.db: ndb.NeuralDB = self.load(write_mode=write_mode)
+        self.set_chat()
 
     def get_ndb_path(self, model_id: str) -> Path:
         """
@@ -134,6 +154,8 @@ class NDBV1Model(NDBModel):
                 for text_id_pair in text_id_pairs
             ]
         )
+
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
     def predict(self, query: str, top_k: int, **kwargs: Any) -> inputs.SearchResultsNDB:
         """
@@ -161,13 +183,6 @@ class NDBV1Model(NDBModel):
             for ref in references
         ]
 
-        self.reporter.log(
-            action="predict",
-            model_id=self.general_variables.model_id,
-            access_token=kwargs.get("token"),
-            train_samples=[{"query": query}],
-        )
-
         return inputs.SearchResultsNDB(
             query_text=query,
             references=pydantic_references,
@@ -184,6 +199,8 @@ class NDBV1Model(NDBModel):
                 (text_pair.source, text_pair.target) for text_pair in text_pairs
             ]
         )
+
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
     def sources(self) -> List[Dict[str, str]]:
         """
@@ -206,13 +223,7 @@ class NDBV1Model(NDBModel):
         """
         self.db.delete(source_ids=source_ids)
 
-        self.reporter.log(
-            action="delete",
-            model_id=self.general_variables.model_id,
-            access_token=token,
-            train_samples=[{"source_ids": " ".join(source_ids)}],
-            used=True,
-        )
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
     def insert(self, **kwargs: Any) -> List[Dict[str, str]]:
         """
@@ -224,13 +235,7 @@ class NDBV1Model(NDBModel):
 
         source_ids = self.db.insert(sources=ndb_docs)
 
-        self.reporter.log(
-            action="insert",
-            model_id=self.general_variables.model_id,
-            access_token=kwargs.get("token"),
-            train_samples=[({"sources_ids": " ".join(source_ids)})],
-            used=True,
-        )
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
         return [
             {
@@ -409,6 +414,7 @@ class NDBV2Model(NDBModel):
         super().__init__()
 
         self.db = self.load(write_mode=write_mode)
+        self.set_chat()
 
     def ndb_save_path(self):
         return os.path.join(self.model_dir, "model.ndb")
@@ -451,13 +457,6 @@ class NDBV2Model(NDBModel):
 
         results = [self.chunk_to_pydantic_ref(chunk, score) for chunk, score in results]
 
-        self.reporter.log(
-            action="predict",
-            model_id=self.general_variables.model_id,
-            access_token=token,
-            train_samples=[{"query": query}],
-        )
-
         return inputs.SearchResultsNDB(query_text=query, references=results)
 
     def insert(
@@ -470,19 +469,12 @@ class NDBV2Model(NDBModel):
             data_dir=self.data_dir,
         )
 
-        source_ids = self.db.insert(ndb_docs)
-
-        self.reporter.log(
-            action="insert",
-            model_id=self.general_variables.model_id,
-            access_token=token,
-            train_samples=[{"sources_ids": " ".join([x.doc_id for x in source_ids])}],
-        )
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
         return [
             {
-                "source": doc.reference(0).source,
-                "source_id": doc.hash,
+                "source": self.full_source_path(doc.chunks()[0].document.iloc[0]),
+                "source_id": doc.doc_id(),
             }
             for doc in ndb_docs
         ]
@@ -496,21 +488,7 @@ class NDBV2Model(NDBModel):
 
         chunks = self.db.chunk_store.get_chunks(chunk_ids=chunk_ids)
 
-        train_samples = [
-            {
-                "query_text": query,
-                "reference_id": str(id),
-                "reference_text": chunk.keywords + " " + chunk.text,
-            }
-            for query, id, chunk in zip(queries, chunk_ids, chunks)
-        ]
-
-        self.reporter.log(
-            action="upvote",
-            model_id=self.general_variables.model_id,
-            train_samples=train_samples,
-            access_token=token,
-        )
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
     def associate(
         self, text_pairs: List[inputs.AssociateInputSingle], token: str, **kwargs: Any
@@ -519,23 +497,13 @@ class NDBV2Model(NDBModel):
         targets = [t.target for t in text_pairs]
         self.db.associate(sources=sources, targets=targets, **kwargs)
 
-        self.reporter.log(
-            action="associate",
-            model_id=self.general_variables.model_id,
-            train_samples=[pair.model_dump() for pair in text_pairs],
-            access_token=token,
-        )
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
     def delete(self, source_ids: List[str], token: str, **kwargs: Any) -> None:
         for id in source_ids:
             self.db.delete_doc(doc_id=id)
 
-        self.reporter.log(
-            action="delete",
-            model_id=self.general_variables.model_id,
-            access_token=token,
-            train_samples=[{"source_ids": " ".join(source_ids)}],
-        )
+        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
     def sources(self) -> List[Dict[str, str]]:
         return sorted(

@@ -261,7 +261,6 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem>Edit</DropdownMenuItem>
             {
               deployStatus === 'Active'
               &&

@@ -15,6 +15,7 @@ interface SemanticSearchQuestionsProps {
 enum SourceType {
   S3 = "s3",
   LOCAL = "local",
+  NSF = "nsf",
 }
 
 const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, appName }: SemanticSearchQuestionsProps) => {
@@ -50,7 +51,17 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
       newFileCount[index] = 1; // Since it's a single S3 URL
       setFileCount(newFileCount);
     }
-  
+
+    const setNSFSourceValue = (index: number, path: string) => {
+      const newSources = [...sources];
+      const file = new File([], path); // Create a dummy File object with the NSF path as the name
+      newSources[index].files = [file];
+      setSources(newSources);
+    
+      const newFileCount = [...fileCount];
+      newFileCount[index] = 1; // It's a single path
+      setFileCount(newFileCount);
+    };  
   
     const deleteSource = (index: number) => {
       const updatedSources = sources.filter((_, i) => i !== index);
@@ -75,7 +86,7 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
         return null;
       }
 
-      const modelOptionsForm = { ndb_options: { ndb_sub_type: 'v2' } };
+      const modelOptionsForm = { ndb_options: { ndb_sub_type: 'v1', retriever: 'finetunable_retriever' } };
       formData.append('model_options', JSON.stringify(modelOptionsForm));
       formData.append('file_info', JSON.stringify({ unsupervised_files: unsupervisedFiles }));
 
@@ -228,13 +239,16 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
                       }}
                       multiple
                     />
-                    {/* <span>{fileCount[index]} files selected</span> */}
                   </div>
                 )}
-                <Button
-                  variant="destructive"
-                  onClick={() => deleteSource(index)}
-                >
+                {type === SourceType.NSF && ( // New input for NSF server path
+                  <Input
+                    className="text-md"
+                    onChange={(e) => setNSFSourceValue(index, e.target.value)}
+                    placeholder="Enter NSF server file path"
+                  />
+                )}
+                <Button variant="destructive" onClick={() => deleteSource(index)}>
                   Delete
                 </Button>
               </div>
@@ -245,6 +259,7 @@ const SemanticSearchQuestions = ({ workflowNames, onCreateModel, stayOnPage, app
         <div style={{display: "flex", gap: "10px", marginTop: "10px"}}>
           <Button onClick={() => addSource(SourceType.LOCAL)}>Add Local File</Button>
           <Button onClick={() => addSource(SourceType.S3)}>Add S3 File</Button>
+          {/* <Button onClick={() => addSource(SourceType.NSF)}>Add NSF File</Button> */}
         </div>
 
         <div className="flex justify-start">
