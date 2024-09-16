@@ -351,15 +351,15 @@ class NDBFunctions:
             }
         else:
             mach_options = None
-        return {"ndb_options": {"ndb_sub_type": "v2"}}
-        # return {
-        #     "ndb_options": {
-        #         "ndb_sub_type": "v1",
-        #         "retriever": config.retriever,
-        #         "mach_options": mach_options,
-        #         "checkpoint_interval": config.checkpoint_interval,
-        #     }
-        # }
+        # return {"ndb_options": {"ndb_sub_type": "v2"}}
+        return {
+            "ndb_options": {
+                "ndb_sub_type": "v1",
+                "retriever": config.retriever,
+                "mach_options": mach_options,
+                "checkpoint_interval": config.checkpoint_interval,
+            }
+        }
 
     def build_doc_options(config: Config) -> Dict[str, Any]:
         return {

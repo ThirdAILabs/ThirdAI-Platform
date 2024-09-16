@@ -1,9 +1,18 @@
 job "telemetry" {
   datacenters = ["dc1"]
   type        = "service"
-
+  {% set nomad_monitoring_dir = "/model_bazaar/nomad-monitoring" -%}
+  {%- set promfile = "node_discovery/prometheus.yaml" %}
   group "telemetry" {
     count = 1
+
+    {% if platform == "docker" -%}
+    constraint {
+      attribute = "${node.class}"
+      value     = "web_ingress"
+      operator = "!="
+    }
+    {%- endif %}
 
     network {
       port "vicky-http" {
@@ -17,7 +26,59 @@ job "telemetry" {
         to = 3000
       }
     }
+    task "collectnodes" {
+      lifecycle {
+        hook = "prestart"
+      }
+      {% if platform == "docker" -%}
+      driver = "docker"
+      {%- else -%}
+      driver = "raw_exec"
+      {%- endif %}
+      env {
+        MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
+        MANAGEMENT_TOKEN = "${MANAGEMENT_TOKEN}"
+        {% if platform == "local" -%}
+        PROMFILE = "{{ share_dir }}/nomad-monitoring/{{ promfile }}"
+        {%- else -%}
+        PROMFILE = "{{ nomad_monitoring_dir }}/{{ promfile }}"
+        {%- endif %}
+        PLATFORM = "{{ platform }}"
+      }
+      config {
+        {% if platform == "docker" -%}
+        image = "{{ registry }}/{{ image_name }}:{{ tag }}"
+        image_pull_timeout = "15m"
+        group_add = ["4646"]
+        auth {
+            username = "{{ docker_username }}"
+            password = "{{ docker_password }}"
+            server_address = "{{ registry }}"
+          }
+        volumes = [
+            "{{ share_dir }}:/model_bazaar"
+          ]
+        {%- else -%}
+        command = "{{ python_path }}"
+        args    = ["{{ node_discovery_script }}"]
+        {%- endif %}
+      }
 
+    {% if platform == "docker" -%}
+    template {
+        destination = "${NOMAD_SECRETS_DIR}/env.vars"
+        env         = true
+        change_mode = "restart"
+        data        = <<EOF
+{% raw -%}
+{{- with nomadVar "nomad/jobs" -}}
+MANAGEMENT_TOKEN = {{ .management_token }}
+{{- end -}}
+{%- endraw %}
+EOF
+      }
+    {%- endif %}
+  }
     task "victoriametrics" {
       driver = "docker"
 
@@ -29,50 +90,21 @@ job "telemetry" {
 
       config {
         image = "victoriametrics/victoria-metrics:latest"
+        group_add = ["4646"]
         ports = ["vicky-http"]
         args = [
-          "--storageDataPath=/storage",
+          "--storageDataPath={{ nomad_monitoring_dir }}/victoriametric",
           "--retentionPeriod=1d",
           "--httpListenAddr=:${NOMAD_PORT_vicky_http}",
-          "--promscrape.config=${NOMAD_TASK_DIR}/prometheus.yaml"
+          "--promscrape.config={{ nomad_monitoring_dir }}/{{ promfile }}"
         ]
         {% if platform == "local" -%}
         extra_hosts = ["host.docker.internal:host-gateway"]
         {%- endif %}
         volumes = [
-          "{{ VM_DATA_DIR }}:/storage"
+          "{{ share_dir }}:/model_bazaar"
         ]
       }
-
-      template {
-        data        = <<EOF
-global:
-  scrape_interval: 2s
-  external_labels:
-    env: "dev"
-    cluster: "local"
-
-scrape_configs:
-  - job_name: "nomad-agent"
-    metrics_path: "/v1/metrics?format=prometheus"
-    static_configs:
-      - targets:
-        {% if platform == "local" -%}
-          - "host.docker.internal:4646"
-        {%- else -%}
-          {% raw %}- "${attr.unique.network.ip-address}:4646"{% endraw %}
-        {%- endif %}
-        labels:
-          role: agent
-    relabel_configs:
-      - source_labels: [__address__]
-        regex: "([^:]+):.+"
-        target_label: "hostname"
-        replacement: "nomad-agent-$1"
-EOF
-        destination = "${NOMAD_TASK_DIR}/prometheus.yaml"
-      }
-
       resources {
         cpu    = 256
         memory = 600
@@ -83,14 +115,15 @@ EOF
       driver = "docker"
 
       config {
-        image = "grafana/loki:3.0.0"
+        image = "grafana/loki:main"
+        group_add = ["4646"]
         args = [
           "-config.file",
           "${NOMAD_TASK_DIR}/loki.yaml",
         ]
 
         volumes = [
-          "{{ LOKI_DATA_DIR }}:/loki_data"
+          "{{ share_dir }}:/model_bazaar"
         ]
         ports = ["loki-http"]
         
@@ -108,18 +141,17 @@ EOF
         */
       template {
         data            = <<EOF
-{% raw -%}
 auth_enabled: false
 server:
   http_listen_port: 3100
   grpc_listen_port: 9096
 common:
   instance_addr: 127.0.0.1
-  path_prefix: /loki_data
+  path_prefix: {{ nomad_monitoring_dir }}/loki
   storage:
     filesystem:
-      chunks_directory: /loki_data/chunks
-      rules_directory: /loki_data/rules
+      chunks_directory: {{ nomad_monitoring_dir }}/loki/chunks
+      rules_directory: {{ nomad_monitoring_dir }}/loki/rules
   replication_factor: 1
   ring:
     kvstore:
@@ -155,7 +187,6 @@ analytics:
 ingester:
   wal:
     flush_on_shutdown: true
-{%- endraw %}
 EOF
         destination     = "${NOMAD_TASK_DIR}/loki.yaml"
       }
@@ -191,15 +222,16 @@ EOF
         GF_SERVER_SERVE_FROM_SUB_PATH = "true"
         GF_SERVER_HTTP_PORT   = "${NOMAD_PORT_http}"
         GF_PATHS_PROVISIONING = "/local/grafana/provisioning"
+        GF_PATHS_DATA = "{{ nomad_monitoring_dir }}/grafana"
       }
 
       config {
         image = "grafana/grafana:main-ubuntu"
+        group_add = ["4646"]
         ports = ["grafana-http"]
         volumes = [
-            "{{ dashboards }}:/local/dashboards",
-            "{{ GRAFANA_DATA_DIR }}:/var/lib/grafana"
-          ]
+          "{{ share_dir }}:/model_bazaar"
+        ]
       }
 
       service {
@@ -247,7 +279,6 @@ EOF
 
       template {
         data        = <<EOF
-{% raw -%}
 apiVersion: 1
 providers:
   - name: dashboards
@@ -257,8 +288,7 @@ providers:
     allowUiUpdates: true
     options:
       foldersFromFilesStructure: true
-      path: /local/dashboards
-{%- endraw %}
+      path: /model_bazaar/nomad-monitoring/telemetry_dashboards
 EOF
         destination = "/local/grafana/provisioning/dashboards/dashboards.yaml"
       }

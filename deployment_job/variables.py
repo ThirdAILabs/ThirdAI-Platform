@@ -109,7 +109,7 @@ class GeneralVariables(EnvLoader):
     license_key: str
     task_runner_token: str
     type: ModelType = ModelType.NDB
-    sub_type: Union[UDTSubType, NDBSubType] = NDBSubType.v2
+    sub_type: Union[UDTSubType, NDBSubType] = NDBSubType.v1
     llm_provider: str = "openai"
     genai_key: Optional[str] = None
 
