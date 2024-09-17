@@ -248,7 +248,7 @@ class DeleteLog(BaseModel):
 
 def list_insertions(deployment_dir: str) -> List[FileInfo]:
     insertions = []
-    for logfile in os.path.join(deployment_dir, "insertions"):
+    for logfile in os.listdir(os.path.join(deployment_dir, "insertions")):
         if logfile.endswith(".jsonl"):
             with open(os.path.join(deployment_dir, "insertions", logfile)) as f:
                 for line in f.readlines():
@@ -258,13 +258,12 @@ def list_insertions(deployment_dir: str) -> List[FileInfo]:
 
 def list_deletions(deployment_dir: str) -> List[str]:
     deletions = []
-    for logfile in os.path.join(deployment_dir, "deletions"):
+    for logfile in os.listdir(os.path.join(deployment_dir, "deletions")):
         if logfile.endswith(".jsonl"):
             with open(os.path.join(deployment_dir, "deletions", logfile)) as f:
                 for line in f.readlines():
                     deletions.extend(DeleteLog.model_validate_json(line).doc_ids)
     return deletions
-
 
 
 @train_router.post("/ndb-retrain")
@@ -319,7 +318,9 @@ def retrain_ndb(
         )
 
     unsupervised_files = list_insertions(deployment_dir)
+    print("INSERTIONS:", unsupervised_files)
     deletions = list_deletions(deployment_dir)
+    print("DELETIONS:", deletions)
 
     feedback_dir = os.path.join(deployment_dir, "feedback")
     supervised_train_dir = os.path.join(

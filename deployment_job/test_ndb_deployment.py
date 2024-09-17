@@ -1,10 +1,12 @@
-import pytest
-from fastapi.testclient import TestClient
+import json
+import os
 import shutil
+
+import pytest
+import thirdai
+from fastapi.testclient import TestClient
 from thirdai import neural_db as ndbv1
 from thirdai import neural_db_v2 as ndbv2
-import os
-import json
 
 MODEL_ID = "xyz"
 
@@ -56,7 +58,11 @@ def set_env_variables(tmp_dir: str, sub_type: str, prod: bool):
     os.environ["MODEL_ID"] = f"{MODEL_ID}_{sub_type}"
     os.environ["MODEL_BAZAAR_ENDPOINT"] = ""
     os.environ["MODEL_BAZAAR_DIR"] = tmp_dir
-    os.environ["LICENSE_KEY"] = "002099-64C584-3E02C8-7E51A0-DE65D9-V3"
+
+    license_key = "002099-64C584-3E02C8-7E51A0-DE65D9-V3"
+    thirdai.licensing.activate(license_key)
+    os.environ["LICENSE_KEY"] = license_key
+
     os.environ["TASK_RUNNER_TOKEN"] = ""
     os.environ["SUB_TYPE"] = sub_type
     os.environ["PRODUCTION"] = str(prod)

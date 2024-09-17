@@ -260,6 +260,29 @@ class ModelBazaar:
         self.await_train(model)
         return model
 
+    def retrain_ndb(self, new_model_name: str, base_model_identifier: str) -> Model:
+        response = http_post_with_error(
+            urljoin(self._base_url, "train/ndb-retrain"),
+            params={
+                "model_name": new_model_name,
+                "base_model_identifier": base_model_identifier,
+            },
+            headers=auth_header(self._access_token),
+        )
+        if response.status_code != 200:
+            raise ValueError(
+                f"Retraining failed with error {response.json()['message']}"
+            )
+        model = Model(
+            model_identifier=create_model_identifier(
+                model_name=new_model_name, author_username=self._username
+            ),
+            model_id=response.json()["data"]["model_id"],
+        )
+
+        self.await_train(model)
+        return model
+
     def train_udt(
         self,
         model_name: str,
@@ -516,6 +539,7 @@ class ModelBazaar:
         model_identifier: str,
         memory: Optional[int] = None,
         is_async=False,
+        autoscaling_enabled=False,
     ):
         """
         Deploys a model and returns a NeuralDBClient instance.
@@ -532,6 +556,7 @@ class ModelBazaar:
         params = {
             "model_identifier": model_identifier,
             "memory": memory,
+            "autoscaling_enabled": autoscaling_enabled,
         }
         response = http_post_with_error(
             url, params=params, headers=auth_header(self._access_token)

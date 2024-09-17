@@ -10,7 +10,7 @@ from models.classification_models import (
     TextClassificationModel,
     TokenClassificationModel,
 )
-from models.ndb_models import NDBV2Model, NDBV1Model
+from models.ndb_models import NDBV1Model, NDBV2Model
 from variables import GeneralVariables, ModelType, NDBSubType, UDTSubType
 
 # Initialize thirdai license

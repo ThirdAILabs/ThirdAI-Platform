@@ -16,18 +16,17 @@ from pydantic import BaseModel, ValidationError
 from pydantic_models import inputs
 from pydantic_models.inputs import BaseQueryParams, NDBExtraParams
 from routers.model import get_model
-from update_logger import UpdateLogger
-from utils import propagate_error, response, validate_name
-from variables import GeneralVariables
-
 from update_logger import (
     AssociateLog,
     DeleteLog,
     FeedbackLog,
     ImplicitUpvoteLog,
     InsertLog,
+    UpdateLogger,
     UpvoteLog,
 )
+from utils import propagate_error, response, validate_name
+from variables import GeneralVariables
 
 permissions = Permissions()
 general_variables = GeneralVariables.load_from_env()

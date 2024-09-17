@@ -1,12 +1,12 @@
 import os
-from typing import List, Optional, Dict, Any
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 import boto3
 from botocore import UNSIGNED
 from botocore.client import Config
 from fastapi import UploadFile
 from pydantic import BaseModel
-from enum import Enum
 
 
 class FileLocation(str, Enum):
