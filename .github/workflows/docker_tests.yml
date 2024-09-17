@@ -267,7 +267,7 @@ jobs:
       - name: Set SKIP_JOBS environment variables
         run: |
           ENABLE_SKIP_JOBS="true"  # Set to "false" to disable skipping
-          SKIP_JOBS="redis-server,autoscaler,traefik,telemetry"
+          SKIP_JOBS="autoscaler,traefik,telemetry"
           echo "ENABLE_SKIP_JOBS=$ENABLE_SKIP_JOBS" >> $GITHUB_ENV
           echo "SKIP_JOBS=$SKIP_JOBS" >> $GITHUB_ENV
 

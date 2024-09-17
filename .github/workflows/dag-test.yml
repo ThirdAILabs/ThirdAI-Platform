@@ -149,7 +149,7 @@ jobs:
     - name: List files in local_setup
       run: ls -la local_setup
     
-    - name: Launch Autoscaler and Redis job
+    - name: Launch Autoscaler
       run: |
         cd local_setup
         NOMAD_PATH=$(which nomad)
