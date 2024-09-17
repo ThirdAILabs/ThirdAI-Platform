@@ -4,7 +4,14 @@ import React, { useState } from 'react';
 import { SelectModel } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { add_models_to_workflow, create_workflow, trainSentenceClassifier } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
 
@@ -25,10 +32,7 @@ type GeneratedData = {
   examples: string[];
 };
 
-const predefinedChoices = [
-  'POSITIVE_SENTIMENT',
-  'NEGATIVE_SENTIMENT',
-];
+const predefinedChoices = ['POSITIVE_SENTIMENT', 'NEGATIVE_SENTIMENT'];
 
 const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) => {
   const [modelName, setModelName] = useState('');
@@ -62,7 +66,7 @@ const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) =>
   const validateCategories = () => {
     // Check if any category has an empty name or example
     return categories.every((category: Category) => {
-      return category.name && category.example && category.description
+      return category.name && category.example && category.description;
     });
   };
 
@@ -72,7 +76,6 @@ const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) =>
       return !category.name.includes(' ');
     });
   };
-
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -104,17 +107,15 @@ const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) =>
     }
   };
 
-
   const generateData = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
 
     try {
       setIsDataGenerating(true);
 
-      console.log('sending question', question)
-      console.log('sending answer', answer)
-      console.log('sending categories', categories)
-
+      console.log('sending question', question);
+      console.log('sending answer', answer);
+      console.log('sending categories', categories);
 
       const response = await fetch('/endpoints/generate-data-sentence-classification', {
         method: 'POST',
@@ -138,29 +139,35 @@ const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) =>
       setIsDataGenerating(false);
     } catch (error) {
       console.error('Error generating data:', error);
-      alert('Error generating data:' + error)
+      alert('Error generating data:' + error);
       setIsDataGenerating(false);
     }
   };
 
-
   const handleCreateSCModel = async () => {
     if (!modelName) {
-      alert("Please enter a model name.");
+      alert('Please enter a model name.');
       return;
     }
     if (warningMessage !== '') {
       return;
     }
-  
+
     try {
-      const modelResponse = await trainSentenceClassifier(modelName, /* modelGoal= */ question, /* examples= */ categories);
+      const modelResponse = await trainSentenceClassifier(
+        modelName,
+        /* modelGoal= */ question,
+        /* examples= */ categories
+      );
       const modelId = modelResponse.data.model_id;
 
       // Create workflow after model creation
       const workflowName = modelName;
-      const workflowTypeName = "nlp"; // Assuming this is the type for NER workflows
-      const workflowResponse = await create_workflow({ name: workflowName, typeName: workflowTypeName });
+      const workflowTypeName = 'nlp'; // Assuming this is the type for NER workflows
+      const workflowResponse = await create_workflow({
+        name: workflowName,
+        typeName: workflowTypeName,
+      });
       const workflowId = workflowResponse.data.workflow_id;
 
       // Add the model to the workflow with the appropriate component
@@ -172,12 +179,11 @@ const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) =>
 
       console.log('Workflow and model addition successful:', addModelsResponse);
 
-      router.push("/");
+      router.push('/');
     } catch (e) {
       console.log(e || 'Failed to create NER model and workflow');
     }
   };
-
 
   return (
     <div>
@@ -187,46 +193,45 @@ const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) =>
         value={modelName}
         onChange={(e) => {
           const name = e.target.value;
-          setModelName(name)
+          setModelName(name);
         }}
-        onBlur={
-          (e) => {
-            const name = e.target.value;
-            if (workflowNames.includes(name)) {
-              setWarningMessage("A workflow with the same name has been created. Please choose a different name.");
-            } else {
-              setWarningMessage(""); // Clear the warning if the name is unique
-            }
+        onBlur={(e) => {
+          const name = e.target.value;
+          if (workflowNames.includes(name)) {
+            setWarningMessage(
+              'A workflow with the same name has been created. Please choose a different name.'
+            );
+          } else {
+            setWarningMessage(''); // Clear the warning if the name is unique
+          }
         }}
         placeholder="Enter app name"
-        style={{ marginTop: "10px" }}
+        style={{ marginTop: '10px' }}
       />
-      {warningMessage && (
-        <span style={{ color: "red", marginTop: "10px" }}>
-          {warningMessage}
-        </span>
-      )}
-      <span className="block text-lg font-semibold" style={{marginTop: "20px"}}>Specify Classes</span>
-      <form onSubmit={handleSubmit} style={{ marginTop: "10px" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      {warningMessage && <span style={{ color: 'red', marginTop: '10px' }}>{warningMessage}</span>}
+      <span className="block text-lg font-semibold" style={{ marginTop: '20px' }}>
+        Specify Classes
+      </span>
+      <form onSubmit={handleSubmit} style={{ marginTop: '10px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {categories.map((category, index) => (
             <div
               key={index}
               style={{
-                display: "flex",
-                flexDirection: "row",
-                gap: "10px",
-                justifyContent: "space-between",
+                display: 'flex',
+                flexDirection: 'row',
+                gap: '10px',
+                justifyContent: 'space-between',
               }}
             >
-              <div style={{ width: "100%" }}>
+              <div style={{ width: '100%' }}>
                 <Input
                   list={`category-options-${index}`}
-                  style={{ width: "100%" }}
+                  style={{ width: '100%' }}
                   className="text-md"
                   placeholder="Category Name"
                   value={category.name}
-                  onChange={(e) => handleCategoryChange(index, "name", e.target.value)}
+                  onChange={(e) => handleCategoryChange(index, 'name', e.target.value)}
                 />
                 <datalist id={`category-options-${index}`}>
                   {predefinedChoices.map((choice, i) => (
@@ -235,40 +240,37 @@ const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) =>
                 </datalist>
               </div>
               <Input
-                style={{ width: "100%" }}
+                style={{ width: '100%' }}
                 className="text-md"
                 placeholder="Example"
                 value={category.example}
-                onChange={(e) => handleCategoryChange(index, "example", e.target.value)}
+                onChange={(e) => handleCategoryChange(index, 'example', e.target.value)}
               />
               <Input
-                style={{ width: "100%" }}
+                style={{ width: '100%' }}
                 className="text-md"
                 placeholder="Description"
                 value={category.description}
-                onChange={(e) => handleCategoryChange(index, "description", e.target.value)}
+                onChange={(e) => handleCategoryChange(index, 'description', e.target.value)}
               />
-              <Button
-                variant="destructive"
-                onClick={() => handleRemoveCategory(index)}
-              >
+              <Button variant="destructive" onClick={() => handleRemoveCategory(index)}>
                 Remove
               </Button>
             </div>
           ))}
           <Button
-            style={{ marginTop: "10px", width: "fit-content" }}
+            style={{ marginTop: '10px', width: 'fit-content' }}
             onClick={handleAddAndReviewCategory}
           >
             Add Category
           </Button>
           {categories.length > 0 && (
             <Button
-              variant={isDataGenerating ? "secondary" : "default"}
-              style={{ marginTop: "30px" }}
+              variant={isDataGenerating ? 'secondary' : 'default'}
+              style={{ marginTop: '30px' }}
               onClick={generateData}
             >
-              {isDataGenerating ? "Generating data..." : "Generate data"}
+              {isDataGenerating ? 'Generating data...' : 'Generate data'}
             </Button>
           )}
         </div>
@@ -283,7 +285,7 @@ const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) =>
       {!isDataGenerating && generatedData.length > 0 && (
         <div className="mt-5">
           <h3 className="mb-3 text-lg font-semibold">Generated Data</h3>
-          <Table style={{ marginTop: "10px" }}>
+          <Table style={{ marginTop: '10px' }}>
             <TableHeader>
               <TableRow>
                 <TableHead>Category</TableHead>
@@ -309,21 +311,21 @@ const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) =>
           </Table>
           <div
             style={{
-              display: "flex",
-              flexDirection: "row",
-              justifyContent: "space-between",
-              gap: "10px",
-              marginTop: "20px",
+              display: 'flex',
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              gap: '10px',
+              marginTop: '20px',
             }}
           >
             <Button
               variant="outline"
-              style={{ width: "100%" }}
+              style={{ width: '100%' }}
               onClick={() => setGeneratedData([])}
             >
               Redefine Tokens
             </Button>
-            <Button style={{ width: "100%" }} onClick={handleCreateSCModel}>
+            <Button style={{ width: '100%' }} onClick={handleCreateSCModel}>
               Create
             </Button>
           </div>

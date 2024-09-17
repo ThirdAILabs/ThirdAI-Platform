@@ -23,19 +23,19 @@ const generateSentences = async (prompt: string) => {
 
   return content
     .split('\n')
-    .map(sentence => sentence.trim().replace(/^[\d.-]+\s*/, ''))
-    .filter(sentence => sentence)
+    .map((sentence) => sentence.trim().replace(/^[\d.-]+\s*/, ''))
+    .filter((sentence) => sentence)
     .slice(-10); // Only keep the last 10 templates
 };
 
 const filterTemplates = (templates: string[], categories: { name: string }[]) => {
-  const categoryNames = categories.map(category => `[${category.name}]`);
+  const categoryNames = categories.map((category) => `[${category.name}]`);
   const categoryNamesSet = new Set(categoryNames);
 
-  return templates.filter(template => {
-    const presentTags = categoryNames.filter(tag => template.includes(tag));
+  return templates.filter((template) => {
+    const presentTags = categoryNames.filter((tag) => template.includes(tag));
     const allTags = template.match(/\[[^\]]+\]/g) || [];
-    const hasOnlyRequestedTags = allTags.every(tag => categoryNamesSet.has(tag));
+    const hasOnlyRequestedTags = allTags.every((tag) => categoryNamesSet.has(tag));
     return presentTags.length > 0 && hasOnlyRequestedTags;
   });
 };
@@ -57,13 +57,16 @@ const generateRealValues = async (entityValuePrompt: string) => {
 
   return content
     .split(';')
-    .map(value => value.trim())
-    .filter(value => value);
+    .map((value) => value.trim())
+    .filter((value) => value);
 };
 
-const generateSyntheticSentence = (template: string, realValuesMap: { [key: string]: string[] }) => {
+const generateSyntheticSentence = (
+  template: string,
+  realValuesMap: { [key: string]: string[] }
+) => {
   let syntheticSentence = template;
-  let entityReplacements: { placeholder: string, value: string, category: string }[] = [];
+  let entityReplacements: { placeholder: string; value: string; category: string }[] = [];
 
   for (const [category, values] of Object.entries(realValuesMap)) {
     const placeholder = `[${category}]`;
@@ -75,7 +78,7 @@ const generateSyntheticSentence = (template: string, realValuesMap: { [key: stri
   }
 
   const tokens = syntheticSentence.split(' ');
-  const nerData = tokens.map(token => {
+  const nerData = tokens.map((token) => {
     let tag = 'O';
     for (const { placeholder, value, category } of entityReplacements) {
       const valueWords = value.split(' ');
@@ -105,12 +108,14 @@ export const POST = async (req: NextRequest) => {
     return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
   }
 
-  const categoryNames = categories.map((category: { name: string }) => `[${category.name}]`).join(', ');
+  const categoryNames = categories
+    .map((category: { name: string }) => `[${category.name}]`)
+    .join(', ');
 
   const templatePrompt = `You are a synthetic data generator for the training of a token classification model.
                   To train a token classification model, your job is to generate 10 sentences, each containing all these categories: ${categoryNames}.
                   Instead of using real values, only use the category's placeholder enclosed by brackets.
-                  Here are the categories and their examples: ${categories.map((category: { name: string, example: string }) => `[${category.name}]: ${category.name} (example: ${category.example})`).join(', ')}.
+                  Here are the categories and their examples: ${categories.map((category: { name: string; example: string }) => `[${category.name}]: ${category.name} (example: ${category.example})`).join(', ')}.
                   The examples should be complete sentences without any numeric numbers, bullet points, or any other extraneous content.
                 `;
 
@@ -120,7 +125,9 @@ export const POST = async (req: NextRequest) => {
     const maxAttempts = 5;
 
     while (validTemplates.length < 10 && attempts < maxAttempts) {
-      console.log(`attempt ${attempts}: have ${validTemplates.length} valid templates, we need 10+`);
+      console.log(
+        `attempt ${attempts}: have ${validTemplates.length} valid templates, we need 10+`
+      );
 
       const templates = await generateSentences(templatePrompt);
       validTemplates = validTemplates.concat(filterTemplates(templates, categories));
@@ -141,7 +148,9 @@ export const POST = async (req: NextRequest) => {
       entityValuePrompts[category.name] = entityValuePrompt;
 
       while (realValuesMap[category.name].length < 10 && attempts < maxAttempts) {
-        console.log(`attempt ${attempts}: [${category.name}] have ${realValuesMap[category.name].length} valid real values, we need 10+`);
+        console.log(
+          `attempt ${attempts}: [${category.name}] have ${realValuesMap[category.name].length} valid real values, we need 10+`
+        );
 
         const values = await generateRealValues(entityValuePrompts[category.name]);
         realValuesMap[category.name] = realValuesMap[category.name].concat(values);
@@ -150,16 +159,24 @@ export const POST = async (req: NextRequest) => {
       }
 
       if (realValuesMap[category.name].length < 10) {
-        return NextResponse.json({ error: `Generating real values for category [${category.name}] has failed` }, { status: 500 });
+        return NextResponse.json(
+          { error: `Generating real values for category [${category.name}] has failed` },
+          { status: 500 }
+        );
       }
     }
 
-    const syntheticDataPairs = validTemplates.map(template => generateSyntheticSentence(template, realValuesMap));
+    const syntheticDataPairs = validTemplates.map((template) =>
+      generateSyntheticSentence(template, realValuesMap)
+    );
 
-    return NextResponse.json({ syntheticDataPairs, prompts: { templatePrompt, entityValuePrompts } });
+    return NextResponse.json({
+      syntheticDataPairs,
+      prompts: { templatePrompt, entityValuePrompts },
+    });
   } catch (error) {
     console.error('Error generating data:', error);
-    alert('Error generating data:' + error)
+    alert('Error generating data:' + error);
     return NextResponse.json({ error: 'Error generating data' }, { status: 500 });
   }
 };

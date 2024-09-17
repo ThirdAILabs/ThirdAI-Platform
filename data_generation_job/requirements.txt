@@ -3,3 +3,4 @@ cohere
 faker
 requests
 pydantic
+numpy

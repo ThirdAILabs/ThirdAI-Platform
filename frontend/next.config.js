@@ -4,13 +4,13 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'avatars.githubusercontent.com'
+        hostname: 'avatars.githubusercontent.com',
       },
       {
         protocol: 'https',
-        hostname: '*.public.blob.vercel-storage.com'
-      }
-    ]
+        hostname: '*.public.blob.vercel-storage.com',
+      },
+    ],
   },
   env: {
     DEPLOYMENT_BASE_URL: process.env.NEXT_PUBLIC_DEPLOYMENT_BASE_URL,
@@ -21,9 +21,9 @@ const nextConfig = {
       test: /\.svg$/i,
       issuer: /\.[jt]sx?$/,
       use: ['@svgr/webpack'],
-    })
+    });
 
-    return config
+    return config;
   },
 };
 

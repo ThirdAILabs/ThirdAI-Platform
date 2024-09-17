@@ -1,11 +1,10 @@
-"use client"
+'use client';
 
 import { File, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useRef } from 'react';
 
 const ImportModelButton = () => {
-
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -19,7 +18,7 @@ const ImportModelButton = () => {
 
   return (
     <>
-        {/* <Button size="sm" variant="outline" className="h-8 gap-1" onClick={()=>{
+      {/* <Button size="sm" variant="outline" className="h-8 gap-1" onClick={()=>{
             if (fileInputRef.current) {
               fileInputRef.current.click();
             }
@@ -29,13 +28,13 @@ const ImportModelButton = () => {
               Import App
             </span>
         </Button> */}
-        <input
-            type="file"
-            ref={fileInputRef}
-            accept=".ndb"
-            style={{ display: 'none' }}
-            onChange={handleFileChange}
-        />
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept=".ndb"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
     </>
   );
 };

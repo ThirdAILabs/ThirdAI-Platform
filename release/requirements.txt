@@ -4,3 +4,4 @@ pyyaml
 docker
 pydantic
 tqdm
+requests<2.32.0

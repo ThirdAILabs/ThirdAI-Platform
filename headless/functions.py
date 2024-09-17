@@ -162,6 +162,17 @@ class CommonFunctions:
         )
         flow.bazaar_client.await_train(model)
 
+    @staticmethod
+    def delete_model(inputs: Dict[str, Any]):
+        """
+        Delete the given model
+        """
+
+        logging.info(f"Deleting the model with inputs: {inputs}")
+        model = inputs.get("model")
+        flow.bazaar_client.delete(model_identifier=model.model_identifier)
+        logging.info(f"Deleted the model {model.model_identifier}")
+
 
 class NDBFunctions:
     @staticmethod

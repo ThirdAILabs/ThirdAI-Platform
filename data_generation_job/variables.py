@@ -6,7 +6,7 @@ from dataclasses import MISSING, asdict, dataclass, fields
 from enum import Enum
 from typing import Dict, List, Optional, Type, TypeVar, Union, get_args, get_origin
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 T = TypeVar("T", bound="EnvLoader")
 
@@ -95,10 +95,12 @@ class EnvLoader:
 @dataclass
 class GeneralVariables(EnvLoader):
     task_prompt: str
+    data_id: str
     storage_dir: str
     model_bazaar_endpoint: str
     data_category: DataCategory
     genai_key: str
+    secret_token: str
     llm_provider: LLMProvider = LLMProvider.openai
     test_size: float = 0.05
 
@@ -108,6 +110,10 @@ class Entity(BaseModel):
     examples: List[str]
     description: str
     status: str = "untrained"
+
+    @field_validator("name", mode="before")
+    def uppercase_name(cls, v):
+        return v.upper()
 
 
 class TextGenerationVariables(BaseModel):

@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { associations, reformulations, upvotes } from './mock_samples';
 import useRollingSamples from './rolling';
 
@@ -18,35 +12,19 @@ interface TextPairsProps {
   text2: string;
 }
 
-function TextPairs({
-  timestamp,
-  label1,
-  label2,
-  text1,
-  text2
-}: TextPairsProps) {
+function TextPairs({ timestamp, label1, label2, text1, text2 }: TextPairsProps) {
   return (
     <div
       className="text-md"
       style={{ display: 'flex', flexDirection: 'column', marginBottom: '10px' }}
     >
       <CardDescription>{timestamp}</CardDescription>
-      <div
-        className="text-md"
-        style={{ display: 'flex', flexDirection: 'row' }}
-      >
-        <span style={{ fontWeight: 'bold', marginRight: '5px' }}>
-          {label1}:
-        </span>
+      <div className="text-md" style={{ display: 'flex', flexDirection: 'row' }}>
+        <span style={{ fontWeight: 'bold', marginRight: '5px' }}>{label1}:</span>
         <span style={{}}>{text1}</span>
       </div>
-      <div
-        className="text-md"
-        style={{ display: 'flex', flexDirection: 'row' }}
-      >
-        <span style={{ fontWeight: 'bold', marginRight: '5px' }}>
-          {label2}:
-        </span>
+      <div className="text-md" style={{ display: 'flex', flexDirection: 'row' }}>
+        <span style={{ fontWeight: 'bold', marginRight: '5px' }}>{label2}:</span>
         <span>{text2}</span>
       </div>
     </div>
@@ -59,11 +37,7 @@ interface ReformulationProps {
   reformulations: string[];
 }
 
-function Reformulation({
-  timestamp,
-  original,
-  reformulations
-}: ReformulationProps) {
+function Reformulation({ timestamp, original, reformulations }: ReformulationProps) {
   return (
     <div
       className="text-md"
@@ -88,21 +62,24 @@ export default function RecentSamples() {
     /* numSamples= */ 5,
     /* maxNewSamples= */ 2,
     /* probabilityNewSamples= */ 0.2,
-    /* intervalSeconds= */ 2);
-  
+    /* intervalSeconds= */ 2
+  );
+
   const recentAssociations = useRollingSamples(
     /* samples= */ associations,
     /* numSamples= */ 5,
     /* maxNewSamples= */ 2,
     /* probabilityNewSamples= */ 0.1,
-    /* intervalSeconds= */ 3);
-  
+    /* intervalSeconds= */ 3
+  );
+
   const recentReformulations = useRollingSamples(
     /* samples= */ reformulations,
     /* numSamples= */ 3,
     /* maxNewSamples= */ 1,
     /* probabilityNewSamples= */ 0.4,
-    /* intervalSeconds= */ 2);
+    /* intervalSeconds= */ 2
+  );
 
   return (
     <div
@@ -110,7 +87,7 @@ export default function RecentSamples() {
         display: 'flex',
         flexDirection: 'row',
         justifyContent: 'space-between',
-        width: '100%'
+        width: '100%',
       }}
     >
       <Card style={{ width: '32.5%', height: '45rem' }}>
@@ -134,9 +111,7 @@ export default function RecentSamples() {
       <Card style={{ width: '32.5%', height: '45rem' }}>
         <CardHeader>
           <CardTitle>Recent Associations</CardTitle>
-          <CardDescription>
-            The latest user-provided associations
-          </CardDescription>
+          <CardDescription>The latest user-provided associations</CardDescription>
         </CardHeader>
         <CardContent>
           {recentAssociations.map(({ timestamp, source, target }, idx) => (
@@ -154,21 +129,17 @@ export default function RecentSamples() {
       <Card style={{ width: '32.5%', height: '45rem' }}>
         <CardHeader>
           <CardTitle>Recent Query Reformulations</CardTitle>
-          <CardDescription>
-            The latest queries that required reformulation
-          </CardDescription>
+          <CardDescription>The latest queries that required reformulation</CardDescription>
         </CardHeader>
         <CardContent>
-          {recentReformulations.map(
-            ({ timestamp, original, reformulations }, idx) => (
-              <Reformulation
-                key={idx}
-                timestamp={timestamp}
-                original={original}
-                reformulations={reformulations}
-              />
-            )
-          )}
+          {recentReformulations.map(({ timestamp, original, reformulations }, idx) => (
+            <Reformulation
+              key={idx}
+              timestamp={timestamp}
+              original={original}
+              reformulations={reformulations}
+            />
+          ))}
         </CardContent>
       </Card>
     </div>

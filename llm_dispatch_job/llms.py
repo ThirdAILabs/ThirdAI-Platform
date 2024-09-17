@@ -113,6 +113,13 @@ class OnPremLLM(LLMBase):
             "system_prompt": "You are a helpful assistant. Please be concise in your answers.",
             "prompt": query + "<|assistant|>",
             "stream": True,
+            # Occasionally the model will repeat itself infinitely, this cuts off
+            # the model at 1000 output tokens so that doesn't occur. Alternatively
+            # we could increase the repeat_penalty argument but its dependent on
+            # the model and there have been reports of output quality being quite
+            # sensitive to this. We set it to 1000 because throughput is important
+            # and answers aren't super useful past 1000 tokens anyways.
+            "n_predict": 1000,
         }
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=data) as response:

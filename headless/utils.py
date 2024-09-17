@@ -1,10 +1,13 @@
+import json
 import os
 import re
 import sys
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Callable, Dict, List, Optional, Type
+from urllib.parse import urljoin
 
 import boto3
+import requests
 from botocore import UNSIGNED
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 from thirdai import neural_db as ndb
@@ -129,3 +132,84 @@ def download_from_s3_if_not_exists(s3_uri, local_dir):
 
 def normalize_s3_uri(s3_uri):
     return s3_uri.rstrip("/")
+
+
+def read_access_token():
+    task_runner_token_path = os.path.join(
+        "/opt/thirdai_platform/nomad_data/", "task_runner_token.txt"
+    )
+    try:
+        # Open the token file for reading
+        with open(task_runner_token_path, "r") as file:
+            # Read the entire file contents
+            file_contents = file.read()
+
+            # Use regex to find the Secret ID value
+            secret_id_match = re.search(r"Secret ID\s*=\s*([^\n]+)", file_contents)
+
+            if secret_id_match:
+                # Extract the Secret ID value from the regex match
+                secret_id = secret_id_match.group(1).strip()
+                return secret_id
+
+    except FileNotFoundError:
+        print(f"Error: File '{task_runner_token_path}' not found.")
+    except Exception as e:
+        print(f"Error reading file '{task_runner_token_path}': {e}")
+
+    return None
+
+
+TASK_RUNNER_TOKEN = os.getenv("TASK_RUNNER_TOKEN", read_access_token())
+
+
+def restart_nomad_job(nomad_endpoint, payload):
+    submit_url = urljoin(nomad_endpoint, "v1/jobs")
+    headers = {"Content-Type": "application/json", "X-Nomad-Token": TASK_RUNNER_TOKEN}
+    response = requests.post(submit_url, headers=headers, json={"Job": payload})
+    return response
+
+
+def stop_nomad_job(job_id, nomad_endpoint):
+    job_url = urljoin(nomad_endpoint, f"v1/job/{job_id}")
+    headers = {"X-Nomad-Token": TASK_RUNNER_TOKEN}
+    response = requests.delete(job_url, headers=headers)
+
+    if response.status_code == 200:
+        print(f"Job {job_id} stopped successfully")
+    else:
+        print(
+            f"Failed to stop job {job_id}. Status code: {response.status_code}, Response: {response.text}"
+        )
+
+    return response
+
+
+def fetch_job_definition(job_id, nomad_endpoint):
+    job_url = urljoin(nomad_endpoint, f"v1/job/{job_id}")
+    headers = {"X-Nomad-Token": TASK_RUNNER_TOKEN}
+    response = requests.get(job_url, headers=headers)
+    if response.status_code != 200:
+        print(response.content)
+        raise Exception()
+    return json.loads(response.content)
+
+
+def get_nomad_endpoint(input_url):
+    # Define a regex pattern to match an IP address, hostname, or 'localhost' with an optional port number
+    ip_hostname_pattern = (
+        r"(localhost|(?:\d{1,3}\.){3}\d{1,3}|(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})(:\d+)?"
+    )
+
+    # Find the first IP address, hostname, or 'localhost' with an optional port number in the input URL
+    match = re.search(ip_hostname_pattern, input_url)
+    if match:
+        # Extract the IP address, hostname, or 'localhost'
+        url_part = match.group(1)  # IP address, hostname, or 'localhost'
+
+        # Remove the port number and append ":4646" to the IP address, hostname, or 'localhost'
+        modified_url = "http://" + url_part + ":4646/"
+        return modified_url
+    else:
+        # If no IP address, hostname, or 'localhost' is found, return the original URL
+        return input_url

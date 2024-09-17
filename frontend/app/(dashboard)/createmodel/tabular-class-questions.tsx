@@ -123,11 +123,14 @@ const TabularClassificationQuestions: React.FC<TabularClassificationQuestionsPro
           if (name.includes(' ')) {
             warningMessage = 'The app name cannot contain spaces. Please remove the spaces.';
           } else if (name.includes('.')) {
-            warningMessage = "The app name cannot contain periods ('.'). Please remove the periods.";
+            warningMessage =
+              "The app name cannot contain periods ('.'). Please remove the periods.";
           } else if (!regexPattern.test(name)) {
-            warningMessage = 'The app name can only contain letters, numbers, underscores, and hyphens. Please modify the name.';
+            warningMessage =
+              'The app name can only contain letters, numbers, underscores, and hyphens. Please modify the name.';
           } else if (workflowNames.includes(name)) {
-            warningMessage = 'An app with the same name already exists. Please choose a different name.';
+            warningMessage =
+              'An app with the same name already exists. Please choose a different name.';
           }
 
           setWarningMessage(warningMessage);
@@ -140,12 +143,16 @@ const TabularClassificationQuestions: React.FC<TabularClassificationQuestionsPro
 
       {warningMessage && <span style={{ color: 'red', marginTop: '10px' }}>{warningMessage}</span>}
 
-      <span className="block text-lg font-semibold" style={{ marginTop: '20px' }}>Upload CSV File</span>
+      <span className="block text-lg font-semibold" style={{ marginTop: '20px' }}>
+        Upload CSV File
+      </span>
       <CardDescription>Upload a CSV file for tabular classification.</CardDescription>
 
       <div style={{ marginTop: '10px' }}>
         <Input type="file" accept=".csv" onChange={handleCsvFileChange} />
-        {csvFile && <span style={{ marginTop: '10px', display: 'block' }}>Selected file: {csvFile.name}</span>}
+        {csvFile && (
+          <span style={{ marginTop: '10px', display: 'block' }}>Selected file: {csvFile.name}</span>
+        )}
       </div>
 
       {columns.length > 0 && (
@@ -163,13 +170,17 @@ const TabularClassificationQuestions: React.FC<TabularClassificationQuestionsPro
 
           <div style={{ marginTop: '20px' }}>
             <span className="block text-lg font-semibold">Select Target Column</span>
-            <CardDescription>Select the target prediction column from the detected columns.</CardDescription>
+            <CardDescription>
+              Select the target prediction column from the detected columns.
+            </CardDescription>
             <select
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
               value={targetColumn || ''}
               onChange={(e) => setTargetColumn(e.target.value)}
             >
-              <option value="" disabled>Select a target column</option>
+              <option value="" disabled>
+                Select a target column
+              </option>
               {columns.map((col) => (
                 <option key={col.name} value={col.name}>
                   {col.name}
