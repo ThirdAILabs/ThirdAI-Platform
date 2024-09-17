@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import Link from 'next/link';
 import {
@@ -9,7 +9,7 @@ import {
   PanelLeft,
   Settings,
   ShoppingCart,
-  Users2
+  Users2,
 } from 'lucide-react';
 
 import {
@@ -18,15 +18,11 @@ import {
   BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
-  BreadcrumbSeparator
+  BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Analytics } from '@vercel/analytics/react';
 import { User } from './user';
 import { ThirdAILogo } from '@/components/icons';
@@ -36,11 +32,7 @@ import { SearchInput } from './search';
 import { useContext } from 'react';
 import { UserContext } from '../user_wrapper';
 
-export default function DashboardLayout({
-  children
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <Providers>
       <main className="flex min-h-screen w-full flex-col">
@@ -66,12 +58,12 @@ function DesktopNav() {
   const { user } = useContext(UserContext);
 
   // Determine if the user is an admin (global or team admin)
-  const isAdmin = user?.global_admin || user?.teams.some(team => team.role === 'team_admin');
+  const isAdmin = user?.global_admin || user?.teams.some((team) => team.role === 'team_admin');
 
   return (
     <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">
       <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
-        <Link 
+        <Link
           href="/"
           className="group flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full text-lg font-semibold text-primary-foreground md:h-8 md:w-8 md:text-base"
         >
@@ -145,10 +137,7 @@ function MobileNav() {
             <ShoppingCart className="h-5 w-5" />
             Orders
           </Link>
-          <Link
-            href="#"
-            className="flex items-center gap-4 px-2.5 text-foreground"
-          >
+          <Link href="#" className="flex items-center gap-4 px-2.5 text-foreground">
             <Package className="h-5 w-5" />
             Models
           </Link>

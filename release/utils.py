@@ -1,3 +1,6 @@
+import os
+
+import yaml
 from pydantic import BaseModel
 
 
@@ -21,3 +24,17 @@ class Credentials(BaseModel):
     pull_username: str
     push_password: str
     pull_password: str
+
+
+def load_config(config_path: str) -> dict:
+    """
+    Load the YAML configuration file.
+
+    :param config_path: Path to the configuration file
+    :return: Configuration dictionary
+    """
+    if os.path.exists(config_path):
+        with open(config_path, "r") as file:
+            return yaml.safe_load(file)
+    else:
+        return {"provider": "azure", "azure": {"registry": "", "branches": {}}}

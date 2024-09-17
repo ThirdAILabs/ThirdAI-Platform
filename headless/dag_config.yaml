@@ -105,6 +105,23 @@ NDB:
     params:
       model: check_supervised
 
+  delete_model:
+    dependencies: [undeploy]
+    params:
+      model: check_unsupervised_supervised
+  
+  delete_model_unsupervised:
+    function: delete_model
+    dependencies: [undeploy_2]
+    params:
+      model: check_unsupervised
+
+  delete_model_supervised:
+    function: delete_model
+    dependencies: [await_train_supervised]
+    params:
+      model: check_supervised
+
 UDT:
   config: [token, text]
   check_udt_train:
@@ -139,41 +156,45 @@ UDT:
     dependencies: [check_search]
     params:
       deployment: udt_deploy
+  delete_model:
+    dependencies: [undeploy]
+    params:
+      model: check_udt_train
 
-# UDT_DATAGEN:
-#   config: [token_with_datagen, text_with_datagen  ]
-#   check_udt_train_with_datagen:
-#     dependencies: []
-#     params:
-#       run_name: variable
-#       config: variable
+UDT_DATAGEN:
+  config: [token_with_datagen, text_with_datagen ]
+  check_udt_train_with_datagen:
+    dependencies: []
+    params:
+      run_name: variable
+      config: variable
 
-#   await_train:
-#     dependencies: [check_udt_train_with_datagen]
-#     params:
-#       model: check_udt_train_with_datagen
+  await_train:
+    dependencies: [check_udt_train_with_datagen]
+    params:
+      model: check_udt_train_with_datagen
   
-#   udt_deploy:
-#     dependencies: [await_train]
-#     params:
-#       model: check_udt_train_with_datagen
-#       run_name: variable
-#       config: variable
+  udt_deploy:
+    dependencies: [await_train]
+    params:
+      model: check_udt_train_with_datagen
+      run_name: variable
+      config: variable
 
-#   await_deploy:
-#     dependencies: [udt_deploy]
-#     params:
-#       deployment: udt_deploy
+  await_deploy:
+    dependencies: [udt_deploy]
+    params:
+      deployment: udt_deploy
 
-#   check_search:
-#     dependencies: [await_deploy]
-#     params:
-#       deployment: udt_deploy
+  check_search:
+    dependencies: [await_deploy]
+    params:
+      deployment: udt_deploy
 
-#   undeploy:
-#     dependencies: [check_search]
-#     params:
-#       deployment: udt_deploy
+  undeploy:
+    dependencies: [check_search]
+    params:
+      deployment: udt_deploy
 
 GlobalAdmin:
   config: dummy

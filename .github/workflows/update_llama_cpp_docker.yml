@@ -34,4 +34,3 @@ jobs:
 
       - name: 'Push Image to ACR'
         run: docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/llama.cpp:server
-

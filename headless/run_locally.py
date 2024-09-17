@@ -67,7 +67,7 @@ def main():
     elif args.dag and args.task:
         dag_executor.execute_task(args.dag, args.task)
     elif args.dag:
-        dag_executor.execute_dag(args.dag)
+        assert dag_executor.execute_dag(args.dag)
     else:
         print("Please specify either --dag, --task, or --all")
         sys.exit(1)

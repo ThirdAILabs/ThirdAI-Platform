@@ -69,6 +69,7 @@ class TokenDataFactory(DataFactory):
         complete_tag_values: Dict[str, List[str]],
         generate_at_a_time: int = 100,
     ):
+        print(f"{values_to_generate = }")
         sampled_tag_values = random.sample(tag.examples, k=min(3, len(tag.examples)))
 
         # Collecting prompts
@@ -487,9 +488,11 @@ Example : {str(random.sample(tag_values[tag.name], k=2))} not limited to given b
 
         combined_prompts = sample_prompts + token_prompts
 
-        self.generate_synthetic_data_for_prompts(
+        dataset_config = self.generate_synthetic_data_for_prompts(
             combined_prompts, train_tag_values, test_tag_values, tags
         )
+
+        return dataset_config
 
     def fill_and_transform(
         self,
@@ -497,6 +500,7 @@ Example : {str(random.sample(tag_values[tag.name], k=2))} not limited to given b
         tag_values: Dict[str, List[str]],
         sentences_to_generate: int,
     ) -> List[str]:
+        template = re.sub("\s+", " ", template).strip()
         if not template:
             return [None]
 
