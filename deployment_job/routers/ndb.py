@@ -243,7 +243,7 @@ def ndb_upvote(
             message="Upvote logged successfully.",
         )
     else:
-        model = get_model(write_mode=True)
+        model = get_model()
         model.upvote(input.text_id_pairs)
 
         return response(
@@ -297,7 +297,7 @@ def ndb_associate(
             message="Associate logged successfully.",
         )
     else:
-        model = get_model(write_mode=True)
+        model = get_model()
         model.associate(input.text_pairs)
 
         return response(
@@ -392,7 +392,7 @@ def delete(
             message="Delete logged successfully.",
         )
     else:
-        model = get_model(write_mode=True)
+        model = get_model()
         model.delete(input.source_ids)
 
         return response(
@@ -551,7 +551,7 @@ def insert(
             message="Insert logged successfully.",
         )
     else:
-        model = get_model(write_mode=True)
+        model = get_model()
 
         model.insert(documents=documents)
 

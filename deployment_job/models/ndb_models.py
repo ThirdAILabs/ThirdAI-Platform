@@ -364,6 +364,7 @@ class NDBV2Model(NDBModel):
     ) -> None:
         queries = [t.query_text for t in text_id_pairs]
         chunk_ids = [t.reference_id for t in text_id_pairs]
+        print("UPVOTE:", queries, chunk_ids)
         self.db.upvote(queries=queries, chunk_ids=chunk_ids, **kwargs)
 
     def associate(
