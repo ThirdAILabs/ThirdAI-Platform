@@ -258,7 +258,6 @@ def deploy_model(
             python_path=get_python_path(),
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
-            worker_enabled=("true" if model.type == "ndb" else "false"),
         )
 
         model.deploy_status = schema.Status.starting

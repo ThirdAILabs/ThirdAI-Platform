@@ -237,6 +237,35 @@ def train_ndb(
     )
 
 
+class InsertLog(BaseModel):
+    documents: List[FileInfo]
+
+
+class DeleteLog(BaseModel):
+    doc_ids: List[str]
+
+
+def list_insertions(deployment_dir: str) -> List[FileInfo]:
+    insertions = []
+    for logfile in os.path.join(deployment_dir, "insertions"):
+        if logfile.endswith(".jsonl"):
+            with open(os.path.join(deployment_dir, "insertions", logfile)) as f:
+                for line in f.readlines():
+                    insertions.extend(InsertLog.model_validate_json(line).documents)
+    return insertions
+
+
+def list_deletions(deployment_dir: str) -> List[str]:
+    deletions = []
+    for logfile in os.path.join(deployment_dir, "deletions"):
+        if logfile.endswith(".jsonl"):
+            with open(os.path.join(deployment_dir, "deletions", logfile)) as f:
+                for line in f.readlines():
+                    deletions.extend(DeleteLog.model_validate_json(line).doc_ids)
+    return deletions
+
+
+
 @train_router.post("/ndb-retrain")
 def retrain_ndb(
     model_name: str,
@@ -275,24 +304,26 @@ def retrain_ndb(
             message=f"NDB retraining can only be performed on NDBv2 base models.",
         )
 
-    feedback_dir = os.path.join(
+    deployment_dir = os.path.join(
         model_bazaar_path(),
         "models",
         str(base_model.id),
         "deployments",
         "data",
-        "feedback",
     )
-    if not os.path.exists(feedback_dir) or len(os.listdir(feedback_dir)) == 0:
+    if not os.path.exists(deployment_dir) or len(os.listdir(deployment_dir)) == 0:
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
             message=f"No feedback found for base model {base_model_identifier}. Unable to perform retraining.",
         )
 
+    unsupervised_files = list_insertions(deployment_dir)
+    deletions = list_deletions(deployment_dir)
+
+    feedback_dir = os.path.join(deployment_dir, "feedback")
     supervised_train_dir = os.path.join(
         model_bazaar_path(), "data", data_id, "supervised"
     )
-
     shutil.copytree(feedback_dir, supervised_train_dir)
 
     config = TrainConfig(
@@ -304,9 +335,11 @@ def retrain_ndb(
         base_model_id=(None if not base_model_identifier else str(base_model.id)),
         model_options=NDBOptions(ndb_options=NDBv2Options()),
         data=NDBData(
+            unsupervised_files=unsupervised_files,
             supervised_files=[
                 FileInfo(path=supervised_train_dir, location=FileLocation.nfs)
-            ]
+            ],
+            deletions=deletions,
         ),
         job_options=job_options,
     )

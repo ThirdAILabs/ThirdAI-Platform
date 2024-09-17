@@ -152,8 +152,6 @@ class NDBV1Model(NDBModel):
             ]
         )
 
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
-
     def predict(self, query: str, top_k: int, **kwargs: Any) -> inputs.SearchResultsNDB:
         """
         Makes a prediction using the NDB model.
@@ -197,8 +195,6 @@ class NDBV1Model(NDBModel):
             ]
         )
 
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
-
     def sources(self) -> List[Dict[str, str]]:
         """
         Retrieves sources from the NDB model.
@@ -220,8 +216,6 @@ class NDBV1Model(NDBModel):
         """
         self.db.delete(source_ids=source_ids)
 
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
-
     def insert(self, documents: List[FileInfo], **kwargs: Any) -> List[Dict[str, str]]:
         """
         Inserts documents into the NDB model.
@@ -232,8 +226,6 @@ class NDBV1Model(NDBModel):
         ]
 
         self.db.insert(ndb_docs)
-
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
         return [
             {
@@ -358,8 +350,6 @@ class NDBV2Model(NDBModel):
 
         self.db.insert(ndb_docs)
 
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
-
         return [
             {
                 "source": self.full_source_path(doc.chunks()[0].document.iloc[0]),
@@ -375,10 +365,6 @@ class NDBV2Model(NDBModel):
         chunk_ids = [t.reference_id for t in text_id_pairs]
         self.db.upvote(queries=queries, chunk_ids=chunk_ids, **kwargs)
 
-        chunks = self.db.chunk_store.get_chunks(chunk_ids=chunk_ids)
-
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
-
     def associate(
         self, text_pairs: List[inputs.AssociateInputSingle], **kwargs: Any
     ) -> None:
@@ -386,13 +372,9 @@ class NDBV2Model(NDBModel):
         targets = [t.target for t in text_pairs]
         self.db.associate(sources=sources, targets=targets, **kwargs)
 
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
-
     def delete(self, source_ids: List[str], **kwargs: Any) -> None:
         for id in source_ids:
             self.db.delete_doc(doc_id=id)
-
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
     def sources(self) -> List[Dict[str, str]]:
         return sorted(
