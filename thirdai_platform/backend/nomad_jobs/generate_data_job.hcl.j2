@@ -15,6 +15,7 @@ job "GenerateData-{{ data_id }}" {
       {% endif %}
 
       env {
+        DATA_ID = "{{ data_id }}"
         DATA_CATEGORY = "{{ data_category }}"
         LLM_PROVIDER = "{{ llm_provider }}"
         GENAI_KEY = "{{ genai_key }}"

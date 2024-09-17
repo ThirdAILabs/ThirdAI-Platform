@@ -1,5 +1,13 @@
 azure:
   branches:
+    docker_tests:
+      pull_credentials:
+        password: ojqTob8LipMFHD5CUtYQqKFT4Yj0dgA42fpzKm08Uu+ACRB3D2G8
+        username: thirdaiplatform-pull-docker-tests
+      push_credentials:
+        password: F2yp3m5uWE/8liQ6lFyGTtZxlMgpirMRStAcdQc6Mu+ACRB6nTfH
+        username: thirdaiplatform-push-docker-tests
+      version: 0.0.1
     mshift:
       pull_credentials:
         password: uGpzj1Ylkgc+PBbQ5e3r1nEFC+BtiQK2cNeFdRW1NP+ACRCsrcq2

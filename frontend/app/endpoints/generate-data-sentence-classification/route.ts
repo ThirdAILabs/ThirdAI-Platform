@@ -23,8 +23,8 @@ const generateExamples = async (prompt: string) => {
 
   return content
     .split('\n')
-    .map(example => example.trim().replace(/^[\d.-]+\s*/, ''))
-    .filter(example => example);
+    .map((example) => example.trim().replace(/^[\d.-]+\s*/, ''))
+    .filter((example) => example);
 };
 
 export const POST = async (req: NextRequest) => {
@@ -41,8 +41,8 @@ export const POST = async (req: NextRequest) => {
   }
 
   const prompts: [string, string][] = [];
-  const generatedExamples: { category: string, examples: string[] }[] = [];
-  const promises = categories.map(async (category: { name: string, example: string }) => {
+  const generatedExamples: { category: string; examples: string[] }[] = [];
+  const promises = categories.map(async (category: { name: string; example: string }) => {
     const prompt = `
       You are a synthetic data generator for the training of a sentence classification model.
       Specifically, our customer has a problem: ${question}.
@@ -60,7 +60,7 @@ export const POST = async (req: NextRequest) => {
       generatedExamples.push({ category: category.name, examples });
     } catch (error) {
       console.error(`Error during fetch for category ${category.name}:`, error);
-      alert(`Error during fetch for category ${category.name}:` + error)
+      alert(`Error during fetch for category ${category.name}:` + error);
       throw error;
     }
   });

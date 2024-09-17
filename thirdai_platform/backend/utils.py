@@ -44,6 +44,10 @@ def setup_logger(
 setup_logger()
 
 
+def model_bazaar_path():
+    return "/model_bazaar" if os.path.exists("/.dockerenv") else os.getenv("SHARE_DIR")
+
+
 def response(status_code: int, message: str, data={}, success: bool = None):
     """
     Create a JSON response.

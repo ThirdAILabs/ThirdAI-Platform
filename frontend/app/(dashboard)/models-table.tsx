@@ -1,20 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  TableHead,
-  TableRow,
-  TableHeader,
-  TableBody,
-  Table
-} from '@/components/ui/table';
+import { TableHead, TableRow, TableHeader, TableBody, Table } from '@/components/ui/table';
 import {
   Card,
   CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle
+  CardTitle,
 } from '@/components/ui/card';
 import { Model } from './model';
 import { WorkFlow } from './workflow';
@@ -22,16 +16,15 @@ import { SelectModel } from '@/lib/db';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { fetchPublicModels, fetchPrivateModels, fetchPendingModels, fetchWorkflows, Workflow } from "@/lib/backend"
+import {
+  fetchPublicModels,
+  fetchPrivateModels,
+  fetchPendingModels,
+  fetchWorkflows,
+  Workflow,
+} from '@/lib/backend';
 
-export function ModelsTable({
-  searchStr,
-  offset,
-}: {
-  searchStr: string;
-  offset: number;
-}) {
-  
+export function ModelsTable({ searchStr, offset }: { searchStr: string; offset: number }) {
   // Hardcode the model display
   let modelsPerPage = 5;
 
@@ -53,39 +46,38 @@ export function ModelsTable({
     }
   }
 
-  const [privateModels, setPrivateModels] = useState<SelectModel[]>([])
+  const [privateModels, setPrivateModels] = useState<SelectModel[]>([]);
   const [pendingModels, setPendingModels] = useState<SelectModel[]>([]);
 
   useEffect(() => {
     async function getModels() {
-        try {
-          let response = await fetchPublicModels('');
-          const publicModels = response.data;
-          console.log('publicModels', publicModels)
+      try {
+        let response = await fetchPublicModels('');
+        const publicModels = response.data;
+        console.log('publicModels', publicModels);
 
-          response = await fetchPrivateModels('');
-          const privateModels: SelectModel[] = response.data;
-          console.log('privateModels', privateModels)
+        response = await fetchPrivateModels('');
+        const privateModels: SelectModel[] = response.data;
+        console.log('privateModels', privateModels);
 
-          setPrivateModels(privateModels)
+        setPrivateModels(privateModels);
 
-          response = await fetchPendingModels();
-          const pendingModels: SelectModel[] = response.data; // Extract the data field
-          console.log('pendingModels', pendingModels)
+        response = await fetchPendingModels();
+        const pendingModels: SelectModel[] = response.data; // Extract the data field
+        console.log('pendingModels', pendingModels);
 
-          setPendingModels(pendingModels)
-
-        } catch (err) {
-          if (err instanceof Error) {
-              console.log(err.message);
-          } else {
-              console.log('An unknown error occurred');
-          }
+        setPendingModels(pendingModels);
+      } catch (err) {
+        if (err instanceof Error) {
+          console.log(err.message);
+        } else {
+          console.log('An unknown error occurred');
+        }
       }
     }
 
     // Call the function immediately
-    getModels()
+    getModels();
 
     const intervalId = setInterval(getModels, 3000);
 
@@ -121,19 +113,16 @@ export function ModelsTable({
   const totalWorkflows = workflows.length;
 
   // const displayedWorkflows = workflows.slice(offset, offset + modelsPerPage);
-  const filteredWorkflows = workflows.filter(workflow =>
+  const filteredWorkflows = workflows.filter((workflow) =>
     workflow.name.toLowerCase().includes(searchStr.toLowerCase())
   );
   const displayedWorkflows = filteredWorkflows.slice(offset, offset + modelsPerPage);
-
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Apps</CardTitle>
-        <CardDescription>
-          Manage your Apps and view their performance.
-        </CardDescription>
+        <CardDescription>Manage your Apps and view their performance.</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
@@ -169,7 +158,7 @@ export function ModelsTable({
               .sort((a, b) => a.name.localeCompare(b.name)) // Sort by name alphabetically
               .map((workflow, index) => (
                 <WorkFlow key={index + 200} workflow={workflow} />
-            ))}
+              ))}
           </TableBody>
         </Table>
       </CardContent>
@@ -178,7 +167,8 @@ export function ModelsTable({
           <div className="text-xs text-muted-foreground">
             Showing{' '}
             <strong>
-              {Math.min(offset + 1, totalWorkflows)}-{Math.min(offset + modelsPerPage, totalWorkflows)}
+              {Math.min(offset + 1, totalWorkflows)}-
+              {Math.min(offset + modelsPerPage, totalWorkflows)}
             </strong>{' '}
             of <strong>{totalWorkflows}</strong> workflows
           </div>

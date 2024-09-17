@@ -10,6 +10,6 @@ These components are built on top of Radix UI and mostly retain the same interfa
 
 The template itself is from Vercel, this one in particular: https://vercel.com/templates/next.js/admin-dashboard-tailwind-postgres-react-nextjs
 
-I recognize the RAG frontend is not organized very well. I suggest trying to understand the code by starting at ThirdAI-Platform/frontend/semantic-search/[deploymentId]/page.tsx file and digging deeper from there. 
+I recognize the RAG frontend is not organized very well. I suggest trying to understand the code by starting at ThirdAI-Platform/frontend/semantic-search/[deploymentId]/page.tsx file and digging deeper from there.
 
 Keep in mind that it is very likely that the PDF reader will not work for you. That is fine. You can continue working on changing the styling of the rest of the page. If you have time and are interested, though, you can try to fix the PDF reader.

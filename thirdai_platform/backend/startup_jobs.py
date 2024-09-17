@@ -8,6 +8,7 @@ from backend.utils import (
     get_platform,
     get_python_path,
     get_root_absolute_path,
+    model_bazaar_path,
     nomad_job_exists,
     response,
     submit_nomad_job,
@@ -19,12 +20,6 @@ GENERATE_JOB_ID = "llm-generation"
 THIRDAI_PLATFORM_FRONTEND_ID = "thirdai-platform-frontend"
 LLM_CACHE_JOB_ID = "llm-cache"
 TELEMETRY_ID = "telemetry"
-
-MODEL_BAZAAR_PATH = (
-    "/model_bazaar"
-    if os.path.exists("/.dockerenv")
-    else os.getenv("SHARE_DIR", "/model_bazaar")
-)
 
 
 async def restart_generate_job():
@@ -75,11 +70,8 @@ async def start_on_prem_generate_job(
     share_dir = os.getenv("SHARE_DIR")
     if not share_dir:
         raise ValueError("SHARE_DIR variable is not set.")
-    MODEL_BAZAAR_PATH = (
-        "/model_bazaar" if os.path.exists("/.dockerenv") else os.getenv("SHARE_DIR")
-    )
     cwd = Path(os.getcwd())
-    mount_dir = os.path.join(MODEL_BAZAAR_PATH, "gen-ai-models")
+    mount_dir = os.path.join(model_bazaar_path(), "gen-ai-models")
     model_path = os.path.join(mount_dir, model_name)
     if not os.path.exists(model_path):
         raise ValueError(f"Cannot find model at location: {model_path}.")
@@ -179,7 +171,9 @@ async def restart_telemetry_jobs():
     if platform == "local":
         shutil.copytree(
             str(cwd / "telemetry_dashboards"),
-            os.path.join(MODEL_BAZAAR_PATH, "nomad-monitoring", "telemetry_dashboards"),
+            os.path.join(
+                model_bazaar_path(), "nomad-monitoring", "telemetry_dashboards"
+            ),
             dirs_exist_ok=True,
         )
     response = submit_nomad_job(

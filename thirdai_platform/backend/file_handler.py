@@ -8,10 +8,6 @@ from backend.config import FileInfo, FileLocation
 from fastapi import HTTPException, UploadFile, status
 
 
-def model_bazaar_path():
-    return "/model_bazaar" if os.path.exists("/.dockerenv") else os.getenv("SHARE_DIR")
-
-
 def download_local_file(file_info: FileInfo, upload_file: UploadFile, dest_dir: str):
     assert os.path.basename(file_info.path) == upload_file.filename
     destination_path = os.path.join(dest_dir, upload_file.filename)

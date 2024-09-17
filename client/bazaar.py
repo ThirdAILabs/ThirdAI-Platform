@@ -392,35 +392,27 @@ class ModelBazaar:
 
         form = []
 
-        category_examples = {}
-        category_descriptions = {}
-        for category, example, description in examples:
-            if category not in category_examples:
-                category_examples[category] = [example]
-                category_descriptions[category] = description
-            else:
-                category_examples[category].append(example)
+        entities = [
+            {"name": item[0], "examples": [item[1]], "description": item[2]}
+            for item in examples
+        ]
 
         if sub_type == "text":
             datagen_options = {
+                "task_prompt": task_prompt,
                 "sub_type": "text",
-                "samples_per_label": max(
-                    math.ceil(10_000 / len(category_examples)), 50
-                ),
-                "target_labels": list(category_examples.keys()),
-                "examples": category_examples,
-                "labels_description": category_descriptions,
+                "samples_per_label": 50,
+                # This incurs cost on OpenAI, hence reducing it to 50. Reach out to (sid/tharun) if u want to increase this
+                "target_labels": entities,
             }
         else:
             datagen_options = {
                 "sub_type": "token",
                 "task_prompt": task_prompt,
-                "tags": list(category_examples.keys()),
-                "tag_examples": category_examples,
-                "num_sentences_to_generate": 10_000,
-                "num_samples_per_tag": max(
-                    math.ceil(10_000 / len(category_examples)), 50
-                ),
+                "tags": entities,
+                "num_sentences_to_generate": 100,
+                # This incurs cost on OpenAI, hence reducing it to 100. Reach out to (sid/tharun) if u want to increase this
+                "num_samples_per_tag": 50,
             }
 
         form.append(
@@ -638,3 +630,12 @@ class ModelBazaar:
         download_files_from_s3(bucket_name, local_dir)
 
         print("Backup and restore operations completed successfully.")
+
+    def delete(self, model_identifier: str):
+        response = http_post_with_error(
+            urljoin(self._base_url, "model/delete"),
+            headers=auth_header(self._access_token),
+            params={"model_identifier": model_identifier},
+        )
+
+        print(f"Successfully deleted the model {model_identifier}")

@@ -6,10 +6,13 @@ import path from 'path';
 async function updateEnvFile(newApiKey: string) {
   const envPath = path.resolve(process.cwd(), '.env');
   let envContent = await fs.readFile(envPath, 'utf8');
-  
+
   // Replace the existing NEXT_PUBLIC_OPENAI_API_KEY with the new one
   if (envContent.includes('NEXT_PUBLIC_OPENAI_API_KEY')) {
-    envContent = envContent.replace(/NEXT_PUBLIC_OPENAI_API_KEY=.*/, `NEXT_PUBLIC_OPENAI_API_KEY=${newApiKey}`);
+    envContent = envContent.replace(
+      /NEXT_PUBLIC_OPENAI_API_KEY=.*/,
+      `NEXT_PUBLIC_OPENAI_API_KEY=${newApiKey}`
+    );
   } else {
     envContent += `\nNEXT_PUBLIC_OPENAI_API_KEY=${newApiKey}`;
   }

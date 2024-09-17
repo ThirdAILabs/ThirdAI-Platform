@@ -16,6 +16,7 @@ from backend.utils import (
     get_high_level_model_info,
     get_model,
     get_model_from_identifier,
+    model_bazaar_path,
     response,
     validate_name,
 )
@@ -30,15 +31,9 @@ from sqlalchemy.orm import Session, joinedload
 
 from storage import interface, local
 
-MODEL_BAZAAR_PATH = (
-    "/model_bazaar"
-    if os.path.exists("/.dockerenv")
-    else os.getenv("SHARE_DIR", "/model_bazaar")
-)
-
 model_router = APIRouter()
 
-storage: interface.StorageInterface = local.LocalStorage(MODEL_BAZAAR_PATH)
+storage: interface.StorageInterface = local.LocalStorage(model_bazaar_path())
 
 
 @model_router.get("/public-list")
