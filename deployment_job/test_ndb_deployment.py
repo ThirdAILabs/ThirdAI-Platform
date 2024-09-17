@@ -9,6 +9,7 @@ from thirdai import neural_db as ndbv1
 from thirdai import neural_db_v2 as ndbv2
 
 MODEL_ID = "xyz"
+LICENSE_KEY = "002099-64C584-3E02C8-7E51A0-DE65D9-V3"
 
 
 def doc_dir():
@@ -26,6 +27,8 @@ def tmp_dir():
 
 @pytest.fixture(scope="function")
 def create_ndbv1_model(tmp_dir):
+    thirdai.licensing.activate(LICENSE_KEY)
+
     db = ndbv1.NeuralDB()
 
     db.insert(
@@ -37,6 +40,8 @@ def create_ndbv1_model(tmp_dir):
 
 @pytest.fixture(scope="function")
 def create_ndbv2_model(tmp_dir):
+    thirdai.licensing.activate(LICENSE_KEY)
+
     db = ndbv2.NeuralDB()
 
     db.insert(
@@ -58,11 +63,7 @@ def set_env_variables(tmp_dir: str, sub_type: str, autoscaling: bool):
     os.environ["MODEL_ID"] = f"{MODEL_ID}_{sub_type}"
     os.environ["MODEL_BAZAAR_ENDPOINT"] = ""
     os.environ["MODEL_BAZAAR_DIR"] = tmp_dir
-
-    license_key = "002099-64C584-3E02C8-7E51A0-DE65D9-V3"
-    thirdai.licensing.activate(license_key)
-    os.environ["LICENSE_KEY"] = license_key
-
+    os.environ["LICENSE_KEY"] = LICENSE_KEY
     os.environ["TASK_RUNNER_TOKEN"] = ""
     os.environ["SUB_TYPE"] = sub_type
     os.environ["AUTOSCALING_ENABLED"] = str(autoscaling)
