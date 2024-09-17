@@ -166,6 +166,7 @@ def generate_text_data(
 
 class TokenClassificationGenerateArgs(BaseModel):
     tags: List[Entity]
+    task_prompt: str
     num_sentences_to_generate: int
     num_samples_per_tag: Optional[int] = None
     allocation_cores: Optional[int] = None

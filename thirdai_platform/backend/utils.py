@@ -297,7 +297,12 @@ def submit_nomad_job(filepath, nomad_endpoint, **kwargs):
         json_payload_url, headers=headers, json=hcl_payload
     )
 
-    json_payload_response.raise_for_status()
+    try:
+        json_payload_response.raise_for_status()
+    except:
+        raise requests.exceptions.HTTPError(
+            f"Request to nomad parse failed. Status code: {json_payload_response.status_code}, Content: {json_payload_response.content}"
+        )
 
     json_payload = json_payload_response.json()
 

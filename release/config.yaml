@@ -1,5 +1,13 @@
 azure:
   branches:
+    demo:
+      pull_credentials:
+        password: obVlt0TPiaNOoqAK/sE3urxQ7wY/6/l0En/MBIMuO9+ACRBK2w7X
+        username: thirdaiplatform-pull-demo
+      push_credentials:
+        password: KF29xfSDxIbo+nckWndoVMfxq376shoihy/2ihlia5+ACRCoKjt8
+        username: thirdaiplatform-push-demo
+      version: 0.0.11
     docker_tests:
       pull_credentials:
         password: ojqTob8LipMFHD5CUtYQqKFT4Yj0dgA42fpzKm08Uu+ACRB3D2G8

@@ -10,6 +10,7 @@ from backend.utils import (
     get_python_path,
     get_root_absolute_path,
     response,
+    save_dict,
     submit_nomad_job,
 )
 from database import schema
@@ -18,6 +19,10 @@ from fastapi import Depends, status
 from licensing.verify.verify_license import valid_job_allocation, verify_license
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
+
+
+def model_bazaar_path():
+    return "/model_bazaar" if os.path.exists("/.dockerenv") else os.getenv("SHARE_DIR")
 
 
 def get_catalogs(task: schema.UDT_Task, session: Session):
@@ -61,9 +66,8 @@ def generate_data_for_train_job(
             secret_token=secret_token,
             license_key=license_key,
             llm_provider=options.llm_provider,
-            options=TextClassificationGenerateArgs(
-                **options_dict, **job_options.model_dump()
-            ),
+            options=TextClassificationGenerateArgs(**options_dict),
+            job_options=job_options
         )
     else:
         generate_token_data(
@@ -72,9 +76,8 @@ def generate_data_for_train_job(
             secret_token=secret_token,
             license_key=license_key,
             llm_provider=options.llm_provider,
-            options=TokenClassificationGenerateArgs(
-                **options_dict, **job_options.model_dump()
-            ),
+            options=TokenClassificationGenerateArgs(**options_dict),
+            job_options=job_options
         )
 
 
@@ -86,8 +89,6 @@ class TextClassificationGenerateArgs(BaseModel):
     user_vocab: Optional[List[str]] = None
     user_prompts: Optional[List[str]] = None
     vocab_per_sentence: int = 4
-    allocation_cores: Optional[int] = None
-    allocation_memory: Optional[int] = None
 
 
 def generate_text_data(
@@ -97,11 +98,13 @@ def generate_text_data(
     license_key: str,
     llm_provider: LLMProvider,
     options: TextClassificationGenerateArgs,
+    job_options: JobOptions
 ):
     try:
-        extra_options = TextClassificationGenerateArgs.model_validate(
+        datagen_options = TextClassificationGenerateArgs.model_validate(
             options
         ).model_dump()
+        extra_options = JobOptions.model_validate(job_options).model_dump()
         extra_options = {k: v for k, v in extra_options.items() if v is not None}
         if extra_options:
             print(f"Extra options for training: {extra_options}")
@@ -111,6 +114,14 @@ def generate_text_data(
     genai_key = os.getenv("GENAI_KEY")
     if genai_key is None:
         raise ValueError(f"Need gen_ai key for data-generation")
+    
+    # Dump the datagen option in the storage dir
+    storage_dir = os.path.join(model_bazaar_path(), "generated_data", str(data_id))
+    os.makedirs(storage_dir, exist_ok=True)
+    save_dict(
+        datagen_options,
+        os.path.join(storage_dir, "generation_args.json"),
+    )
 
     try:
         nomad_response = submit_nomad_job(
@@ -139,6 +150,7 @@ def generate_text_data(
             license_key=license_key,
             extra_options=extra_options,
             python_path=get_python_path(),
+            storage_dir=storage_dir
         )
         nomad_response.raise_for_status()
     except Exception as e:
@@ -146,13 +158,11 @@ def generate_text_data(
 
 
 class TokenClassificationGenerateArgs(BaseModel):
-    task_prompt: str
     tags: List[str]
+    task_prompt: str
     tag_examples: Dict[str, List[str]]
     num_sentences_to_generate: int
     num_samples_per_tag: int = 4
-    allocation_cores: Optional[int] = None
-    allocation_memory: Optional[int] = None
 
 
 def generate_token_data(
@@ -162,11 +172,13 @@ def generate_token_data(
     license_key: str,
     llm_provider: LLMProvider,
     options: TokenClassificationGenerateArgs,
+    job_options: JobOptions
 ):
     try:
-        extra_options = TokenClassificationGenerateArgs.model_validate(
+        datagen_options = TokenClassificationGenerateArgs.model_validate(
             options
         ).model_dump()
+        extra_options = JobOptions.model_validate(job_options).model_dump()
         extra_options = {k: v for k, v in extra_options.items() if v is not None}
         if extra_options:
             print(f"Extra options for training: {extra_options}")
@@ -176,6 +188,14 @@ def generate_token_data(
     genai_key = os.getenv("GENAI_KEY")
     if genai_key is None:
         raise ValueError(f"Need gen_ai key for data-generation")
+
+    # Dump the datagen option in the storage dir
+    storage_dir = os.path.join(model_bazaar_path(), "generated_data", str(data_id))
+    os.makedirs(storage_dir, exist_ok=True)
+    save_dict(
+        datagen_options,
+        os.path.join(storage_dir, "generation_args.json"),
+    )
 
     try:
         nomad_response = submit_nomad_job(
@@ -204,6 +224,7 @@ def generate_token_data(
             license_key=license_key,
             extra_options=extra_options,
             python_path=get_python_path(),
+            storage_dir=storage_dir
         )
         nomad_response.raise_for_status()
     except Exception as e:
