@@ -82,31 +82,6 @@ def get_configs(config_type: type, config_regex: str) -> List[Config]:
     return configs
 
 
-def create_doc_dict(path: str, doc_type: str) -> Dict[str, str]:
-    """
-    Creates a document dictionary for different document types.
-
-    Parameters:
-    path (str): Path to the document file.
-    doc_type (str): Type of the document location.
-
-    Returns:
-    dict[str, str]: Dictionary containing document details.
-
-    Raises:
-    Exception: If the document type is not supported.
-    """
-    _, ext = os.path.splitext(path)
-    if ext == ".pdf":
-        return {"document_type": "PDF", "path": path, "location": doc_type}
-    if ext == ".csv":
-        return {"document_type": "CSV", "path": path, "location": doc_type}
-    if ext == ".docx":
-        return {"document_type": "DOCX", "path": path, "location": doc_type}
-
-    raise Exception(f"Please add a map from {ext} to document dictionary.")
-
-
 def extract_static_methods(cls: Type) -> Dict[str, Callable]:
     """
     Extracts all static methods from a given class and returns them in a dictionary.

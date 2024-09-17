@@ -85,7 +85,7 @@ class NDBOptions(BaseModel):
     model_type: Literal[ModelType.NDB] = ModelType.NDB
 
     ndb_options: Union[NDBv1Options, NDBv2Options] = Field(
-        NDBv1Options(), discriminator="ndb_sub_type"
+        NDBv2Options(), discriminator="ndb_sub_type"
     )
 
     class Config:

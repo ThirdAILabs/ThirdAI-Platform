@@ -7,7 +7,7 @@ from requests.exceptions import HTTPError
 
 from headless.configs import Config
 from headless.model import Flow
-from headless.utils import create_doc_dict, extract_static_methods
+from headless.utils import extract_static_methods
 
 logging.basicConfig(level=logging.INFO)
 
@@ -184,44 +184,31 @@ class NDBFunctions:
         good_answer = references[2]
 
         logging.info("Associating the model")
-        associate_task_id = deployment.associate(
+        deployment.associate(
             [
                 {"source": "authors", "target": "contributors"},
                 {"source": "paper", "target": "document"},
             ]
         )
 
-        deployment.await_task(associate_task_id)
-
         logging.info(f"upvoting the model")
-        upvote_task_id = deployment.upvote(
+        deployment.upvote(
             [
                 {"query_text": query_text, "reference_id": best_answer["id"]},
                 {"query_text": query_text, "reference_id": good_answer["id"]},
             ]
         )
 
-        deployment.await_task(upvote_task_id)
-
         logging.info(f"inserting the docs to the model")
-        insert_task_id = deployment.insert(
+        deployment.insert(
             [
-                create_doc_dict(
-                    os.path.join(
-                        (
-                            config.base_path
-                            if config.doc_type != "nfs"
-                            else config.base_path
-                        ),
-                        file,
-                    ),
-                    config.doc_type,
-                )
+                {
+                    "path": os.path.join(config.base_path, file),
+                    "location": config.doc_type,
+                }
                 for file in config.insert_paths
             ],
         )
-
-        deployment.await_task(insert_task_id)
 
         logging.info("Checking the sources")
         deployment.sources()
@@ -347,25 +334,25 @@ class NDBFunctions:
         return flow.bazaar_client.deploy(model.model_identifier)
 
     def build_model_options(config: Config) -> Dict[str, Any]:
-        if config.retriever == "mach":
-            mach_options = {
-                "fhr": config.input_dim,
-                "embedding_dim": config.hidden_dim,
-                "output_dim": config.output_dim,
-                "unsupervised_epochs": config.epochs,
-                "supervised_epochs": config.epochs,
-            }
-        else:
-            mach_options = None
-        # return {"ndb_options": {"ndb_sub_type": "v2"}}
-        return {
-            "ndb_options": {
-                "ndb_sub_type": "v1",
-                "retriever": config.retriever,
-                "mach_options": mach_options,
-                "checkpoint_interval": config.checkpoint_interval,
-            }
-        }
+        # if config.retriever == "mach":
+        #     mach_options = {
+        #         "fhr": config.input_dim,
+        #         "embedding_dim": config.hidden_dim,
+        #         "output_dim": config.output_dim,
+        #         "unsupervised_epochs": config.epochs,
+        #         "supervised_epochs": config.epochs,
+        #     }
+        # else:
+        #     mach_options = None
+        return {"ndb_options": {"ndb_sub_type": "v2"}}
+        # return {
+        #     "ndb_options": {
+        #         "ndb_sub_type": "v1",
+        #         "retriever": config.retriever,
+        #         "mach_options": mach_options,
+        #         "checkpoint_interval": config.checkpoint_interval,
+        #     }
+        # }
 
     def build_doc_options(config: Config) -> Dict[str, Any]:
         return {

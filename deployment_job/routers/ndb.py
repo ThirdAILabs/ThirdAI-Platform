@@ -20,7 +20,7 @@ from update_logger import UpdateLogger
 from utils import propagate_error, response, validate_name
 from variables import GeneralVariables
 
-from deployment_job.update_logger import (
+from update_logger import (
     AssociateLog,
     DeleteLog,
     FeedbackLog,
@@ -241,7 +241,7 @@ def ndb_upvote(
         )
         return response(
             status_code=status.HTTP_202_ACCEPTED,
-            message="Upvote task logged successfully.",
+            message="Upvote logged successfully.",
         )
     else:
         model = get_model(write_mode=True)
@@ -295,7 +295,7 @@ def ndb_associate(
         )
         return response(
             status_code=status.HTTP_202_ACCEPTED,
-            message="Associate task logged successfully.",
+            message="Associate logged successfully.",
         )
     else:
         model = get_model(write_mode=True)
@@ -390,7 +390,7 @@ def delete(
 
         return response(
             status_code=status.HTTP_202_ACCEPTED,
-            message="Delete task logged successfully.",
+            message="Delete logged successfully.",
         )
     else:
         model = get_model(write_mode=True)
