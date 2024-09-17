@@ -10,7 +10,7 @@ from models.classification_models import (
     TextClassificationModel,
     TokenClassificationModel,
 )
-from models.ndb_models import NDBV2Model, ShardedNDB, SingleNDB
+from models.ndb_models import NDBV2Model, NDBV1Model
 from variables import GeneralVariables, ModelType, NDBSubType, UDTSubType
 
 # Initialize thirdai license
@@ -61,7 +61,7 @@ class ModelManager:
         """
         if general_variables.type == ModelType.NDB:
             if general_variables.sub_type == NDBSubType.v1:
-                return SingleNDB(write_mode=write_mode)
+                return NDBV1Model(write_mode=write_mode)
             elif general_variables.sub_type == NDBSubType.v2:
                 return NDBV2Model(write_mode=write_mode)
             else:

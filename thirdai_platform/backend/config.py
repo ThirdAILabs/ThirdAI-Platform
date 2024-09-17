@@ -99,6 +99,8 @@ class NDBData(BaseModel):
     supervised_files: List[FileInfo] = []
     test_files: List[FileInfo] = []
 
+    deletions: List[str] = []
+
     class Config:
         protected_namespaces = ()
 

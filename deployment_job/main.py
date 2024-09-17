@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from reporter import Reporter
-from routers.model import ModelManager, get_model
+from routers.model import get_model
 from routers.ndb import ndb_router
 from routers.udt import udt_router
 from utils import delete_deployment_job
@@ -81,38 +81,6 @@ async def async_timer() -> None:
             reset_event.clear()  # Clear event after handling timeout
 
 
-async def check_for_model_updates():
-    global model
-    last_loaded_timestamp = None
-    model_id = general_variables.model_id
-
-    while True:
-        try:
-            # Get the current model update timestamp from Redis using model_id
-            current_timestamp = model.redis_client.get(f"model_last_updated:{model_id}")
-            if current_timestamp:
-                current_timestamp = current_timestamp.decode()
-
-                # If the timestamp is newer than the last loaded one, reload the model
-                if not last_loaded_timestamp or datetime.fromisoformat(
-                    current_timestamp
-                ) > datetime.fromisoformat(last_loaded_timestamp):
-                    model.logger.info(
-                        f"New model update detected at {current_timestamp}. Reloading model..."
-                    )
-                    # when we rest the instance will be cleared, so forcing to load the latest model instance.
-                    ModelManager.reset_instances()
-                    model = get_model()
-                    last_loaded_timestamp = current_timestamp
-                    model.logger.info("Model successfully reloaded.")
-
-        except Exception as e:
-            model.logger.error(f"Error checking for model update: {str(e)}")
-
-        # Sleep for a short period before checking again
-        await asyncio.sleep(10)  # Adjust the sleep time according to your needs
-
-
 if general_variables.type == ModelType.NDB:
     app.include_router(ndb_router, prefix=f"/{general_variables.model_id}")
 elif general_variables.type == ModelType.UDT:
@@ -141,7 +109,6 @@ async def startup_event() -> None:
         await asyncio.sleep(10)
         reporter.update_deploy_status(general_variables.model_id, "complete")
         asyncio.create_task(async_timer())
-        asyncio.create_task(check_for_model_updates())
     except Exception as e:
         reporter.update_deploy_status(general_variables.model_id, "failed")
         model.logger.error(f"Failed to startup the application, {e}")

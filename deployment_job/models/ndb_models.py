@@ -3,11 +3,8 @@ Defines NDB model classes for the application.
 """
 
 import ast
-import copy
-import json
 import logging
 import os
-import pickle
 import shutil
 import tempfile
 import traceback
@@ -17,9 +14,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import fitz
+import models.ndbv1_parser as ndbv1_parser
+import models.ndbv2_parser as ndbv2_parser
 import thirdai.neural_db_v2.chunk_stores.constraints as ndbv2_constraints
 from chat import llm_providers
-from file_handler import create_ndb_docs, create_ndbv2_docs
+from file_handler import FileInfo, expand_s3_buckets_and_directories
 from models.model import Model
 from pydantic_models import inputs
 from thirdai import neural_db as ndb
@@ -41,7 +40,7 @@ class NDBModel(Model):
         raise NotImplementedError
 
     @abstractmethod
-    def insert(self, **kwargs: Any) -> List[Dict[str, str]]:
+    def insert(self, documents: List[FileInfo], **kwargs: Any) -> List[Dict[str, str]]:
         """
         Inserts documents into the NDB model.
         """
@@ -223,15 +222,16 @@ class NDBV1Model(NDBModel):
 
         # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
-    def insert(self, **kwargs: Any) -> List[Dict[str, str]]:
+    def insert(self, documents: List[FileInfo], **kwargs: Any) -> List[Dict[str, str]]:
         """
         Inserts documents into the NDB model.
         """
-        documents = kwargs.get("documents")
+        ndb_docs = [
+            ndbv1_parser.parse_doc(doc, self.data_dir)
+            for doc in expand_s3_buckets_and_directories(documents)
+        ]
 
-        ndb_docs = create_ndb_docs(documents, self.data_dir)
-
-        source_ids = self.db.insert(sources=ndb_docs)
+        self.db.insert(ndb_docs)
 
         # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
@@ -253,18 +253,6 @@ class NDBV1Model(NDBModel):
         if chunks:
             return chunks
         return old_pdf_chunks(self.db, reference)
-
-
-class SingleNDB(NDBV1Model):
-    """
-    Single instance of the NDB model.
-    """
-
-    def __init__(self, write_mode: bool = False) -> None:
-        """
-        Initializes a single NDB model.
-        """
-        super().__init__(write_mode)
 
     def load(self, write_mode: bool = False) -> ndb.NeuralDB:
         """
@@ -305,104 +293,6 @@ class SingleNDB(NDBV1Model):
                     shutil.rmtree(model_path)
                 shutil.copytree(backup_path, model_path)
                 shutil.rmtree(backup_path.parent)
-
-            raise
-
-
-class ShardedNDB(NDBV1Model):
-    """
-    Sharded instance of the NDB model.
-    """
-
-    def __init__(self, write_mode: bool = False) -> None:
-        """
-        Initializes a sharded NDB model.
-        """
-        super().__init__(write_mode)
-
-    def load(self, write_mode: bool = False) -> ndb.NeuralDB:
-        """
-        Loads the sharded NDB model from model path.
-        """
-        db = ndb.NeuralDB.from_checkpoint(self.model_path, read_only=not write_mode)
-
-        for i in range(db._savable_state.model.num_shards):
-            models = []
-
-            for j in range(db._savable_state.model.num_models_per_shard):
-                model_shard_num = i * db._savable_state.model.num_models_per_shard + j
-
-                mach_model_pkl = (
-                    self.model_dir / str(model_shard_num) / "shard_mach_model.pkl"
-                )
-
-                with open(mach_model_pkl, "rb") as pkl:
-                    mach_model = pickle.load(pkl)
-
-                models.append(mach_model)
-
-            db._savable_state.model.ensembles[i].models = models
-
-        return db
-
-    def save(self, **kwargs: Any) -> None:
-        """
-        Saves the sharded NDB model to model path.
-        """
-        model_dir = self.get_model_dir(kwargs.get("model_id"))
-        num_shards = self.db._savable_state.model.num_shards
-        backup_dir = None
-
-        try:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                temp_dir = Path(tmpdir) / "latest"
-                temp_dir.mkdir(parents=True, exist_ok=True)
-                db_copy = copy.deepcopy(self.db)
-
-                for i in range(num_shards):
-                    ensemble = db_copy._savable_state.model.ensembles[i]
-                    for j, model in enumerate(ensemble.models):
-                        model_shard_num = (
-                            i * db_copy._savable_state.model.num_models_per_shard + j
-                        )
-                        shard_dir = temp_dir / str(model_shard_num)
-                        shard_dir.mkdir(parents=True, exist_ok=True)
-                        mach_model_pkl = shard_dir / "shard_mach_model.pkl"
-                        with mach_model_pkl.open("wb") as pkl:
-                            pickle.dump(model, pkl)
-
-                for ensemble in db_copy._savable_state.model.ensembles:
-                    ensemble.set_model([])
-
-                db_copy.save(save_to=temp_dir / "model.ndb")
-
-                if model_dir.exists():
-                    backup_id = str(uuid.uuid4())
-                    backup_dir = self.get_model_dir(backup_id)
-                    print(f"Creating backup: {backup_id}")
-                    shutil.copytree(model_dir, backup_dir)
-
-                    backup_deployments_dir = model_dir / "deployments"
-                    latest_deployment_dir = temp_dir / "deployments"
-                    if backup_deployments_dir.exists():
-                        shutil.copytree(backup_deployments_dir, latest_deployment_dir)
-
-                if model_dir.exists():
-                    shutil.rmtree(model_dir)
-                shutil.move(temp_dir, model_dir)
-
-                if backup_dir and backup_dir.exists():
-                    shutil.rmtree(backup_dir)
-
-        except Exception as err:
-            self.logger.error(f"Failed while saving with error: {err}")
-            traceback.print_exc()
-
-            if backup_dir and backup_dir.exists():
-                if model_dir.exists():
-                    shutil.rmtree(model_dir)
-                shutil.copytree(backup_dir, model_dir)
-                shutil.rmtree(backup_dir)
 
             raise
 
@@ -456,15 +346,17 @@ class NDBV2Model(NDBModel):
 
         return inputs.SearchResultsNDB(query_text=query, references=results)
 
-    def insert(
-        self, documents: List[Dict[str, Any]], **kwargs: Any
-    ) -> List[Dict[str, str]]:
+    def insert(self, documents: List[FileInfo], **kwargs: Any) -> List[Dict[str, str]]:
         # TODO(V2 Support): add flag for upsert
-        ndb_docs = create_ndbv2_docs(
-            documents=documents,
-            doc_save_dir=self.doc_save_path(),
-            data_dir=self.data_dir,
-        )
+
+        ndb_docs = [
+            ndbv2_parser.parse_doc(
+                doc, doc_save_dir=self.doc_save_path(), tmp_dir=self.data_dir
+            )
+            for doc in expand_s3_buckets_and_directories(documents)
+        ]
+
+        self.db.insert(ndb_docs)
 
         # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 

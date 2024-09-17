@@ -100,6 +100,8 @@ class NDBData(BaseModel):
     supervised_files: List[FileInfo] = []
     test_files: List[FileInfo] = []
 
+    deletions: List[str] = []
+
     @model_validator(mode="after")
     def check_nonempty(self):
         if len(self.unsupervised_files) + len(self.supervised_files) == 0:

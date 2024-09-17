@@ -23,7 +23,6 @@ class Model(ABC):
         self.data_dir: Path = self.general_variables.get_data_dir()
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
-        self.permissions = Permissions()
         logger_file_path = self.data_dir / "deployment.log"
         self.logger = LoggerConfig(logger_file_path).get_logger("deployment-logger")
 

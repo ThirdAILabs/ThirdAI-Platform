@@ -4,9 +4,10 @@ import html
 import os
 from dataclasses import MISSING, asdict, dataclass, fields
 from enum import Enum
+from pathlib import Path
 from typing import Dict, Optional, Type, TypeVar, Union, get_args, get_origin
 from urllib.parse import urljoin
-from pathlib import Path
+
 import requests
 from fastapi import status
 from utils import now
@@ -157,7 +158,7 @@ class GeneralVariables(EnvLoader):
         return urlunparse((parsed_url.scheme, nomad_netloc, "", "", "", ""))
 
     def get_model_dir(self) -> Path:
-        return Path(self.general_variables.model_bazaar_dir) / "models" / self.model_id
+        return Path(self.model_bazaar_dir) / "models" / self.model_id
 
     def get_data_dir(self) -> Path:
         return self.get_model_dir() / "deployments" / "data"

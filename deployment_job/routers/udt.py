@@ -8,11 +8,9 @@ from pydantic_models.inputs import BaseQueryParams, SearchResultsTokenClassifica
 from routers.model import get_model
 from throughput import Throughput
 from utils import propagate_error, response
-from variables import GeneralVariables
 
 udt_router = APIRouter()
 permissions = Permissions()
-general_variables = GeneralVariables.load_from_env()
 
 
 start_time = time.time()

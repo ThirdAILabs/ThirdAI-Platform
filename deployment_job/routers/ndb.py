@@ -1,6 +1,4 @@
-import datetime
 import io
-import json
 import traceback
 import uuid
 from pathlib import Path
@@ -11,32 +9,25 @@ import jwt
 import thirdai
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
-from deployment_job.update_logger import (
-    AssociateLog,
-    FeedbackLog,
-    ImplicitUpvoteLog,
-    UpvoteLog,
-    DeleteLog,
-    InsertLog,
-    FileInfo,
-    FileLocation,
-)
-from file_handler import validate_files
+from file_handler import FileInfo, download_local_files
 from permissions import Permissions
 from prometheus_client import Summary
-from pydantic import ValidationError, parse_obj_as
+from pydantic import BaseModel, ValidationError
 from pydantic_models import inputs
-from pydantic_models.documents import DocumentList
-from pydantic_models.inputs import (
-    AssociateInputSingle,
-    BaseQueryParams,
-    NDBExtraParams,
-    UpvoteInputSingle,
-)
+from pydantic_models.inputs import BaseQueryParams, NDBExtraParams
 from routers.model import get_model
-from utils import Status, now, propagate_error, response, validate_name
-from variables import GeneralVariables
 from update_logger import UpdateLogger
+from utils import propagate_error, response, validate_name
+from variables import GeneralVariables
+
+from deployment_job.update_logger import (
+    AssociateLog,
+    DeleteLog,
+    FeedbackLog,
+    ImplicitUpvoteLog,
+    InsertLog,
+    UpvoteLog,
+)
 
 permissions = Permissions()
 general_variables = GeneralVariables.load_from_env()
@@ -63,7 +54,7 @@ ndb_delete_metric = Summary("ndb_delete", "NDB deletions")
 def ndb_query(
     base_params: BaseQueryParams,
     ndb_params: Optional[NDBExtraParams] = NDBExtraParams(),
-    token: str = Depends(permissions.verify_permission("read")),
+    _: str = Depends(permissions.verify_permission("read")),
 ):
     """
     Query the NDB model with specified parameters.
@@ -114,11 +105,9 @@ def ndb_query(
     ```
     """
     model = get_model()
-    params = base_params.dict()
-    extra_params = ndb_params.dict(exclude_unset=True)
+    params = base_params.model_dump()
+    extra_params = ndb_params.model_dump()
     params.update(extra_params)
-
-    params["token"] = token
 
     results = model.predict(**params)
 
@@ -237,9 +226,7 @@ def ndb_upvote(
     }
     ```
     """
-    model = get_model()
-
-    write_permission = model.permissions.check_permission(
+    write_permission = permissions.check_permission(
         token=token, permission_type="write"
     )
 
@@ -257,6 +244,7 @@ def ndb_upvote(
             message="Upvote task logged successfully.",
         )
     else:
+        model = get_model(write_mode=True)
         model.upvote(input.text_id_pairs)
 
         return response(
@@ -292,13 +280,12 @@ def ndb_associate(
     }
     ```
     """
-    model = get_model()
-    write_permission = model.permissions.check_permission(
+    write_permission = permissions.check_permission(
         token=token, permission_type="write"
     )
 
     if not write_permission or general_variables.production:
-        model.feedback_logger.log(
+        feedback_logger.log(
             FeedbackLog(
                 event=AssociateLog(
                     sources=[sample.source for sample in input.text_pairs],
@@ -311,6 +298,7 @@ def ndb_associate(
             message="Associate task logged successfully.",
         )
     else:
+        model = get_model(write_mode=True)
         model.associate(input.text_pairs)
 
         return response(
@@ -326,8 +314,7 @@ def implicit_feedback(
     feedback: inputs.ImplicitFeedbackInput,
     _: str = Depends(permissions.verify_permission("read")),
 ):
-    model = get_model()
-    model.feedback_logger.log(
+    feedback_logger.log(
         FeedbackLog(
             event=ImplicitUpvoteLog(
                 chunk_id=feedback.reference_id,
@@ -406,7 +393,7 @@ def delete(
             message="Delete task logged successfully.",
         )
     else:
-        model = get_model()
+        model = get_model(write_mode=True)
         model.delete(input.source_ids)
 
         return response(
@@ -494,13 +481,17 @@ def save(
     )
 
 
+class DocumentList(BaseModel):
+    documents: List[FileInfo]
+
+
 @ndb_router.post("/insert")
 @propagate_error
 @ndb_insert_metric.time()
 def insert(
     documents: str = Form(...),
     files: List[UploadFile] = [],
-    token: str = Depends(permissions.verify_permission("write")),
+    _: str = Depends(permissions.verify_permission("write")),
 ):
     """
     Insert documents into the model.
@@ -533,7 +524,7 @@ def insert(
     ```
     """
     try:
-        documents_list = DocumentList.model_validate_json(documents).model_dump()
+        documents = DocumentList.model_validate_json(documents).documents
     except ValidationError as e:
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -541,37 +532,34 @@ def insert(
             data={"details": str(e), "documents": documents},
         )
 
-    if not documents_list:
+    if not documents:
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
             message="No documents supplied for insertion. Must supply at least one document.",
         )
 
-    model = get_model()
-
-    # TODO(YASH): Handle multiple files with same name across multiple calls or single
-    # call, one way is to append task_id along with data_dir.
-    validate_files(documents_list, files, model.data_dir)
-
-    task_id = str(uuid.uuid4())
-    task_data = {
-        "task_id": task_id,
-        "model_id": general_variables.model_id,
-        "action": "insert",
-        "documents": json.dumps(documents_list),
-        "token": token,
-        "status": Status.not_started,
-        "last_modified": now(),
-        "message": "",
-    }
-
-    model.redis_publish(task_id=task_id, task_data=task_data)
-
-    return response(
-        status_code=status.HTTP_202_ACCEPTED,
-        message="Insert task queued successfully.",
-        data={"task_id": task_id},
+    documents = download_local_files(
+        files=files,
+        file_infos=documents,
+        dest_dir=general_variables.get_data_dir() / "insertions" / "documents",
     )
+
+    if general_variables.production:
+        insertion_logger.log(InsertLog(documents=documents))
+
+        return response(
+            status_code=status.HTTP_202_ACCEPTED,
+            message="Insert logged successfully.",
+        )
+    else:
+        model = get_model(write_mode=True)
+
+        model.insert(documents=documents)
+
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Insert applied successfully.",
+        )
 
 
 @ndb_router.get("/highlighted-pdf")
@@ -651,5 +639,3 @@ def pdf_chunks(reference_id: int, _=Depends(permissions.verify_permission("read"
         message=f"Reference with id ${reference_id} is not a PDF.",
         data={},
     )
-
-
