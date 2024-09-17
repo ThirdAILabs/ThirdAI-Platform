@@ -54,7 +54,7 @@ def dummy_check(self, token, permission_type):
     return True
 
 
-def set_env_variables(tmp_dir: str, sub_type: str, prod: bool):
+def set_env_variables(tmp_dir: str, sub_type: str, autoscaling: bool):
     os.environ["MODEL_ID"] = f"{MODEL_ID}_{sub_type}"
     os.environ["MODEL_BAZAAR_ENDPOINT"] = ""
     os.environ["MODEL_BAZAAR_DIR"] = tmp_dir
@@ -65,7 +65,7 @@ def set_env_variables(tmp_dir: str, sub_type: str, prod: bool):
 
     os.environ["TASK_RUNNER_TOKEN"] = ""
     os.environ["SUB_TYPE"] = sub_type
-    os.environ["PRODUCTION"] = str(prod)
+    os.environ["AUTOSCALING_ENABLED"] = str(autoscaling)
 
 
 def get_query_result(client: TestClient, query: str):
@@ -159,7 +159,7 @@ def check_deletion_dev_mode(client: TestClient):
 
 
 def test_deploy_ndbv1_dev_mode(tmp_dir, create_ndbv1_model):
-    set_env_variables(tmp_dir=tmp_dir, sub_type="v1", prod=False)
+    set_env_variables(tmp_dir=tmp_dir, sub_type="v1", autoscaling=False)
 
     from permissions import Permissions
 
@@ -178,7 +178,7 @@ def test_deploy_ndbv1_dev_mode(tmp_dir, create_ndbv1_model):
 
 
 def test_deploy_ndbv2_dev_mode(tmp_dir, create_ndbv2_model):
-    set_env_variables(tmp_dir=tmp_dir, sub_type="v2", prod=False)
+    set_env_variables(tmp_dir=tmp_dir, sub_type="v2", autoscaling=False)
 
     from permissions import Permissions
 
@@ -285,7 +285,7 @@ def check_log_lines(logdir, expected_lines):
 
 
 def test_deploy_ndbv1_prod_mode(tmp_dir, create_ndbv1_model):
-    set_env_variables(tmp_dir=tmp_dir, sub_type="v1", prod=True)
+    set_env_variables(tmp_dir=tmp_dir, sub_type="v1", autoscaling=True)
 
     from permissions import Permissions
 
@@ -315,7 +315,7 @@ def test_deploy_ndbv1_prod_mode(tmp_dir, create_ndbv1_model):
 
 
 def test_deploy_ndbv2_prod_mode(tmp_dir, create_ndbv2_model):
-    set_env_variables(tmp_dir=tmp_dir, sub_type="v2", prod=True)
+    set_env_variables(tmp_dir=tmp_dir, sub_type="v2", autoscaling=True)
 
     from permissions import Permissions
 

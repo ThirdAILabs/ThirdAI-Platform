@@ -5,8 +5,8 @@ from urllib.parse import urljoin
 import pytest
 import requests
 
-from client.bazaar import Model, ModelBazaar
-from client.utils import auth_header, create_model_identifier
+from client.bazaar import ModelBazaar
+from client.utils import auth_header
 
 
 def doc_dir():
@@ -71,22 +71,9 @@ def test_ndb_retraining_log_feedback_from_read_only_users():
 
     admin_client.undeploy(ndb_client)
 
-    retrained_model_name = "retrained_" + base_model_name
-    res = requests.post(
-        urljoin(admin_client._base_url, "train/ndb-retrain"),
-        params={
-            "model_name": retrained_model_name,
-            "base_model_identifier": ndb_client.model_identifier,
-        },
-        headers=auth_header(admin_client._access_token),
-    )
-    assert res.status_code == 200
-
-    retrained_model = Model(
-        model_identifier=create_model_identifier(
-            model_name=retrained_model_name, author_username=admin_client._username
-        ),
-        model_id=res.json()["data"]["model_id"],
+    retrained_model = admin_client.retrain_ndb(
+        new_model_name="retrained_" + base_model_name,
+        base_model_identifier=ndb_client.model_identifier,
     )
 
     admin_client.await_train(retrained_model)

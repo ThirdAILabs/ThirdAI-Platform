@@ -229,7 +229,7 @@ def ndb_upvote(
         token=token, permission_type="write"
     )
 
-    if not write_permission or general_variables.production:
+    if not write_permission or general_variables.autoscaling_enabled:
         feedback_logger.log(
             FeedbackLog(
                 event=UpvoteLog(
@@ -283,7 +283,7 @@ def ndb_associate(
         token=token, permission_type="write"
     )
 
-    if not write_permission or general_variables.production:
+    if not write_permission or general_variables.autoscaling_enabled:
         feedback_logger.log(
             FeedbackLog(
                 event=AssociateLog(
@@ -384,7 +384,7 @@ def delete(
     ```
     """
 
-    if general_variables.production:
+    if general_variables.autoscaling_enabled:
         deletion_logger.log(DeleteLog(doc_ids=input.source_ids))
 
         return response(
@@ -543,7 +543,7 @@ def insert(
         dest_dir=general_variables.get_data_dir() / "insertions" / "documents",
     )
 
-    if general_variables.production:
+    if general_variables.autoscaling_enabled:
         insertion_logger.log(InsertLog(documents=documents))
 
         return response(

@@ -114,7 +114,7 @@ class GeneralVariables(EnvLoader):
     llm_provider: str = "openai"
     genai_key: Optional[str] = None
 
-    production: bool = False
+    autoscaling_enabled: bool = False
 
     def deployment_permissions(self, token: str):
         deployment_permissions_endpoint = urljoin(
