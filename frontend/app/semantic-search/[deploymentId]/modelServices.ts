@@ -92,6 +92,7 @@ function startAndEnd(text: string, n_words: number = 2) {
 
 type ImplicitFeecback = {
   reference_id: number;
+  reference_rank: number;
   query_text: string;
   event_desc: string;
 };
