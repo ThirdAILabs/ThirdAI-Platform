@@ -1,20 +1,23 @@
-'use client'
+'use client';
 
 import { useEffect, useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
-import {
-  fetchAllModels, fetchAllTeams, fetchAllUsers,
-  updateModelAccessLevel, deleteModel,
-  createTeam, addUserToTeam, assignTeamAdmin, deleteUserFromTeam, deleteTeamById, removeTeamAdmin,
+  fetchAllModels,
+  fetchAllTeams,
+  fetchAllUsers,
+  updateModelAccessLevel,
+  deleteModel,
+  createTeam,
+  addUserToTeam,
+  assignTeamAdmin,
+  deleteUserFromTeam,
+  deleteTeamById,
+  removeTeamAdmin,
   deleteUserAccount,
-  Workflow, fetchWorkflows
-} from "@/lib/backend";
+  Workflow,
+  fetchWorkflows,
+} from '@/lib/backend';
 import { useContext } from 'react';
 import { UserContext } from '../../user_wrapper';
 import AutocompleteInput from '@/components/ui/AutocompleteInput';
@@ -42,7 +45,7 @@ type Model = {
 type Team = {
   id: string;
   name: string;
-  admins: string[];  // Updated to support multiple admins
+  admins: string[]; // Updated to support multiple admins
   members: string[];
 };
 
@@ -57,7 +60,7 @@ type User = {
   name: string;
   email: string;
   role: 'Member' | 'Team Admin' | 'Global Admin';
-  teams: UserTeam[];  // Updated to store team details
+  teams: UserTeam[]; // Updated to store team details
   ownedModels: string[];
 };
 
@@ -65,18 +68,20 @@ export default function AccessPage() {
   const { user } = useContext(UserContext);
 
   // Determine the user role
-  let userRole = "";
-  let roleDescription = "";
-  
+  let userRole = '';
+  let roleDescription = '';
+
   if (user?.global_admin) {
-    userRole = "Global Admin";
-    roleDescription = "This role has read and write access to all members, models, and applications.";
-  } else if (user?.teams.some(team => team.role === 'team_admin')) {
-    userRole = "Team Admin";
-    roleDescription = "This role has read and write access to all team members, models, and applications in the team.";
+    userRole = 'Global Admin';
+    roleDescription =
+      'This role has read and write access to all members, models, and applications.';
+  } else if (user?.teams.some((team) => team.role === 'team_admin')) {
+    userRole = 'Team Admin';
+    roleDescription =
+      'This role has read and write access to all team members, models, and applications in the team.';
   } else {
-    userRole = "User"; // Default role if not an admin
-    roleDescription = "This role has limited access based on specific team permissions.";
+    userRole = 'User'; // Default role if not an admin
+    roleDescription = 'This role has limited access based on specific team permissions.';
   }
 
   // State to manage models, teams, and users
@@ -94,78 +99,89 @@ export default function AccessPage() {
   const getModels = async () => {
     try {
       const response = await fetchAllModels();
-      console.log('Fetched Models:', response.data);  // Print out the results
-      const modelData = response.data.map((model): Model => ({
-        name: model.model_name,
-        type: model.access_level === 'private' ? 'Private Model' : model.access_level === 'protected' ? 'Protected Model' : 'Public Model',
-        owner: model.username,
-        users: [], // To be populated later
-        team: model.team_id !== 'None' ? model.team_id : undefined,
-        teamAdmin: undefined, // To be populated later
-        domain: model.domain,
-        latency: model.latency,
-        modelId: model.model_id,
-        numParams: model.num_params,
-        publishDate: model.publish_date,
-        size: model.size,
-        sizeInMemory: model.size_in_memory,
-        subType: model.sub_type,
-        thirdaiVersion: model.thirdai_version,
-        trainingTime: model.training_time,
-      }));
+      console.log('Fetched Models:', response.data); // Print out the results
+      const modelData = response.data.map(
+        (model): Model => ({
+          name: model.model_name,
+          type:
+            model.access_level === 'private'
+              ? 'Private Model'
+              : model.access_level === 'protected'
+                ? 'Protected Model'
+                : 'Public Model',
+          owner: model.username,
+          users: [], // To be populated later
+          team: model.team_id !== 'None' ? model.team_id : undefined,
+          teamAdmin: undefined, // To be populated later
+          domain: model.domain,
+          latency: model.latency,
+          modelId: model.model_id,
+          numParams: model.num_params,
+          publishDate: model.publish_date,
+          size: model.size,
+          sizeInMemory: model.size_in_memory,
+          subType: model.sub_type,
+          thirdaiVersion: model.thirdai_version,
+          trainingTime: model.training_time,
+        })
+      );
       setModels(modelData);
     } catch (error) {
       console.error('Failed to fetch models', error);
-      alert('Failed to fetch models' + error)
+      alert('Failed to fetch models' + error);
     }
   };
 
   const getUsers = async () => {
     try {
       const response = await fetchAllUsers();
-      console.log('Fetched Users:', response.data);  // Print out the results
-      const userData = response.data.map((user): User => ({
-        id: user.id,
-        name: user.username,
-        email: user.email,
-        role: user.global_admin ? 'Global Admin' : 'Member', // Adjust the logic if you have Team Admins
-        teams: user.teams.map(team => ({
-          id: team.team_id,
-          name: team.team_name,
-          role: team.role,
-        })),
-        ownedModels: models.filter(model => model.owner === user.username).map(model => model.name),
-      }));
+      console.log('Fetched Users:', response.data); // Print out the results
+      const userData = response.data.map(
+        (user): User => ({
+          id: user.id,
+          name: user.username,
+          email: user.email,
+          role: user.global_admin ? 'Global Admin' : 'Member', // Adjust the logic if you have Team Admins
+          teams: user.teams.map((team) => ({
+            id: team.team_id,
+            name: team.team_name,
+            role: team.role,
+          })),
+          ownedModels: models
+            .filter((model) => model.owner === user.username)
+            .map((model) => model.name),
+        })
+      );
       setUsers(userData);
     } catch (error) {
       console.error('Failed to fetch users', error);
-      alert('Failed to fetch users' + error)
+      alert('Failed to fetch users' + error);
     }
   };
 
   const getTeams = async () => {
     try {
       const response = await fetchAllTeams();
-      console.log('Fetched Teams:', response.data);  // Print out the results
+      console.log('Fetched Teams:', response.data); // Print out the results
       const teamData = response.data.map((team): Team => {
         const members: string[] = [];
-        const admins: string[] = [];  // Collect multiple admins
-  
+        const admins: string[] = []; // Collect multiple admins
+
         // Populate members and admins from users and models data
-        users.forEach(user => {
-          const userTeam = user.teams.find(ut => ut.id === team.id);
+        users.forEach((user) => {
+          const userTeam = user.teams.find((ut) => ut.id === team.id);
           if (userTeam) {
             members.push(user.name);
             if (userTeam.role === 'team_admin') {
-              admins.push(user.name);  // Add to admins array
+              admins.push(user.name); // Add to admins array
             }
           }
         });
-  
+
         return {
           id: team.id,
           name: team.name,
-          admins: admins,  // Store the admins array
+          admins: admins, // Store the admins array
           members: members,
         };
       });
@@ -179,18 +195,20 @@ export default function AccessPage() {
 
   // Handle model type change
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [selectedType, setSelectedType] = useState<'Private Model' | 'Protected Model' | 'Public Model' | null>(null);
+  const [selectedType, setSelectedType] = useState<
+    'Private Model' | 'Protected Model' | 'Public Model' | null
+  >(null);
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null); // For team selection
 
   const handleModelTypeChange = async (index: number) => {
     if (!selectedType) return;
-  
+
     try {
       const model = models[index];
       const model_identifier = `${model.owner}/${model.name}`;
       let access_level: 'private' | 'protected' | 'public' = 'private';
       let team_id: string | undefined;
-  
+
       switch (selectedType) {
         case 'Private Model':
           access_level = 'private';
@@ -205,37 +223,39 @@ export default function AccessPage() {
         default:
           return;
       }
-  
+
       // Call the API to update the model access level
       await updateModelAccessLevel(model_identifier, access_level, team_id);
-  
+
       // Update the models state
-      await getModels()
-      await getUsers()
-      await getTeams()
-  
+      await getModels();
+      await getUsers();
+      await getTeams();
+
       // Reset editing state
       setEditingIndex(null);
       setSelectedType(null);
       setSelectedTeam(null);
     } catch (error) {
       console.error('Failed to update model access level', error);
-      alert('Failed to update model access level' + error)
+      alert('Failed to update model access level' + error);
     }
   };
-  
+
   const handleDeleteModel = async (index: number) => {
     const model = models[index];
     const model_identifier = `${model.owner}/${model.name}`;
-  
+
     try {
       // Confirm deletion with the user
-      const isConfirmed = window.confirm(`Are you sure you want to delete the model "${model.name}"?`);
+      const isConfirmed = window.confirm(
+        `Are you sure you want to delete the model "${model.name}"?`
+      );
       if (!isConfirmed) return;
-  
+
       // Call the API to delete the model
       await deleteModel(model_identifier);
-  
+
       // Optionally, refresh the models after deletion
       await getModels();
       await getUsers();
@@ -245,7 +265,6 @@ export default function AccessPage() {
       alert('Failed to delete model: ' + error);
     }
   };
-  
 
   // Create a new team
   const createNewTeam = async () => {
@@ -256,28 +275,28 @@ export default function AccessPage() {
 
       // Add members to the team
       for (const memberName of newTeamMembers) {
-        const member = users.find(user => user.name === memberName);
+        const member = users.find((user) => user.name === memberName);
         if (member) {
           await addUserToTeam(member.email, team_id);
         } else {
           console.error(`User with name ${memberName} not found`);
-          alert(`User with name ${memberName} not found`)
+          alert(`User with name ${memberName} not found`);
         }
       }
 
       // Assign the admin to the team
-      const admin = users.find(user => user.name === newTeamAdmin);
+      const admin = users.find((user) => user.name === newTeamAdmin);
       if (admin) {
         await assignTeamAdmin(admin.email, team_id);
       } else {
         console.error(`User with name ${newTeamAdmin} not found`);
-        alert(`User with name ${newTeamAdmin} not found`)
+        alert(`User with name ${newTeamAdmin} not found`);
       }
 
       // Update the state
-      await getModels()
-      await getUsers()
-      await getTeams()
+      await getModels();
+      await getUsers();
+      await getTeams();
 
       // Clear the input fields
       setNewTeamName('');
@@ -285,7 +304,7 @@ export default function AccessPage() {
       setNewTeamMembers([]);
     } catch (error) {
       console.error('Failed to create new team', error);
-      alert('Failed to create new team' + error)
+      alert('Failed to create new team' + error);
     }
   };
 
@@ -293,18 +312,18 @@ export default function AccessPage() {
   const addMemberToTeam = async () => {
     try {
       // Find the team by name
-      const team = teams.find(t => t.name === selectedTeamForAdd);
+      const team = teams.find((t) => t.name === selectedTeamForAdd);
       if (!team) {
         console.error('Selected team not found');
-        alert('Selected team not found')
+        alert('Selected team not found');
         return;
       }
 
       // Find the user by name
-      const user = users.find(u => u.name === newMember);
+      const user = users.find((u) => u.name === newMember);
       if (!user) {
         console.error('User not found');
-        alert('User not found')
+        alert('User not found');
         return;
       }
 
@@ -312,33 +331,33 @@ export default function AccessPage() {
       await addUserToTeam(user.email, team.id);
 
       // Optionally update the team members state (if needed)
-      await getModels()
-      await getUsers()
-      await getTeams()
+      await getModels();
+      await getUsers();
+      await getTeams();
 
-      setSelectedTeamForAdd('');  // Clear the selected team
-      setNewMember('');     // Clear the new member input
+      setSelectedTeamForAdd(''); // Clear the selected team
+      setNewMember(''); // Clear the new member input
     } catch (error) {
       console.error('Failed to add member to team', error);
-      alert('Failed to add member to team' + error)
+      alert('Failed to add member to team' + error);
     }
   };
 
   const removeMemberFromTeam = async () => {
     try {
       // Find the team by name
-      const team = teams.find(t => t.name === selectedTeamForRemove);
+      const team = teams.find((t) => t.name === selectedTeamForRemove);
       if (!team) {
         console.error('Selected team not found');
-        alert('Selected team not found')
+        alert('Selected team not found');
         return;
       }
 
       // Find the user by name
-      const user = users.find(u => u.name === memberToRemove);
+      const user = users.find((u) => u.name === memberToRemove);
       if (!user) {
         console.error('User not found');
-        alert('User not found')
+        alert('User not found');
         return;
       }
 
@@ -346,15 +365,15 @@ export default function AccessPage() {
       await deleteUserFromTeam(user.email, team.id);
 
       // Optionally update the team members state (if needed)
-      await getModels()
-      await getUsers()
-      await getTeams()
+      await getModels();
+      await getUsers();
+      await getTeams();
 
-      setSelectedTeamForRemove('');  // Clear the selected team
+      setSelectedTeamForRemove(''); // Clear the selected team
       setMemberToRemove(''); // Clear the member input
     } catch (error) {
       console.error('Failed to remove member from team', error);
-      alert('Failed to remove member from team' + error)
+      alert('Failed to remove member from team' + error);
     }
   };
 
@@ -362,23 +381,22 @@ export default function AccessPage() {
   const deleteTeam = async (teamName: string) => {
     try {
       // Find the team by name
-      const team = teams.find(t => t.name === teamName);
+      const team = teams.find((t) => t.name === teamName);
       if (!team) {
         console.error('Team not found');
-        alert('Team not found')
+        alert('Team not found');
         return;
       }
 
       // Call the API to delete the team
       await deleteTeamById(team.id);
 
-
-      await getModels()
-      await getUsers()
-      await getTeams()
+      await getModels();
+      await getUsers();
+      await getTeams();
     } catch (error) {
       console.error('Failed to delete team', error);
-      alert('Failed to delete team' + error)
+      alert('Failed to delete team' + error);
     }
   };
 
@@ -386,10 +404,10 @@ export default function AccessPage() {
   const deleteUser = async (userName: string) => {
     try {
       // Find the user by name
-      const user = users.find(u => u.name === userName);
+      const user = users.find((u) => u.name === userName);
       if (!user) {
         console.error('User not found');
-        alert('User not found')
+        alert('User not found');
         return;
       }
 
@@ -397,23 +415,23 @@ export default function AccessPage() {
       await deleteUserAccount(user.email);
 
       // Update the states
-      await getModels()
-      await getUsers()
-      await getTeams()
+      await getModels();
+      await getUsers();
+      await getTeams();
     } catch (error) {
       console.error('Failed to delete user', error);
-      alert('Failed to delete user' + error)
+      alert('Failed to delete user' + error);
     }
   };
 
   useEffect(() => {
     getModels();
-    getUsers()
+    getUsers();
   }, []);
 
   useEffect(() => {
-    getTeams()
-  }, [users])
+    getTeams();
+  }, [users]);
 
   // State to manage workflows
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -424,7 +442,7 @@ export default function AccessPage() {
       setWorkflows(fetchedWorkflows);
     } catch (error) {
       console.error('Failed to fetch workflows', error);
-      alert('Failed to fetch workflows' + error)
+      alert('Failed to fetch workflows' + error);
     }
   };
 
@@ -441,20 +459,20 @@ export default function AccessPage() {
   const assignAdminToTeam = async () => {
     if (selectedTeamForAddAdmin && newAdmin) {
       // Find the team ID based on the selected team name
-      const selectedTeam = teams.find(team => team.name === selectedTeamForAddAdmin);
-      
+      const selectedTeam = teams.find((team) => team.name === selectedTeamForAddAdmin);
+
       if (!selectedTeam) {
-        alert("Selected team not found.");
+        alert('Selected team not found.');
         return;
       }
-  
+
       // Find the user email based on the selected admin's name
-      const user = users.find(u => u.name === newAdmin);
+      const user = users.find((u) => u.name === newAdmin);
       if (!user) {
-        alert("User not found.");
+        alert('User not found.');
         return;
       }
-  
+
       try {
         // Use the team ID and user email in the API call
         await assignTeamAdmin(user.email, selectedTeam.id);
@@ -464,31 +482,31 @@ export default function AccessPage() {
         await getUsers();
         await getTeams();
       } catch (error) {
-        console.error("Error adding admin:", error);
-        alert("Failed to add admin.");
+        console.error('Error adding admin:', error);
+        alert('Failed to add admin.');
       }
     } else {
-      alert("Please select a team and enter an admin name.");
+      alert('Please select a team and enter an admin name.');
     }
   };
-  
+
   const removeAdminFromTeam = async () => {
     if (selectedTeamForRemoveAdmin && adminToRemove) {
       // Find the team ID based on the selected team name
-      const selectedTeam = teams.find(team => team.name === selectedTeamForRemoveAdmin);
-      
+      const selectedTeam = teams.find((team) => team.name === selectedTeamForRemoveAdmin);
+
       if (!selectedTeam) {
-        alert("Selected team not found.");
+        alert('Selected team not found.');
         return;
       }
-  
+
       // Find the user email based on the admin's name to be removed
-      const user = users.find(u => u.name === adminToRemove);
+      const user = users.find((u) => u.name === adminToRemove);
       if (!user) {
-        alert("User not found.");
+        alert('User not found.');
         return;
       }
-  
+
       try {
         // Use the team ID and user email in the API call
         await removeTeamAdmin(user.email, selectedTeam.id);
@@ -498,17 +516,17 @@ export default function AccessPage() {
         await getUsers();
         await getTeams();
 
-        setSelectedTeamForRemoveAdmin('');  // Clear the selected team
-        setAdminToRemove('');               // Clear the admin input
+        setSelectedTeamForRemoveAdmin(''); // Clear the selected team
+        setAdminToRemove(''); // Clear the admin input
       } catch (error) {
-        console.error("Error removing admin:", error);
-        alert("Failed to remove admin.");
+        console.error('Error removing admin:', error);
+        alert('Failed to remove admin.');
       }
     } else {
-      alert("Please select a team and enter the admin name.");
+      alert('Please select a team and enter the admin name.');
     }
   };
-  
+
   // For single string values
   const handleSingleChange = (setter: React.Dispatch<React.SetStateAction<string>>) => {
     return (value: string | string[]) => {
@@ -528,7 +546,7 @@ export default function AccessPage() {
   };
 
   // Handle OpenAI key change
-  const [apiKey, setApiKey] = useState('');   // Display the masked API key
+  const [apiKey, setApiKey] = useState(''); // Display the masked API key
   const [newApiKey, setNewApiKey] = useState(''); // For storing the new API key
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -542,18 +560,18 @@ export default function AccessPage() {
         setApiKey(data.apiKey); // set masked API key
       }
     }
-  
+
     fetchApiKey();
-  }, []);  
+  }, []);
 
   const handleSave = async () => {
     if (!newApiKey) {
       alert('Please enter a new OpenAI API Key');
       return;
     }
-  
+
     setLoading(true);
-  
+
     const response = await fetch('/endpoints/change_openai_key', {
       method: 'POST',
       headers: {
@@ -561,32 +579,34 @@ export default function AccessPage() {
       },
       body: JSON.stringify({ newApiKey }),
     });
-  
+
     const data = await response.json();
     if (data.success) {
       setSuccessMessage('OpenAI API Key successfully updated!');
       setApiKey(`sk-${newApiKey.slice(-4)}`);
-      setNewApiKey('') // clear the openai key field
+      setNewApiKey(''); // clear the openai key field
     } else {
       alert('Error updating API Key');
     }
-  
+
     setLoading(false);
-  };  
+  };
 
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen">
       <Card className="shadow-lg">
         <CardHeader className="bg-blue-500 text-white p-6 rounded-t-lg">
           <CardTitle className="text-2xl font-bold">Manage Access</CardTitle>
-          <CardDescription className="text-white">View all personnel and their access.</CardDescription>
+          <CardDescription className="text-white">
+            View all personnel and their access.
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-6 bg-white rounded-b-lg">
           <div className="mb-8">
             <h2 className="text-2xl font-semibold text-gray-800">{userRole}</h2>
             <p className="text-gray-600">{roleDescription}</p>
           </div>
-  
+
           {/* Models Section */}
           <div className="mb-12">
             <h3 className="text-xl font-semibold text-gray-800 mb-4">Models</h3>
@@ -601,8 +621,7 @@ export default function AccessPage() {
                 </tr>
               </thead>
               <tbody>
-                {models
-                .map((model, index) => (
+                {models.map((model, index) => (
                   <tr key={index} className="border-t">
                     <td className="py-3 px-4 text-gray-800">{model.name}</td>
                     <td className="py-3 px-4 text-gray-800">{model.type}</td>
@@ -616,19 +635,26 @@ export default function AccessPage() {
                       {model.type === 'Protected Model' && (
                         <div>
                           <div>Owner: {model.owner}</div>
-                          <div>Team: {teams.find(team => team.id === model.team)?.name || 'None'}</div>
+                          <div>
+                            Team: {teams.find((team) => team.id === model.team)?.name || 'None'}
+                          </div>
                         </div>
                       )}
-                      {model.type === 'Public Model' && (
-                        <div>Owner: {model.owner}</div>
-                      )}
+                      {model.type === 'Public Model' && <div>Owner: {model.owner}</div>}
                     </td>
                     <td className="py-3 px-4">
                       {editingIndex === index ? (
                         <div className="flex flex-col space-y-2">
                           <select
                             value={selectedType || model.type}
-                            onChange={(e) => setSelectedType(e.target.value as 'Private Model' | 'Protected Model' | 'Public Model')}
+                            onChange={(e) =>
+                              setSelectedType(
+                                e.target.value as
+                                  | 'Private Model'
+                                  | 'Protected Model'
+                                  | 'Public Model'
+                              )
+                            }
                             className="border border-gray-300 rounded px-4 py-2"
                           >
                             <option value="Private Model">Private Model</option>
@@ -641,7 +667,9 @@ export default function AccessPage() {
                               onChange={(e) => setSelectedTeam(e.target.value)}
                               className="border border-gray-300 rounded px-4 py-2"
                             >
-                              <option value="" disabled>Select Team</option>
+                              <option value="" disabled>
+                                Select Team
+                              </option>
                               {teams.map((team) => (
                                 <option key={team.id} value={team.id}>
                                   {team.name}
@@ -687,7 +715,7 @@ export default function AccessPage() {
               </tbody>
             </table>
           </div>
-  
+
           {/* Workflows Section */}
           <div className="mb-12">
             <h3 className="text-xl font-semibold text-gray-800 mb-4">Workflows</h3>
@@ -702,8 +730,7 @@ export default function AccessPage() {
                 </tr>
               </thead>
               <tbody>
-                {workflows
-                .map((workflow, index) => (
+                {workflows.map((workflow, index) => (
                   <tr key={index} className="border-t">
                     <td className="py-3 px-4 text-gray-800">{workflow.name}</td>
                     <td className="py-3 px-4 text-gray-800">{workflow.type}</td>
@@ -730,12 +757,11 @@ export default function AccessPage() {
               </tbody>
             </table>
           </div>
-  
+
           {/* Teams Section */}
           <div className="mb-12">
             <h3 className="text-xl font-semibold text-gray-800 mb-4">Teams</h3>
-            {teams
-            .map((team, index) => (
+            {teams.map((team, index) => (
               <div key={index} className="bg-gray-100 p-4 rounded-lg shadow-md mb-8">
                 <h4 className="text-lg font-semibold text-gray-800">{team.name}</h4>
                 <div className="text-gray-700 mb-2">
@@ -748,7 +774,9 @@ export default function AccessPage() {
                   <h5 className="text-md font-semibold text-gray-800">Protected Models</h5>
                   <ul className="list-disc pl-5">
                     {models
-                      .filter(model => model.type === 'Protected Model' && model.team === team.name)
+                      .filter(
+                        (model) => model.type === 'Protected Model' && model.team === team.name
+                      )
                       .map((model, modelIndex) => (
                         <li key={modelIndex}>{model.name}</li>
                       ))}
@@ -762,7 +790,7 @@ export default function AccessPage() {
                 </button>
               </div>
             ))}
-  
+
             {/* Create New Team */}
             <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
               <h4 className="text-lg font-semibold text-gray-800">Create New Team</h4>
@@ -775,16 +803,16 @@ export default function AccessPage() {
                   className="border border-gray-300 rounded px-4 py-2"
                 />
                 <AutocompleteInput
-                  key={newTeamAdmin}  // Use a dynamic key to force re-render
+                  key={newTeamAdmin} // Use a dynamic key to force re-render
                   value={newTeamAdmin}
                   onChange={handleSingleChange(setNewTeamAdmin)}
-                  options={users.map(user => user.name)}
+                  options={users.map((user) => user.name)}
                   placeholder="Team Admin"
                 />
                 <AutocompleteInput
                   value={newTeamMembers}
                   onChange={handleMultipleChange(setNewTeamMembers)}
-                  options={users.map(user => user.name)}
+                  options={users.map((user) => user.name)}
                   multiple={true}
                   placeholder="Team Members"
                 />
@@ -793,7 +821,7 @@ export default function AccessPage() {
                     if (newTeamAdmin && newTeamMembers.length > 0) {
                       createNewTeam();
                     } else {
-                      alert("Please enter both Team Admin and at least one Team Member.");
+                      alert('Please enter both Team Admin and at least one Team Member.');
                     }
                   }}
                   className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
@@ -802,7 +830,7 @@ export default function AccessPage() {
                 </button>
               </div>
             </div>
-  
+
             {/* Add Member to Team */}
             <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
               <h4 className="text-lg font-semibold text-gray-800">Add Member to Team</h4>
@@ -820,14 +848,19 @@ export default function AccessPage() {
                   ))}
                 </select>
                 <AutocompleteInput
-                  key={selectedTeamForAdd + newMember}  // Use a key to force re-render
+                  key={selectedTeamForAdd + newMember} // Use a key to force re-render
                   value={newMember}
                   onChange={handleSingleChange(setNewMember)}
                   options={
                     selectedTeamForAdd
                       ? users
-                          .map(user => user.name)
-                          .filter(userName => !teams.find(team => team.name === selectedTeamForAdd)?.members.includes(userName))
+                          .map((user) => user.name)
+                          .filter(
+                            (userName) =>
+                              !teams
+                                .find((team) => team.name === selectedTeamForAdd)
+                                ?.members.includes(userName)
+                          )
                       : []
                   }
                   placeholder="New Member"
@@ -840,7 +873,7 @@ export default function AccessPage() {
                 </button>
               </div>
             </div>
-  
+
             {/* Remove Member from Team */}
             <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
               <h4 className="text-lg font-semibold text-gray-800">Remove Member from Team</h4>
@@ -858,10 +891,14 @@ export default function AccessPage() {
                   ))}
                 </select>
                 <AutocompleteInput
-                  key={selectedTeamForRemove + memberToRemove}  // Use a dynamic key to force re-render
+                  key={selectedTeamForRemove + memberToRemove} // Use a dynamic key to force re-render
                   value={memberToRemove}
                   onChange={handleSingleChange(setMemberToRemove)}
-                  options={selectedTeamForRemove ? teams.find(team => team.name === selectedTeamForRemove)?.members || [] : []}
+                  options={
+                    selectedTeamForRemove
+                      ? teams.find((team) => team.name === selectedTeamForRemove)?.members || []
+                      : []
+                  }
                   placeholder="Member to Remove"
                 />
                 <button
@@ -872,7 +909,7 @@ export default function AccessPage() {
                 </button>
               </div>
             </div>
-  
+
             {/* Add Admin to Team */}
             <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
               <h4 className="text-lg font-semibold text-gray-800">Add Admin to Team</h4>
@@ -890,10 +927,10 @@ export default function AccessPage() {
                   ))}
                 </select>
                 <AutocompleteInput
-                  key={selectedTeamForAddAdmin + newAdmin}  // Use a dynamic key to force re-render
+                  key={selectedTeamForAddAdmin + newAdmin} // Use a dynamic key to force re-render
                   value={newAdmin}
                   onChange={handleSingleChange(setNewAdmin)}
-                  options={users.map(user => user.name)}
+                  options={users.map((user) => user.name)}
                   placeholder="New Admin"
                 />
                 <button
@@ -904,7 +941,7 @@ export default function AccessPage() {
                 </button>
               </div>
             </div>
-  
+
             {/* Remove Admin from Team */}
             <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
               <h4 className="text-lg font-semibold text-gray-800">Remove Admin from Team</h4>
@@ -922,10 +959,15 @@ export default function AccessPage() {
                   ))}
                 </select>
                 <AutocompleteInput
-                  key={selectedTeamForRemoveAdmin + adminToRemove}  // Use a dynamic key to force re-render
+                  key={selectedTeamForRemoveAdmin + adminToRemove} // Use a dynamic key to force re-render
                   value={adminToRemove}
                   onChange={handleSingleChange(setAdminToRemove)}
-                  options={selectedTeamForRemoveAdmin ? teams.find(team => team.name === selectedTeamForRemoveAdmin)?.members || [] : []}
+                  options={
+                    selectedTeamForRemoveAdmin
+                      ? teams.find((team) => team.name === selectedTeamForRemoveAdmin)?.members ||
+                        []
+                      : []
+                  }
                   placeholder="Admin to Remove"
                 />
                 <button
@@ -937,18 +979,21 @@ export default function AccessPage() {
               </div>
             </div>
           </div>
-  
+
           {/* Users Section */}
           <div className="mb-12">
             <h3 className="text-xl font-semibold text-gray-800 mb-4">Users</h3>
-            {users
-            .map((user, index) => (
+            {users.map((user, index) => (
               <div key={index} className="bg-gray-100 p-4 rounded-lg shadow-md mb-8">
                 <h4 className="text-lg font-semibold text-gray-800">{user.name}</h4>
                 <div className="text-gray-700 mb-2">Role: {user.role}</div>
-                {user.teams.filter(team => team.role === 'team_admin').length > 0 && (
+                {user.teams.filter((team) => team.role === 'team_admin').length > 0 && (
                   <div className="text-gray-700 mb-2">
-                    Admin Teams: {user.teams.filter(team => team.role === 'team_admin').map(team => team.name).join(', ')}
+                    Admin Teams:{' '}
+                    {user.teams
+                      .filter((team) => team.role === 'team_admin')
+                      .map((team) => team.name)
+                      .join(', ')}
                   </div>
                 )}
                 {user.ownedModels.length > 0 && (
@@ -968,7 +1013,9 @@ export default function AccessPage() {
           <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
             <h4 className="text-lg font-semibold text-gray-800">Change OpenAI API Key</h4>
             <div className="mt-4">
-              <label className="block text-gray-700">Current Organization OpenAI API Key (masked):</label>
+              <label className="block text-gray-700">
+                Current Organization OpenAI API Key (masked):
+              </label>
               <p className="bg-gray-200 p-2 rounded">{apiKey || 'Loading...'}</p>
             </div>
             <div className="mt-4">
@@ -990,7 +1037,6 @@ export default function AccessPage() {
             </button>
             {successMessage && <p className="text-green-500 mt-4">{successMessage}</p>}
           </div>
-
         </CardContent>
       </Card>
     </div>

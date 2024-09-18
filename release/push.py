@@ -7,7 +7,7 @@ import yaml
 from azure_provider import AzureProvider
 from cloud_provider_interface import CloudProviderInterface
 from docker_constants import image_base_names
-from utils import Credentials, image_name_for_branch
+from utils import Credentials, image_name_for_branch, load_config
 
 
 def get_args() -> argparse.Namespace:
@@ -42,6 +42,11 @@ def get_args() -> argparse.Namespace:
         "--dont-update-latest",
         action="store_true",
         help="If this flag is present, the 'latest' tag will not be updated.",
+    )
+    parser.add_argument(
+        "--dont-update-scope",
+        action="store_true",
+        help="If this flag is present, we dont update the scope with latest images, helpful for running docker tests.",
     )
     return parser.parse_args()
 
@@ -198,20 +203,6 @@ def push_images(
             )
 
 
-def load_config(config_path: str) -> dict:
-    """
-    Load the YAML configuration file.
-
-    :param config_path: Path to the configuration file
-    :return: Configuration dictionary
-    """
-    if os.path.exists(config_path):
-        with open(config_path, "r") as file:
-            return yaml.safe_load(file)
-    else:
-        return {"provider": "azure", "azure": {"registry": "", "branches": {}}}
-
-
 def save_config(config_path: str, config: dict) -> None:
     """
     Save the configuration dictionary to a YAML file.
@@ -279,14 +270,15 @@ def main() -> None:
                 "password": push_password,
             }
         else:
-            provider.update_credentials(
-                name=f"thirdaiplatform-push-{sanitized_branch}",
-                image_names=[
-                    image_name_for_branch(name, args.branch)
-                    for name in image_base_names.to_list()
-                ],
-                push_access=True,
-            )
+            if not args.dont_update_scope:
+                provider.update_credentials(
+                    name=f"thirdaiplatform-push-{sanitized_branch}",
+                    image_names=[
+                        image_name_for_branch(name, args.branch)
+                        for name in image_base_names.to_list()
+                    ],
+                    push_access=True,
+                )
 
         if not pull_username or not pull_password:
             new_pull_credentials = provider.create_credentials(
@@ -305,14 +297,15 @@ def main() -> None:
                 "password": pull_password,
             }
         else:
-            provider.update_credentials(
-                name=f"thirdaiplatform-pull-{sanitized_branch}",
-                image_names=[
-                    image_name_for_branch(name, args.branch)
-                    for name in image_base_names.to_list()
-                ],
-                push_access=False,
-            )
+            if not args.dont_update_scope:
+                provider.update_credentials(
+                    name=f"thirdaiplatform-pull-{sanitized_branch}",
+                    image_names=[
+                        image_name_for_branch(name, args.branch)
+                        for name in image_base_names.to_list()
+                    ],
+                    push_access=False,
+                )
 
         # Write back the configuration to ensure it is up-to-date
         save_config(args.config, config)

@@ -30,3 +30,4 @@ langchain_openai
 hvac
 nltk
 jinja2
+pyyaml

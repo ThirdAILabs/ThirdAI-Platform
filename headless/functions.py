@@ -162,6 +162,17 @@ class CommonFunctions:
         )
         flow.bazaar_client.await_train(model)
 
+    @staticmethod
+    def delete_model(inputs: Dict[str, Any]):
+        """
+        Delete the given model
+        """
+
+        logging.info(f"Deleting the model with inputs: {inputs}")
+        model = inputs.get("model")
+        flow.bazaar_client.delete(model_identifier=model.model_identifier)
+        logging.info(f"Deleted the model {model.model_identifier}")
+
 
 class NDBFunctions:
     @staticmethod
@@ -184,23 +195,27 @@ class NDBFunctions:
         good_answer = references[2]
 
         logging.info("Associating the model")
-        deployment.associate(
+        associate_task_id = deployment.associate(
             [
                 {"source": "authors", "target": "contributors"},
                 {"source": "paper", "target": "document"},
             ]
         )
 
+        deployment.await_task(associate_task_id)
+
         logging.info(f"upvoting the model")
-        deployment.upvote(
+        upvote_task_id = deployment.upvote(
             [
                 {"query_text": query_text, "reference_id": best_answer["id"]},
                 {"query_text": query_text, "reference_id": good_answer["id"]},
             ]
         )
 
+        deployment.await_task(upvote_task_id)
+
         logging.info(f"inserting the docs to the model")
-        deployment.insert(
+        insert_task_id = deployment.insert(
             [
                 create_doc_dict(
                     os.path.join(
@@ -216,6 +231,8 @@ class NDBFunctions:
                 for file in config.insert_paths
             ],
         )
+
+        deployment.await_task(insert_task_id)
 
         logging.info("Checking the sources")
         deployment.sources()

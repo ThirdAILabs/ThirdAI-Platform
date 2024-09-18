@@ -1,3 +1,4 @@
+import datetime
 import io
 import json
 import traceback
@@ -597,13 +598,13 @@ def task_status(
     _=Depends(permissions.verify_permission("write")),
 ):
     """
-    Get the status of a specific task.
+    Get the status of a specific task, including the remaining time before the task data expires.
 
     Parameters:
     - task_id: str - The ID of the task.
 
     Returns:
-    - JSONResponse: The status of the task.
+    - JSONResponse: The status of the task along with ttl.
 
     Example Request Body:
     ```
@@ -618,29 +619,57 @@ def task_status(
         "status": "success",
         "message": "Information for task 1234-5678-91011-1213",
         "data": {
-            "status": "in_progress",
-            "action": "insert",
-            "last_modified": "2024-07-31T12:34:56.789Z",
-            "documents": [...],
-            "message": "",
-            "data": null,
-            "token": "token_value"
+            "task": {
+                "status": "complete",
+                "action": "insert",
+                "last_modified": "2024-07-31T12:34:56.789Z",
+                "documents": [...],
+                "message": "",
+                "data": null
+                // 'token' field is removed for security
+            },
+            "ttl": "23:59:59"
         }
     }
     ```
     """
     model = get_model()
-    task_data = model.redis_client.hgetall(f"task:{task_id}")
+    task_key = f"task:{task_id}"
+    task_data = model.redis_client.hgetall(task_key)
     if task_data:
+        # Deserialize fields that were stored as JSON strings
+        for key in task_data:
+            try:
+                task_data[key] = json.loads(task_data[key])
+            except (TypeError, json.JSONDecodeError):
+                pass
+
+        # Remove sensitive fields
+        sensitive_fields = ["token"]
+        for field in sensitive_fields:
+            task_data.pop(field, None)
+
+        # Get the remaining TTL for the task key
+        ttl_seconds = model.redis_client.ttl(task_key)
+        if ttl_seconds >= 0:
+            # Convert seconds to HH:MM:SS format
+            ttl_info = str(datetime.timedelta(seconds=ttl_seconds))
+        elif ttl_seconds == -1:
+            # Key exists but has no expiration (unlikely since we set TTL)
+            ttl_info = "Does not expire"
+        else:
+            # ttl_seconds == -2, key does not exist (should not reach here as task_data exists)
+            ttl_info = None
+
         return response(
             status_code=status.HTTP_200_OK,
             message=f"Information for task {task_id}",
-            data=jsonable_encoder(task_data),
+            data={"task": jsonable_encoder(task_data), "ttl": ttl_info},
         )
     else:
         return response(
             status_code=status.HTTP_404_NOT_FOUND,
-            message="Task ID not found",
+            message="Task ID not found or has expired.",
         )
 
 
@@ -812,5 +841,7 @@ def process_ndb_task(task):
         )
     finally:
         model.redis_client.srem(f"tasks_by_model:{model_id}", task_id)
-        model.redis_client.delete(f"task:{task_id}")
+        model.redis_client.expire(
+            f"task:{task_id}", model.general_variables.task_ttl_seconds
+        )
         model.logger.info(f"Task {task_id} removed from Redis.")

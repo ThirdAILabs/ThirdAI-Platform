@@ -16,6 +16,8 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  merge_group:
+    types: [checks_requested]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -88,3 +90,19 @@ jobs:
     - name: run unit tests
       run: |
         python3 -m pytest ./train_job -v
+  
+  llm-gen-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: install dependencies
+      run: |
+        pip3 install -r llm_dispatch_job/requirements.txt
+        pip3 install httpx
+        pip3 install pytest
+
+    - name: run unit tests
+      run: |
+        python3 -m pytest ./llm_dispatch_job -v
+

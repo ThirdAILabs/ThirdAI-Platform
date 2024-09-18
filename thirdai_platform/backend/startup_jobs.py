@@ -2,12 +2,15 @@ import os
 import shutil
 from pathlib import Path
 
+import requests
+import yaml
 from backend.utils import (
     delete_nomad_job,
     get_empty_port,
     get_platform,
     get_python_path,
     get_root_absolute_path,
+    model_bazaar_path,
     nomad_job_exists,
     response,
     submit_nomad_job,
@@ -19,12 +22,6 @@ GENERATE_JOB_ID = "llm-generation"
 THIRDAI_PLATFORM_FRONTEND_ID = "thirdai-platform-frontend"
 LLM_CACHE_JOB_ID = "llm-cache"
 TELEMETRY_ID = "telemetry"
-
-MODEL_BAZAAR_PATH = (
-    "/model_bazaar"
-    if os.path.exists("/.dockerenv")
-    else os.getenv("SHARE_DIR", "/model_bazaar")
-)
 
 
 async def restart_generate_job():
@@ -75,14 +72,13 @@ async def start_on_prem_generate_job(
     share_dir = os.getenv("SHARE_DIR")
     if not share_dir:
         raise ValueError("SHARE_DIR variable is not set.")
-    MODEL_BAZAAR_PATH = (
-        "/model_bazaar" if os.path.exists("/.dockerenv") else os.getenv("SHARE_DIR")
-    )
     cwd = Path(os.getcwd())
-    mount_dir = os.path.join(MODEL_BAZAAR_PATH, "gen-ai-models")
+    mount_dir = os.path.join(model_bazaar_path(), "gen-ai-models")
     model_path = os.path.join(mount_dir, model_name)
     if not os.path.exists(model_path):
         raise ValueError(f"Cannot find model at location: {model_path}.")
+    model_size = int(os.path.get_size(model_path) / 1e6)
+    job_memory_mb = model_size * 2  # give some leeway
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "on_prem_generation_job.hcl.j2"),
@@ -91,8 +87,8 @@ async def start_on_prem_generate_job(
         min_allocations=1,
         max_allocations=5,
         threads_http=2,
-        cores_per_allocation=10,
-        memory_per_allocation=4000,
+        cores_per_allocation=7,
+        memory_per_allocation=job_memory_mb,
         model_name=model_name,
     )
 
@@ -163,6 +159,64 @@ async def restart_llm_cache_job():
     )
 
 
+def create_promfile(promfile_path: str):
+    platform = get_platform()
+    model_bazaar_endpoint = os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT")
+    if platform == "local":
+        targets = ["host.docker.internal:4646"]
+
+        deployment_targets_endpoint = (
+            "http://host.docker.internal:80/api/telemetry/deployment-services"
+        )
+    else:
+        nomad_url = f"{model_bazaar_endpoint.rstrip('/')}:4646/v1/nodes"
+
+        # Fetch the node data from Nomad
+        headers = {"X-Nomad-Token": os.getenv("MANAGEMENT_TOKEN")}
+        response = requests.get(nomad_url, headers=headers)
+        nodes = response.json()
+
+        targets = [f"{node['Address']}:4646" for node in nodes]
+
+        deployment_targets_endpoint = (
+            f"{model_bazaar_endpoint.rstrip('/')}/api/telemetry/deployment-services"
+        )
+
+    # Prometheus template
+    prometheus_config = {
+        "global": {
+            "scrape_interval": "1s",
+            "external_labels": {"env": "dev", "cluster": "local"},
+        },
+        "scrape_configs": [
+            {
+                "job_name": "nomad-agent",
+                "metrics_path": "/v1/metrics?format=prometheus",
+                "static_configs": [{"targets": targets, "labels": {"role": "agent"}}],
+                "relabel_configs": [
+                    {
+                        "source_labels": ["__address__"],
+                        "regex": "([^:]+):.+",
+                        "target_label": "hostname",
+                        "replacement": "nomad-agent-$1",
+                    }
+                ],
+            },
+            {
+                "job_name": "deployment-jobs",
+                "metrics_path": "/metrics",
+                "http_sd_configs": [{"url": deployment_targets_endpoint}],
+            },
+        ],
+    }
+    os.makedirs(os.path.dirname(promfile_path), exist_ok=True)
+    with open(promfile_path, "w") as file:
+        yaml.dump(prometheus_config, file, sort_keys=False)
+
+    print(f"Prometheus configuration has been written to {promfile_path}")
+    return targets
+
+
 async def restart_telemetry_jobs():
     """
     Restart the telemetry jobs.
@@ -176,25 +230,30 @@ async def restart_telemetry_jobs():
 
     cwd = Path(os.getcwd())
     platform = get_platform()
+    share_dir = os.getenv("SHARE_DIR")
+    # Copying the telemetry dashboards if running on local
     if platform == "local":
         shutil.copytree(
             str(cwd / "telemetry_dashboards"),
-            os.path.join(MODEL_BAZAAR_PATH, "nomad-monitoring", "telemetry_dashboards"),
+            os.path.join(share_dir, "nomad-monitoring", "telemetry_dashboards"),
             dirs_exist_ok=True,
         )
+        promfile_path = os.path.join(
+            share_dir, "nomad-monitoring/node_discovery/prometheus.yaml"
+        )
+    else:
+        promfile_path = "/model_bazaar/nomad-monitoring/node_discovery/prometheus.yaml"
+
+    # Creating prometheus config file
+    targets = create_promfile(promfile_path)
+
     response = submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "telemetry.hcl.j2"),
         platform=platform,
-        tag=os.getenv("TAG"),
-        registry=os.getenv("DOCKER_REGISTRY"),
-        docker_username=os.getenv("DOCKER_USERNAME"),
-        docker_password=os.getenv("DOCKER_PASSWORD"),
-        image_name=os.getenv("NODE_DISCOVERY_IMAGE_NAME"),
-        model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
-        share_dir=os.getenv("SHARE_DIR"),
-        python_path=get_python_path(),
-        node_discovery_script=str(get_root_absolute_path() / "node_discovery/run.py"),
+        promfile="/model_bazaar/nomad-monitoring/node_discovery/prometheus.yaml",  # Promfile_path could be different based on whether it is being run on `local-docker` or `docker`. But victoriametric should always find this file somewhere in the mounted volume. That's why it is being hardcoded here
+        share_dir=share_dir,
+        target_count=str(len(targets)),
     )
     if response.status_code != 200:
         raise Exception(f"{response.text}")

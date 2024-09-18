@@ -27,7 +27,7 @@ from backend.config import (
     UDTSubType,
 )
 from backend.datagen import generate_data_for_train_job
-from backend.file_handler import download_local_files, model_bazaar_path
+from backend.file_handler import download_local_files
 from backend.utils import (
     get_model,
     get_model_from_identifier,
@@ -35,6 +35,7 @@ from backend.utils import (
     get_python_path,
     get_root_absolute_path,
     logger,
+    model_bazaar_path,
     response,
     submit_nomad_job,
     update_json,

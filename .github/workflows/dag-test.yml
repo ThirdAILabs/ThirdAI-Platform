@@ -7,6 +7,8 @@ on:
   pull_request:
     branches:
       - main
+  merge_group:
+    types: [checks_requested]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -49,15 +51,13 @@ jobs:
         export PGPASSWORD='password'
         psql -h localhost -U postgres -d model_bazaar -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
 
-    - name: Set DATABASE_URI
-      run: echo "DATABASE_URI=postgresql://postgres:password@localhost:5432/model_bazaar" >> $GITHUB_ENV
-
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
         python-version: '3.11'
 
     - name: Setup Python and Install Dependencies
+    # We need to install uvicorn in sudo mode so that we can run the backend with sudo, which is required for delete endpoint to work.
       run: |
         python -m venv ${{ github.workspace }}/venv
         source venv/bin/activate
@@ -65,10 +65,14 @@ jobs:
         pip install -r docs/requirements.txt
         pip install -r headless/requirements.txt
         pip install -r llm_dispatch_job/requirements.txt
-        pip install -r thirdai_platform/requirements.txt
+        sudo pip install -r thirdai_platform/requirements.txt
         pip install -r train_job/requirements.txt
         pip install -r data_generation_job/requirements.txt
-        echo "PYTHON_PATH=${{ github.workspace }}/venv/bin/python" >> $GITHUB_ENV
+    
+    - name: Update openssl
+      run: |
+        sudo pip install --upgrade cryptography pyopenssl
+        sudo apt-get install --only-upgrade openssl
 
     - name: Setup `nomad`
       uses: hashicorp/setup-nomad@main
@@ -80,7 +84,6 @@ jobs:
       run: |
         NOMAD_PATH=$(which nomad)
         nohup sudo $NOMAD_PATH agent -dev -config="local_setup/agent.hcl" > nomad.log 2>&1 &
-        echo "NOMAD_ENDPOINT=http://localhost:4646/" >> $GITHUB_ENV
     
     - name: Verify Nomad Cluster
       run: |
@@ -98,8 +101,6 @@ jobs:
         cd local_setup
         nohup sudo bash launch_traefik.sh > traefik.log 2>&1 &
         cd ..
-        echo "PUBLIC_MODEL_BAZAAR_ENDPOINT=http://localhost:80/" >> $GITHUB_ENV
-        echo "PRIVATE_MODEL_BAZAAR_ENDPOINT=http://localhost:80/" >> $GITHUB_ENV
 
     - name: Install Vault
       run: |
@@ -107,34 +108,43 @@ jobs:
         sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
         sudo apt-get update
         sudo apt-get install -y vault
-        echo "HASHICORP_VAULT_ENDPOINT=http://127.0.0.1:8200" >> $GITHUB_ENV
-        echo "HASHICORP_VAULT_TOKEN=00000000-0000-0000-0000-000000000000" >> $GITHUB_ENV
 
     - name: Start Vault Server
-      run: nohup vault server --dev --dev-root-token-id="00000000-0000-0000-0000-000000000000" > vault.log 2>&1 &
+      run: nohup sudo vault server --dev --dev-root-token-id="00000000-0000-0000-0000-000000000000" > vault.log 2>&1 &
 
     - name: Create Directories for Share and Test
       run: |
         mkdir -p $HOME/nfs/dir
+        sudo chmod -R 777 $HOME/nfs/dir
+        sudo chmod +t $HOME/nfs/dir
+        sudo chmod g+s $HOME/nfs/dir
         echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_ENV
 
-    - name: Setup additional environment variables
+    - name: Write All Environment Variables to .env File
       run: |
-        echo "LICENSE_PATH=${{ github.workspace }}/local_setup/ndb_enterprise_license.json" >> $GITHUB_ENV
-        echo "JWT_SECRET=CsnCr3lebs9eJQ" >> $GITHUB_ENV
-        echo "SENDGRID_KEY=sendgrid-key" >> $GITHUB_ENV
-        echo "GENAI_KEY=${{ secrets.GENAI_KEY }}" >> $GITHUB_ENV
-        echo "ADMIN_USERNAME=admin" >> $GITHUB_ENV
-        echo "ADMIN_MAIL=admin@mail.com" >> $GITHUB_ENV
-        echo "ADMIN_PASSWORD=password" >> $GITHUB_ENV
-        echo "PLATFORM=local" >> $GITHUB_ENV
-        echo "TEST_ENVIRONMENT=True" >> $GITHUB_ENV
-    
+        echo "LICENSE_PATH=${{ github.workspace }}/local_setup/ndb_enterprise_license.json" >> $GITHUB_WORKSPACE/.env
+        echo "JWT_SECRET=CsnCr3lebs9eJQ" >> $GITHUB_WORKSPACE/.env
+        echo "SENDGRID_KEY=sendgrid-key" >> $GITHUB_WORKSPACE/.env
+        echo "GENAI_KEY=${{ secrets.GENAI_KEY }}" >> $GITHUB_WORKSPACE/.env
+        echo "ADMIN_USERNAME=admin" >> $GITHUB_WORKSPACE/.env
+        echo "ADMIN_MAIL=admin@mail.com" >> $GITHUB_WORKSPACE/.env
+        echo "ADMIN_PASSWORD=password" >> $GITHUB_WORKSPACE/.env
+        echo "PLATFORM=local" >> $GITHUB_WORKSPACE/.env
+        echo "TEST_ENVIRONMENT=True" >> $GITHUB_WORKSPACE/.env
+        echo "DATABASE_URI=postgresql://postgres:password@localhost:5432/model_bazaar" >> $GITHUB_WORKSPACE/.env
+        echo "NOMAD_ENDPOINT=http://localhost:4646/" >> $GITHUB_WORKSPACE/.env
+        echo "PUBLIC_MODEL_BAZAAR_ENDPOINT=http://localhost:80/" >> $GITHUB_WORKSPACE/.env
+        echo "PRIVATE_MODEL_BAZAAR_ENDPOINT=http://localhost:80/" >> $GITHUB_WORKSPACE/.env
+        echo "HASHICORP_VAULT_ENDPOINT=http://127.0.0.1:8200" >> $GITHUB_WORKSPACE/.env
+        echo "HASHICORP_VAULT_TOKEN=00000000-0000-0000-0000-000000000000" >> $GITHUB_WORKSPACE/.env
+        echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_WORKSPACE/.env
+        echo "PYTHON_PATH=${{ github.workspace }}/venv/bin/python" >> $GITHUB_WORKSPACE/.env
+
     - name: Launch Backend
       run: |
         source ${{ github.workspace }}/venv/bin/activate
         cd $GITHUB_WORKSPACE/thirdai_platform
-        nohup uvicorn main:app --reload --host 0.0.0.0 --port 8000 > uvicorn.log 2>&1 &
+        nohup sudo uvicorn main:app --reload --host 0.0.0.0 --port 8000 > uvicorn.log 2>&1 &
     
     - name: List files in local_setup
       run: ls -la local_setup

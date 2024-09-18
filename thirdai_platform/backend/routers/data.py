@@ -6,15 +6,14 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from auth.jwt import AuthenticatedUser, verify_access_token
-from backend.config import JobOptions
-from backend.utils import (
-    get_platform,
-    get_python_path,
-    get_root_absolute_path,
-    response,
-    save_dict,
-    submit_nomad_job,
+from backend.config import Entity, JobOptions
+from backend.datagen import (
+    TextClassificationGenerateArgs,
+    TokenClassificationGenerateArgs,
+    generate_text_data,
+    generate_token_data,
 )
+from backend.utils import response
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, Form, status
@@ -23,10 +22,6 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 data_router = APIRouter()
-
-
-def model_bazaar_path():
-    return "/model_bazaar" if os.path.exists("/.dockerenv") else os.getenv("SHARE_DIR")
 
 
 def get_catalogs(task: schema.UDT_Task, session: Session):
@@ -62,28 +57,14 @@ class LLMProvider(str, Enum):
     cohere = "cohere"
 
 
-class Entity(BaseModel):
-    name: str
-    examples: List[str]
-    description: str
-
-
-class TextClassificationGenerateArgs(BaseModel):
-    samples_per_label: int
-    target_labels: List[Entity]
-    user_vocab: Optional[List[str]] = None
-    user_prompts: Optional[List[str]] = None
-    vocab_per_sentence: int = 2
-
-
 @data_router.post("/generate-text-data")
-def generate_text_data(
+def generate_text_data_endpoint(
     task_prompt: str,
     llm_provider: LLMProvider = LLMProvider.openai,
     datagen_form: str = Form(default="{}"),
     job_form: str = Form(default="{}"),
     session: Session = Depends(get_session),
-    # authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
     # TODO(Gautam): Only people from ThirdAI should be able to access this endpoint
     try:
@@ -119,69 +100,31 @@ def generate_text_data(
         )
 
     data_id = uuid.uuid4()
-
-    genai_key = os.getenv("GENAI_KEY")
-    if genai_key is None:
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"Need gen_ai key for data-generation",
-        )
-
-    # Dump the datagen option in the storage dir
-    storage_dir = os.path.join(model_bazaar_path(), "generated_data", str(data_id))
-    os.makedirs(storage_dir, exist_ok=True)
-    save_dict(
-        datagen_options.model_dump(),
-        os.path.join(storage_dir, "generation_args.json"),
-    )
-
-    submit_nomad_job(
-        str(Path(os.getcwd()) / "backend" / "nomad_jobs" / "generate_data_job.hcl.j2"),
-        nomad_endpoint=os.getenv("NOMAD_ENDPOINT"),
-        platform=get_platform(),
-        tag=os.getenv("TAG"),
-        registry=os.getenv("DOCKER_REGISTRY"),
-        docker_username=os.getenv("DOCKER_USERNAME"),
-        docker_password=os.getenv("DOCKER_PASSWORD"),
-        image_name=os.getenv("TRAIN_IMAGE_NAME"),
-        train_script=str(get_root_absolute_path() / "data_generation_job/run.py"),
+    generate_text_data(
         task_prompt=task_prompt,
         data_id=str(data_id),
-        storage_dir=storage_dir,
-        data_category="text",
-        llm_provider=llm_provider.value,
-        model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT", None),
-        share_dir=os.getenv("SHARE_DIR", None),
-        genai_key=os.getenv("GENAI_KEY", None),
+        secret_token="",
         license_key=license_info["boltLicenseKey"],
-        extra_options=extra_options,
-        python_path=get_python_path(),
+        llm_provider=llm_provider,
+        datagen_options=datagen_options,
+        job_options=extra_options,
     )
 
     return response(
         status_code=status.HTTP_200_OK,
-        message="Successfully submitted the data-generation job",
+        message="Successfully submitted the text-data generation job",
     )
 
 
-class TokenClassificationGenerateArgs(BaseModel):
-    tags: List[Entity]
-    num_sentences_to_generate: int
-    num_samples_per_tag: Optional[int] = None
-    allocation_cores: Optional[int] = None
-    allocation_memory: Optional[int] = None
-
-
 @data_router.post("/generate-token-data")
-def generate_token_data(
+def generate_token_data_endpoint(
     task_prompt: str,
     llm_provider: LLMProvider = LLMProvider.openai,
     datagen_form: str = Form(default="{}"),
     job_form: str = Form(default="{}"),
     session: Session = Depends(get_session),
-    # authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
-    # print(f"Received form data: {form}")
     # TODO(Gautam): Only people from ThirdAI should be able to access this endpoint
     try:
         extra_options = JobOptions.model_validate_json(job_form).model_dump()
@@ -215,43 +158,14 @@ def generate_token_data(
         )
 
     data_id = uuid.uuid4()
-
-    genai_key = os.getenv("GENAI_KEY")
-    if genai_key is None:
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"Need gen_ai key for data-generation",
-        )
-
-    # Dump the datagen option in the storage dir
-    storage_dir = os.path.join(model_bazaar_path(), "generated_data", str(data_id))
-    os.makedirs(storage_dir, exist_ok=True)
-    save_dict(
-        datagen_options.model_dump(),
-        os.path.join(storage_dir, "generation_args.json"),
-    )
-
-    submit_nomad_job(
-        str(Path(os.getcwd()) / "backend" / "nomad_jobs" / "generate_data_job.hcl.j2"),
-        nomad_endpoint=os.getenv("NOMAD_ENDPOINT"),
-        platform=get_platform(),
-        tag=os.getenv("TAG"),
-        registry=os.getenv("DOCKER_REGISTRY"),
-        docker_username=os.getenv("DOCKER_USERNAME"),
-        docker_password=os.getenv("DOCKER_PASSWORD"),
-        image_name=os.getenv("TRAIN_IMAGE_NAME"),
-        train_script=str(get_root_absolute_path() / "data_generation_job/run.py"),
+    generate_token_data(
         task_prompt=task_prompt,
         data_id=str(data_id),
-        storage_dir=storage_dir,
-        data_category="token",
-        llm_provider=llm_provider.value,
-        model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT", None),
-        share_dir=os.getenv("SHARE_DIR", None),
-        genai_key=genai_key,
+        secret_token="",
         license_key=license_info["boltLicenseKey"],
-        extra_options=extra_options,
-        python_path=get_python_path(),
+        llm_provider=llm_provider,
+        datagen_options=datagen_options,
+        job_options=extra_options,
     )
 
     return response(

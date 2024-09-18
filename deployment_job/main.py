@@ -1,4 +1,5 @@
 import asyncio
+import time
 from datetime import datetime
 from functools import wraps
 from typing import Any
@@ -36,7 +37,21 @@ app.add_middleware(
 # with @reset_timer is called, in which case the timer restarts.
 reset_event = asyncio.Event()
 
-model = get_model()
+# We have a case where we copy the ndb model for base model training and
+# read the model for deployment we face the open database issue.
+max_retries = 2  # Total attempts including the initial one
+retry_delay = 5  # Delay in seconds before retrying
+
+for attempt in range(1, max_retries + 1):
+    try:
+        model = get_model()
+        break  # Exit the loop if model loading is successful
+    except Exception as err:
+        if attempt < max_retries:
+            time.sleep(retry_delay)
+        else:
+            reporter.update_deploy_status(general_variables.model_id, "failed")
+            raise  # Optionally re-raise the exception if you want the application to stop
 
 
 def reset_timer(endpoint_func):

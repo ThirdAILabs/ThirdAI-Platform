@@ -2,11 +2,20 @@ job "telemetry" {
   datacenters = ["dc1"]
   type        = "service"
   {% set nomad_monitoring_dir = "/model_bazaar/nomad-monitoring" -%}
-  {%- set promfile = "node_discovery/prometheus.yaml" %}
   group "telemetry" {
     count = 1
+    {#
+      If there are more than one node in the cluster, 
+        then this constraint ensures that telemetry job always run on client node,
 
-    {% if platform == "docker" -%}
+      The issue originates from victoriametric and grafana creating db on nfs.
+        so, if the telemetry job is started by node of a class [server or (any client)], the job won't get restarted by node of different class [(any client) or server] 
+      
+      Incase multiple nodes are in the cluster,
+        Assumption: There will be more client nodes than server.
+        so constraint the job to always get scheduled on client node.
+    #}
+    {% if platform == "docker" and target_count != "1" -%}
     constraint {
       attribute = "${node.class}"
       value     = "web_ingress"
@@ -26,59 +35,7 @@ job "telemetry" {
         to = 3000
       }
     }
-    task "collectnodes" {
-      lifecycle {
-        hook = "prestart"
-      }
-      {% if platform == "docker" -%}
-      driver = "docker"
-      {%- else -%}
-      driver = "raw_exec"
-      {%- endif %}
-      env {
-        MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
-        MANAGEMENT_TOKEN = "${MANAGEMENT_TOKEN}"
-        {% if platform == "local" -%}
-        PROMFILE = "{{ share_dir }}/nomad-monitoring/{{ promfile }}"
-        {%- else -%}
-        PROMFILE = "{{ nomad_monitoring_dir }}/{{ promfile }}"
-        {%- endif %}
-        PLATFORM = "{{ platform }}"
-      }
-      config {
-        {% if platform == "docker" -%}
-        image = "{{ registry }}/{{ image_name }}:{{ tag }}"
-        image_pull_timeout = "15m"
-        group_add = ["4646"]
-        auth {
-            username = "{{ docker_username }}"
-            password = "{{ docker_password }}"
-            server_address = "{{ registry }}"
-          }
-        volumes = [
-            "{{ share_dir }}:/model_bazaar"
-          ]
-        {%- else -%}
-        command = "{{ python_path }}"
-        args    = ["{{ node_discovery_script }}"]
-        {%- endif %}
-      }
 
-    {% if platform == "docker" -%}
-    template {
-        destination = "${NOMAD_SECRETS_DIR}/env.vars"
-        env         = true
-        change_mode = "restart"
-        data        = <<EOF
-{% raw -%}
-{{- with nomadVar "nomad/jobs" -}}
-MANAGEMENT_TOKEN = {{ .management_token }}
-{{- end -}}
-{%- endraw %}
-EOF
-      }
-    {%- endif %}
-  }
     task "victoriametrics" {
       driver = "docker"
 
@@ -96,7 +53,7 @@ EOF
           "--storageDataPath={{ nomad_monitoring_dir }}/victoriametric",
           "--retentionPeriod=1d",
           "--httpListenAddr=:${NOMAD_PORT_vicky_http}",
-          "--promscrape.config={{ nomad_monitoring_dir }}/{{ promfile }}"
+          "--promscrape.config={{ promfile }}"
         ]
         {% if platform == "local" -%}
         extra_hosts = ["host.docker.internal:host-gateway"]
@@ -288,7 +245,7 @@ providers:
     allowUiUpdates: true
     options:
       foldersFromFilesStructure: true
-      path: /model_bazaar/nomad-monitoring/telemetry_dashboards
+      path: {{ nomad_monitoring_dir }}/telemetry_dashboards
 EOF
         destination = "/local/grafana/provisioning/dashboards/dashboards.yaml"
       }

@@ -25,21 +25,6 @@ class LLMBase(ABC):
     ) -> str:
         pass
 
-    def update_usage_stat(self, model_name: str, current_usage: dict):
-        with self.lock:
-            if model_name not in self.usage:
-                self.usage[model_name] = {}
-
-            self.usage[model_name].update(
-                {
-                    key: self.usage[model_name].get(key, 0) + value
-                    for key, value in current_usage.items()
-                }
-            )
-
-            if self.usage_file:
-                save_dict(self.usage_file, **self.usage)
-
 
 class OpenAILLM(LLMBase):
     def __init__(
@@ -70,16 +55,28 @@ class OpenAILLM(LLMBase):
         )
 
         res = response.choices[0].message.content
-        usage = dict(response.usage)
+        current_usage = dict(response.usage)
         if self.response_file:
             with self.lock:
                 with open(self.response_file, "a") as fp:
                     fp.write(f"Prompt: \n{prompt}\n")
                     fp.write(f"Response: \n{res}\n")
-                    fp.write(f"\nUsage: \n{usage}\n")
+                    fp.write(f"\nUsage: \n{current_usage}\n")
                     fp.write("=" * 100 + "\n\n")
 
-        self.update_usage_stat(model_name, usage)
+        # updating the llm usage
+        if self.usage_file:
+            with self.lock:
+                if model_name not in self.usage:
+                    self.usage[model_name] = {}
+
+                for key in ["completion_tokens", "prompt_tokens", "total_tokens"]:
+                    self.usage[model_name][key] = (
+                        self.usage[model_name].get(key, 0) + current_usage[key]
+                    )
+
+                save_dict(self.usage_file, **self.usage)
+
         return res
 
 

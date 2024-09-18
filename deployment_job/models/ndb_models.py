@@ -473,8 +473,8 @@ class NDBV2Model(NDBModel):
 
         return [
             {
-                "source": doc.reference(0).source,
-                "source_id": doc.hash,
+                "source": self.full_source_path(doc.chunks()[0].document.iloc[0]),
+                "source_id": doc.doc_id(),
             }
             for doc in ndb_docs
         ]

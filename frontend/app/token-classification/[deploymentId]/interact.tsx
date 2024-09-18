@@ -2,13 +2,7 @@
 
 import { Container, TextField, Box } from '@mui/material';
 import { Button } from '@/components/ui/button';
-import {
-  MouseEventHandler,
-  ReactNode,
-  useEffect,
-  useRef,
-  useState
-} from 'react';
+import { MouseEventHandler, ReactNode, useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import * as _ from 'lodash';
 import { useTokenClassificationEndpoints } from '@/lib/backend';
@@ -16,7 +10,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import Fuse from 'fuse.js';
@@ -51,7 +45,7 @@ function Highlight({
   onMouseOver,
   onMouseDown,
   selecting,
-  selected
+  selected,
 }: HighlightProps) {
   const [hover, setHover] = useState<boolean>(false);
 
@@ -68,7 +62,7 @@ function Highlight({
           padding: '2px',
           borderRadius: '2px',
           cursor: hover ? 'pointer' : 'default',
-          userSelect: 'none'
+          userSelect: 'none',
         }}
         onMouseOver={(e) => {
           setHover(true);
@@ -90,7 +84,7 @@ function Highlight({
               borderRadius: '2px',
               marginLeft: '4px',
               padding: '5px 3px 1px 3px',
-              marginBottom: '1px'
+              marginBottom: '1px',
             }}
           >
             {currentToken.tag}
@@ -126,13 +120,8 @@ function TagSelector({ open, choices, onSelect }: TagSelectorProps) {
   useEffect(() => {
     setFuse(new Fuse(choices));
   }, [choices]);
-  const searchResults =
-    query !== '' ? fuse.search(query).map((val) => val.item) : choices;
-  const makeDropdownMenuItem = (
-    key: number,
-    value: string,
-    child: ReactNode
-  ) => (
+  const searchResults = query !== '' ? fuse.search(query).map((val) => val.item) : choices;
+  const makeDropdownMenuItem = (key: number, value: string, child: ReactNode) => (
     <DropdownMenuItem className="font-medium" key={key}>
       <button
         style={{ width: '100%', height: '100%', textAlign: 'left' }}
@@ -161,9 +150,7 @@ function TagSelector({ open, choices, onSelect }: TagSelectorProps) {
             e.stopPropagation();
           }}
         />
-        {searchResults.map((val, index) =>
-          makeDropdownMenuItem(index, val, val)
-        )}
+        {searchResults.map((val, index) => makeDropdownMenuItem(index, val, val))}
         {query !== '' &&
           !searchResults.map((val) => val).includes(query) &&
           makeDropdownMenuItem(
@@ -176,7 +163,7 @@ function TagSelector({ open, choices, onSelect }: TagSelectorProps) {
                   padding: '0 3px',
                   marginRight: '5px',
                   borderRadius: '2px',
-                  fontWeight: 'bold'
+                  fontWeight: 'bold',
                 }}
                 onClick={() => onSelect(query)}
               >
@@ -196,9 +183,7 @@ export default function Interact() {
   const [inputText, setInputText] = useState<string>('');
   const [annotations, setAnnotations] = useState<Token[]>([]);
 
-  const [tagColors, setTagColors] = useState<Record<string, HighlightColor>>(
-    {}
-  );
+  const [tagColors, setTagColors] = useState<Record<string, HighlightColor>>({});
 
   const [mouseDownIndex, setMouseDownIndex] = useState<number | null>(null);
   const [mouseUpIndex, setMouseUpIndex] = useState<number | null>(null);
@@ -211,9 +196,7 @@ export default function Interact() {
     mouseDownIndex !== null && mouseUpIndex !== null
       ? Math.max(mouseDownIndex, mouseUpIndex)
       : null;
-  const [selectedRange, setSelectedRange] = useState<[number, number] | null>(
-    null
-  );
+  const [selectedRange, setSelectedRange] = useState<[number, number] | null>(null);
 
   const triggers = useRef<(HTMLElement | null)[]>([]);
 
@@ -231,35 +214,19 @@ export default function Interact() {
   };
 
   const updateTagColors = (tags: string[][]) => {
-    const pastels = [
-      '#E5A49C',
-      '#F6C886',
-      '#FBE7AA',
-      '#99E3B5',
-      '#A6E6E7',
-      '#A5A1E1',
-      '#D8A4E2'
-    ];
-    const darkers = [
-      '#D34F3E',
-      '#F09336',
-      '#F7CF5F',
-      '#5CC96E',
-      '#65CFD0',
-      '#597CE2',
-      '#B64DC8'
-    ];
+    const pastels = ['#E5A49C', '#F6C886', '#FBE7AA', '#99E3B5', '#A6E6E7', '#A5A1E1', '#D8A4E2'];
+    const darkers = ['#D34F3E', '#F09336', '#F7CF5F', '#5CC96E', '#65CFD0', '#597CE2', '#B64DC8'];
 
     setTagColors((existingColors) => {
       const colors = { ...existingColors };
-      const newTags = Array.from(
-        new Set(tags.flatMap((tokenTags) => tokenTags))
-      ).filter((tag) => !existingColors[tag] && tag !== 'O');
+      const newTags = Array.from(new Set(tags.flatMap((tokenTags) => tokenTags))).filter(
+        (tag) => !existingColors[tag] && tag !== 'O'
+      );
       newTags.forEach((tag, index) => {
         const i = Object.keys(existingColors).length + index;
         colors[tag] = {
           text: pastels[i % pastels.length],
-          tag: darkers[i % darkers.length]
+          tag: darkers[i % darkers.length],
         };
       });
       return colors;
@@ -272,7 +239,7 @@ export default function Interact() {
       setAnnotations(
         _.zip(result.tokens, result.predicted_tags).map(([text, tag]) => ({
           text: text as string,
-          tag: tag![0] as string
+          tag: tag![0] as string,
         }))
       );
     });
@@ -300,19 +267,14 @@ export default function Interact() {
         paddingTop: '20vh',
         width: '70%',
         minWidth: '400px',
-        maxWidth: '800px'
+        maxWidth: '800px',
       }}
     >
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        width="100%"
-      >
+      <Box display="flex" justifyContent="center" alignItems="center" width="100%">
         <Input
           autoFocus
-          className='text-md'
-          style={{height: "3rem"}}
+          className="text-md"
+          style={{ height: '3rem' }}
           value={inputText}
           onChange={handleInputChange}
           placeholder="Enter your text..."
@@ -322,10 +284,14 @@ export default function Interact() {
               e.preventDefault();
               handleRun();
             }
-          }}    
+          }}
         />
-        <Button size="sm" style={{height: '3rem', marginLeft: '10px', padding: '0 20px'}} onClick={handleRun}>
-            Run
+        <Button
+          size="sm"
+          style={{ height: '3rem', marginLeft: '10px', padding: '0 20px' }}
+          onClick={handleRun}
+        >
+          Run
         </Button>
       </Box>
       {annotations.length > 0 && (
@@ -342,10 +308,7 @@ export default function Interact() {
             }}
           >
             {annotations.map((token, index) => {
-              const nextToken =
-                index === annotations.length - 1
-                  ? null
-                  : annotations[index + 1];
+              const nextToken = index === annotations.length - 1 ? null : annotations[index + 1];
               return (
                 <>
                   <Highlight
