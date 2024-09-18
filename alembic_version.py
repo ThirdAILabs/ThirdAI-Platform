@@ -35,7 +35,7 @@ def get_latest_commit_hash(directory):
     added_files = latest_commit.stats.files.keys()
 
     files_in_directory = [file for file in added_files if file.startswith(directory)]
-    if len(added_files) == 0:
+    if len(files_in_directory) == 0:
         files_in_directory = get_latest_files_from_main(repo, directory)
     latest_file = max(files_in_directory, key=lambda x: latest_commit.committed_date)
     commit_hash = os.path.basename(latest_file).split("_", 1)[0]
