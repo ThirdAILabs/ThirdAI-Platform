@@ -108,6 +108,16 @@ def setup_users():
     res = create_user(client, "team-admin", "team-admin@mail.com", "admin-password")
     assert res.status_code == 200
 
+    res = create_user(
+        client, "user_1", email="user_1@mail.com", password="user_1_password"
+    )
+    assert res.status_code == 200
+
+    res = create_user(
+        client, "user_2", email="user_2@mail.com", password="user_2_password"
+    )
+    assert res.status_code == 200
+
 
 ### 1. Workflow Type Tests ###
 
@@ -506,3 +516,106 @@ def test_workflow_access_based_on_model_access():
         assert set(accessible_workflows) == set(
             expected_workflows
         ), f"Failed for user {user_jwt}"
+
+
+def test_workflow_access_control_with_model_visibility():
+    from main import app
+
+    client = TestClient(app)
+
+    # Create a workflow type with two NDB models
+    res = login(client, username="admin@mail.com", password="password")
+    assert res.status_code == 200
+    admin_jwt = res.json()["data"]["access_token"]
+
+    res = client.post(
+        "/api/workflow/add-type",
+        json={
+            "name": "ndb_workflow_type",
+            "description": "A workflow type requiring two NDB models",
+            "model_requirements": [
+                [{"component": "search_1", "type": "ndb"}],
+                [{"component": "search_2", "type": "ndb"}],
+            ],
+        },
+        headers=auth_header(admin_jwt),
+    )
+    assert res.status_code == 200
+
+    # User 1 creates two private models
+    res = login(client, username="user_1@mail.com", password="user_1_password")
+    assert res.status_code == 200
+    user_1_jwt = res.json()["data"]["access_token"]
+
+    model_1_id = setup_model(client, user_1_jwt, "user_1_model_1", "private")
+    model_2_id = setup_model(client, user_1_jwt, "user_1_model_2", "private")
+
+    # User 1 creates a workflow with the two private models
+    workflow_id = create_workflow(
+        client, user_1_jwt, "User 1 Workflow", "ndb_workflow_type"
+    )
+
+    # Add models to the workflow
+    res = client.post(
+        "/api/workflow/add-models",
+        json={
+            "workflow_id": workflow_id,
+            "model_ids": [model_1_id, model_2_id],
+            "components": ["search_1", "search_2"],
+        },
+        headers=auth_header(user_1_jwt),
+    )
+    assert res.status_code == 200
+
+    # User 2 creates a third NDB model and tries to create a workflow using User 1's second model
+    res = login(client, username="user_2@mail.com", password="user_2_password")
+    assert res.status_code == 200
+    user_2_jwt = res.json()["data"]["access_token"]
+
+    model_3_id = setup_model(client, user_2_jwt, "user_2_model_3", "private")
+
+    worfklow_id_2 = create_workflow(
+        client, user_2_jwt, "User 2 Workflow", "ndb_workflow_type"
+    )
+
+    # Attempt to add models to workflow by User 2 using User 1's second model
+    res = client.post(
+        "/api/workflow/add-models",
+        json={
+            "workflow_id": worfklow_id_2,
+            "model_ids": [model_3_id, model_2_id],
+            "components": ["search_1", "search_2"],
+        },
+        headers=auth_header(user_2_jwt),
+    )
+
+    assert res.status_code == 403  # Should fail because model_2 is private
+
+    # User 1 changes model_2 access to public
+    res = client.post(
+        "/api/model/update-access-level",
+        params={
+            "model_identifier": "user_1/user_1_model_2",
+            "access_level": "public",
+        },
+        headers=auth_header(user_1_jwt),
+    )
+    assert res.status_code == 200
+
+    # User 2 tries again to create a workflow using User 1's second model
+    res = client.post(
+        "/api/workflow/add-models",
+        json={
+            "workflow_id": worfklow_id_2,
+            "model_ids": [model_3_id, model_2_id],
+            "components": ["search_1", "search_2"],
+        },
+        headers=auth_header(user_2_jwt),
+    )
+    assert res.status_code == 200  # Should succeed now
+
+    # Verify that the workflow created by User 2 is visible in their list
+    res = client.get("/api/workflow/list", headers=auth_header(user_2_jwt))
+    assert res.status_code == 200
+    workflows = [wf["name"] for wf in res.json()["data"]]
+    assert "User 2 Workflow" in workflows

@@ -627,22 +627,18 @@ interface TokenClassificationExample {
 }
 
 function tokenClassifierDatagenForm(modelGoal: string, examples: TokenClassificationExample[]) {
-  let tagExamples: Record<string, string[]> = {};
-  examples.forEach((example) => {
-    if (!tagExamples[example.name]) {
-      tagExamples[example.name] = [example.example];
-    } else {
-      tagExamples[example.name].push(example.example);
-    }
-  });
+  const tags = examples.map((example) => ({
+    name: example.name,
+    examples: [example.example],
+    description: example.description,
+  }));
   const numSentences = 10_000;
   return {
     sub_type: 'token',
-    domain_prompt: modelGoal,
-    tags: Object.keys(tagExamples),
-    tag_examples: tagExamples,
+    task_prompt: modelGoal,
+    tags: tags,
     num_sentences_to_generate: numSentences,
-    num_samples_per_tag: Math.max(Math.ceil(numSentences / Object.keys(tagExamples).length), 50),
+    num_samples_per_tag: Math.max(Math.ceil(numSentences / tags.length), 50),
   };
 }
 
@@ -698,23 +694,17 @@ interface SentenceClassificationExample {
 }
 
 function sentenceClassifierDatagenForm(examples: SentenceClassificationExample[]) {
-  let labelExamples: Record<string, string[]> = {};
-  let labelDescriptions: Record<string, string> = {};
-  examples.forEach((example) => {
-    if (!labelExamples[example.name]) {
-      labelExamples[example.name] = [example.example];
-      labelDescriptions[example.name] = example.description;
-    } else {
-      labelExamples[example.name].push(example.example);
-    }
-  });
+  const labels = examples.map((example) => ({
+    name: example.name,
+    examples: [example.example],
+    description: example.description,
+  }));
+
   const numSentences = 10_000;
   return {
     sub_type: 'text',
-    samples_per_label: Math.max(Math.ceil(numSentences / Object.keys(labelExamples).length), 50),
-    target_labels: Object.keys(labelExamples),
-    examples: labelExamples,
-    labels_description: labelDescriptions,
+    samples_per_label: Math.max(Math.ceil(numSentences / labels.length), 50),
+    target_labels: labels,
   };
 }
 
