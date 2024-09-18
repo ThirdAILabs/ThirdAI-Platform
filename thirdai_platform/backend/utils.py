@@ -341,6 +341,18 @@ def delete_nomad_job(job_id, nomad_endpoint):
     return response
 
 
+def list_services(nomad_endpoint: str):
+    headers = {"X-Nomad-Token": TASK_RUNNER_TOKEN}
+    return requests.get(urljoin(nomad_endpoint, "v1/services"), headers=headers)
+
+
+def get_service_info(nomad_endpoint: str, service_name: str):
+    headers = {"X-Nomad-Token": TASK_RUNNER_TOKEN}
+    return requests.get(
+        urljoin(nomad_endpoint, f"v1/service/{service_name}"), headers=headers
+    )
+
+
 def get_platform():
     """
     Get the platform identifier.

@@ -238,3 +238,31 @@ def get_nomad_endpoint(input_url):
     else:
         # If no IP address, hostname, or 'localhost' is found, return the original URL
         return input_url
+
+
+def update_docker_image_version(job_definition, new_version):
+    """
+    Updates the Docker image version in the Nomad job definition.
+
+    Args:
+        job_definition (dict): The Nomad job definition.
+        new_version (str): The new version of the Docker image (without the 'v' prefix).
+
+    Returns:
+        dict: Updated job definition with the new Docker image version.
+    """
+    # Ensure the new version is prefixed with 'v'
+    version_tag = f"v{new_version}"
+
+    # Find the task group and task with the Docker config
+    for task_group in job_definition.get("TaskGroups", []):
+        for task in task_group.get("Tasks", []):
+            if task.get("Driver") == "docker":
+                current_image = task["Config"]["image"]
+                # Extract base image name without version
+                image_name = current_image.split(":")[0]
+                # Update the image with the new version
+                task["Config"]["image"] = f"{image_name}:{version_tag}"
+                print(f"Updated Docker image to: {task['Config']['image']}")
+
+    return job_definition

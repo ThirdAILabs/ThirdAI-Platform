@@ -37,8 +37,6 @@ job "thirdai-platform-frontend" {
       {% endif %}
 
       env {
-        NEXT_PUBLIC_DEPLOYMENT_BASE_URL = "{{ deployment_base_url }}"
-        NEXT_PUBLIC_THIRDAI_PLATFORM_BASE_URL = "{{ thirdai_platform_base_url }}"
         NEXT_PUBLIC_OPENAI_API_KEY = "{{ openai_api_key }}"
       }
 

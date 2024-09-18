@@ -6,11 +6,8 @@ import _ from 'lodash';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-export const thirdaiPlatformBaseUrl = _.trim(
-  process.env.NEXT_PUBLIC_THIRDAI_PLATFORM_BASE_URL!,
-  '/'
-);
-export const deploymentBaseUrl = _.trim(process.env.NEXT_PUBLIC_DEPLOYMENT_BASE_URL!, '/');
+export const thirdaiPlatformBaseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+export const deploymentBaseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
 export function getAccessToken(throwIfNotFound: boolean = true): string | null {
   const accessToken = localStorage.getItem('accessToken');

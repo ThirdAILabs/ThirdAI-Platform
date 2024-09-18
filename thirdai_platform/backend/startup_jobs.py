@@ -164,6 +164,10 @@ def create_promfile(promfile_path: str):
     model_bazaar_endpoint = os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT")
     if platform == "local":
         targets = ["host.docker.internal:4646"]
+
+        deployment_targets_endpoint = (
+            "http://host.docker.internal:80/api/telemetry/deployment-services"
+        )
     else:
         nomad_url = f"{model_bazaar_endpoint.rstrip('/')}:4646/v1/nodes"
 
@@ -173,6 +177,10 @@ def create_promfile(promfile_path: str):
         nodes = response.json()
 
         targets = [f"{node['Address']}:4646" for node in nodes]
+
+        deployment_targets_endpoint = (
+            f"{model_bazaar_endpoint.rstrip('/')}/api/telemetry/deployment-services"
+        )
 
     # Prometheus template
     prometheus_config = {
@@ -193,7 +201,12 @@ def create_promfile(promfile_path: str):
                         "replacement": "nomad-agent-$1",
                     }
                 ],
-            }
+            },
+            {
+                "job_name": "deployment-jobs",
+                "metrics_path": "/metrics",
+                "http_sd_configs": [{"url": deployment_targets_endpoint}],
+            },
         ],
     }
     os.makedirs(os.path.dirname(promfile_path), exist_ok=True)

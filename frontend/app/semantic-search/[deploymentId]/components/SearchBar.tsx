@@ -119,7 +119,7 @@ function GlobalModelDescription() {
     <Description>
       Generating answers from knowledgebase documents, or
       <Spacer $width="7px" />
-      <a href={process.env.NEXT_PUBLIC_THIRDAI_PLATFORM_BASE_URL}>
+      <a href={typeof window !== 'undefined' ? window.location.origin : ''}>
         <TryNewModelButton>use your own documents</TryNewModelButton>
       </a>
     </Description>

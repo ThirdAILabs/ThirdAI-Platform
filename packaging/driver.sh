@@ -13,9 +13,16 @@ function install_ansible() {
                 sudo apt install -y software-properties-common
                 sudo add-apt-repository --yes --update ppa:ansible/ansible
                 sudo apt install -y ansible
+            elif [ -f /etc/system-release ] && grep -q "Amazon Linux release 2" /etc/system-release; then
+                echo "Installing Ansible on Amazon Linux 2..."
+                sudo amazon-linux-extras install -y ansible2
             elif [ -f /etc/redhat-release ]; then
                 echo "Installing Ansible on CentOS/RHEL..."
                 sudo dnf install -y ansible
+            else
+                echo "Unsupported OS: $OSTYPE"
+                echo "Please download and install Ansible manually for your operating system."
+                exit 1
             fi
         elif [[ "$OSTYPE" == "darwin"* ]]; then
             echo "Installing Ansible on macOS..."
