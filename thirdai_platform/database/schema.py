@@ -378,6 +378,7 @@ class Workflow(SQLDeclarativeBase):
                 > most_restrictive_access.restrictiveness()
             ):
                 most_restrictive_access = model_access
+                most_restrictive_model = model
                 required_teams.clear()  # Clear teams as we're now dealing with a new, more restrictive level
 
             if model_access == Access.protected:
@@ -396,7 +397,7 @@ class Workflow(SQLDeclarativeBase):
                 or user.is_global_admin()
             )
         elif most_restrictive_access == Access.private:
-            return model.user_id == user.id or user.is_global_admin()
+            return most_restrictive_model.user_id == user.id or user.is_global_admin()
 
         return False
 
