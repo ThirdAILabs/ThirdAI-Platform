@@ -77,7 +77,7 @@ async def start_on_prem_generate_job(
     model_path = os.path.join(mount_dir, model_name)
     if not os.path.exists(model_path):
         raise ValueError(f"Cannot find model at location: {model_path}.")
-    model_size = int(os.path.get_size(model_path) / 1e6)
+    model_size = int(os.path.getsize(model_path) / 1e6)
     job_memory_mb = model_size * 2  # give some leeway
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
