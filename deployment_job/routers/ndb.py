@@ -14,7 +14,7 @@ from fastapi.encoders import jsonable_encoder
 from feedback_logger import AssociateLog, FeedbackLog, ImplicitUpvoteLog, UpvoteLog
 from file_handler import validate_files
 from permissions import Permissions
-from prometheus_client import Summary, Counter
+from prometheus_client import Counter, Summary
 from pydantic import ValidationError, parse_obj_as
 from pydantic_models import inputs
 from pydantic_models.documents import DocumentList
@@ -354,7 +354,7 @@ def implicit_feedback(
         )
     )
 
-    if feedback.reference_rank < 5:
+    if feedback.reference_rank is not None and feedback.reference_rank < 5:
         ndb_top_k_selections.inc()
 
     return response(

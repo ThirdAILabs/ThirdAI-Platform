@@ -65,8 +65,8 @@ class ImplicitFeedbackInput(BaseModel):
     query_text: str
     reference_id: int = Field(..., ge=0)
 
-    reference_rank: int = Field(..., ge=0)
     event_desc: str
+    reference_rank: Optional[int] = Field(None, ge=0)
 
 
 class SearchResultsNDB(BaseModel):
