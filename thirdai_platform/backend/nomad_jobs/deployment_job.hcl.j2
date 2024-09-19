@@ -34,7 +34,7 @@ job "deployment-{{ model_id }}" {
     }
 
     service {
-      name = "{{ model_id }}"
+      name = "deployment-{{ model_id }}"
       port = "{{ model_id }}-http"
       provider = "nomad"
 

@@ -12,6 +12,7 @@ from backend.routers.deploy import deploy_router as deploy
 from backend.routers.models import model_router as model
 from backend.routers.recovery import recovery_router as recovery
 from backend.routers.team import team_router as team
+from backend.routers.telemetry import telemetry_router as telemetry
 from backend.routers.train import train_router as train
 from backend.routers.user import user_router as user
 from backend.routers.vault import vault_router as vault
@@ -47,6 +48,7 @@ app.include_router(vault, prefix="/api/vault", tags=["vault"])
 app.include_router(team, prefix="/api/team", tags=["team"])
 app.include_router(recovery, prefix="/api/recovery", tags=["recovery"])
 app.include_router(data_router, prefix="/api/data", tags=["data"])
+app.include_router(telemetry, prefix="/api/telemetry", tags=["telemetry"])
 
 
 @app.on_event("startup")

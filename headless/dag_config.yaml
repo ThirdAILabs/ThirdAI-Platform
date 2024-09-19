@@ -195,6 +195,11 @@ UDT_DATAGEN:
     dependencies: [check_search]
     params:
       deployment: udt_deploy
+  
+  delete_model:
+    dependencies: [undeploy]
+    params:
+      model: check_udt_train_with_datagen
 
 GlobalAdmin:
   config: dummy

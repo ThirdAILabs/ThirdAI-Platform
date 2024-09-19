@@ -100,6 +100,7 @@ const VoteButtonsContainer = styled.section`
 `;
 
 interface ReferenceProps {
+  query: string;
   info: ReferenceInfo;
   onOpen: MouseEventHandler<any>;
   onUpvote: MouseEventHandler<any>;
@@ -111,6 +112,7 @@ interface ReferenceProps {
 }
 
 export default function Reference({
+  query,
   info,
   onOpen,
   onUpvote,
@@ -245,20 +247,26 @@ export default function Reference({
             onOpen(e);
 
             // TODO(Any): use update query text and uncomment below to record implicit-feedback
-            // const feedback = {
-            //     reference_id: info.id,
-            //     query_text: "", // TODO
-            //     event_desc: "open_reference_source",
-            // };
+            // Capture the query text and complete the telemetry event for implicit feedback.
+            const feedback = {
+              reference_id: info.id,
+              reference_rank: 0, // TODO: fill actual rank
+              query_text: query || '',
+              event_desc: 'open_reference_source',
+            };
 
-            // modelService.recordImplicitFeedback(feedback)
-            //     .then(data => {
-            //         console.log("Implicit feedback recorded successfully:", data)
-            //     })
-            //     .catch(error => {
-            //         console.error("Error recording implicit feedback:", error)
-            //         alert("Error recording implicit feedback:" + error)
-            //     })
+            console.log('feedback logged:', feedback);
+
+            // Record the implicit feedback
+            modelService
+              .recordImplicitFeedback(feedback)
+              .then((data) => {
+                console.log('Implicit feedback recorded successfully:', data);
+              })
+              .catch((error) => {
+                console.error('Error recording implicit feedback:', error);
+                alert('Error recording implicit feedback:' + error);
+              });
           }}
           target={'_blank'}
         >
@@ -310,7 +318,7 @@ export default function Reference({
           <DownvoteButton onClick={onDownvote} />
         </VoteButtonsContainer>
         <Spacer $height={padding.card} />
-        <CopyButton toCopy={info.content} />
+        <CopyButton toCopy={info.content} referenceID={info.id} queryText={query} />
       </ButtonsContainer>
     </Card>
   );

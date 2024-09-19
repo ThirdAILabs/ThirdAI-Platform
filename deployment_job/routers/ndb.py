@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from file_handler import FileInfo, download_local_files
 from permissions import Permissions
-from prometheus_client import Summary
+from prometheus_client import Summary, Counter
 from pydantic import BaseModel, ValidationError
 from pydantic_models import inputs
 from pydantic_models.inputs import BaseQueryParams, NDBExtraParams
@@ -45,6 +45,10 @@ ndb_associate_metric = Summary("ndb_associate", "NDB associations")
 ndb_implicit_feedback_metric = Summary("ndb_implicit_feedback", "NDB implicit feedback")
 ndb_insert_metric = Summary("ndb_insert", "NDB insertions")
 ndb_delete_metric = Summary("ndb_delete", "NDB deletions")
+
+ndb_top_k_selections = Counter(
+    "ndb_top_k_selections", "Number of top-k results selected by user."
+)
 
 
 @ndb_router.post("/predict")
@@ -322,6 +326,9 @@ def implicit_feedback(
             )
         )
     )
+
+    if feedback.reference_rank is not None and feedback.reference_rank < 5:
+        ndb_top_k_selections.inc()
 
     return response(
         status_code=status.HTTP_200_OK,
