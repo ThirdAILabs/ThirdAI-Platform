@@ -1,3 +1,6 @@
+from shared_utils.util_file import func
+func()
+
 from dotenv import load_dotenv
 
 load_dotenv()
