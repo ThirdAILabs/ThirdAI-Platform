@@ -126,4 +126,4 @@ jobs:
         python3 -m pytest ./deployment_job -k dev_mode[v1]
         python3 -m pytest ./deployment_job -k dev_mode[v2]
         python3 -m pytest ./deployment_job -k prod_mode[v1]
-        python3 -m pytest ./deployment_job -k prot_mode[v2]
+        python3 -m pytest ./deployment_job -k prod_mode[v2]
