@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from file_handler import FileInfo, download_local_files
 from permissions import Permissions
-from prometheus_client import Summary, Counter
+from prometheus_client import Counter, Summary
 from pydantic import BaseModel, ValidationError
 from pydantic_models import inputs
 from pydantic_models.inputs import BaseQueryParams, NDBExtraParams
