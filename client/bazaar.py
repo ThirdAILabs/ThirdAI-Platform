@@ -260,7 +260,9 @@ class ModelBazaar:
         self.await_train(model)
         return model
 
-    def retrain_ndb(self, new_model_name: str, base_model_identifier: str) -> Model:
+    def retrain_ndb(
+        self, new_model_name: str, base_model_identifier: str, is_async: bool = False
+    ) -> Model:
         response = http_post_with_error(
             urljoin(self._base_url, "train/ndb-retrain"),
             params={
@@ -269,16 +271,15 @@ class ModelBazaar:
             },
             headers=auth_header(self._access_token),
         )
-        if response.status_code != 200:
-            raise ValueError(
-                f"Retraining failed with error {response.json()['message']}"
-            )
         model = Model(
             model_identifier=create_model_identifier(
                 model_name=new_model_name, author_username=self._username
             ),
             model_id=response.json()["data"]["model_id"],
         )
+
+        if is_async:
+            return model
 
         self.await_train(model)
         return model

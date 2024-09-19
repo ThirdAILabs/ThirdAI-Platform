@@ -25,7 +25,6 @@ def tmp_dir():
     shutil.rmtree(path)
 
 
-@pytest.fixture(scope="function")
 def create_ndbv1_model(tmp_dir):
     thirdai.licensing.activate(LICENSE_KEY)
 
@@ -38,7 +37,6 @@ def create_ndbv1_model(tmp_dir):
     db.save(os.path.join(tmp_dir, "models", f"{MODEL_ID}_v1", "model.ndb"))
 
 
-@pytest.fixture(scope="function")
 def create_ndbv2_model(tmp_dir):
     thirdai.licensing.activate(LICENSE_KEY)
 
@@ -59,7 +57,14 @@ def dummy_check(self, token, permission_type):
     return True
 
 
-def set_env_variables(tmp_dir: str, sub_type: str, autoscaling: bool):
+def setup_env(tmp_dir: str, sub_type: str, autoscaling: bool):
+    if sub_type == "v1":
+        create_ndbv1_model(tmp_dir)
+    elif sub_type == "v2":
+        create_ndbv2_model(tmp_dir)
+    else:
+        raise ValueError(f"Invalid subtype '{sub_type}'")
+
     os.environ["MODEL_ID"] = f"{MODEL_ID}_{sub_type}"
     os.environ["MODEL_BAZAAR_ENDPOINT"] = ""
     os.environ["MODEL_BAZAAR_DIR"] = tmp_dir
@@ -76,11 +81,13 @@ def get_query_result(client: TestClient, query: str):
 
 
 def check_query(client: TestClient):
+    # This query corresponds to row/chunk 27 in articles.csv
     assert get_query_result(client, "manufacturing faster chips") == 27
 
 
 def check_upvote_dev_mode(client: TestClient):
     random_query = "some random nonsense with no relevance to any article"
+    # Here 78 is just a random chunk that we are upvoting for this query
     assert get_query_result(client, random_query) != 78
 
     res = client.post(
@@ -93,6 +100,7 @@ def check_upvote_dev_mode(client: TestClient):
 
 
 def check_associate_dev_mode(client: TestClient):
+    # This query corresponds to row/chunk 16 in articles.csv
     query = "premier league teams in england"
     assert get_query_result(client, query) != 16
 
@@ -159,27 +167,10 @@ def check_deletion_dev_mode(client: TestClient):
     assert len(res.json()["data"]) == 3
 
 
-def test_deploy_ndbv1_dev_mode(tmp_dir, create_ndbv1_model):
-    set_env_variables(tmp_dir=tmp_dir, sub_type="v1", autoscaling=False)
-
-    from permissions import Permissions
-
-    Permissions.verify_permission = dummy_verify
-    Permissions.check_permission = dummy_check
-
-    from routers.ndb import ndb_router
-
-    client = TestClient(ndb_router)
-
-    check_query(client)
-    check_upvote_dev_mode(client)
-    check_associate_dev_mode(client)
-    check_insertion_dev_mode(client)
-    check_deletion_dev_mode(client)
-
-
-def test_deploy_ndbv2_dev_mode(tmp_dir, create_ndbv2_model):
-    set_env_variables(tmp_dir=tmp_dir, sub_type="v2", autoscaling=False)
+@pytest.mark.unit
+@pytest.mark.parametrize("sub_type", ["v1", "v2"])
+def test_deploy_ndb_dev_mode(tmp_dir, sub_type):
+    setup_env(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=False)
 
     from permissions import Permissions
 
@@ -201,6 +192,7 @@ def check_upvote_prod_mode(client: TestClient):
     random_query = "some random nonsense with no relevance to any article"
     original_result = get_query_result(client, random_query)
 
+    # Here 78 is just a random chunk that we are upvoting for this query
     res = client.post(
         "/upvote",
         json={"text_id_pairs": [{"query_text": random_query, "reference_id": 78}]},
@@ -285,38 +277,10 @@ def check_log_lines(logdir, expected_lines):
     assert total_lines == expected_lines
 
 
-def test_deploy_ndbv1_prod_mode(tmp_dir, create_ndbv1_model):
-    set_env_variables(tmp_dir=tmp_dir, sub_type="v1", autoscaling=True)
-
-    from permissions import Permissions
-
-    Permissions.verify_permission = dummy_verify
-    Permissions.check_permission = dummy_check
-
-    from routers.ndb import ndb_router
-
-    client = TestClient(ndb_router)
-
-    deployment_dir = os.path.join(
-        tmp_dir, "models", os.environ["MODEL_ID"], "deployments/data"
-    )
-    check_log_lines(os.path.join(deployment_dir, "feedback"), 0)
-    check_log_lines(os.path.join(deployment_dir, "insertions"), 0)
-    check_log_lines(os.path.join(deployment_dir, "deletions"), 0)
-
-    check_query(client)
-    check_upvote_prod_mode(client)
-    check_associate_prod_mode(client)
-    check_insertion_prod_mode(client)
-    check_deletion_prod_mode(client)
-
-    check_log_lines(os.path.join(deployment_dir, "feedback"), 2)
-    check_log_lines(os.path.join(deployment_dir, "insertions"), 1)
-    check_log_lines(os.path.join(deployment_dir, "deletions"), 1)
-
-
-def test_deploy_ndbv2_prod_mode(tmp_dir, create_ndbv2_model):
-    set_env_variables(tmp_dir=tmp_dir, sub_type="v2", autoscaling=True)
+@pytest.mark.unit
+@pytest.mark.parametrize("sub_type", ["v1", "v2"])
+def test_deploy_ndb_prod_mode(tmp_dir, sub_type):
+    setup_env(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=True)
 
     from permissions import Permissions
 

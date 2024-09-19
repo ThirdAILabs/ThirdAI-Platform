@@ -123,7 +123,7 @@ jobs:
       # don't get reset correctly between tests. 
       # TODO(Nicholas): Refactor the deployment job to avoid this.
       run: |
-        python3 -m pytest ./deployment_job -k ndbv1_dev
-        python3 -m pytest ./deployment_job -k ndbv1_prod
-        python3 -m pytest ./deployment_job -k ndbv2_dev
-        python3 -m pytest ./deployment_job -k ndbv2_prod
+        python3 -m pytest ./deployment_job -k dev_mode[v1]
+        python3 -m pytest ./deployment_job -k dev_mode[v2]
+        python3 -m pytest ./deployment_job -k prod_mode[v1]
+        python3 -m pytest ./deployment_job -k prot_mode[v2]
