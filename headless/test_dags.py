@@ -9,9 +9,12 @@ from headless.utils import download_from_s3_if_not_exists, normalize_s3_uri
 
 @pytest.fixture(scope="session")
 def additional_variables():
+    is_merge_group = os.getenv("GITHUB_EVENT_NAME") == "merge_group"
     return {
         "sharded": False,
         "run_name": "ci_run",
+        "on_prem": False,
+        "generation": is_merge_group,
     }
 
 
@@ -65,5 +68,12 @@ dag_files = [
 
 @pytest.mark.parametrize("dag_file, dag_name", dag_files)
 def test_dag(dag_executor, dag_file, dag_name):
+    event_name = os.getenv("GITHUB_EVENT_NAME")
+
+    # Skip UDT_DATAGEN if not a merge_group
+    if dag_name == "UDT_DATAGEN" and event_name != "merge_group":
+        pytest.skip(
+            f"Skipping UDT_DATAGEN since the event is not merge_group, it's {event_name}"
+        )
     dag_executor.load_dags_from_file(dag_file)
     assert dag_executor.execute_dag(dag_name)

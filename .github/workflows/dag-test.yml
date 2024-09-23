@@ -119,6 +119,7 @@ jobs:
         sudo chmod +t $HOME/nfs/dir
         sudo chmod g+s $HOME/nfs/dir
         echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_ENV
+        echo "GENAI_KEY=${{ secrets.GENAI_KEY }}" >> $GITHUB_ENV
 
     - name: Write All Environment Variables to .env File
       run: |

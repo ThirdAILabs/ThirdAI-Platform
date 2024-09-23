@@ -102,6 +102,7 @@ jobs:
         run: |
           mkdir -p $HOME/nfs/dir
           echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_ENV
+          echo "GENAI_KEY=${{ secrets.GENAI_KEY }}" >> $GITHUB_ENV
 
       - name: Restart Model Bazaar Job
         run: |
@@ -119,7 +120,7 @@ jobs:
 
       - name: Run tests
         run: |
-          python3 -m headless.run_locally --base-url ${{ secrets.BASE_URL }} --email ${{ secrets.EMAIL }} --password ${{ secrets.PASSWORD }} --run-name ${{ steps.random-run-name.outputs.name }} --dag NDB
+          python3 -m headless.run_locally --base-url ${{ secrets.BASE_URL }} --email ${{ secrets.EMAIL }} --password ${{ secrets.PASSWORD }} --run-name ${{ steps.random-run-name.outputs.name }} --dag NDB --on-prem --generation
           python3 -m headless.run_locally --base-url ${{ secrets.BASE_URL }} --email ${{ secrets.EMAIL }} --password ${{ secrets.PASSWORD }} --run-name ${{ steps.random-run-name.outputs.name }} --dag UDT
           python3 -m headless.run_locally --base-url ${{ secrets.BASE_URL }} --email ${{ secrets.EMAIL }} --password ${{ secrets.PASSWORD }} --run-name ${{ steps.random-run-name.outputs.name }} --dag UDT_DATAGEN
 

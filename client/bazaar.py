@@ -514,6 +514,20 @@ class ModelBazaar:
 
         return response_data
 
+    def start_on_prem(
+        self, restart_if_exists: bool = True, autoscaling_enabled: bool = True
+    ):
+        url = urljoin(self._base_url, "deploy/start-on-prem")
+
+        response = http_post_with_error(
+            url,
+            headers=auth_header(self._access_token),
+            params={
+                "restart_if_exists": restart_if_exists,
+                "autoscaling_enabled": autoscaling_enabled,
+            },
+        )
+
     def await_train(self, model: Model):
         """
         Waits for the training of a model to complete.

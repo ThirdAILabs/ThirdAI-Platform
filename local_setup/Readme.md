@@ -119,7 +119,7 @@ Without this process, it is cumbersome to test out platform changes. We would ha
     - Modify the following variables in `.env.example` and copy them to `.env` and save it inside `frontend` folder
       - Change `NEXT_PUBLIC_OPENAI_API_KEY` to openai-key you wanna use.
     - Finally to start you can run `pnpm dev`.
-    - Your application should now be running, and you can access it in the browser at port 3006.
+    - Your application should now be running, and you can access it in the browser at port 80.
 
 
 11. **Insert existing datasets in DB:**

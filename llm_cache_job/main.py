@@ -99,7 +99,7 @@ def temporary_cache_token(model_id: str):
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "status": "sucess",
+            "status": "success",
             "access_token": permissions.create_temporary_cache_access_token(
                 model_id=model_id
             ),

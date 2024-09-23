@@ -737,6 +737,9 @@ async def start_workflow(
                     python_path=get_python_path(),
                     aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
                     aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
+                    llm_provider=(
+                        workflow.gen_ai_provider or os.getenv("LLM_PROVIDER", "openai")
+                    ),
                 )
 
                 model.deploy_status = schema.Status.starting

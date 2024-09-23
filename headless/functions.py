@@ -187,6 +187,8 @@ class NDBFunctions:
         deployment = inputs.get("deployment")
         config: Config = inputs.get("config")
         results = inputs.get("results")
+        generation = inputs.get("generation", False)
+        on_prem = inputs.get("on_prem")
 
         query_text = results["query_text"]
         references = results["references"]
@@ -226,6 +228,31 @@ class NDBFunctions:
 
         logging.info("Ovveriding the model")
         deployment.save_model(override=True)
+
+        llm_client = deployment.llm_client()
+
+        if generation:
+            api_key = os.getenv("GENAI_KEY", None)
+            if api_key:
+                generated_answer = llm_client.generate(
+                    query=best_answer["text"],
+                    api_key=api_key,
+                    provider="openai",
+                    use_cache=True,
+                )
+                logging.info(f"Openai generated answer: {generated_answer}")
+
+            if on_prem:
+                flow.bazaar_client.start_on_prem(autoscaling_enabled=False)
+                # waiting for our on-prem to start and trafeik to discover the service
+                time.sleep(45)
+                generated_answer = llm_client.generate(
+                    query=best_answer["text"],
+                    api_key="no key",
+                    provider="on-prem",
+                    use_cache=False,
+                )
+                logging.info(f"on-prem generated answer: {generated_answer}")
 
     @staticmethod
     def check_unsupervised(inputs: Dict[str, Any]) -> Any:

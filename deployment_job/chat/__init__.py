@@ -1,5 +1,3 @@
-import os
+from chat.openai import OnPremChat, OpenAIChat
 
-from chat.openai import OpenAIChat
-
-llm_providers = {"openai": OpenAIChat}
+llm_providers = {"openai": OpenAIChat, "on-prem": OnPremChat}

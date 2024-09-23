@@ -23,6 +23,11 @@ default_workflow_types = [
             [
                 {"component": "search", "type": "ndb"},
             ],
+            [
+                {"component": "search", "type": "ndb"},
+                {"component": "guardrail", "type": "udt", "subtype": "token"},
+                {"component": "sentiment", "type": "udt", "subtype": "text"},
+            ],
         ],
     },
 ]
@@ -35,7 +40,13 @@ def initialize_default_workflow_types(session: Session):
             .filter_by(name=workflow_type["name"])
             .first()
         )
-        if not existing_type:
+        if existing_type:
+            # If the model_requirements don't match, update them
+            if existing_type.model_requirements != workflow_type["model_requirements"]:
+                existing_type.model_requirements = workflow_type["model_requirements"]
+                session.add(existing_type)
+
+        else:
             new_workflow_type = schema.WorkflowType(
                 name=workflow_type["name"],
                 description=workflow_type["description"],

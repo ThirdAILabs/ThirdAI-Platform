@@ -7,7 +7,7 @@ job "on-prem-llm-generation" {
     count = "{{ initial_allocations }}"
 
     scaling {
-      enabled = true
+      enabled = "{{ autoscaling_enabled }}"
       min = {{ min_allocations }}
       max = {{ max_allocations }}
 
@@ -78,6 +78,7 @@ job "on-prem-llm-generation" {
       resources {
         cores = {{ cores_per_allocation }}
         memory = {{ memory_per_allocation }}
+        memory_max = {{ 2 * memory_per_allocation }}
       }
     }
   }
