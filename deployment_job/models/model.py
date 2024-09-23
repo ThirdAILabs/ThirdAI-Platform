@@ -2,9 +2,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 from logger import LoggerConfig
-from permissions import Permissions
-from reporter import Reporter
-from variables import GeneralVariables
 
 
 class Model(ABC):
@@ -12,19 +9,23 @@ class Model(ABC):
     Abstract base class for all models.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, model_bazaar_dir: str, model_id: str) -> None:
         """
         Initializes model directories and reporter.
         """
-        self.general_variables: GeneralVariables = GeneralVariables.load_from_env()
-        self.reporter: Reporter = Reporter(self.general_variables.model_bazaar_endpoint)
-        self.model_dir: Path = self.general_variables.get_model_dir()
+        self.model_bazaar_dir = model_bazaar_dir
+        self.model_id = model_id
 
-        self.data_dir: Path = self.general_variables.get_data_dir()
+        self.model_dir = self.get_model_dir(model_id)
+        self.data_dir = self.model_dir / "deployments" / "data"
+
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         logger_file_path = self.data_dir / "deployment.log"
         self.logger = LoggerConfig(logger_file_path).get_logger("deployment-logger")
+
+    def get_model_dir(self, model_id: str):
+        return Path(self.model_bazaar_dir) / "models" / model_id
 
     @abstractmethod
     def predict(self, **kwargs):

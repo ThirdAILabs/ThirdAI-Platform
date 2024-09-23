@@ -3,23 +3,49 @@ import time
 from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
 from permissions import Permissions
+from models.classification_models import (
+    TextClassificationModel,
+    TokenClassificationModel,
+)
 from prometheus_client import Summary
 from pydantic_models.inputs import BaseQueryParams, SearchResultsTokenClassification
 from routers.model import get_model
 from throughput import Throughput
 from utils import propagate_error, response
+from config import DeploymentConfig, UDTSubType
 
 udt_router = APIRouter()
 permissions = Permissions()
 
 
-start_time = time.time()
-tokens_identified = Throughput()
-queries_ingested = Throughput()
-queries_ingested_bytes = Throughput()
-
-
 udt_predict_metric = Summary("udt_predict", "UDT predictions")
+
+
+class UDTRouter:
+    def __init__(self, config: DeploymentConfig, permissions: Permissions):
+        self.config = config
+        self.permissions = permissions
+
+        sub_type = self.config.model_options.udt_sub_type
+        if sub_type == UDTSubType.text:
+            self.model = TextClassificationModel(
+                model_bazaar_dir=self.config.model_bazaar_dir,
+                model_id=self.config.model_id,
+            )
+        elif sub_type == UDTSubType.token:
+            self.model = TokenClassificationModel(
+                model_bazaar_dir=self.config.model_bazaar_dir,
+                model_id=self.config.model_id,
+            )
+        else:
+            raise ValueError(f"Unhandled udt_sub_type '{sub_type}'.")
+
+        self.start_time = time.time()
+        self.tokens_identified = Throughput()
+        self.queries_ingested = Throughput()
+        self.queries_ingested_bytes = Throughput()
+
+    def predict(base_params: BaseQueryParams, token=Depends(self.p))
 
 
 @udt_router.post("/predict")
