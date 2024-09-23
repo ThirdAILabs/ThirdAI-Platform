@@ -115,7 +115,7 @@ class NDBModel(Model):
             self.chat = llm_chat_interface(
                 db=self.db,
                 chat_history_sql_uri=chat_history_sql_uri,
-                key=self.config.genai_key,
+                key=self.config.model_options.genai_key,
                 base_url=self.config.model_bazaar_endpoint,
                 **kwargs,
             )

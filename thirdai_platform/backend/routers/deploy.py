@@ -23,6 +23,12 @@ from backend.utils import (
     response,
     submit_nomad_job,
 )
+from backend.deployment_config import (
+    DeploymentConfig,
+    NDBDeploymentOptions,
+    UDTDeploymentOptions,
+    ModelType,
+)
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -232,6 +238,31 @@ def deploy_model(
     work_dir = os.getcwd()
     platform = get_platform()
 
+    if model.type == ModelType.NDB:
+        model_options = NDBDeploymentOptions(
+            ndb_sub_type=model.sub_type,
+            llm_provider=(llm_provider or os.getenv("LLM_PROVIDER", "openai")),
+            genai_key=(genai_key or os.getenv("GENAI_KEY", "")),
+        )
+    elif model.type == ModelType.UDT:
+        model_options = UDTDeploymentOptions(udt_sub_type=model.sub_type)
+    else:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"Unsupported model type '{model.type}'.",
+        )
+
+    config = DeploymentConfig(
+        model_id=str(model.id),
+        model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
+        model_bazaar_dir=(
+            os.getenv("SHARE_DIR", None) if platform == "local" else "/model_bazaar"
+        ),
+        license_key=license_info["boltLicenseKey"],
+        autoscaling_enabled=autoscaling_enabled,
+        model_options=model_options,
+    )
+
     try:
         submit_nomad_job(
             str(Path(work_dir) / "backend" / "nomad_jobs" / "deployment_job.hcl.j2"),
@@ -244,16 +275,11 @@ def deploy_model(
             image_name=os.getenv("DEPLOY_IMAGE_NAME"),
             deployment_app_dir=str(get_root_absolute_path() / "deployment_job"),
             model_id=str(model.id),
-            model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
             share_dir=os.getenv("SHARE_DIR", None),
-            license_key=license_info["boltLicenseKey"],
-            genai_key=(genai_key or os.getenv("GENAI_KEY", "")),
-            llm_provider=(llm_provider or os.getenv("LLM_PROVIDER", "openai")),
+            config_path=config.save_deployment_config(),
             autoscaling_enabled=("true" if autoscaling_enabled else "false"),
             autoscaler_max_count=str(autoscaler_max_count),
             memory=memory,
-            type=model.type,
-            sub_type=model.sub_type,
             python_path=get_python_path(),
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),

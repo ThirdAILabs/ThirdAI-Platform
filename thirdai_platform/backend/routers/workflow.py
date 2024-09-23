@@ -22,6 +22,12 @@ from backend.utils import (
     response,
     submit_nomad_job,
 )
+from backend.deployment_config import (
+    DeploymentConfig,
+    NDBDeploymentOptions,
+    UDTDeploymentOptions,
+    ModelType,
+)
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, status
@@ -701,6 +707,39 @@ async def start_workflow(
             work_dir = os.getcwd()
             platform = get_platform()
 
+            if model.type == ModelType.NDB:
+                model_options = NDBDeploymentOptions(
+                    ndb_sub_type=model.sub_type,
+                    llm_provider=workflow.gen_ai_provider
+                    or os.getenv("LLM_PROVIDER", "openai"),
+                    genai_key=os.getenv("GENAI_KEY", ""),
+                )
+            elif model.type == ModelType.UDT:
+                model_options = UDTDeploymentOptions(udt_sub_type=model.sub_type)
+            else:
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message=f"Unsupported model type '{model.type}'.",
+                )
+
+            config = DeploymentConfig(
+                model_id=str(model.id),
+                model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
+                model_bazaar_dir=(
+                    os.getenv("SHARE_DIR", None)
+                    if platform == "local"
+                    else "/model_bazaar"
+                ),
+                license_key=verify_license(
+                    os.getenv(
+                        "LICENSE_PATH",
+                        "/model_bazaar/license/ndb_enterprise_license.json",
+                    )
+                )["boltLicenseKey"],
+                autoscaling_enabled=bool(os.getenv("AUTOSCALING_ENABLED", "false")),
+                model_options=model_options,
+            )
+
             try:
                 submit_nomad_job(
                     str(
@@ -718,28 +757,16 @@ async def start_workflow(
                     image_name=os.getenv("DEPLOY_IMAGE_NAME"),
                     deployment_app_dir=str(get_root_absolute_path() / "deployment_job"),
                     model_id=str(model.id),
-                    model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
                     share_dir=os.getenv("SHARE_DIR", None),
-                    license_key=verify_license(
-                        os.getenv(
-                            "LICENSE_PATH",
-                            "/model_bazaar/license/ndb_enterprise_license.json",
-                        )
-                    )["boltLicenseKey"],
-                    genai_key=(os.getenv("GENAI_KEY", "")),
+                    config_path=config.save_deployment_config(),
                     autoscaling_enabled=str(
                         os.getenv("AUTOSCALING_ENABLED", "false")
                     ).lower(),
                     autoscaler_max_count=os.getenv("AUTOSCALER_MAX_COUNT", "1"),
                     memory=memory,
-                    type=model.type,
-                    sub_type=model.sub_type,
                     python_path=get_python_path(),
                     aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
                     aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
-                    llm_provider=(
-                        workflow.gen_ai_provider or os.getenv("LLM_PROVIDER", "openai")
-                    ),
                 )
 
                 model.deploy_status = schema.Status.starting

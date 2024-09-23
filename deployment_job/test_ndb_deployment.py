@@ -59,23 +59,6 @@ class DummyPermissions:
         return True
 
 
-# def setup_env(tmp_dir: str, sub_type: str, autoscaling: bool):
-#     if sub_type == "v1":
-#         create_ndbv1_model(tmp_dir)
-#     elif sub_type == "v2":
-#         create_ndbv2_model(tmp_dir)
-#     else:
-#         raise ValueError(f"Invalid subtype '{sub_type}'")
-
-#     os.environ["MODEL_ID"] = f"{MODEL_ID}_{sub_type}"
-#     os.environ["MODEL_BAZAAR_ENDPOINT"] = ""
-#     os.environ["MODEL_BAZAAR_DIR"] = tmp_dir
-#     os.environ["LICENSE_KEY"] = LICENSE_KEY
-#     os.environ["TASK_RUNNER_TOKEN"] = ""
-#     os.environ["SUB_TYPE"] = sub_type
-#     os.environ["AUTOSCALING_ENABLED"] = str(autoscaling)
-
-
 def create_config(tmp_dir: str, sub_type: NDBSubType, autoscaling: bool):
     if sub_type == NDBSubType.v1:
         create_ndbv1_model(tmp_dir)
@@ -89,7 +72,6 @@ def create_config(tmp_dir: str, sub_type: NDBSubType, autoscaling: bool):
         model_bazaar_endpoint="",
         model_bazaar_dir=tmp_dir,
         license_key=LICENSE_KEY,
-        task_runner_token="",
         autoscaling_enabled=autoscaling,
         model_options=NDBDeploymentOptions(ndb_sub_type=sub_type),
     )

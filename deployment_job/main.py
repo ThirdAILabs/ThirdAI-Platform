@@ -10,12 +10,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from permissions import Permissions
 from prometheus_client import make_asgi_app
+import os
 from reporter import Reporter
 from routers.ndb import create_ndb_router
 from routers.udt import create_udt_router
 from utils import delete_deployment_job
 
-config: DeploymentConfig = None
+
+def load_config():
+    with open(os.getenv("CONFIG_PATH")) as file:
+        return DeploymentConfig.model_validate_json(file.read())
+
+
+config: DeploymentConfig = load_config()
 reporter = Reporter(config.model_bazaar_endpoint)
 
 app = FastAPI(
@@ -67,7 +74,7 @@ async def async_timer() -> None:
                 response, job_id = delete_deployment_job(
                     config.get_nomad_endpoint(),
                     config.model_id,
-                    config.task_runner_token,
+                    os.getenv("TASK_RUNNER_TOKEN"),
                 )
                 if response.status_code == 200:
                     print(f"Job {job_id} stopped successfully")

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from auth.jwt import AuthenticatedUser, verify_access_token
-from backend.config import Entity, JobOptions
+from backend.train_config import Entity, JobOptions
 from backend.datagen import (
     TextClassificationGenerateArgs,
     TokenClassificationGenerateArgs,

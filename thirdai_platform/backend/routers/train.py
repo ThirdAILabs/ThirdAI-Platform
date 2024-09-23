@@ -8,7 +8,7 @@ from typing import Dict, List, Optional
 
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
-from backend.config import (
+from backend.train_config import (
     DatagenOptions,
     FileInfo,
     FileLocation,

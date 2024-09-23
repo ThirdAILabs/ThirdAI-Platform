@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field
+import os
 
 
 class ModelType(str, Enum):
@@ -57,3 +58,17 @@ class DeploymentConfig(BaseModel):
 
         # Rebuild the URL while keeping the original scheme and hostname
         return urlunparse((parsed_url.scheme, nomad_netloc, "", "", "", ""))
+
+    def save_deployment_config(self):
+        config_path = os.path.join(
+            self.model_bazaar_dir,
+            "models",
+            str(self.model_id),
+            "deployments",
+            "deployment_config.json",
+        )
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        with open(config_path, "w") as file:
+            file.write(self.model_dump_json(indent=4))
+
+        return config_path
