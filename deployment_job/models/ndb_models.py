@@ -391,30 +391,49 @@ class NDBV2Model(NDBModel):
             key=lambda x: x["source"],
         )
 
-    def highlight_pdf(self, chunk_id: int) -> Tuple[str, Optional[bytes]]:
-        chunk = self.db.chunk_store.get_chunks([chunk_id])
-        if not chunk:
-            raise ValueError(f"{chunk_id} is not a valid chunk_id")
-        chunk = chunk[0]
-
+    def highlight_v1(self, chunk: Chunk) -> Tuple[str, Optional[bytes]]:
         source = self.full_source_path(chunk.document)
-        if "chunk_boxes" not in chunk.metadata:
-            return source, None
+        highlights = ast.literal_eval(chunk.metadata["highlight"])
 
+        doc = fitz.open(source)
+        for key, val in highlights.items():
+            page = doc[key]
+            blocks = page.get_text("blocks")
+            for i, b in enumerate(blocks):
+                if i in val:
+                    rect = fitz.Rect(b[:4])
+                    page.add_highlight_annot(rect)
+
+        return source, doc.tobytes()
+
+    def highlight_v2(self, chunk: Chunk) -> Tuple[str, Optional[bytes]]:
+        source = self.full_source_path(chunk.document)
         highlights = ast.literal_eval(chunk.metadata["chunk_boxes"])
+
         doc = fitz.open(source)
         for page, bounding_box in highlights:
             doc[page].add_highlight_annot(fitz.Rect(bounding_box))
 
         return source, doc.tobytes()
 
+    def highlight_pdf(self, chunk_id: int) -> Tuple[str, Optional[bytes]]:
+        chunk = self.db.chunk_store.get_chunks([chunk_id])
+        if not chunk:
+            raise ValueError(f"{chunk_id} is not a valid chunk_id")
+        chunk = chunk[0]
+
+        if "highlight" in chunk.metadata:
+            return self.highlight_v1(chunk)
+        elif "chunk_boxes" in chunk.metadata:
+            return self.highlight_v2(chunk)
+        else:
+            return self.full_source_path(chunk.document), None
+
     def chunks(self, chunk_id: int) -> Optional[Dict[str, Any]]:
         chunk = self.db.chunk_store.get_chunks([chunk_id])
         if not chunk:
             raise ValueError(f"{chunk_id} is not a valid chunk_id")
         chunk = chunk[0]
-        if "chunk_boxes" not in chunk.metadata:
-            return None
 
         chunk_ids = self.db.chunk_store.get_doc_chunks(
             doc_id=chunk.doc_id, before_version=chunk.doc_version + 1
@@ -423,11 +442,29 @@ class NDBV2Model(NDBModel):
 
         chunks = list(filter(lambda c: c.doc_version == chunk.doc_version, chunks))
 
+        if "chunk_boxes" in chunk.metadata:
+            bboxes = [ast.literal_eval(c.metadata["chunk_boxes"]) for c in chunks]
+        elif "highlight" in chunk.metadata:
+            doc = fitz.open(self.full_source_path(chunk.document))
+            page_blocks = [page.get_text("blocks") for page in doc]
+            bboxes = [
+                [
+                    (page_idx, page_blocks[page_idx][i][:4])
+                    for page_idx, block_ids in ast.literal_eval(
+                        c.metadata["highlight"]
+                    ).items()
+                    for i in block_ids
+                ]
+                for c in chunks
+            ]
+        else:
+            return None
+
         return {
             "filename": self.full_source_path(chunk.document),
             "id": [c.chunk_id for c in chunks],
             "text": [c.text for c in chunks],
-            "boxes": [ast.literal_eval(c.metadata["chunk_boxes"]) for c in chunks],
+            "boxes": bboxes,
         }
 
     def load(self, write_mode: bool = False, **kwargs) -> ndbv2.NeuralDB:
