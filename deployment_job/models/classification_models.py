@@ -4,19 +4,22 @@ from typing import Optional
 from models.model import Model
 from pydantic_models import inputs
 from thirdai import bolt
+from config import DeploymentConfig
 
 
 class ClassificationModel(Model):
-    def __init__(self, model_bazaar_dir: str, model_id: str):
-        super().__init__(model_bazaar_dir=model_bazaar_dir, model_id=model_id)
+    def __init__(self, config: DeploymentConfig):
+        super().__init__(config=config)
         self.model: bolt.UniversalDeepTransformer = self.load()
 
     def get_udt_path(self, model_id: Optional[str] = None) -> str:
-        model_id = model_id or self.model_id
+        model_id = model_id or self.config.model_id
         return str(self.get_model_dir(model_id) / "model.udt")
 
     def load(self):
-        return bolt.UniversalDeepTransformer.load(self.get_udt_path(self.model_id))
+        return bolt.UniversalDeepTransformer.load(
+            self.get_udt_path(self.config.model_id)
+        )
 
     def save(self, model_id):
         self.model.save(self.get_udt_path(model_id))
@@ -27,8 +30,8 @@ class ClassificationModel(Model):
 
 
 class TextClassificationModel(ClassificationModel):
-    def __init__(self, model_bazaar_dir: str, model_id: str):
-        super().__init__(model_bazaar_dir=model_bazaar_dir, model_id=model_id)
+    def __init__(self, config: DeploymentConfig):
+        super().__init__(config=config)
         self.num_classes = self.model.predict({"text": "test"}).shape[-1]
 
     def predict(self, query: str, top_k: int, **kwargs):

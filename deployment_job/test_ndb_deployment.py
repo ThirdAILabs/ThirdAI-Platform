@@ -7,6 +7,8 @@ import thirdai
 from fastapi.testclient import TestClient
 from thirdai import neural_db as ndbv1
 from thirdai import neural_db_v2 as ndbv2
+from config import DeploymentConfig, NDBDeploymentOptions, NDBSubType, ModelType
+from routers.ndb import create_ndb_router
 
 MODEL_ID = "xyz"
 LICENSE_KEY = "002099-64C584-3E02C8-7E51A0-DE65D9-V3"
@@ -49,29 +51,48 @@ def create_ndbv2_model(tmp_dir):
     db.save(os.path.join(tmp_dir, "models", f"{MODEL_ID}_v2", "model.ndb"))
 
 
-def dummy_verify(self, permission_type: str):
-    return lambda: ""
+class DummyPermissions:
+    def verify_permission(self, permission_type: str = "read"):
+        return lambda: ""
+
+    def check_permission(self, token: str, permission_type: str = "read"):
+        return True
 
 
-def dummy_check(self, token, permission_type):
-    return True
+# def setup_env(tmp_dir: str, sub_type: str, autoscaling: bool):
+#     if sub_type == "v1":
+#         create_ndbv1_model(tmp_dir)
+#     elif sub_type == "v2":
+#         create_ndbv2_model(tmp_dir)
+#     else:
+#         raise ValueError(f"Invalid subtype '{sub_type}'")
+
+#     os.environ["MODEL_ID"] = f"{MODEL_ID}_{sub_type}"
+#     os.environ["MODEL_BAZAAR_ENDPOINT"] = ""
+#     os.environ["MODEL_BAZAAR_DIR"] = tmp_dir
+#     os.environ["LICENSE_KEY"] = LICENSE_KEY
+#     os.environ["TASK_RUNNER_TOKEN"] = ""
+#     os.environ["SUB_TYPE"] = sub_type
+#     os.environ["AUTOSCALING_ENABLED"] = str(autoscaling)
 
 
-def setup_env(tmp_dir: str, sub_type: str, autoscaling: bool):
-    if sub_type == "v1":
+def create_config(tmp_dir: str, sub_type: NDBSubType, autoscaling: bool):
+    if sub_type == NDBSubType.v1:
         create_ndbv1_model(tmp_dir)
-    elif sub_type == "v2":
+    elif sub_type == NDBSubType.v2:
         create_ndbv2_model(tmp_dir)
     else:
         raise ValueError(f"Invalid subtype '{sub_type}'")
 
-    os.environ["MODEL_ID"] = f"{MODEL_ID}_{sub_type}"
-    os.environ["MODEL_BAZAAR_ENDPOINT"] = ""
-    os.environ["MODEL_BAZAAR_DIR"] = tmp_dir
-    os.environ["LICENSE_KEY"] = LICENSE_KEY
-    os.environ["TASK_RUNNER_TOKEN"] = ""
-    os.environ["SUB_TYPE"] = sub_type
-    os.environ["AUTOSCALING_ENABLED"] = str(autoscaling)
+    return DeploymentConfig(
+        model_id=f"{MODEL_ID}_{sub_type}",
+        model_bazaar_endpoint="",
+        model_bazaar_dir=tmp_dir,
+        license_key=LICENSE_KEY,
+        task_runner_token="",
+        autoscaling_enabled=autoscaling,
+        model_options=NDBDeploymentOptions(ndb_sub_type=sub_type),
+    )
 
 
 def get_query_result(client: TestClient, query: str):
@@ -170,16 +191,9 @@ def check_deletion_dev_mode(client: TestClient):
 @pytest.mark.unit
 @pytest.mark.parametrize("sub_type", ["v1", "v2"])
 def test_deploy_ndb_dev_mode(tmp_dir, sub_type):
-    setup_env(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=False)
+    config = create_config(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=False)
 
-    from permissions import Permissions
-
-    Permissions.verify_permission = dummy_verify
-    Permissions.check_permission = dummy_check
-
-    from routers.ndb import ndb_router
-
-    client = TestClient(ndb_router)
+    client = TestClient(create_ndb_router(config, DummyPermissions()))
 
     check_query(client)
     check_upvote_dev_mode(client)
@@ -280,19 +294,12 @@ def check_log_lines(logdir, expected_lines):
 @pytest.mark.unit
 @pytest.mark.parametrize("sub_type", ["v1", "v2"])
 def test_deploy_ndb_prod_mode(tmp_dir, sub_type):
-    setup_env(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=True)
+    config = create_config(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=True)
 
-    from permissions import Permissions
-
-    Permissions.verify_permission = dummy_verify
-    Permissions.check_permission = dummy_check
-
-    from routers.ndb import ndb_router
-
-    client = TestClient(ndb_router)
+    client = TestClient(create_ndb_router(config, DummyPermissions()))
 
     deployment_dir = os.path.join(
-        tmp_dir, "models", os.environ["MODEL_ID"], "deployments/data"
+        tmp_dir, "models", config.model_id, "deployments/data"
     )
     check_log_lines(os.path.join(deployment_dir, "feedback"), 0)
     check_log_lines(os.path.join(deployment_dir, "insertions"), 0)

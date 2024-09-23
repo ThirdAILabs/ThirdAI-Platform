@@ -4,23 +4,22 @@ from functools import wraps
 from typing import Any
 
 import uvicorn
+from config import DeploymentConfig, ModelType
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from permissions import Permissions
 from prometheus_client import make_asgi_app
 from reporter import Reporter
-from routers.model import get_model
-from routers.ndb import ndb_router
-from routers.udt import udt_router
+from routers.ndb import create_ndb_router
+from routers.udt import create_udt_router
 from utils import delete_deployment_job
-from variables import GeneralVariables, ModelType
 
-general_variables = GeneralVariables.load_from_env()
-reporter = Reporter(general_variables.model_bazaar_endpoint)
+config: DeploymentConfig = None
+reporter = Reporter(config.model_bazaar_endpoint)
 
 app = FastAPI(
-    docs_url=f"/{general_variables.model_id}/docs",
-    openapi_url=f"/{general_variables.model_id}/openapi.json",
+    docs_url=f"/{config.model_id}/docs", openapi_url=f"/{config.model_id}/openapi.json"
 )
 
 app.add_middleware(
@@ -35,22 +34,6 @@ app.add_middleware(
 # after n minutes, this service will shut down, unless a function that is decorated
 # with @reset_timer is called, in which case the timer restarts.
 reset_event = asyncio.Event()
-
-# We have a case where we copy the ndb model for base model training and
-# read the model for deployment we face the open database issue.
-max_retries = 2  # Total attempts including the initial one
-retry_delay = 5  # Delay in seconds before retrying
-
-for attempt in range(1, max_retries + 1):
-    try:
-        model = get_model()
-        break  # Exit the loop if model loading is successful
-    except Exception as err:
-        if attempt < max_retries:
-            time.sleep(retry_delay)
-        else:
-            reporter.update_deploy_status(general_variables.model_id, "failed")
-            raise  # Optionally re-raise the exception if you want the application to stop
 
 
 def reset_timer(endpoint_func):
@@ -78,28 +61,53 @@ async def async_timer() -> None:
         except asyncio.TimeoutError:
             # Timer expired, initiate shutdown
             active_workflows_count = reporter.active_workflow_count(
-                model_id=general_variables.model_id
+                model_id=config.model_id
             )
             if active_workflows_count == 0:
                 response, job_id = delete_deployment_job(
-                    general_variables.get_nomad_endpoint(),
-                    general_variables.model_id,
-                    general_variables.task_runner_token,
+                    config.get_nomad_endpoint(),
+                    config.model_id,
+                    config.task_runner_token,
                 )
                 if response.status_code == 200:
-                    model.logger.info(f"Job {job_id} stopped successfully")
+                    print(f"Job {job_id} stopped successfully")
                 else:
-                    model.logger.error(
+                    print(
                         f"Failed to stop job {job_id}. Status code: {response.status_code}, Response: {response.text}"
                     )
-                reporter.update_deploy_status(general_variables.model_id, "stopped")
+                reporter.update_deploy_status(config.model_id, "stopped")
             reset_event.clear()  # Clear event after handling timeout
 
 
-if general_variables.type == ModelType.NDB:
-    app.include_router(ndb_router, prefix=f"/{general_variables.model_id}")
-elif general_variables.type == ModelType.UDT:
-    app.include_router(udt_router, prefix=f"/{general_variables.model_id}")
+if config.model_options.model_type == ModelType.NDB:
+    backend_router_factory = create_ndb_router
+elif config.model_options.model_type == ModelType.UDT:
+    backend_router_factory = create_udt_router
+else:
+    raise ValueError(f"Unsupported ModelType '{config.model_options.model_type}'.")
+
+permissions = Permissions(
+    model_bazaar_endpoint=config.model_bazaar_endpoint, model_id=config.model_id
+)
+
+# We have a case where we copy the ndb model for base model training and
+# read the model for deployment we face the open database issue.
+max_retries = 2  # Total attempts including the initial one
+retry_delay = 5  # Delay in seconds before retrying
+
+for attempt in range(1, max_retries + 1):
+    try:
+        backend_router = backend_router_factory(config, permissions)
+        break  # Exit the loop if model loading is successful
+    except Exception as err:
+        if attempt < max_retries:
+            time.sleep(retry_delay)
+        else:
+            reporter.update_deploy_status(config.model_id, "failed")
+            raise  # Optionally re-raise the exception if you want the application to stop
+
+
+app.include_router(backend_router, prefix=f"/{config.model_id}")
 
 app.mount("/metrics", make_asgi_app())
 
@@ -124,11 +132,11 @@ async def startup_event() -> None:
     """
     try:
         await asyncio.sleep(10)
-        reporter.update_deploy_status(general_variables.model_id, "complete")
+        reporter.update_deploy_status(config.model_id, "complete")
         asyncio.create_task(async_timer())
     except Exception as e:
-        reporter.update_deploy_status(general_variables.model_id, "failed")
-        model.logger.error(f"Failed to startup the application, {e}")
+        reporter.update_deploy_status(config.model_id, "failed")
+        print(f"Failed to startup the application, {e}")
         raise e  # Re-raise the exception to propagate it to the main block
 
 
@@ -136,5 +144,5 @@ if __name__ == "__main__":
     try:
         uvicorn.run(app, host="localhost", port=8000)
     except Exception as e:
-        model.logger.error(f"Uvicorn failed to start: {str(e)}")
-        reporter.update_deploy_status(general_variables.model_id, "failed")
+        print(f"Uvicorn failed to start: {str(e)}")
+        reporter.update_deploy_status(config.model_id, "failed")

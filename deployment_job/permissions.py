@@ -1,9 +1,10 @@
 import datetime
 from threading import Lock
 from typing import Callable, Dict, List, Tuple
-
+from urllib.parse import urljoin
+import requests
 import fastapi
-from variables import GeneralVariables
+from fastapi import status
 
 CREDENTIALS_EXCEPTION = fastapi.HTTPException(
     status_code=fastapi.status.HTTP_401_UNAUTHORIZED,
@@ -43,7 +44,9 @@ def now() -> datetime.datetime:
 
 
 class Permissions:
-    def __init__(self, entry_expiration_min: int = 5):
+    def __init__(
+        self, model_bazaar_endpoint: str, model_id: str, entry_expiration_min: int = 5
+    ):
         """
         Manages permissions for tokens with caching and expiration.
 
@@ -51,10 +54,11 @@ class Permissions:
             entry_expiration_min (int): Number of minutes until the permissions
                                         for a token need to be refreshed.
         """
+        self.model_bazaar_endpoint = model_bazaar_endpoint
+        self.model_id = model_id
         # entry_expiration_seconds: number of seconds until the permissions for a
         # token needs to be refreshed. We refresh in case a previously invalid
         # token becomes a valid token.
-        self.general_variables = GeneralVariables.load_from_env()
         self.entry_expiration_min = entry_expiration_min
         self.expirations: List[Tuple[datetime.datetime, str]] = []
         self.cache: Dict[str, dict] = {}
@@ -76,6 +80,35 @@ class Permissions:
             pos += 1
         self.expirations = self.expirations[pos:]
 
+    def _deployment_permissions(self, token: str):
+        deployment_permissions_endpoint = urljoin(
+            self.model_bazaar_endpoint,
+            f"api/deploy/permissions/{self.model_id}",
+        )
+        response = requests.get(
+            deployment_permissions_endpoint,
+            headers={"Authorization": "Bearer " + token},
+        )
+        if response.status_code == status.HTTP_401_UNAUTHORIZED:
+            return {
+                "read": False,
+                "write": False,
+                "exp": now() + datetime.timedelta(minutes=5),
+                "override": False,
+            }
+        elif response.status_code != status.HTTP_200_OK:
+            print(response.text)
+            return {
+                "read": False,
+                "write": False,
+                "exp": now(),
+                "override": False,
+            }
+        res_json = response.json()
+        permissions = res_json["data"]
+        permissions["exp"] = datetime.datetime.fromisoformat(permissions["exp"])
+        return permissions
+
     def _get_permissions(self, token: str) -> Tuple[bool, bool, bool]:
         """
         Retrieves permissions for a token, updating the cache if necessary.
@@ -89,7 +122,7 @@ class Permissions:
         self._clear_expired_entries()
         curr_time = now()
         if token not in self.cache:
-            permissions = self.general_variables.deployment_permissions(token)
+            permissions = self._deployment_permissions(token)
             self.expirations.append(
                 (
                     curr_time + datetime.timedelta(minutes=self.entry_expiration_min),

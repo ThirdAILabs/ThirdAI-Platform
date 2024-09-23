@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 from pydantic_models.constraints import Constraints
+from file_handler import FileInfo
 
 
 class AssociateInputSingle(BaseModel):
@@ -76,6 +77,10 @@ class SearchResultsNDB(BaseModel):
 
     query_text: str
     references: List[Reference]
+
+
+class DocumentList(BaseModel):
+    documents: List[FileInfo]
 
 
 class DeleteInput(BaseModel):
