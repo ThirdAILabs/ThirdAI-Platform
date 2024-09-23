@@ -11,6 +11,12 @@ from auth.jwt import (
     verify_access_token_no_throw,
 )
 from backend.auth_dependencies import is_model_owner
+from backend.deployment_config import (
+    DeploymentConfig,
+    ModelType,
+    NDBDeploymentOptions,
+    UDTDeploymentOptions,
+)
 from backend.startup_jobs import start_on_prem_generate_job
 from backend.utils import (
     delete_nomad_job,
@@ -22,12 +28,6 @@ from backend.utils import (
     model_accessible,
     response,
     submit_nomad_job,
-)
-from backend.deployment_config import (
-    DeploymentConfig,
-    NDBDeploymentOptions,
-    UDTDeploymentOptions,
-    ModelType,
 )
 from database import schema
 from database.session import get_session

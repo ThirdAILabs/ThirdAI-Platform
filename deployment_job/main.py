@@ -1,4 +1,5 @@
 import asyncio
+import os
 import time
 from functools import wraps
 from typing import Any
@@ -10,7 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from permissions import Permissions
 from prometheus_client import make_asgi_app
-import os
 from reporter import Reporter
 from routers.ndb import create_ndb_router
 from routers.udt import create_udt_router

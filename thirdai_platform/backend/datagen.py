@@ -4,7 +4,13 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from backend.train_config import DatagenOptions, Entity, JobOptions, LLMProvider, UDTSubType
+from backend.train_config import (
+    DatagenOptions,
+    Entity,
+    JobOptions,
+    LLMProvider,
+    UDTSubType,
+)
 from backend.utils import (
     get_platform,
     get_python_path,

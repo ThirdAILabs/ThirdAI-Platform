@@ -6,13 +6,13 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from auth.jwt import AuthenticatedUser, verify_access_token
-from backend.train_config import Entity, JobOptions
 from backend.datagen import (
     TextClassificationGenerateArgs,
     TokenClassificationGenerateArgs,
     generate_text_data,
     generate_token_data,
 )
+from backend.train_config import Entity, JobOptions
 from backend.utils import response
 from database import schema
 from database.session import get_session

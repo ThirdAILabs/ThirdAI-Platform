@@ -18,11 +18,11 @@ import models.ndbv1_parser as ndbv1_parser
 import models.ndbv2_parser as ndbv2_parser
 import thirdai.neural_db_v2.chunk_stores.constraints as ndbv2_constraints
 from chat import llm_providers
+from config import DeploymentConfig
 from file_handler import FileInfo, expand_s3_buckets_and_directories
 from models.model import Model
 from pydantic_models import inputs
 from thirdai import neural_db as ndb
-from config import DeploymentConfig
 from thirdai import neural_db_v2 as ndbv2
 from thirdai.neural_db_v2.core.types import Chunk
 from utils import highlighted_pdf_bytes, new_pdf_chunks, old_pdf_chunks

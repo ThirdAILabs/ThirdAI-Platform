@@ -7,9 +7,11 @@ from typing import List, Optional
 import fitz
 import jwt
 import thirdai
+from config import DeploymentConfig, NDBSubType
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from file_handler import FileInfo, download_local_files
+from models.ndb_models import NDBModel, NDBV1Model, NDBV2Model
 from permissions import Permissions
 from prometheus_client import Counter, Summary
 from pydantic import BaseModel, ValidationError
@@ -24,10 +26,7 @@ from update_logger import (
     UpdateLogger,
     UpvoteLog,
 )
-from models.ndb_models import NDBModel, NDBV1Model, NDBV2Model
 from utils import propagate_error, response, validate_name
-from config import DeploymentConfig, NDBSubType
-
 
 ndb_query_metric = Summary("ndb_query", "NDB Queries")
 ndb_upvote_metric = Summary("ndb_upvote", "NDB upvotes")

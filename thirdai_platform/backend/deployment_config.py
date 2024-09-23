@@ -1,8 +1,8 @@
+import os
 from enum import Enum
 from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field
-import os
 
 
 class ModelType(str, Enum):

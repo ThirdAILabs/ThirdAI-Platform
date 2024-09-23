@@ -2,8 +2,9 @@ import datetime
 from threading import Lock
 from typing import Callable, Dict, List, Tuple
 from urllib.parse import urljoin
-import requests
+
 import fastapi
+import requests
 from fastapi import status
 
 CREDENTIALS_EXCEPTION = fastapi.HTTPException(

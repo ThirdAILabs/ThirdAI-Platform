@@ -4,11 +4,11 @@ import shutil
 
 import pytest
 import thirdai
+from config import DeploymentConfig, ModelType, NDBDeploymentOptions, NDBSubType
 from fastapi.testclient import TestClient
+from routers.ndb import create_ndb_router
 from thirdai import neural_db as ndbv1
 from thirdai import neural_db_v2 as ndbv2
-from config import DeploymentConfig, NDBDeploymentOptions, NDBSubType, ModelType
-from routers.ndb import create_ndb_router
 
 MODEL_ID = "xyz"
 LICENSE_KEY = "002099-64C584-3E02C8-7E51A0-DE65D9-V3"
