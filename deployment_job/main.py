@@ -12,10 +12,10 @@ from fastapi.responses import JSONResponse
 from permissions import Permissions
 from prometheus_client import make_asgi_app
 from reporter import Reporter
-from routers.ndb import create_ndb_router
-from routers.udt import create_udt_router
-from utils import delete_deployment_job
+from routers.ndb import NDBRouter
+from routers.udt import UDTRouter
 from thirdai import licensing
+from utils import delete_deployment_job
 
 
 def load_config():
@@ -27,6 +27,10 @@ config: DeploymentConfig = load_config()
 reporter = Reporter(config.model_bazaar_endpoint)
 
 licensing.activate(config.license_key)
+
+Permissions.init(
+    model_bazaar_endpoint=config.model_bazaar_endpoint, model_id=config.model_id
+)
 
 app = FastAPI(
     docs_url=f"/{config.model_id}/docs", openapi_url=f"/{config.model_id}/openapi.json"
@@ -90,15 +94,12 @@ async def async_timer() -> None:
 
 
 if config.model_options.model_type == ModelType.NDB:
-    backend_router_factory = create_ndb_router
+    backend_router_factory = NDBRouter
 elif config.model_options.model_type == ModelType.UDT:
-    backend_router_factory = create_udt_router
+    backend_router_factory = UDTRouter
 else:
     raise ValueError(f"Unsupported ModelType '{config.model_options.model_type}'.")
 
-permissions = Permissions(
-    model_bazaar_endpoint=config.model_bazaar_endpoint, model_id=config.model_id
-)
 
 # We have a case where we copy the ndb model for base model training and
 # read the model for deployment we face the open database issue.
@@ -107,7 +108,7 @@ retry_delay = 5  # Delay in seconds before retrying
 
 for attempt in range(1, max_retries + 1):
     try:
-        backend_router = backend_router_factory(config, permissions)
+        backend_router = backend_router_factory(config, reporter)
         break  # Exit the loop if model loading is successful
     except Exception as err:
         if attempt < max_retries:
@@ -117,7 +118,7 @@ for attempt in range(1, max_retries + 1):
             raise  # Optionally re-raise the exception if you want the application to stop
 
 
-app.include_router(backend_router, prefix=f"/{config.model_id}")
+app.include_router(backend_router.router, prefix=f"/{config.model_id}")
 
 app.mount("/metrics", make_asgi_app())
 

@@ -11,16 +11,11 @@ from models.classification_models import (
 from permissions import Permissions
 from prometheus_client import Summary
 from pydantic_models.inputs import BaseQueryParams, SearchResultsTokenClassification
+from reporter import Reporter
 from throughput import Throughput
 from utils import propagate_error, response
 
 udt_predict_metric = Summary("udt_predict", "UDT predictions")
-
-# TODO(Nicholas): move these metrics to prometheus
-start_time = time.time()
-tokens_identified = Throughput()
-queries_ingested = Throughput()
-queries_ingested_bytes = Throughput()
 
 
 def get_model(config: DeploymentConfig) -> ClassificationModel:
@@ -33,17 +28,26 @@ def get_model(config: DeploymentConfig) -> ClassificationModel:
         raise ValueError(f"Unsupported UDT subtype '{subtype}'.")
 
 
-def create_udt_router(config: DeploymentConfig, permissions: Permissions):
-    model: ClassificationModel = get_model(config)
+class UDTRouter:
+    def __init__(self, config: DeploymentConfig, reporter: Reporter):
+        self.model: ClassificationModel = get_model(config)
 
-    udt_router = APIRouter()
+        # TODO(Nicholas): move these metrics to prometheus
+        self.start_time = time.time()
+        self.tokens_identified = Throughput()
+        self.queries_ingested = Throughput()
+        self.queries_ingested_bytes = Throughput()
 
-    @udt_router.post("/predict")
+        self.router = APIRouter()
+        self.router.add_api_route("/predict", self.predict, methods=["POST"])
+        self.router.add_api_route("/stats", self.stats, methods=["GET"])
+
     @propagate_error
     @udt_predict_metric.time()
-    def udt_query(
+    def predict(
+        self,
         base_params: BaseQueryParams,
-        token=Depends(permissions.verify_permission("read")),
+        token=Depends(Permissions.verify_permission("read")),
     ):
         """
         Predicts the output based on the provided query parameters.
@@ -64,15 +68,15 @@ def create_udt_router(config: DeploymentConfig, permissions: Permissions):
         ```
         """
         params = base_params.model_dump()
-        results = model.predict(**params)
+        results = self.model.predict(**params)
 
         # TODO(pratik/geordie/yash): Add logging for search results text classification
         if isinstance(results, SearchResultsTokenClassification):
-            tokens_identified.log(
+            self.tokens_identified.log(
                 len([tags[0] for tags in results.predicted_tags if tags[0] != "O"])
             )
-            queries_ingested.log(1)
-            queries_ingested_bytes.log(len(params["query"]))
+            self.queries_ingested.log(1)
+            self.queries_ingested_bytes.log(len(params["query"]))
 
         return response(
             status_code=status.HTTP_200_OK,
@@ -80,9 +84,8 @@ def create_udt_router(config: DeploymentConfig, permissions: Permissions):
             data=jsonable_encoder(results),
         )
 
-    @udt_router.get("/stats")
     @propagate_error
-    def udt_stats(_=Depends(permissions.verify_permission("read"))):
+    def stats(self, token=Depends(Permissions.verify_permission("read"))):
         """
         Returns statistics about the deployment such as the number of tokens identified, number of
         queries ingested, and total size of queries ingested.
@@ -112,17 +115,15 @@ def create_udt_router(config: DeploymentConfig, permissions: Permissions):
             message="Successful",
             data={
                 "past_hour": {
-                    "tokens_identified": tokens_identified.past_hour(),
-                    "queries_ingested": queries_ingested.past_hour(),
-                    "queries_ingested_bytes": queries_ingested_bytes.past_hour(),
+                    "tokens_identified": self.tokens_identified.past_hour(),
+                    "queries_ingested": self.queries_ingested.past_hour(),
+                    "queries_ingested_bytes": self.queries_ingested_bytes.past_hour(),
                 },
                 "total": {
-                    "tokens_identified": tokens_identified.past_hour(),
-                    "queries_ingested": queries_ingested.past_hour(),
-                    "queries_ingested_bytes": queries_ingested_bytes.past_hour(),
+                    "tokens_identified": self.tokens_identified.past_hour(),
+                    "queries_ingested": self.queries_ingested.past_hour(),
+                    "queries_ingested_bytes": self.queries_ingested_bytes.past_hour(),
                 },
-                "uptime": int(time.time() - start_time),
+                "uptime": int(time.time() - self.start_time),
             },
         )
-
-    return udt_router

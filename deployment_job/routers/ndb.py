@@ -17,6 +17,7 @@ from prometheus_client import Counter, Summary
 from pydantic import BaseModel, ValidationError
 from pydantic_models import inputs
 from pydantic_models.inputs import BaseQueryParams, NDBExtraParams
+from reporter import Reporter
 from update_logger import (
     AssociateLog,
     DeleteLog,
@@ -50,22 +51,48 @@ def get_model(config: DeploymentConfig) -> NDBModel:
         raise ValueError(f"Unsupported NDB subtype '{subtype}'.")
 
 
-def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
-    model: NDBModel = get_model(config)
+class NDBRouter:
+    def __init__(self, config: DeploymentConfig, reporter: Reporter):
+        self.config = config
+        self.reporter = reporter
 
-    feedback_logger = UpdateLogger.get_feedback_logger(model.data_dir)
-    insertion_logger = UpdateLogger.get_insertion_logger(model.data_dir)
-    deletion_logger = UpdateLogger.get_deletion_logger(model.data_dir)
+        self.model: NDBModel = get_model(config)
 
-    ndb_router = APIRouter()
+        self.feedback_logger = UpdateLogger.get_feedback_logger(self.model.data_dir)
+        self.insertion_logger = UpdateLogger.get_insertion_logger(self.model.data_dir)
+        self.deletion_logger = UpdateLogger.get_deletion_logger(self.model.data_dir)
 
-    @ndb_router.post("/predict")
+        self.router = APIRouter()
+        self.router.add_api_route("/predict", self.query, methods=["POST"])
+        self.router.add_api_route("/insert", self.insert, methods=["POST"])
+        self.router.add_api_route("/delete", self.delete, methods=["POST"])
+        self.router.add_api_route("/upvote", self.upvote, methods=["POST"])
+        self.router.add_api_route("/associate", self.associate, methods=["POST"])
+        self.router.add_api_route(
+            "/implicit-feedback", self.implicit_feedback, methods=["POST"]
+        )
+        self.router.add_api_route(
+            "/update-chat-settings", self.update_chat_settings, methods=["POST"]
+        )
+        self.router.add_api_route(
+            "/get-chat-history", self.get_chat_history, methods=["POST"]
+        )
+        self.router.add_api_route("/chat", self.chat, methods=["POST"])
+        self.router.add_api_route("/sources", self.get_sources, methods=["GET"])
+        self.router.add_api_route("/save", self.save, methods=["POST"])
+        self.router.add_api_route(
+            "/highlighted-pdf", self.highlighted_pdf, methods=["GET"]
+        )
+        self.router.add_api_route("/pdf-blob", self.pdf_blob, methods=["GET"])
+        self.router.add_api_route("/pdf-chunks", self.pdf_chunks, methods=["GET"])
+
     @ndb_query_metric.time()
     @propagate_error
-    def ndb_query(
+    def query(
+        self,
         base_params: BaseQueryParams,
         ndb_params: Optional[NDBExtraParams] = NDBExtraParams(),
-        _: str = Depends(permissions.verify_permission("read")),
+        token: str = Depends(Permissions.verify_permission("read")),
     ):
         """
         Query the NDB model with specified parameters.
@@ -119,7 +146,7 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
         extra_params = ndb_params.model_dump()
         params.update(extra_params)
 
-        results = model.predict(**params)
+        results = self.model.predict(**params)
 
         return response(
             status_code=status.HTTP_200_OK,
@@ -127,13 +154,13 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
             data=jsonable_encoder(results),
         )
 
-    @ndb_router.post("/insert")
     @propagate_error
     @ndb_insert_metric.time()
     def insert(
+        self,
         documents: str = Form(...),
         files: List[UploadFile] = [],
-        _: str = Depends(permissions.verify_permission("write")),
+        token: str = Depends(Permissions.verify_permission("write")),
     ):
         """
         Insert documents into the model.
@@ -183,30 +210,30 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
         documents = download_local_files(
             files=files,
             file_infos=documents,
-            dest_dir=model.data_dir / "insertions" / "documents",
+            dest_dir=self.model.data_dir / "insertions" / "documents",
         )
 
-        if config.autoscaling_enabled:
-            insertion_logger.log(InsertLog(documents=documents))
+        if self.config.autoscaling_enabled:
+            self.insertion_logger.log(InsertLog(documents=documents))
 
             return response(
                 status_code=status.HTTP_202_ACCEPTED,
                 message="Insert logged successfully.",
             )
         else:
-            model.insert(documents=documents)
+            self.model.insert(documents=documents)
 
             return response(
                 status_code=status.HTTP_200_OK,
                 message="Insert applied successfully.",
             )
 
-    @ndb_router.post("/delete")
     @propagate_error
     @ndb_delete_metric.time()
     def delete(
+        self,
         input: inputs.DeleteInput,
-        token: str = Depends(permissions.verify_permission("write")),
+        token: str = Depends(Permissions.verify_permission("write")),
     ):
         """
         Delete sources from the model.
@@ -226,27 +253,27 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
         ```
         """
 
-        if config.autoscaling_enabled:
-            deletion_logger.log(DeleteLog(doc_ids=input.source_ids))
+        if self.config.autoscaling_enabled:
+            self.deletion_logger.log(DeleteLog(doc_ids=input.source_ids))
 
             return response(
                 status_code=status.HTTP_202_ACCEPTED,
                 message="Delete logged successfully.",
             )
         else:
-            model.delete(input.source_ids)
+            self.model.delete(input.source_ids)
 
             return response(
                 status_code=status.HTTP_200_OK,
                 message="Delete applied successfully.",
             )
 
-    @ndb_router.post("/upvote")
     @propagate_error
     @ndb_upvote_metric.time()
-    def ndb_upvote(
+    def upvote(
+        self,
         input: inputs.UpvoteInput,
-        token: str = Depends(permissions.verify_permission("read")),
+        token: str = Depends(Permissions.verify_permission("read")),
     ):
         """
         Upvote specific text-id pairs.
@@ -268,12 +295,12 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
         }
         ```
         """
-        write_permission = permissions.check_permission(
+        write_permission = Permissions.check_permission(
             token=token, permission_type="write"
         )
 
-        if not write_permission or config.autoscaling_enabled:
-            feedback_logger.log(
+        if not write_permission or self.config.autoscaling_enabled:
+            self.feedback_logger.log(
                 FeedbackLog(
                     event=UpvoteLog(
                         chunk_ids=[
@@ -288,19 +315,19 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
                 message="Upvote logged successfully.",
             )
         else:
-            model.upvote(input.text_id_pairs)
+            self.model.upvote(input.text_id_pairs)
 
             return response(
                 status_code=status.HTTP_200_OK,
                 message="Upvote applied successfully.",
             )
 
-    @ndb_router.post("/associate")
     @propagate_error
     @ndb_associate_metric.time()
-    def ndb_associate(
+    def associate(
+        self,
         input: inputs.AssociateInput,
-        token: str = Depends(permissions.verify_permission("read")),
+        token: str = Depends(Permissions.verify_permission("read")),
     ):
         """
         Associate text pairs in the model.
@@ -322,12 +349,12 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
         }
         ```
         """
-        write_permission = permissions.check_permission(
+        write_permission = Permissions.check_permission(
             token=token, permission_type="write"
         )
 
-        if not write_permission or config.autoscaling_enabled:
-            feedback_logger.log(
+        if not write_permission or self.config.autoscaling_enabled:
+            self.feedback_logger.log(
                 FeedbackLog(
                     event=AssociateLog(
                         sources=[sample.source for sample in input.text_pairs],
@@ -340,21 +367,21 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
                 message="Associate logged successfully.",
             )
         else:
-            model.associate(input.text_pairs)
+            self.model.associate(input.text_pairs)
 
             return response(
                 status_code=status.HTTP_200_OK,
                 message="Associate applied successfully.",
             )
 
-    @ndb_router.post("/implicit-feedback")
     @propagate_error
     @ndb_implicit_feedback_metric.time()
     def implicit_feedback(
+        self,
         feedback: inputs.ImplicitFeedbackInput,
-        _: str = Depends(permissions.verify_permission("read")),
+        token: str = Depends(Permissions.verify_permission("read")),
     ):
-        feedback_logger.log(
+        self.feedback_logger.log(
             FeedbackLog(
                 event=ImplicitUpvoteLog(
                     chunk_id=feedback.reference_id,
@@ -372,26 +399,26 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
             message="Implicit feedback logged successfully.",
         )
 
-    @ndb_router.post("/update-chat-settings")
     @propagate_error
     def update_chat_settings(
+        self,
         settings: inputs.ChatSettings,
-        _=Depends(permissions.verify_permission("write")),
+        token=Depends(Permissions.verify_permission("write")),
     ):
-        model.set_chat(**(settings.dict()))
+        self.model.set_chat(**(settings.model_dump()))
 
         return response(
             status_code=status.HTTP_200_OK,
             message="Successfully updated chat settings",
         )
 
-    @ndb_router.post("/get-chat-history")
     @propagate_error
     def get_chat_history(
+        self,
         input: inputs.ChatHistoryInput,
-        token=Depends(permissions.verify_permission("read")),
+        token=Depends(Permissions.verify_permission("read")),
     ):
-        if not model.chat:
+        if not self.model.chat:
             raise Exception(
                 "Chat is not enabled. Please provide an GenAI key to enable chat."
             )
@@ -409,7 +436,7 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
         else:
             session_id = input.session_id
 
-        chat_history = {"chat_history": model.chat.get_chat_history(session_id)}
+        chat_history = {"chat_history": self.model.chat.get_chat_history(session_id)}
 
         return response(
             status_code=status.HTTP_200_OK,
@@ -417,12 +444,13 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
             data=chat_history,
         )
 
-    @ndb_router.post("/chat")
     @propagate_error
     def chat(
-        input: inputs.ChatInput, token=Depends(permissions.verify_permission("read"))
+        self,
+        input: inputs.ChatInput,
+        token=Depends(Permissions.verify_permission("read")),
     ):
-        if not model.chat:
+        if not self.model.chat:
             raise Exception(
                 "Chat is not enabled. Please provide an GENAI key to enable chat."
             )
@@ -440,7 +468,7 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
         else:
             session_id = input.session_id
 
-        chat_result = {"response": model.chat.chat(input.user_input, session_id)}
+        chat_result = {"response": self.model.chat.chat(input.user_input, session_id)}
 
         return response(
             status_code=status.HTTP_200_OK,
@@ -448,9 +476,8 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
             data=chat_result,
         )
 
-    @ndb_router.get("/sources")
     @propagate_error
-    def get_sources(_=Depends(permissions.verify_permission("read"))):
+    def get_sources(self, token=Depends(Permissions.verify_permission("read"))):
         """
         Get the sources used in the model.
 
@@ -469,17 +496,17 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
         }
         ```
         """
-        sources = model.sources()
+        sources = self.model.sources()
         return response(
             status_code=status.HTTP_200_OK,
             message="Successful",
             data=sources,
         )
 
-    @ndb_router.post("/save")
     def save(
+        self,
         input: inputs.SaveModel,
-        token: str = Depends(permissions.verify_permission("read")),
+        token: str = Depends(Permissions.verify_permission("read")),
     ):
         """
         Save the current state of the NDB model.
@@ -499,7 +526,7 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
         }
         ```
         """
-        model_id = config.model_id
+        model_id = self.config.model_id
         if not input.override:
             model_id = str(uuid.uuid4())
             if not input.model_name:
@@ -516,7 +543,7 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
                     message="Name must only contain alphanumeric characters, underscores (_), and hyphens (-).",
                 )
 
-            is_model_present = model.reporter.check_model_present(
+            is_model_present = self.reporter.check_model_present(
                 token, input.model_name
             )
             if is_model_present:
@@ -525,7 +552,7 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
                     message="Model name already exists, choose another one.",
                 )
         else:
-            override_permission = permissions.check_permission(
+            override_permission = Permissions.check_permission(
                 token=token, permission_type="override"
             )
             if not override_permission:
@@ -534,9 +561,9 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
                     message="You don't have permissions to override this model.",
                 )
         try:
-            model.save(model_id=model_id)
+            self.model.save(model_id=model_id)
             if not input.override:
-                model.reporter.save_model(
+                self.reporter.save_model(
                     access_token=token,
                     model_id=model_id,
                     base_model_id=model_id,
@@ -555,10 +582,9 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
             data={"new_model_id": model_id if not input.override else None},
         )
 
-    @ndb_router.get("/highlighted-pdf")
     @propagate_error
     def highlighted_pdf(
-        reference_id: int, _=Depends(permissions.verify_permission("read"))
+        self, reference_id: int, token=Depends(Permissions.verify_permission("read"))
     ):
         """
         Get a highlighted PDF based on the reference ID.
@@ -574,16 +600,17 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
         /highlighted-pdf?reference_id=123
         ```
         """
-        source, pdf_bytes = model.highlight_pdf(reference_id)
+        source, pdf_bytes = self.model.highlight_pdf(reference_id)
         buffer = io.BytesIO(pdf_bytes)
         headers = {"Content-Disposition": f'inline; filename="{Path(source).name}"'}
         return Response(
             buffer.getvalue(), headers=headers, media_type="application/pdf"
         )
 
-    @ndb_router.get("/pdf-blob")
     @propagate_error
-    def pdf_blob(source: str, _=Depends(permissions.verify_permission("read"))):
+    def pdf_blob(
+        self, source: str, token=Depends(Permissions.verify_permission("read"))
+    ):
         """
         Get the PDF blob from the source.
 
@@ -604,9 +631,10 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
             buffer.getvalue(), headers=headers, media_type="application/pdf"
         )
 
-    @ndb_router.get("/pdf-chunks")
     @propagate_error
-    def pdf_chunks(reference_id: int, _=Depends(permissions.verify_permission("read"))):
+    def pdf_chunks(
+        self, reference_id: int, token=Depends(Permissions.verify_permission("read"))
+    ):
         """
         Get the chunks of a PDF document based on the reference ID.
 
@@ -621,7 +649,7 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
         /pdf-chunks?reference_id=123
         ```
         """
-        if chunks := model.chunks(reference_id):
+        if chunks := self.model.chunks(reference_id):
             return response(
                 status_code=status.HTTP_200_OK,
                 message="Successful",
@@ -632,5 +660,3 @@ def create_ndb_router(config: DeploymentConfig, permissions: Permissions):
             message=f"Reference with id ${reference_id} is not a PDF.",
             data={},
         )
-
-    return ndb_router

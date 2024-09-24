@@ -4,9 +4,9 @@ import shutil
 
 import pytest
 import thirdai
-from config import DeploymentConfig, ModelType, NDBDeploymentOptions, NDBSubType
+from config import DeploymentConfig, NDBDeploymentOptions, NDBSubType
 from fastapi.testclient import TestClient
-from routers.ndb import create_ndb_router
+from permissions import Permissions
 from thirdai import neural_db as ndbv1
 from thirdai import neural_db_v2 as ndbv2
 
@@ -51,12 +51,16 @@ def create_ndbv2_model(tmp_dir):
     db.save(os.path.join(tmp_dir, "models", f"{MODEL_ID}_v2", "model.ndb"))
 
 
-class DummyPermissions:
-    def verify_permission(self, permission_type: str = "read"):
-        return lambda: ""
+def mock_verify_permission(permission_type: str = "read"):
+    return lambda: ""
 
-    def check_permission(self, token: str, permission_type: str = "read"):
-        return True
+
+def mock_check_permission(token: str, permission_type: str = "read"):
+    return True
+
+
+Permissions.verify_permission = mock_verify_permission
+Permissions.check_permission = mock_check_permission
 
 
 def create_config(tmp_dir: str, sub_type: NDBSubType, autoscaling: bool):
@@ -173,9 +177,12 @@ def check_deletion_dev_mode(client: TestClient):
 @pytest.mark.unit
 @pytest.mark.parametrize("sub_type", ["v1", "v2"])
 def test_deploy_ndb_dev_mode(tmp_dir, sub_type):
+    from routers.ndb import NDBRouter
+
     config = create_config(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=False)
 
-    client = TestClient(create_ndb_router(config, DummyPermissions()))
+    router = NDBRouter(config, None)
+    client = TestClient(router.router)
 
     check_query(client)
     check_upvote_dev_mode(client)
@@ -276,9 +283,12 @@ def check_log_lines(logdir, expected_lines):
 @pytest.mark.unit
 @pytest.mark.parametrize("sub_type", ["v1", "v2"])
 def test_deploy_ndb_prod_mode(tmp_dir, sub_type):
+    from routers.ndb import NDBRouter
+
     config = create_config(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=True)
 
-    client = TestClient(create_ndb_router(config, DummyPermissions()))
+    router = NDBRouter(config, None)
+    client = TestClient(router.router)
 
     deployment_dir = os.path.join(
         tmp_dir, "models", config.model_id, "deployments/data"
