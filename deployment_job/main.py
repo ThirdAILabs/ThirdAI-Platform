@@ -15,6 +15,7 @@ from reporter import Reporter
 from routers.ndb import create_ndb_router
 from routers.udt import create_udt_router
 from utils import delete_deployment_job
+from thirdai import licensing
 
 
 def load_config():
@@ -24,6 +25,8 @@ def load_config():
 
 config: DeploymentConfig = load_config()
 reporter = Reporter(config.model_bazaar_endpoint)
+
+licensing.activate(config.license_key)
 
 app = FastAPI(
     docs_url=f"/{config.model_id}/docs", openapi_url=f"/{config.model_id}/openapi.json"
