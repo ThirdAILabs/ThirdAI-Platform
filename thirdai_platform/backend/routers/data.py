@@ -11,7 +11,7 @@ from backend.datagen import (
     generate_text_data,
     generate_token_data,
 )
-from backend.train_config import Entity, JobOptions
+from backend.train_config import JobOptions
 from backend.utils import response
 from database import schema
 from database.session import get_session
