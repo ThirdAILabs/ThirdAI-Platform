@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 import os
 import re
-import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
 
+import requests
 from requests.auth import HTTPBasicAuth
 
 from client.utils import (
@@ -218,83 +218,20 @@ class NeuralDBClient(BaseClient):
         return json.loads(response.content)["data"]
 
     @check_deployment_decorator
-    def insert(self, documents: list[dict[str, Any]], input_mode="sync"):
+    def insert(self, documents: list[dict[str, Any]]):
         """
         Inserts documents into the ndb model.
 
         Args:
             documents (List[dict[str, Any]]): A list of dictionaries that represent documents to be inserted to the ndb model.
-                The document dictionaries must be in the following format:
-                {"document_type": "DOCUMENT_TYPE", **kwargs} where "DOCUMENT_TYPE" is one of the following:
-                "PDF", "CSV", "DOCX", "URL", "SentenceLevelPDF", "SentenceLevelDOCX", "Unstructured", "InMemoryText".
-                The kwargs for each document type are shown below:
-
-                class PDF(Document):
-                    document_type: Literal["PDF"]
-                    path: str
-                    metadata: Optional[dict[str, Any]] = None
-                    on_disk: bool = False
-                    version: str = "v1"
-                    chunk_size: int = 100
-                    stride: int = 40
-                    emphasize_first_words: int = 0
-                    ignore_header_footer: bool = True
-                    ignore_nonstandard_orientation: bool = True
-
-                class CSV(Document):
-                    document_type: Literal["CSV"]
-                    path: str
-                    id_column: Optional[str] = None
-                    strong_columns: Optional[List[str]] = None
-                    weak_columns: Optional[List[str]] = None
-                    reference_columns: Optional[List[str]] = None
-                    save_extra_info: bool = True
-                    metadata: Optional[dict[str, Any]] = None
-                    has_offset: bool = False
-                    on_disk: bool = False
-
-                class DOCX(Document):
-                    document_type: Literal["DOCX"]
-                    path: str
-                    metadata: Optional[dict[str, Any]] = None
-                    on_disk: bool = False
-
-                class URL(Document):
-                    document_type: Literal["URL"]
-                    url: str
-                    save_extra_info: bool = True
-                    title_is_strong: bool = False
-                    metadata: Optional[dict[str, Any]] = None
-                    on_disk: bool = False
-
-                class SentenceLevelPDF(Document):
-                    document_type: Literal["SentenceLevelPDF"]
-                    path: str
-                    metadata: Optional[dict[str, Any]] = None
-                    on_disk: bool = False
-
-                class SentenceLevelDOCX(Document):
-                    document_type: Literal["SentenceLevelDOCX"]
-                    path: str
-                    metadata: Optional[dict[str, Any]] = None
-                    on_disk: bool = False
-
-                class Unstructured(Document):
-                    document_type: Literal["Unstructured"]
-                    path: str
-                    save_extra_info: bool = True
-                    metadata: Optional[dict[str, Any]] = None
-                    on_disk: bool = False
-
-                class InMemoryText(Document):
-                    document_type: Literal["InMemoryText"]
-                    name: str
-                    texts: list[str]
-                    metadatas: Optional[list[dict[str, Any]]] = None
-                    global_metadata: Optional[dict[str, Any]] = None
-                    on_disk: bool = False
-
-                For Document types with the arg "path", ensure that the path exists on your local machine.
+                The document dictionaries can have the following fields:
+                - path (str): the path to the document (either local or s3 bucket).
+                - location (str): where the file is found either "local" or "s3".
+                  Optional, defaults to "local".
+                - doc_id (Optional[str]): an optional arg to indicate the id to use to
+                  reference the document. Optional.
+                - metadata (Dict[str, Any]): metadata for the document. Optional.
+                - options (Dict[str, Any]): any options for specific document types. Optional.
         """
 
         if not documents:
@@ -302,74 +239,27 @@ class NeuralDBClient(BaseClient):
 
         files = []
         for doc in documents:
-            if "path" in doc and ("location" not in doc or doc["location"] == "local"):
+            if "location" not in doc:
+                doc["location"] = "local"
+            if doc["location"] == "local":
                 if not os.path.exists(doc["path"]):
                     raise ValueError(
                         f"Path {doc['path']} was provided but doesn't exist on the machine."
                     )
                 files.append(("files", open(doc["path"], "rb")))
 
-        files.append(("documents", (None, json.dumps(documents), "application/json")))
-        files.append(("input_mode", (None, input_mode)))
+        files.append(
+            (
+                "documents",
+                (None, json.dumps({"documents": documents}), "application/json"),
+            )
+        )
 
-        response = http_post_with_error(
+        http_post_with_error(
             urljoin(self.base_url, "insert"),
             files=files,
             headers=auth_header(self.login_instance.access_token),
         )
-
-        response_data = response.json()
-        status_code = response.status_code
-        message = response_data.get("message", "")
-        data = response_data.get("data", {})
-
-        if status_code == 202 and "task_id" in data:
-            task_id = data["task_id"]
-            print("Insert task queued successfully. Task ID:", task_id)
-            return task_id
-        else:
-            raise Exception(f"Error in insert: {message}")
-
-    @check_deployment_decorator
-    def task_status(self, task_id: str):
-        """
-        Gets the task for the given task_id
-
-        Args:
-            task_id (str): A task id
-
-        """
-
-        response = http_post_with_error(
-            urljoin(self.base_url, "task-status"),
-            params={"task_id": task_id},
-            headers=auth_header(self.login_instance.access_token),
-        )
-
-        return json.loads(response.content)["data"]["task"]
-
-    def await_task(self, task_id: str, poll_interval: int = 5):
-        """
-        Waits for a task to complete.
-
-        Args:
-            task_id (str): The ID of the task to wait for.
-            poll_interval (int): Time in seconds between status checks.
-
-        Raises:
-            Exception: If the task fails.
-        """
-        while True:
-            task_status = self.task_status(task_id)
-            status = task_status.get("status")
-            if status == "complete":
-                return
-            elif status == "failed":
-                message = task_status.get("message", "No message")
-                raise Exception(f"Task {task_id} failed. Reason: {message}")
-            else:
-                # status is 'in_progress' or other statuses
-                time.sleep(poll_interval)
 
     @check_deployment_decorator
     def delete(self, source_ids: List[str]):
@@ -379,23 +269,11 @@ class NeuralDBClient(BaseClient):
         Args:
             files (List[str]): A list of source ids to delete from the ndb model.
         """
-        response = http_post_with_error(
+        http_post_with_error(
             urljoin(self.base_url, "delete"),
             json={"source_ids": source_ids},
             headers=auth_header(self.login_instance.access_token),
         )
-
-        response_data = response.json()
-        status_code = response.status_code
-        message = response_data.get("message", "")
-        data = response_data.get("data", {})
-
-        if status_code == 202 and "task_id" in data:
-            task_id = data["task_id"]
-            print("Delete task queued successfully. Task ID:", task_id)
-            return task_id
-        else:
-            raise Exception(f"Error in insert: {message}")
 
     @check_deployment_decorator
     def associate(self, text_pairs: List[Dict[str, str]]):
@@ -405,26 +283,11 @@ class NeuralDBClient(BaseClient):
         Args:
             text_pairs (List[Dict[str, str]]): List of dictionaries where each dictionary has 'source' and 'target' keys.
         """
-        response = http_post_with_error(
+        http_post_with_error(
             urljoin(self.base_url, "associate"),
             json={"text_pairs": text_pairs},
             headers=auth_header(self.login_instance.access_token),
         )
-
-        response_data = response.json()
-        status_code = response.status_code
-        message = response_data.get("message", "")
-        data = response_data.get("data", {})
-
-        if status_code == 202 and "task_id" in data:
-            task_id = data["task_id"]
-            print("Successfully associated the specified text pairs. Task ID:", task_id)
-            return task_id
-        elif status_code == 200:
-            print("Associate task logged successfully.")
-            return None
-        else:
-            raise Exception(f"Error in associate: {message}")
 
     @check_deployment_decorator
     def save_model(self, override: bool = True, model_name: Optional[str] = None):
@@ -456,26 +319,11 @@ class NeuralDBClient(BaseClient):
         Args:
             text_id_pairs: (List[Dict[str, Union[str, int]]]): List of dictionaries where each dictionary has 'query_text' and 'reference_id' keys.
         """
-        response = http_post_with_error(
+        http_post_with_error(
             urljoin(self.base_url, "upvote"),
             json={"text_id_pairs": text_id_pairs},
             headers=auth_header(self.login_instance.access_token),
         )
-
-        response_data = response.json()
-        status_code = response.status_code
-        message = response_data.get("message", "")
-        data = response_data.get("data", {})
-
-        if status_code == 202 and "task_id" in data:
-            task_id = data["task_id"]
-            print("Successfully upvoted the specified search result. Task ID:", task_id)
-            return task_id
-        elif status_code == 200:
-            print("Upvote task logged successfully.")
-            return None
-        else:
-            raise Exception(f"Error in upvote: {message}")
 
     @check_deployment_decorator
     def sources(self) -> List[Dict[str, str]]:
@@ -489,6 +337,71 @@ class NeuralDBClient(BaseClient):
         )
 
         return response.json()["data"]
+
+    @check_deployment_decorator
+    def llm_client(self) -> LLMClient:
+        return LLMClient(self.login_instance, self)
+
+
+class LLMClient:
+    def __init__(self, login_instance: Login, neuraldb_client: NeuralDBClient):
+        self.login_instance = login_instance
+        self.base_url = re.sub(r"api/$", "", login_instance.base_url)
+        self.neuraldb_client = neuraldb_client
+
+    def generate(
+        self,
+        query: str,
+        api_key: str,
+        provider: str = "openai",
+        use_cache: bool = False,
+    ):
+        cache_result = None
+
+        # Check cache if use_cache is enabled
+        if use_cache:
+            # Query cache for the result
+            cache_response = http_get_with_error(
+                urljoin(self.base_url, "cache/query"),
+                headers=auth_header(self.login_instance.access_token),
+                params={"model_id": self.neuraldb_client.model_id, "query": query},
+            )
+
+            cache_result = json.loads(cache_response.content).get("cached_response")
+
+        if cache_result:
+            return cache_result
+
+        # No cached result or cache disabled, proceed with generation
+        token_response = http_get_with_error(
+            urljoin(self.base_url, "cache/token"),
+            headers=auth_header(self.login_instance.access_token),
+            params={"model_id": self.neuraldb_client.model_id},
+        )
+
+        cache_token = json.loads(token_response.content)["access_token"]
+
+        response = requests.post(
+            urljoin(self.base_url, "llm-dispatch/generate"),
+            headers={
+                "Content-Type": "application/json",
+            },
+            json={
+                "query": query,
+                "key": api_key,
+                "provider": provider,
+                "original_query": query,
+                "cache_access_token": cache_token,
+            },
+        )
+
+        print(response.content)
+
+        if response.status_code != 200:
+            print("Network response was not ok")
+            raise
+
+        return response.text
 
 
 class UDTClient(BaseClient):

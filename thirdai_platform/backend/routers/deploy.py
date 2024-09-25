@@ -1,9 +1,8 @@
 import json
 import os
 import traceback
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Optional, Union
 
 from auth.jwt import (
     AuthenticatedUser,
@@ -12,6 +11,7 @@ from auth.jwt import (
     verify_access_token_no_throw,
 )
 from backend.auth_dependencies import is_model_owner
+from backend.startup_jobs import start_on_prem_generate_job
 from backend.utils import (
     delete_nomad_job,
     get_model_from_identifier,
@@ -28,7 +28,6 @@ from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from licensing.verify.verify_license import valid_job_allocation, verify_license
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 deploy_router = APIRouter()
@@ -258,7 +257,6 @@ def deploy_model(
             python_path=get_python_path(),
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
-            worker_enabled=("true" if model.type == "ndb" else "false"),
         )
 
         model.deploy_status = schema.Status.starting
@@ -408,16 +406,6 @@ def undeploy_model(
     )
 
 
-class LogData(BaseModel):
-    model_id: str
-    action: str
-    train_samples: List[Dict[str, str]]
-    used: bool
-
-    class Config:
-        protected_namespaces = ()
-
-
 @deploy_router.get("/info", dependencies=[Depends(is_model_owner)])
 def get_deployment_info(
     model_identifier: str,
@@ -455,4 +443,22 @@ def get_deployment_info(
         status_code=status.HTTP_200_OK,
         message="Deployment info retrieved successfully",
         data=jsonable_encoder(deployment_info),
+    )
+
+
+@deploy_router.post("/start-on-prem")
+async def start_on_prem_job(
+    model_name: str = "qwen2-0_5b-instruct-fp16.gguf",
+    restart_if_exists: bool = True,
+    autoscaling_enabled: bool = True,
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
+    await start_on_prem_generate_job(
+        model_name=model_name,
+        restart_if_exists=restart_if_exists,
+        autoscaling_enabled=autoscaling_enabled,
+    )
+
+    return response(
+        status_code=status.HTTP_200_OK, message="On-prem job started successfully"
     )

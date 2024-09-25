@@ -57,6 +57,7 @@ ON_PREM_GENERATE_JOB_ID = "on-prem-llm-generation"
 async def start_on_prem_generate_job(
     model_name="qwen2-0_5b-instruct-fp16.gguf",
     restart_if_exists=True,
+    autoscaling_enabled=True,
 ):
     """
     Restart the LLM generation job.
@@ -77,7 +78,7 @@ async def start_on_prem_generate_job(
     model_path = os.path.join(mount_dir, model_name)
     if not os.path.exists(model_path):
         raise ValueError(f"Cannot find model at location: {model_path}.")
-    model_size = int(os.path.get_size(model_path) / 1e6)
+    model_size = int(os.path.getsize(model_path) / 1e6)
     job_memory_mb = model_size * 2  # give some leeway
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
@@ -90,6 +91,10 @@ async def start_on_prem_generate_job(
         cores_per_allocation=7,
         memory_per_allocation=job_memory_mb,
         model_name=model_name,
+        registry=os.getenv("DOCKER_REGISTRY"),
+        docker_username=os.getenv("DOCKER_USERNAME"),
+        docker_password=os.getenv("DOCKER_PASSWORD"),
+        autoscaling_enabled="true" if autoscaling_enabled else "false",
     )
 
 
@@ -164,6 +169,10 @@ def create_promfile(promfile_path: str):
     model_bazaar_endpoint = os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT")
     if platform == "local":
         targets = ["host.docker.internal:4646"]
+
+        deployment_targets_endpoint = (
+            "http://host.docker.internal:80/api/telemetry/deployment-services"
+        )
     else:
         nomad_url = f"{model_bazaar_endpoint.rstrip('/')}:4646/v1/nodes"
 
@@ -173,6 +182,10 @@ def create_promfile(promfile_path: str):
         nodes = response.json()
 
         targets = [f"{node['Address']}:4646" for node in nodes]
+
+        deployment_targets_endpoint = (
+            f"{model_bazaar_endpoint.rstrip('/')}/api/telemetry/deployment-services"
+        )
 
     # Prometheus template
     prometheus_config = {
@@ -193,7 +206,12 @@ def create_promfile(promfile_path: str):
                         "replacement": "nomad-agent-$1",
                     }
                 ],
-            }
+            },
+            {
+                "job_name": "deployment-jobs",
+                "metrics_path": "/metrics",
+                "http_sd_configs": [{"url": deployment_targets_endpoint}],
+            },
         ],
     }
     os.makedirs(os.path.dirname(promfile_path), exist_ok=True)
@@ -241,6 +259,9 @@ async def restart_telemetry_jobs():
         promfile="/model_bazaar/nomad-monitoring/node_discovery/prometheus.yaml",  # Promfile_path could be different based on whether it is being run on `local-docker` or `docker`. But victoriametric should always find this file somewhere in the mounted volume. That's why it is being hardcoded here
         share_dir=share_dir,
         target_count=str(len(targets)),
+        registry=os.getenv("DOCKER_REGISTRY"),
+        docker_username=os.getenv("DOCKER_USERNAME"),
+        docker_password=os.getenv("DOCKER_PASSWORD"),
     )
     if response.status_code != 200:
         raise Exception(f"{response.text}")

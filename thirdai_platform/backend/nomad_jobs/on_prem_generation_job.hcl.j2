@@ -7,7 +7,7 @@ job "on-prem-llm-generation" {
     count = "{{ initial_allocations }}"
 
     scaling {
-      enabled = true
+      enabled = "{{ autoscaling_enabled }}"
       min = {{ min_allocations }}
       max = {{ max_allocations }}
 
@@ -60,12 +60,14 @@ job "on-prem-llm-generation" {
       driver = "docker"
 
       config {
-        image = "thirdaipublic.azurecr.io/llama.cpp:server"
+        image = "{{ registry }}/llama.cpp:server"
         image_pull_timeout = "15m"
         ports = ["on-prem-generation-http"]
         volumes = ["{{ mount_dir }}:/gen-ai-models"]
         auth {
-          server_address = "thirdaipublic.azurecr.io"
+          username = "{{ docker_username }}"
+          password = "{{ docker_password }}"
+          server_address = "{{ registry }}"
         }
         args = [
           "-m", "/gen-ai-models/{{ model_name }}",
@@ -78,6 +80,7 @@ job "on-prem-llm-generation" {
       resources {
         cores = {{ cores_per_allocation }}
         memory = {{ memory_per_allocation }}
+        memory_max = {{ 2 * memory_per_allocation }}
       }
     }
   }

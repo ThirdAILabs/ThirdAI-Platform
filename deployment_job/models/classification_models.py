@@ -19,7 +19,7 @@ class ClassificationModel(Model):
 
     def get_udt_path(self, model_id: Optional[str] = None) -> str:
         model_id = model_id or self.general_variables.model_id
-        return str(self.get_model_dir(model_id) / "model.udt")
+        return str(self.general_variables.get_model_dir() / "model.udt")
 
     def load(self):
         return bolt.UniversalDeepTransformer.load(self.model_path)

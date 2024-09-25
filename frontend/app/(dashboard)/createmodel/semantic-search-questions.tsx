@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { getUsername, train_ndb, create_workflow, add_models_to_workflow } from '@/lib/backend';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button, TextField } from '@mui/material';
 import { CardDescription } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
+import { Input } from '@/components/ui/input';
 
 interface SemanticSearchQuestionsProps {
   workflowNames: string[];
@@ -91,9 +91,7 @@ const SemanticSearchQuestions = ({
       return null;
     }
 
-    const modelOptionsForm = {
-      ndb_options: { ndb_sub_type: 'v1', retriever: 'finetunable_retriever' },
-    };
+    const modelOptionsForm = { ndb_options: { ndb_sub_type: 'v2' } };
     formData.append('model_options', JSON.stringify(modelOptionsForm));
     formData.append('file_info', JSON.stringify({ unsupervised_files: unsupervisedFiles }));
 
@@ -190,8 +188,8 @@ const SemanticSearchQuestions = ({
   return (
     <div>
       <span className="block text-lg font-semibold">App Name</span>
-      <Input
-        className="text-md"
+      <TextField
+        className="text-md w-full"
         value={modelName}
         onChange={(e) => {
           const name = e.target.value;
@@ -244,8 +242,8 @@ const SemanticSearchQuestions = ({
             }}
           >
             {type === SourceType.S3 && (
-              <Input
-                className="text-md"
+              <TextField
+                className="text-md w-full"
                 onChange={(e) => setS3SourceValue(index, e.target.value)}
                 placeholder="http://s3.amazonaws.com/bucketname/"
               />
@@ -264,13 +262,13 @@ const SemanticSearchQuestions = ({
               </div>
             )}
             {type === SourceType.NSF && ( // New input for NSF server path
-              <Input
-                className="text-md"
+              <TextField
+                className="text-md w-full"
                 onChange={(e) => setNSFSourceValue(index, e.target.value)}
                 placeholder="Enter NSF server file path"
               />
             )}
-            <Button variant="destructive" onClick={() => deleteSource(index)}>
+            <Button variant="contained" color="error" onClick={() => deleteSource(index)}>
               Delete
             </Button>
           </div>
@@ -278,13 +276,21 @@ const SemanticSearchQuestions = ({
       ))}
 
       <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-        <Button onClick={() => addSource(SourceType.LOCAL)}>Add Local File</Button>
-        <Button onClick={() => addSource(SourceType.S3)}>Add S3 File</Button>
-        {/* <Button onClick={() => addSource(SourceType.NSF)}>Add NSF File</Button> */}
+        <Button onClick={() => addSource(SourceType.LOCAL)} variant="contained">
+          Add Local File
+        </Button>
+        <Button onClick={() => addSource(SourceType.S3)} variant="contained">
+          Add S3 File
+        </Button>
       </div>
 
       <div className="flex justify-start">
-        <Button onClick={submit} style={{ marginTop: '30px', width: '100%' }} disabled={isLoading}>
+        <Button
+          onClick={submit}
+          variant="contained"
+          style={{ marginTop: '30px', width: '100%' }}
+          disabled={isLoading}
+        >
           {isLoading ? (
             <div className="flex items-center">
               <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500 mr-2"></div>

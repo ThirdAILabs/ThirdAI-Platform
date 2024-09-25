@@ -1,6 +1,6 @@
 name: Docker tests
 
-# Kills old jobs from the same pr if we push a new commit
+# Global concurrency to Kills old jobs from the same pr if we push a new commit
 # See https://stackoverflow.com/questions/66335225/how-to-cancel-previous-runs-in-the-pr-when-you-push-new-commitsupdate-the-curre
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -71,12 +71,16 @@ jobs:
         run: |
           docker system prune -af --volumes
 
-  restart_modelbazaar:
+  test:
+    strategy:
+      fail-fast: false
+
     runs-on: self-hosted
-    environment:
-      name: docker_tests
 
     if: github.event_name != 'pull_request'
+
+    environment:
+      name: docker_tests
 
     needs: build_docker_images
 
@@ -98,60 +102,25 @@ jobs:
         run: |
           mkdir -p $HOME/nfs/dir
           echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_ENV
+          echo "GENAI_KEY=${{ secrets.GENAI_KEY }}" >> $GITHUB_ENV
 
       - name: Restart Model Bazaar Job
         run: |
-          python3 -m headless.restart_modelbazaar
-
-      # This is to clean up local docker builds to free up storage.
-      - name: Cleanup Docker after build
-        if: always() # Run this step regardless of success or failure
-        run: |
-          docker system prune -af --volumes
-
-  test:
-    strategy:
-      fail-fast: false
-
-    runs-on: self-hosted
-
-    if: github.event_name != 'pull_request'
-
-    environment:
-      name: docker_tests
-
-    needs: restart_modelbazaar
-
-    steps:
-      - name: Delay before running tests
-        run: sleep 150 # Wait for 2 1/2 minutes (150 seconds)
-
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-
-      - name: Install requirements
-        run: |
-          cd headless
-          pip install -r requirements.txt
+          version="${{ needs.build_docker_images.outputs.version }}"
+          echo "Restarting the model bazaar with the: $version"
+          python3 -m headless.restart_modelbazaar --version "$version"
 
       - name: Generate random run name
         id: random-run-name
         run: |
           echo "::set-output name=name::test_$(python3 -c "import secrets; print(secrets.token_urlsafe(8))")"
 
-      - name: Create Directories for Share and Test
-        run: |
-          mkdir -p $HOME/nfs/dir
-          echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_ENV
+      - name: Delay before running tests
+        run: sleep 150 # Wait for 2 1/2 minutes (150 seconds)
 
       - name: Run tests
         run: |
-          python3 -m headless.run_locally --base-url ${{ secrets.BASE_URL }} --email ${{ secrets.EMAIL }} --password ${{ secrets.PASSWORD }} --run-name ${{ steps.random-run-name.outputs.name }} --dag NDB
+          python3 -m headless.run_locally --base-url ${{ secrets.BASE_URL }} --email ${{ secrets.EMAIL }} --password ${{ secrets.PASSWORD }} --run-name ${{ steps.random-run-name.outputs.name }} --dag NDB --on-prem --generation
           python3 -m headless.run_locally --base-url ${{ secrets.BASE_URL }} --email ${{ secrets.EMAIL }} --password ${{ secrets.PASSWORD }} --run-name ${{ steps.random-run-name.outputs.name }} --dag UDT
           python3 -m headless.run_locally --base-url ${{ secrets.BASE_URL }} --email ${{ secrets.EMAIL }} --password ${{ secrets.PASSWORD }} --run-name ${{ steps.random-run-name.outputs.name }} --dag UDT_DATAGEN
 
@@ -166,32 +135,24 @@ jobs:
           BASE_URL_WITHOUT_API=$(echo "${{ secrets.BASE_URL }}" | sed 's/\/api\/\?$//')
           echo "Testing frontend at $BASE_URL_WITHOUT_API"
           curl -f "$BASE_URL_WITHOUT_API" || exit 1
-
-  restore_original_alembic_version:
-    runs-on: ubuntu-latest
-
-    needs: test
-
-    # This condition ensures that the job runs only if the branch is not 'main' and it's not a pull request.
-    if: github.ref != 'refs/heads/main' && github.event_name != 'pull_request'
-
-    environment:
-      name: docker_tests
-
-    steps:
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
+      
+      # This is to clean up local docker builds to free up storage.
+      - name: Cleanup Docker after build
+        if: always() # Run this step regardless of success or failure
+        run: |
+          docker system prune -af --volumes
 
       - name: Install git
+        if: always()
         run: |
           pip install gitpython
 
       - name: Checkout current branch
+        if: always()
         uses: actions/checkout@v3
 
       - name: Latest alembic version in main
+        if: always()
         id: version
         run: |
           alembic_version=$(python alembic_version.py)
@@ -199,16 +160,57 @@ jobs:
           echo "$alembic_version"
 
       - name: Install requirements
+        if: always()
         run: |
           cd thirdai_platform
           pip install -r requirements.txt
 
       - name: Revert Back to original alembic version
+        if: always()
         env:
           DATABASE_URI: ${{ secrets.DATABASE_URI }}
         run: |
           cd thirdai_platform
           alembic downgrade ${{ steps.version.outputs.alembic_version }}
+
+      - name: Read Nomad ACL Token
+        if: always()
+        id: read_nomad_token
+        run: |
+          TOKEN_FILE="/opt/thirdai_platform/nomad_data/management_token.txt"
+          if [ -f "$TOKEN_FILE" ]; then
+            NOMAD_TOKEN=$(grep 'Secret ID' "$TOKEN_FILE" | awk '{print $NF}')
+            echo "::add-mask::$NOMAD_TOKEN"  # Masks the token in logs
+            echo "NOMAD_TOKEN=$NOMAD_TOKEN" >> $GITHUB_ENV
+          else
+            echo "Nomad token file not found at $TOKEN_FILE"
+            exit 1
+          fi
+
+      - name: Set SKIP_JOBS environment variables
+        if: always()
+        run: |
+          ENABLE_SKIP_JOBS="true"  # Set to "false" to disable skipping
+          SKIP_JOBS="autoscaler,traefik,telemetry"
+          echo "ENABLE_SKIP_JOBS=$ENABLE_SKIP_JOBS" >> $GITHUB_ENV
+          echo "SKIP_JOBS=$SKIP_JOBS" >> $GITHUB_ENV
+
+      - name: Run fetch_nomad_logs.sh script
+        if: always()
+        env:
+          NOMAD_TOKEN: ${{ env.NOMAD_TOKEN }}
+          SKIP_JOBS: ${{ env.SKIP_JOBS }}
+          ENABLE_SKIP_JOBS: ${{ env.ENABLE_SKIP_JOBS }}
+        run: |
+          bash local_setup/fetch_nomad_logs.sh
+
+      - name: Grabage collect the jobs
+        if: always()
+        env:
+          NOMAD_TOKEN: ${{ env.NOMAD_TOKEN }}
+        run: |
+          NOMAD_PATH=$(which nomad)
+          $NOMAD_PATH system gc
 
   delete_docker_images:
     runs-on: ubuntu-latest
@@ -216,7 +218,7 @@ jobs:
     environment:
       name: docker_tests
 
-    needs: test
+    needs: [test, build_docker_images]
 
     if: always() && github.event_name != 'pull_request'
 
@@ -236,52 +238,3 @@ jobs:
           version="${{ needs.build_docker_images.outputs.version }}"
           echo "Deleting Docker images for version: $version"
           python3 docker_remove.py -b docker_tests --version "$version" --client_id ${{ secrets.APPLICATION_ID }} --tenant_id ${{ secrets.TENANT_ID }} --secret ${{ secrets.SECRET }} --config config.yaml
-
-  fetch_nomad_job_logs:
-    runs-on: self-hosted
-
-    environment:
-      name: docker_tests
-
-    needs: delete_docker_images
-
-    if: always() && github.event_name != 'pull_request'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Read Nomad ACL Token
-        id: read_nomad_token
-        run: |
-          TOKEN_FILE="/opt/thirdai_platform/nomad_data/management_token.txt"
-          if [ -f "$TOKEN_FILE" ]; then
-            NOMAD_TOKEN=$(grep 'Secret ID' "$TOKEN_FILE" | awk '{print $NF}')
-            echo "::add-mask::$NOMAD_TOKEN"  # Masks the token in logs
-            echo "NOMAD_TOKEN=$NOMAD_TOKEN" >> $GITHUB_ENV
-          else
-            echo "Nomad token file not found at $TOKEN_FILE"
-            exit 1
-          fi
-
-      - name: Set SKIP_JOBS environment variables
-        run: |
-          ENABLE_SKIP_JOBS="true"  # Set to "false" to disable skipping
-          SKIP_JOBS="redis-server,autoscaler,traefik,telemetry"
-          echo "ENABLE_SKIP_JOBS=$ENABLE_SKIP_JOBS" >> $GITHUB_ENV
-          echo "SKIP_JOBS=$SKIP_JOBS" >> $GITHUB_ENV
-
-      - name: Run fetch_nomad_logs.sh script
-        env:
-          NOMAD_TOKEN: ${{ env.NOMAD_TOKEN }}
-          SKIP_JOBS: ${{ env.SKIP_JOBS }}
-          ENABLE_SKIP_JOBS: ${{ env.ENABLE_SKIP_JOBS }}
-        run: |
-          bash local_setup/fetch_nomad_logs.sh
-
-      - name: Grabage collect the jobs
-        env:
-          NOMAD_TOKEN: ${{ env.NOMAD_TOKEN }}
-        run: |
-          NOMAD_PATH=$(which nomad)
-          $NOMAD_PATH system gc

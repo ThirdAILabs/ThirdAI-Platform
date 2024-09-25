@@ -112,16 +112,6 @@ def validate_name(name: str) -> None:
         raise ValueError("name is not valid")
 
 
-FILE_DOCUMENT_TYPES = [
-    "CSV",
-    "PDF",
-    "DOCX",
-    "SentenceLevelPDF",
-    "SentenceLevelDOCX",
-    "Unstructured",
-]
-
-
 class Status(str, enum.Enum):
     not_started = "not_started"
     starting = "starting"

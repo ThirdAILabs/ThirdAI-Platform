@@ -89,6 +89,10 @@ class FinetunableRetriever(NDBModel):
         total_time = time.time() - start_time
         self.logger.info(f"Total training time: {total_time} seconds")
 
+        if self.config.data.deletions:
+            db.delete(self.config.data.deletions)
+            self.logger.info(f"Deleted {len(self.config.data.deletions)} docs.")
+
         self.save(db)
         self.logger.info("Model saved successfully.")
 

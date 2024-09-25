@@ -3,11 +3,8 @@ Defines NDB model classes for the application.
 """
 
 import ast
-import copy
-import json
 import logging
 import os
-import pickle
 import shutil
 import tempfile
 import traceback
@@ -17,9 +14,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import fitz
+import models.ndbv1_parser as ndbv1_parser
+import models.ndbv2_parser as ndbv2_parser
 import thirdai.neural_db_v2.chunk_stores.constraints as ndbv2_constraints
 from chat import llm_providers
-from file_handler import create_ndb_docs, create_ndbv2_docs
+from file_handler import FileInfo, expand_s3_buckets_and_directories
 from models.model import Model
 from pydantic_models import inputs
 from thirdai import neural_db as ndb
@@ -41,16 +40,14 @@ class NDBModel(Model):
         raise NotImplementedError
 
     @abstractmethod
-    def insert(self, **kwargs: Any) -> List[Dict[str, str]]:
+    def insert(self, documents: List[FileInfo], **kwargs: Any) -> List[Dict[str, str]]:
         """
         Inserts documents into the NDB model.
         """
         raise NotImplementedError
 
     @abstractmethod
-    def upvote(
-        self, text_pairs: List[inputs.UpvoteInputSingle], token: str, **kwargs: Any
-    ) -> None:
+    def upvote(self, text_pairs: List[inputs.UpvoteInputSingle], **kwargs: Any) -> None:
         """
         Upvotes entries in the NDB model.
         """
@@ -58,7 +55,7 @@ class NDBModel(Model):
 
     @abstractmethod
     def associate(
-        self, text_pairs: List[inputs.AssociateInputSingle], token: str, **kwargs: Any
+        self, text_pairs: List[inputs.AssociateInputSingle], **kwargs: Any
     ) -> None:
         """
         Associates entries in the NDB model.
@@ -66,7 +63,7 @@ class NDBModel(Model):
         raise NotImplementedError
 
     @abstractmethod
-    def delete(self, source_ids: List[str], token: str, **kwargs: Any) -> None:
+    def delete(self, source_ids: List[str], **kwargs: Any) -> None:
         """
         Deletes entries from the NDB model.
         """
@@ -114,11 +111,19 @@ class NDBModel(Model):
                 db=self.db,
                 chat_history_sql_uri=chat_history_sql_uri,
                 key=self.general_variables.genai_key,
+                base_url=self.general_variables.model_bazaar_endpoint,
                 **kwargs,
             )
         except Exception as err:
             traceback.print_exc()
             self.chat = None
+
+
+def get_ndb_path(general_variables, model_id: str) -> Path:
+    """
+    Returns the NDB model path for the given model ID.
+    """
+    return Path(general_variables.model_bazaar_dir) / "models" / model_id / "model.ndb"
 
 
 class NDBV1Model(NDBModel):
@@ -133,13 +138,7 @@ class NDBV1Model(NDBModel):
         super().__init__()
         self.model_path: Path = self.model_dir / "model.ndb"
         self.db: ndb.NeuralDB = self.load(write_mode=write_mode)
-        self.set_chat()
-
-    def get_ndb_path(self, model_id: str) -> Path:
-        """
-        Returns the NDB model path for the given model ID.
-        """
-        return self.get_model_dir(model_id) / "model.ndb"
+        self.set_chat(provider=self.general_variables.llm_provider)
 
     def upvote(
         self, text_id_pairs: List[inputs.UpvoteInputSingle], **kwargs: Any
@@ -154,8 +153,6 @@ class NDBV1Model(NDBModel):
                 for text_id_pair in text_id_pairs
             ]
         )
-
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
     def predict(self, query: str, top_k: int, **kwargs: Any) -> inputs.SearchResultsNDB:
         """
@@ -200,8 +197,6 @@ class NDBV1Model(NDBModel):
             ]
         )
 
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
-
     def sources(self) -> List[Dict[str, str]]:
         """
         Retrieves sources from the NDB model.
@@ -217,25 +212,22 @@ class NDBV1Model(NDBModel):
             key=lambda source: source["source"],
         )
 
-    def delete(self, source_ids: List[str], token: str, **kwargs: Any) -> None:
+    def delete(self, source_ids: List[str], **kwargs: Any) -> None:
         """
         Deletes entries from the NDB model.
         """
         self.db.delete(source_ids=source_ids)
 
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
-
-    def insert(self, **kwargs: Any) -> List[Dict[str, str]]:
+    def insert(self, documents: List[FileInfo], **kwargs: Any) -> List[Dict[str, str]]:
         """
         Inserts documents into the NDB model.
         """
-        documents = kwargs.get("documents")
+        ndb_docs = [
+            ndbv1_parser.parse_doc(doc, self.data_dir)
+            for doc in expand_s3_buckets_and_directories(documents)
+        ]
 
-        ndb_docs = create_ndb_docs(documents, self.data_dir)
-
-        source_ids = self.db.insert(sources=ndb_docs)
-
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
+        self.db.insert(ndb_docs)
 
         return [
             {
@@ -256,18 +248,6 @@ class NDBV1Model(NDBModel):
             return chunks
         return old_pdf_chunks(self.db, reference)
 
-
-class SingleNDB(NDBV1Model):
-    """
-    Single instance of the NDB model.
-    """
-
-    def __init__(self, write_mode: bool = False) -> None:
-        """
-        Initializes a single NDB model.
-        """
-        super().__init__(write_mode)
-
     def load(self, write_mode: bool = False) -> ndb.NeuralDB:
         """
         Loads the NDB model from a model path.
@@ -278,7 +258,7 @@ class SingleNDB(NDBV1Model):
         """
         Saves the NDB model to a model path.
         """
-        model_path = self.get_ndb_path(kwargs.get("model_id"))
+        model_path = get_ndb_path(self.general_variables, kwargs.get("model_id"))
         temp_dir = None
 
         try:
@@ -287,7 +267,7 @@ class SingleNDB(NDBV1Model):
                 self.db.save(save_to=temp_model_path)
                 if model_path.exists():
                     backup_id = str(uuid.uuid4())
-                    backup_path = self.get_ndb_path(backup_id)
+                    backup_path = get_ndb_path(self.general_variables, backup_id)
                     print(f"Creating backup: {backup_id}")
                     shutil.copytree(model_path, backup_path)
 
@@ -311,110 +291,12 @@ class SingleNDB(NDBV1Model):
             raise
 
 
-class ShardedNDB(NDBV1Model):
-    """
-    Sharded instance of the NDB model.
-    """
-
-    def __init__(self, write_mode: bool = False) -> None:
-        """
-        Initializes a sharded NDB model.
-        """
-        super().__init__(write_mode)
-
-    def load(self, write_mode: bool = False) -> ndb.NeuralDB:
-        """
-        Loads the sharded NDB model from model path.
-        """
-        db = ndb.NeuralDB.from_checkpoint(self.model_path, read_only=not write_mode)
-
-        for i in range(db._savable_state.model.num_shards):
-            models = []
-
-            for j in range(db._savable_state.model.num_models_per_shard):
-                model_shard_num = i * db._savable_state.model.num_models_per_shard + j
-
-                mach_model_pkl = (
-                    self.model_dir / str(model_shard_num) / "shard_mach_model.pkl"
-                )
-
-                with open(mach_model_pkl, "rb") as pkl:
-                    mach_model = pickle.load(pkl)
-
-                models.append(mach_model)
-
-            db._savable_state.model.ensembles[i].models = models
-
-        return db
-
-    def save(self, **kwargs: Any) -> None:
-        """
-        Saves the sharded NDB model to model path.
-        """
-        model_dir = self.get_model_dir(kwargs.get("model_id"))
-        num_shards = self.db._savable_state.model.num_shards
-        backup_dir = None
-
-        try:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                temp_dir = Path(tmpdir) / "latest"
-                temp_dir.mkdir(parents=True, exist_ok=True)
-                db_copy = copy.deepcopy(self.db)
-
-                for i in range(num_shards):
-                    ensemble = db_copy._savable_state.model.ensembles[i]
-                    for j, model in enumerate(ensemble.models):
-                        model_shard_num = (
-                            i * db_copy._savable_state.model.num_models_per_shard + j
-                        )
-                        shard_dir = temp_dir / str(model_shard_num)
-                        shard_dir.mkdir(parents=True, exist_ok=True)
-                        mach_model_pkl = shard_dir / "shard_mach_model.pkl"
-                        with mach_model_pkl.open("wb") as pkl:
-                            pickle.dump(model, pkl)
-
-                for ensemble in db_copy._savable_state.model.ensembles:
-                    ensemble.set_model([])
-
-                db_copy.save(save_to=temp_dir / "model.ndb")
-
-                if model_dir.exists():
-                    backup_id = str(uuid.uuid4())
-                    backup_dir = self.get_model_dir(backup_id)
-                    print(f"Creating backup: {backup_id}")
-                    shutil.copytree(model_dir, backup_dir)
-
-                    backup_deployments_dir = model_dir / "deployments"
-                    latest_deployment_dir = temp_dir / "deployments"
-                    if backup_deployments_dir.exists():
-                        shutil.copytree(backup_deployments_dir, latest_deployment_dir)
-
-                if model_dir.exists():
-                    shutil.rmtree(model_dir)
-                shutil.move(temp_dir, model_dir)
-
-                if backup_dir and backup_dir.exists():
-                    shutil.rmtree(backup_dir)
-
-        except Exception as err:
-            self.logger.error(f"Failed while saving with error: {err}")
-            traceback.print_exc()
-
-            if backup_dir and backup_dir.exists():
-                if model_dir.exists():
-                    shutil.rmtree(model_dir)
-                shutil.copytree(backup_dir, model_dir)
-                shutil.rmtree(backup_dir)
-
-            raise
-
-
 class NDBV2Model(NDBModel):
     def __init__(self, write_mode: bool = False):
         super().__init__()
 
         self.db = self.load(write_mode=write_mode)
-        self.set_chat()
+        self.set_chat(provider=self.general_variables.llm_provider)
 
     def ndb_save_path(self):
         return os.path.join(self.model_dir, "model.ndb")
@@ -441,7 +323,6 @@ class NDBV2Model(NDBModel):
         query: str,
         top_k: int,
         constraints: Dict[str, Dict[str, Any]],
-        token: str,
         **kwargs: Any,
     ) -> inputs.SearchResultsNDB:
         constraints = {
@@ -459,17 +340,17 @@ class NDBV2Model(NDBModel):
 
         return inputs.SearchResultsNDB(query_text=query, references=results)
 
-    def insert(
-        self, documents: List[Dict[str, Any]], token: str, **kwargs: Any
-    ) -> List[Dict[str, str]]:
+    def insert(self, documents: List[FileInfo], **kwargs: Any) -> List[Dict[str, str]]:
         # TODO(V2 Support): add flag for upsert
-        ndb_docs = create_ndbv2_docs(
-            documents=documents,
-            doc_save_dir=self.doc_save_path(),
-            data_dir=self.data_dir,
-        )
 
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
+        ndb_docs = [
+            ndbv2_parser.parse_doc(
+                doc, doc_save_dir=self.doc_save_path(), tmp_dir=self.data_dir
+            )
+            for doc in expand_s3_buckets_and_directories(documents)
+        ]
+
+        self.db.insert(ndb_docs)
 
         return [
             {
@@ -480,30 +361,22 @@ class NDBV2Model(NDBModel):
         ]
 
     def upvote(
-        self, text_id_pairs: List[inputs.UpvoteInputSingle], token: str, **kwargs: Any
+        self, text_id_pairs: List[inputs.UpvoteInputSingle], **kwargs: Any
     ) -> None:
         queries = [t.query_text for t in text_id_pairs]
         chunk_ids = [t.reference_id for t in text_id_pairs]
         self.db.upvote(queries=queries, chunk_ids=chunk_ids, **kwargs)
 
-        chunks = self.db.chunk_store.get_chunks(chunk_ids=chunk_ids)
-
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
-
     def associate(
-        self, text_pairs: List[inputs.AssociateInputSingle], token: str, **kwargs: Any
+        self, text_pairs: List[inputs.AssociateInputSingle], **kwargs: Any
     ) -> None:
         sources = [t.source for t in text_pairs]
         targets = [t.target for t in text_pairs]
         self.db.associate(sources=sources, targets=targets, **kwargs)
 
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
-
-    def delete(self, source_ids: List[str], token: str, **kwargs: Any) -> None:
+    def delete(self, source_ids: List[str], **kwargs: Any) -> None:
         for id in source_ids:
             self.db.delete_doc(doc_id=id)
-
-        # TODO(Nicholas) should we have prometheus metrics for the actual execution of queued updates?
 
     def sources(self) -> List[Dict[str, str]]:
         return sorted(
@@ -518,30 +391,49 @@ class NDBV2Model(NDBModel):
             key=lambda x: x["source"],
         )
 
-    def highlight_pdf(self, chunk_id: int) -> Tuple[str, Optional[bytes]]:
-        chunk = self.db.chunk_store.get_chunks([chunk_id])
-        if not chunk:
-            raise ValueError(f"{chunk_id} is not a valid chunk_id")
-        chunk = chunk[0]
-
+    def highlight_v1(self, chunk: Chunk) -> Tuple[str, Optional[bytes]]:
         source = self.full_source_path(chunk.document)
-        if "chunk_boxes" not in chunk.metadata:
-            return source, None
+        highlights = ast.literal_eval(chunk.metadata["highlight"])
 
+        doc = fitz.open(source)
+        for key, val in highlights.items():
+            page = doc[key]
+            blocks = page.get_text("blocks")
+            for i, b in enumerate(blocks):
+                if i in val:
+                    rect = fitz.Rect(b[:4])
+                    page.add_highlight_annot(rect)
+
+        return source, doc.tobytes()
+
+    def highlight_v2(self, chunk: Chunk) -> Tuple[str, Optional[bytes]]:
+        source = self.full_source_path(chunk.document)
         highlights = ast.literal_eval(chunk.metadata["chunk_boxes"])
+
         doc = fitz.open(source)
         for page, bounding_box in highlights:
             doc[page].add_highlight_annot(fitz.Rect(bounding_box))
 
         return source, doc.tobytes()
 
+    def highlight_pdf(self, chunk_id: int) -> Tuple[str, Optional[bytes]]:
+        chunk = self.db.chunk_store.get_chunks([chunk_id])
+        if not chunk:
+            raise ValueError(f"{chunk_id} is not a valid chunk_id")
+        chunk = chunk[0]
+
+        if "highlight" in chunk.metadata:
+            return self.highlight_v1(chunk)
+        elif "chunk_boxes" in chunk.metadata:
+            return self.highlight_v2(chunk)
+        else:
+            return self.full_source_path(chunk.document), None
+
     def chunks(self, chunk_id: int) -> Optional[Dict[str, Any]]:
         chunk = self.db.chunk_store.get_chunks([chunk_id])
         if not chunk:
             raise ValueError(f"{chunk_id} is not a valid chunk_id")
         chunk = chunk[0]
-        if "chunk_boxes" not in chunk.metadata:
-            return None
 
         chunk_ids = self.db.chunk_store.get_doc_chunks(
             doc_id=chunk.doc_id, before_version=chunk.doc_version + 1
@@ -550,11 +442,29 @@ class NDBV2Model(NDBModel):
 
         chunks = list(filter(lambda c: c.doc_version == chunk.doc_version, chunks))
 
+        if "chunk_boxes" in chunk.metadata:
+            bboxes = [ast.literal_eval(c.metadata["chunk_boxes"]) for c in chunks]
+        elif "highlight" in chunk.metadata:
+            doc = fitz.open(self.full_source_path(chunk.document))
+            page_blocks = [page.get_text("blocks") for page in doc]
+            bboxes = [
+                [
+                    (page_idx, page_blocks[page_idx][i][:4])
+                    for page_idx, block_ids in ast.literal_eval(
+                        c.metadata["highlight"]
+                    ).items()
+                    for i in block_ids
+                ]
+                for c in chunks
+            ]
+        else:
+            return None
+
         return {
             "filename": self.full_source_path(chunk.document),
             "id": [c.chunk_id for c in chunks],
             "text": [c.text for c in chunks],
-            "boxes": [ast.literal_eval(c.metadata["chunk_boxes"]) for c in chunks],
+            "boxes": bboxes,
         }
 
     def load(self, write_mode: bool = False, **kwargs) -> ndbv2.NeuralDB:
@@ -564,10 +474,7 @@ class NDBV2Model(NDBModel):
         return ndbv2.NeuralDB.load(self.ndb_save_path(), read_only=not write_mode)
 
     def save(self, model_id: str, **kwargs) -> None:
-        def ndb_path(model_id: str):
-            return self.get_model_dir(model_id) / "model.ndb"
-
-        model_path = ndb_path(model_id=model_id)
+        model_path = get_ndb_path(self.general_variables, model_id)
         backup_path = None
 
         try:
@@ -576,7 +483,7 @@ class NDBV2Model(NDBModel):
                 self.db.save(temp_model_path)
                 if model_path.exists():
                     backup_id = str(uuid.uuid4())
-                    backup_path = ndb_path(backup_id)
+                    backup_path = get_ndb_path(self.general_variables, backup_id)
                     print(f"Creating backup: {backup_id}")
                     shutil.copytree(model_path, backup_path)
 

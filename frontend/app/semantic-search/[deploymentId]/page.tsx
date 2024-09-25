@@ -373,7 +373,11 @@ function App() {
           if (matchedEntry) {
             return `[${tag} #${matchedEntry[1].id}]`;
           } else {
-            piiMap.set(sentence, { id: currentId, originalToken: sentence, tag });
+            piiMap.set(sentence, {
+              id: currentId,
+              originalToken: sentence,
+              tag,
+            });
             currentId++;
             return `[${tag} #${piiMap.get(sentence)?.id}]`;
           }
@@ -675,6 +679,7 @@ function App() {
                       )}
                       <Spacer $height="50px" />
                       <ReferenceList
+                        query={query}
                         references={results.references.slice(0, numReferences)}
                         onOpen={openSource}
                         onUpvote={upvote}

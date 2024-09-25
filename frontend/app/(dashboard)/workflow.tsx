@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button } from '@mui/material';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -209,6 +209,9 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
     return (parseInt(bytes) / (1024 * 1024)).toFixed(2) + ' MB';
   };
 
+  // Find the model where component === "search"
+  const searchModel = workflow.models.find((model) => model.component === 'search');
+
   return (
     <TableRow>
       <TableCell className="hidden sm:table-cell">
@@ -237,7 +240,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       <TableCell className="hidden md:table-cell text-center font-medium">
         <Button
           onClick={deployStatus === 'Active' ? goToEndpoint : handleDeploy}
-          className="text-white focus:ring-4 focus:outline-none font-medium text-sm p-2.5 text-center inline-flex items-center me-2"
+          variant="contained"
           style={{ width: '100px' }}
           disabled={
             isTrainingIncomplete ||
@@ -270,7 +273,18 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       <TableCell className="text-center font-medium">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button aria-haspopup="true" size="icon" variant="ghost">
+            <Button
+              aria-haspopup="true"
+              size="small"
+              variant="text" // Using "text" as base variant
+              sx={{
+                color: 'inherit', // Default text color
+                '&:hover': {
+                  backgroundColor: 'var(--accent)', // Replace with your accent color
+                  color: 'var(--accent-foreground)', // Replace with your foreground color for hover
+                },
+              }}
+            >
               <MoreHorizontal className="h-4 w-4" />
               <span className="sr-only">Toggle menu</span>
             </Button>
@@ -321,11 +335,16 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
                 </button>
               </form>
             </DropdownMenuItem>
-            <Link href={`/analytics?id=${encodeURIComponent(`${workflow.id}`)}`}>
-              <DropdownMenuItem>
-                <button type="button">Usage stats</button>
-              </DropdownMenuItem>
-            </Link>
+
+            {searchModel && (
+              <Link
+                href={`/analytics?id=${encodeURIComponent(workflow.id)}&username=${encodeURIComponent(searchModel.username)}&model_name=${encodeURIComponent(searchModel.model_name)}&old_model_id=${encodeURIComponent(searchModel.model_id)}`}
+              >
+                <DropdownMenuItem>
+                  <button type="button">Search usage stats</button>
+                </DropdownMenuItem>
+              </Link>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>

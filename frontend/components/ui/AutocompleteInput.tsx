@@ -1,3 +1,4 @@
+import { TextField } from '@mui/material';
 import React, { useState, ChangeEvent } from 'react';
 
 interface AutocompleteInputProps {
@@ -47,12 +48,13 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
 
   return (
     <div className="relative">
-      <input
+      <TextField
         type="text"
         value={multiple && Array.isArray(value) ? inputValue : inputValue}
         onChange={handleInputChange}
         placeholder={placeholder}
-        className="border border-gray-300 rounded px-2 py-1 mb-2 w-full"
+        className="w-full"
+        // className="border border-gray-300 rounded px-2 py-1 mb-2 w-full"
       />
       {filteredOptions.length > 0 && (
         <ul className="absolute z-10 bg-white border border-gray-300 rounded shadow-md w-full max-h-40 overflow-y-auto">

@@ -34,7 +34,7 @@ job "deployment-{{ model_id }}" {
     }
 
     service {
-      name = "{{ model_id }}"
+      name = "deployment-{{ model_id }}"
       port = "{{ model_id }}-http"
       provider = "nomad"
 
@@ -66,25 +66,12 @@ EOF
 
       {% endif %}
 
-      template {
-        env         = true
-        destination = "${NOMAD_SECRETS_DIR}/redis_env.vars"
-        data = <<EOF
-{% raw %}
-{{ range nomadService "redis" }}
-REDIS_HOST = {{ .Address }}
-REDIS_PORT = {{ .Port }}
-{{ end }}
-{% endraw %}
-EOF
-        change_mode = "restart"
-      }
-
       env {
         MODEL_ID = "{{ model_id }}"
         MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
         LICENSE_KEY = "{{ license_key }}"
         GENAI_KEY = "{{ genai_key }}"
+        LLM_PROVIDER = "{{ llm_provider }}"
         TYPE = "{{ type }}"
         SUB_TYPE = "{{ sub_type }}"
         AWS_ACCESS_KEY = "{{ aws_access_key }}"
@@ -96,6 +83,8 @@ EOF
         {% endif %}
 
         TASK_RUNNER_TOKEN = "${TASK_RUNNER_TOKEN}"
+
+        AUTOSCALING_ENABLED = "{{ autoscaling_enabled }}"
       }
 
       config {
@@ -126,97 +115,4 @@ EOF
       }
     }
   }
-
-  {% if worker_enabled == "true" %}
-  group "worker" {
-    count = 1  # Number of worker instances
-
-    network {
-      port "{{ model_id }}-worker-http" {}
-    }
-
-    task "worker" {
-      {% if platform == "local" %}
-        driver = "raw_exec"
-      {% elif platform == "docker" %}  
-        driver = "docker"
-
-      template {
-        destination = "${NOMAD_SECRETS_DIR}/env.vars"
-        env         = true
-        change_mode = "restart"
-        data        = <<EOF
-{% raw %}
-{{- with nomadVar "nomad/jobs" -}}
-TASK_RUNNER_TOKEN = {{ .task_runner_token }}
-{{- end -}}
-{% endraw %}
-EOF
-      }
-
-      {% endif %}
-
-      template {
-        env         = true
-        destination = "${NOMAD_SECRETS_DIR}/redis_env.vars"
-        data = <<EOF
-{% raw %}
-{{ range nomadService "redis" }}
-REDIS_HOST = {{ .Address }}
-REDIS_PORT = {{ .Port }}
-{{ end }}
-{% endraw %}
-EOF
-        change_mode = "restart"
-      }
-
-      env {
-        MODEL_ID = "{{ model_id }}"
-        MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
-        LICENSE_KEY = "{{ license_key }}"
-        GENAI_KEY = "{{ genai_key }}"
-        TYPE = "{{ type }}"
-        SUB_TYPE = "{{ sub_type }}"
-        AWS_ACCESS_KEY = "{{ aws_access_key }}"
-        AWS_ACCESS_SECRET = "{{ aws_access_secret }}"
-        {% if platform == "local" %}
-          MODEL_BAZAAR_DIR = "{{ share_dir }}"
-        {% elif platform == "docker" %}  
-          MODEL_BAZAAR_DIR = "/model_bazaar"
-        {% endif %}
-
-        TASK_RUNNER_TOKEN = "${TASK_RUNNER_TOKEN}"
-      }
-
-      config {
-        {% if platform == "docker" %}  
-          image = "{{ registry }}/{{ image_name }}:{{ tag }}"
-          image_pull_timeout = "15m"
-          ports = ["{{ model_id }}-worker-http"]
-          group_add = ["4646"]
-          auth {
-            username = "{{ docker_username }}"
-            password = "{{ docker_password }}"
-            server_address = "{{ registry }}"
-          }
-          volumes = [
-            "{{ share_dir }}:/model_bazaar"
-          ]
-        {% endif %}
-        command = "{{ python_path }}"
-        {% if platform == "docker" %}
-          args = ["worker.py"]
-        {% elif platform == "local" %}
-          args = ["{{ deployment_app_dir }}/worker.py"]
-        {% endif %}
-      }
-
-      resources {
-        cpu = 2400
-        memory = {{ memory }}
-        memory_max = {{ 4 * memory }}
-      }
-    }
-  }
-  {% endif %}
 }

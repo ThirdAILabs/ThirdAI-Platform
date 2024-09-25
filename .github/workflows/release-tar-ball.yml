@@ -1,12 +1,19 @@
 name: Release Job
 
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published] # This triggers the workflow when a new release is published
+
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: "Branch name for the release"
+        required: true
+        default: "main"
 
 jobs:
   package:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
 
     steps:
       - name: Checkout the repository
@@ -25,8 +32,8 @@ jobs:
 
       - name: Download and store the model
         run: |
-          mkdir -p models
-          wget -O models/qwen2-0_5b-instruct-fp16.gguf https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-fp16.gguf?download=true
+          mkdir -p gen-ai-models
+          wget -O gen-ai-models/qwen2-0_5b-instruct-fp16.gguf https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-fp16.gguf?download=true
 
       - name: Ensure scripts directory exists
         run: mkdir -p ./platform/scripts
@@ -43,12 +50,149 @@ jobs:
         run: |
           cp ./packaging/README.md ./README.md
 
-      - name: Package platform, model, driver, config, and README into tarball
-        run: |
-          tar -czvf thirdai-platform-package.tar.gz ./platform ./models/qwen2-0_5b-instruct-fp16.gguf ./driver.sh ./config.yml ./README.md
-
-      - name: Upload artifact
+      - name: Upload platform package artifact
         uses: actions/upload-artifact@v3
         with:
           name: thirdai-platform-package
           path: thirdai-platform-package.tar.gz
+
+      - name: Install Docker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            apt-transport-https \
+            ca-certificates \
+            curl \
+            software-properties-common
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+          sudo add-apt-repository \
+            "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+          sudo apt-get update
+          sudo apt-get install -y docker-ce
+
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y awscli
+
+      - name: Configure AWS credentials
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set region us-east-1
+
+      - name: Verify AWS CLI Setup
+        run: |
+          aws --version
+          aws sts get-caller-identity
+
+      - name: "Azure Login"
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install yq for YAML parsing
+        run: |
+          sudo add-apt-repository ppa:rmescandon/yq
+          sudo apt update
+          sudo apt install yq -y
+
+      - name: Set the branch name for release
+        run: |
+          branch_name="${{ github.event.inputs.branch_name || 'release-test-main' }}"
+          echo "Docker image branch to build on is: $branch_name"
+          echo "branch_name=$branch_name" >> $GITHUB_ENV
+
+      - name: Read Pull Credentials from release/config.yaml
+        id: credentials
+        run: |
+          PULL_USERNAME=$(yq e '.azure.branches."'${branch_name}'".pull_credentials.username' $GITHUB_WORKSPACE/release/config.yaml)
+          PULL_PASSWORD=$(yq e '.azure.branches."'${branch_name}'".pull_credentials.password' $GITHUB_WORKSPACE/release/config.yaml)
+
+          echo "pull_username=$PULL_USERNAME" >> $GITHUB_ENV
+          echo "pull_password=$PULL_PASSWORD" >> $GITHUB_ENV
+
+      - name: Log in to Docker Registry
+        run: |
+          docker login -u ${{ env.pull_username }} -p ${{ env.pull_password }} thirdaiplatform.azurecr.io
+
+      - name: Fetch the latest tag for thirdai_platform
+        id: fetch_latest_tag
+        run: |
+          latest_tag=$(az acr repository show-tags --name thirdaiplatform \
+            --repository thirdai_platform_${{ env.branch_name }} --orderby time_desc --output tsv | grep -v '^latest$' | head -n 1)
+          echo "Latest tag is: $latest_tag"
+          echo "latest_tag=$latest_tag" >> $GITHUB_ENV  # Save the latest_tag to the environment file
+
+      - name: Download Docker images using the latest tag
+        run: |
+          # TODO(pratik): write a job to keep updating the images whose releases doesnot have versioning.
+          mkdir -p docker_images-${{ env.latest_tag }}
+
+          # Pull and save images using the persisted ${{ env.latest_tag }} across steps
+          images=(thirdai_platform_${{ env.branch_name }} data_generation_job_${{ env.branch_name }} train_job_${{ env.branch_name }} deployment_job_${{ env.branch_name }} llm_dispatch_job_${{ env.branch_name }} frontend_${{ env.branch_name }} llm_cache_job_${{ env.branch_name }})
+
+          for image in "${images[@]}"
+          do
+              echo "Pulling thirdaiplatform.azurecr.io/${image}:${{ env.latest_tag }}..."
+              docker pull thirdaiplatform.azurecr.io/${image}:${{ env.latest_tag }}
+              docker save -o docker_images-${{ env.latest_tag }}/${image}_${{ env.latest_tag }}.tar thirdaiplatform.azurecr.io/${image}:${{ env.latest_tag }}
+          done
+
+          docker pull thirdaiplatform.azurecr.io/nomad-autoscaler:0.3.7
+          docker save -o docker_images-${{ env.latest_tag }}/nomad-autoscaler_0.3.7.tar thirdaiplatform.azurecr.io/nomad-autoscaler:0.3.7
+
+          # TODO(pratik): Cleanup workflows/update_llama_cpp_docker.yml.
+          docker pull thirdaiplatform.azurecr.io/llama.cpp:server
+          docker save -o docker_images-${{ env.latest_tag }}/llama.cpp_server.tar thirdaiplatform.azurecr.io/llama.cpp:server
+
+          docker pull thirdaiplatform.azurecr.io/redis:7.4.0
+          docker save -o docker_images-${{ env.latest_tag }}/redis_7.4.0.tar thirdaiplatform.azurecr.io/redis:7.4.0
+
+          docker pull registry:2
+          docker save -o docker_images-${{ env.latest_tag }}/registry_2.tar registry:2
+
+          docker pull postgres:latest
+          docker save -o docker_images-${{ env.latest_tag }}/postgres_latest.tar postgres:latest
+
+          docker pull thirdaiplatform.azurecr.io/traefik:v2.10
+          docker save -o docker_images-${{ env.latest_tag }}/traefik_v2.10.tar thirdaiplatform.azurecr.io/traefik:v2.10
+
+          docker pull thirdaiplatform.azurecr.io/grafana:main-ubuntu
+          docker save -o docker_images-${{ env.latest_tag }}/grafana_main-ubuntu.tar thirdaiplatform.azurecr.io/grafana:main-ubuntu
+
+          docker pull thirdaiplatform.azurecr.io/loki:k221-47b9075
+          docker save -o docker_images-${{ env.latest_tag }}/loki_k221-47b9075.tar thirdaiplatform.azurecr.io/loki:k221-47b9075
+
+          docker pull thirdaiplatform.azurecr.io/victoria-metrics:tags-v1.102.1-1-g76115c611f
+          docker save -o docker_images-${{ env.latest_tag }}/victoria-metrics_tags-v1.102.1-1-g76115c611f.tar thirdaiplatform.azurecr.io/victoria-metrics:tags-v1.102.1-1-g76115c611f
+
+          echo "All images pulled and saved in the docker_images-${{ env.latest_tag }} folder."
+
+      - name: Package platform, model, driver, config, and README into tarball
+        run: |
+          tar -czvf thirdai-platform-package-${{ env.branch_name }}-${{ env.latest_tag }}.tar.gz ./platform ./gen-ai-models ./driver.sh ./config.yml ./README.md
+
+      - name: Package Docker images, driver script, config, and README into tarball
+        run: |
+          tar -czvf thirdai-platform-package-offline-${{ env.branch_name }}-${{ env.latest_tag }}.tar.gz ./platform ./docker_images-${{ env.latest_tag }} ./driver.sh ./config.yml ./README.md ./gen-ai-models
+
+      - name: Upload platform package artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: thirdai-platform-package-${{ env.branch_name }}-${{ env.latest_tag }}
+          path: thirdai-platform-package-${{ env.branch_name }}-${{ env.latest_tag }}.tar.gz
+
+      - name: Upload platform package to S3
+        run: |
+          aws s3 cp thirdai-platform-package-${{ env.branch_name }}-${{ env.latest_tag }}.tar.gz s3://thirdai-corp-public/ThirdAI-Platform-latest-release/
+
+      - name: Upload Docker images artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: thirdai-platform-package-offline-${{ env.branch_name }}-${{ env.latest_tag }}
+          path: thirdai-platform-package-offline-${{ env.branch_name }}-${{ env.latest_tag }}.tar.gz
+
+      - name: Upload Docker images package to S3
+        run: |
+          aws s3 cp thirdai-platform-package-offline-${{ env.branch_name }}-${{ env.latest_tag }}.tar.gz s3://thirdai-corp-public/ThirdAI-Platform-latest-release/

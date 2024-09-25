@@ -7,6 +7,7 @@ import { fontSizes } from '../stylingConstants';
 import { ModelService, ReferenceInfo } from '../modelServices';
 
 interface ReferenceListProps {
+  query: string;
   references: ReferenceInfo[];
   onOpen: (ref: ReferenceInfo) => void;
   onUpvote: (refId: number, content: string) => void;
@@ -39,6 +40,7 @@ const ButtonContainer = styled.section`
 `;
 
 export default function ReferenceList({
+  query,
   references,
   onOpen,
   onUpvote,
@@ -62,6 +64,7 @@ export default function ReferenceList({
       {references.map((ref) => (
         <Fragment key={ref.id}>
           <Reference
+            query={query}
             info={ref}
             onOpen={() => onOpen(ref)}
             onUpvote={() => onUpvote(ref.id, ref.content)}

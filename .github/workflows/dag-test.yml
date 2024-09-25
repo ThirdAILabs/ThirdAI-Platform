@@ -119,6 +119,7 @@ jobs:
         sudo chmod +t $HOME/nfs/dir
         sudo chmod g+s $HOME/nfs/dir
         echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_ENV
+        echo "GENAI_KEY=${{ secrets.GENAI_KEY }}" >> $GITHUB_ENV
 
     - name: Write All Environment Variables to .env File
       run: |
@@ -149,7 +150,7 @@ jobs:
     - name: List files in local_setup
       run: ls -la local_setup
     
-    - name: Launch Autoscaler and Redis job
+    - name: Launch Autoscaler
       run: |
         cd local_setup
         NOMAD_PATH=$(which nomad)

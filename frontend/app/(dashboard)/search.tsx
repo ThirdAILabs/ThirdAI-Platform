@@ -3,9 +3,9 @@
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
+import { TextField, InputAdornment } from '@mui/material';
 import { Spinner } from '@/components/icons';
-import { Search } from 'lucide-react';
-
+import SearchIcon from '@mui/icons-material/Search';
 export function SearchInput() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -20,12 +20,26 @@ export function SearchInput() {
 
   return (
     <form action={searchAction} className="relative ml-auto flex-1 md:grow-0">
-      <Search className="absolute left-2.5 top-[.75rem] h-4 w-4 text-muted-foreground" />
-      <Input
+      {/* <Search className="absolute left-9.5 top-[.75rem] h-4 w-4 text-muted-foreground" /> */}
+      {/* <TextField
         name="q"
         type="search"
         placeholder="Search..."
-        className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+        className="w-80"
+      /> */}
+      <TextField
+        name="q"
+        type="search"
+        placeholder="Search..."
+        className="w-80"
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start" style={{ backgroundColor: 'white' }}>
+              <SearchIcon className="text-muted-foreground" />
+            </InputAdornment>
+          ),
+          style: { backgroundColor: 'white' }, // Ensures the input field background is white
+        }}
       />
       {isPending && <Spinner />}
     </form>

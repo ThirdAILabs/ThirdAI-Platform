@@ -1,4 +1,3 @@
-import json
 import multiprocessing as mp
 import os
 import shutil
@@ -322,6 +321,11 @@ class NeuralDBV2(Model):
 
         train_time = time.time() - start_time
         self.logger.info(f"Total training time: {train_time} seconds")
+
+        if self.config.data.deletions:
+            for doc_id in self.config.data.deletions:
+                self.db.delete_doc(doc_id=doc_id)
+            self.logger.info(f"Deleted {len(self.config.data.deletions)} docs.")
 
         self.save()
         self.logger.info("Model saved successfully.")

@@ -235,7 +235,10 @@ export function Model({ model, pending }: { model: SelectModel; pending?: boolea
             console.log('The NER model is not yet deployed and ready to deploy');
             setDeployStatus('Ready to Deploy');
 
-            deployModel({ deployment_name: modelName, model_identifier: tokenModelId })
+            deployModel({
+              deployment_name: modelName,
+              model_identifier: tokenModelId,
+            })
               .then((response) => {
                 if (response.status === 'complete') {
                   console.log('deployment success');
@@ -254,7 +257,10 @@ export function Model({ model, pending }: { model: SelectModel; pending?: boolea
             console.log('The NER model is not yet deployed and ready to deploy');
             setDeployStatus('Deploying');
 
-            deployModel({ deployment_name: modelName, model_identifier: tokenModelId })
+            deployModel({
+              deployment_name: modelName,
+              model_identifier: tokenModelId,
+            })
               .then((response) => {
                 if (response.status === 'complete') {
                   console.log('deployment success');

@@ -2,11 +2,6 @@ import argparse
 import os
 import sys
 
-import boto3
-from botocore import UNSIGNED
-from botocore.client import Config
-from botocore.exceptions import NoCredentialsError, PartialCredentialsError
-
 from headless import add_basic_args
 from headless.dag_executor import DAGExecutor
 from headless.functions import functions_registry, initialize_flow
@@ -29,11 +24,19 @@ def main():
     parser.add_argument("--all", action="store_true", help="Run all DAGs")
     parser.add_argument("--run-name", type=str, required=True, help="Name of the run")
     parser.add_argument("--sharded", action="store_true", help="Run sharded training")
+    parser.add_argument(
+        "--on-prem", action="store_true", help="Run on prem llm generation"
+    )
+    parser.add_argument(
+        "--generation", action="store_true", help="Run generation tests"
+    )
 
     args = parser.parse_args()
     additional_variables = {
         "sharded": args.sharded,
         "run_name": args.run_name,
+        "on_prem": args.on_prem,
+        "generation": args.generation,
     }
 
     local_test_dir = os.getenv("SHARE_DIR")

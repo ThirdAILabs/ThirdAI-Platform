@@ -93,7 +93,11 @@ const TabularClassificationQuestions: React.FC<TabularClassificationQuestionsPro
 
     // Your form submission logic goes here
     try {
-      console.log('Submitting form with:', { modelName, csvFile, targetColumn });
+      console.log('Submitting form with:', {
+        modelName,
+        csvFile,
+        targetColumn,
+      });
 
       if (onCreateModel) {
         onCreateModel('model_id_example');

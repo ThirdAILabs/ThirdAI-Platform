@@ -367,17 +367,29 @@ class Workflow(SQLDeclarativeBase):
             bool: True if the user can access the workflow, False otherwise.
         """
         most_restrictive_access = Access.public  # Start with the least restrictive
+        most_restrictive_model = (
+            None  # Track the model that imposes the most restrictive access
+        )
         required_teams = set()  # To track teams associated with protected models
 
         for workflow_model in self.workflow_models:
             model = workflow_model.model
-            model_access = model.access_level
+
+            user_permission = model.get_user_permission(user)
+
+            if user_permission:
+                # If the user has permission, treat as public for this model
+                model_access = Access.public
+            else:
+                # Use the model's access level if no explicit permission
+                model_access = model.access_level
 
             if (
                 model_access.restrictiveness()
                 > most_restrictive_access.restrictiveness()
             ):
                 most_restrictive_access = model_access
+                most_restrictive_model = model
                 required_teams.clear()  # Clear teams as we're now dealing with a new, more restrictive level
 
             if model_access == Access.protected:
@@ -396,7 +408,7 @@ class Workflow(SQLDeclarativeBase):
                 or user.is_global_admin()
             )
         elif most_restrictive_access == Access.private:
-            return model.user_id == user.id or user.is_global_admin()
+            return most_restrictive_model.user_id == user.id or user.is_global_admin()
 
         return False
 

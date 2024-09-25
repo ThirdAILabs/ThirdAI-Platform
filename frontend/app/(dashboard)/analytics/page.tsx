@@ -6,7 +6,7 @@ import UpdateButton from './updateButton';
 import { UsageDurationChart, UsageFrequencyChart, ReformulatedQueriesChart } from './charts';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { Button } from '@mui/material';
 import _ from 'lodash';
 
 export default function AnalyticsPage() {
@@ -101,7 +101,7 @@ export default function AnalyticsPage() {
           <div className="mt-4 flex justify-center items-center">
             <Link href={grafanaUrl} passHref legacyBehavior>
               <a target="_blank" rel="noopener noreferrer">
-                <Button>See more system stats</Button>
+                <Button variant="contained">See more system stats</Button>
               </a>
             </Link>
           </div>

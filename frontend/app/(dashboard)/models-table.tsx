@@ -15,7 +15,7 @@ import { WorkFlow } from './workflow';
 import { SelectModel } from '@/lib/db';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@mui/material';
 import {
   fetchPublicModels,
   fetchPrivateModels,
@@ -143,17 +143,6 @@ export function ModelsTable({ searchStr, offset }: { searchStr: string; offset: 
             </TableRow>
           </TableHeader>
           <TableBody>
-            {/* {privateModels.map((model, index) => (
-                <Model key={index} model={model} />
-            ))}
-
-            {pendingModels.map((model, index) => (
-                <Model key={index + 100} model={model} pending = {true} />
-            ))}  */}
-
-            {/* {workflows.map((workflow, index) => (
-                <WorkFlow key={index + 200} workflow={workflow} />
-            ))} */}
             {displayedWorkflows
               .sort((a, b) => a.name.localeCompare(b.name)) // Sort by name alphabetically
               .map((workflow, index) => (
@@ -175,8 +164,9 @@ export function ModelsTable({ searchStr, offset }: { searchStr: string; offset: 
           <div className="flex">
             <Button
               onClick={prevPage}
-              variant="ghost"
-              size="sm"
+              variant="contained"
+              color="error"
+              // size="sm"
               type="button"
               disabled={offset <= 0}
             >
@@ -185,8 +175,9 @@ export function ModelsTable({ searchStr, offset }: { searchStr: string; offset: 
             </Button>
             <Button
               onClick={nextPage}
-              variant="ghost"
-              size="sm"
+              className="ml-5"
+              // size="sm"
+              variant="contained"
               type="button"
               disabled={offset + modelsPerPage >= totalWorkflows}
             >

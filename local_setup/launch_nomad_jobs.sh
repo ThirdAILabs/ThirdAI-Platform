@@ -12,4 +12,3 @@ fi
 
 # Run Nomad jobs
 $NOMAD_PATH job run -var="nomad_endpoint=$($NOMAD_PATH agent-info | grep 'known_servers' | awk '{print $3}' | sed 's/:4647//')" autoscaler.nomad
-$NOMAD_PATH job run redis.nomad

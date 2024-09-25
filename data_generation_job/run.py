@@ -1,7 +1,5 @@
-import io
 import json
 import os
-from dataclasses import asdict
 from urllib.parse import urljoin
 
 import requests

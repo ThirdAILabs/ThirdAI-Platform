@@ -124,7 +124,7 @@ class OnPremLLM(LLMBase):
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=data) as response:
                 if response.status != 200:
-                    raise RuntimeError(
+                    raise Exception(
                         f"Failed to connect to On Prem LLM server: {response.status}"
                     )
                 async for line in response.content.iter_any():

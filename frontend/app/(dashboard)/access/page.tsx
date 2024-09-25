@@ -21,6 +21,7 @@ import {
 import { useContext } from 'react';
 import { UserContext } from '../../user_wrapper';
 import AutocompleteInput from '@/components/ui/AutocompleteInput';
+import { TextField, Button } from '@mui/material';
 
 // Define types for the models, teams, and users
 type Model = {
@@ -661,6 +662,7 @@ export default function AccessPage() {
                             <option value="Protected Model">Protected Model</option>
                             <option value="Public Model">Public Model</option>
                           </select>
+
                           {selectedType === 'Protected Model' && (
                             <select
                               value={selectedTeam || ''}
@@ -678,37 +680,35 @@ export default function AccessPage() {
                             </select>
                           )}
                           <div className="flex space-x-2 mt-2">
-                            <button
+                            <Button
                               onClick={() => handleModelTypeChange(index)}
                               className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                             >
                               Confirm
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               onClick={() => setEditingIndex(null)}
                               className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
                             >
                               Cancel
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => setEditingIndex(index)}
-                          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                        >
+                        <Button onClick={() => setEditingIndex(index)} variant="contained">
                           Change Access
-                        </button>
+                        </Button>
                       )}
                     </td>
 
                     <td className="py-3 px-4">
-                      <button
+                      <Button
                         onClick={() => handleDeleteModel(index)}
-                        className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+                        color="error"
+                        variant="contained"
                       >
                         Delete
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -782,12 +782,12 @@ export default function AccessPage() {
                       ))}
                   </ul>
                 </div>
-                <button
+                <Button
                   onClick={() => deleteTeam(team.name)}
                   className="mt-4 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
                 >
                   Delete Team
-                </button>
+                </Button>
               </div>
             ))}
 
@@ -795,12 +795,11 @@ export default function AccessPage() {
             <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
               <h4 className="text-lg font-semibold text-gray-800">Create New Team</h4>
               <div className="grid grid-cols-1 gap-4 mt-4">
-                <input
+                <TextField
                   type="text"
                   placeholder="Team Name"
                   value={newTeamName}
                   onChange={(e) => setNewTeamName(e.target.value)}
-                  className="border border-gray-300 rounded px-4 py-2"
                 />
                 <AutocompleteInput
                   key={newTeamAdmin} // Use a dynamic key to force re-render
@@ -816,7 +815,7 @@ export default function AccessPage() {
                   multiple={true}
                   placeholder="Team Members"
                 />
-                <button
+                <Button
                   onClick={() => {
                     if (newTeamAdmin && newTeamMembers.length > 0) {
                       createNewTeam();
@@ -824,10 +823,10 @@ export default function AccessPage() {
                       alert('Please enter both Team Admin and at least one Team Member.');
                     }
                   }}
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                  variant="contained"
                 >
                   Create Team
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -847,6 +846,7 @@ export default function AccessPage() {
                     </option>
                   ))}
                 </select>
+
                 <AutocompleteInput
                   key={selectedTeamForAdd + newMember} // Use a key to force re-render
                   value={newMember}
@@ -865,12 +865,9 @@ export default function AccessPage() {
                   }
                   placeholder="New Member"
                 />
-                <button
-                  onClick={addMemberToTeam}
-                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                >
+                <Button onClick={addMemberToTeam} variant="contained" color="success">
                   Add Member
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -901,12 +898,9 @@ export default function AccessPage() {
                   }
                   placeholder="Member to Remove"
                 />
-                <button
-                  onClick={removeMemberFromTeam}
-                  className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-                >
+                <Button onClick={removeMemberFromTeam} variant="contained" color="error">
                   Remove Member
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -933,12 +927,9 @@ export default function AccessPage() {
                   options={users.map((user) => user.name)}
                   placeholder="New Admin"
                 />
-                <button
-                  onClick={assignAdminToTeam}
-                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                >
+                <Button onClick={assignAdminToTeam} variant="contained" color="success">
                   Add Admin
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -970,12 +961,9 @@ export default function AccessPage() {
                   }
                   placeholder="Admin to Remove"
                 />
-                <button
-                  onClick={removeAdminFromTeam}
-                  className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-                >
+                <Button onClick={removeAdminFromTeam} variant="contained" color="error">
                   Remove Admin
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -999,12 +987,9 @@ export default function AccessPage() {
                 {user.ownedModels.length > 0 && (
                   <div className="text-gray-700">Owned Models: {user.ownedModels.join(', ')}</div>
                 )}
-                <button
-                  onClick={() => deleteUser(user.name)}
-                  className="mt-4 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-                >
+                <Button onClick={() => deleteUser(user.name)} variant="contained" color="error">
                   Delete User
-                </button>
+                </Button>
               </div>
             ))}
           </div>
@@ -1020,7 +1005,7 @@ export default function AccessPage() {
             </div>
             <div className="mt-4">
               <label className="block text-gray-700">New OpenAI API Key:</label>
-              <input
+              <TextField
                 type="text"
                 placeholder="sk-..."
                 value={newApiKey}
@@ -1028,13 +1013,14 @@ export default function AccessPage() {
                 className="border border-gray-300 rounded px-4 py-2 w-full"
               />
             </div>
-            <button
+            <Button
               onClick={handleSave}
-              className={`mt-4 bg-blue-500 text-white px-4 py-2 rounded ${loading ? 'cursor-not-allowed' : ''}`}
+              variant="contained"
+              className={`${loading ? 'cursor-not-allowed' : ''}`}
               disabled={loading}
             >
               {loading ? 'Saving...' : 'Save'}
-            </button>
+            </Button>
             {successMessage && <p className="text-green-500 mt-4">{successMessage}</p>}
           </div>
         </CardContent>
