@@ -18,19 +18,9 @@ from utils import propagate_error, response
 udt_predict_metric = Summary("udt_predict", "UDT predictions")
 
 
-def get_model(config: DeploymentConfig) -> ClassificationModel:
-    subtype = config.model_options.udt_sub_type
-    if subtype == UDTSubType.text:
-        return TextClassificationModel(config=config)
-    elif subtype == UDTSubType.token:
-        return TokenClassificationModel(config=config)
-    else:
-        raise ValueError(f"Unsupported UDT subtype '{subtype}'.")
-
-
 class UDTRouter:
     def __init__(self, config: DeploymentConfig, reporter: Reporter):
-        self.model: ClassificationModel = get_model(config)
+        self.model: ClassificationModel = UDTRouter.get_model(config)
 
         # TODO(Nicholas): move these metrics to prometheus
         self.start_time = time.time()
@@ -41,6 +31,16 @@ class UDTRouter:
         self.router = APIRouter()
         self.router.add_api_route("/predict", self.predict, methods=["POST"])
         self.router.add_api_route("/stats", self.stats, methods=["GET"])
+
+    @staticmethod
+    def get_model(config: DeploymentConfig) -> ClassificationModel:
+        subtype = config.model_options.udt_sub_type
+        if subtype == UDTSubType.text:
+            return TextClassificationModel(config=config)
+        elif subtype == UDTSubType.token:
+            return TokenClassificationModel(config=config)
+        else:
+            raise ValueError(f"Unsupported UDT subtype '{subtype}'.")
 
     @propagate_error
     @udt_predict_metric.time()

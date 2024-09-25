@@ -41,22 +41,12 @@ ndb_top_k_selections = Counter(
 )
 
 
-def get_model(config: DeploymentConfig) -> NDBModel:
-    subtype = config.model_options.ndb_sub_type
-    if subtype == NDBSubType.v1:
-        return NDBV1Model(config=config, write_mode=not config.autoscaling_enabled)
-    elif subtype == NDBSubType.v2:
-        return NDBV2Model(config=config, write_mode=not config.autoscaling_enabled)
-    else:
-        raise ValueError(f"Unsupported NDB subtype '{subtype}'.")
-
-
 class NDBRouter:
     def __init__(self, config: DeploymentConfig, reporter: Reporter):
         self.config = config
         self.reporter = reporter
 
-        self.model: NDBModel = get_model(config)
+        self.model: NDBModel = NDBRouter.get_model(config)
 
         self.feedback_logger = UpdateLogger.get_feedback_logger(self.model.data_dir)
         self.insertion_logger = UpdateLogger.get_insertion_logger(self.model.data_dir)
@@ -85,6 +75,16 @@ class NDBRouter:
         )
         self.router.add_api_route("/pdf-blob", self.pdf_blob, methods=["GET"])
         self.router.add_api_route("/pdf-chunks", self.pdf_chunks, methods=["GET"])
+
+    @staticmethod
+    def get_model(config: DeploymentConfig) -> NDBModel:
+        subtype = config.model_options.ndb_sub_type
+        if subtype == NDBSubType.v1:
+            return NDBV1Model(config=config, write_mode=not config.autoscaling_enabled)
+        elif subtype == NDBSubType.v2:
+            return NDBV2Model(config=config, write_mode=not config.autoscaling_enabled)
+        else:
+            raise ValueError(f"Unsupported NDB subtype '{subtype}'.")
 
     @ndb_query_metric.time()
     @propagate_error
