@@ -8,6 +8,17 @@ from datetime import datetime, timezone
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--thirdai_key",
+    type=str,
+    required=True,
+    help="The thirdai license key to use for the Platform license.",
+)
+
+args = parser.parse_args()
 
 cpu_mhz_limit = 100000000
 expiry_date = datetime(year=2030, month=4, day=3, tzinfo=timezone.utc)
@@ -24,7 +35,7 @@ with open(os.path.join(licensing_dir, "generate", "private_key.pem"), "rb") as f
 license_info = {
     "cpuMhzLimit": str(cpu_mhz_limit),
     "expiryDate": expiry_date.isoformat(),
-    "boltLicenseKey": "002099-64C584-3E02C8-7E51A0-DE65D9-V3",
+    "boltLicenseKey": args.thirdai_key,
 }
 
 # Serialize license information

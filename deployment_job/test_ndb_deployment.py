@@ -9,7 +9,7 @@ from thirdai import neural_db as ndbv1
 from thirdai import neural_db_v2 as ndbv2
 
 MODEL_ID = "xyz"
-LICENSE_KEY = "002099-64C584-3E02C8-7E51A0-DE65D9-V3"
+LICENSE_KEY = "236C00-47457C-4641C5-52E3BB-3D1F34-V3"
 
 
 def doc_dir():
