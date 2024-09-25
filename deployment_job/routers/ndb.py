@@ -566,7 +566,7 @@ class NDBRouter:
                 self.reporter.save_model(
                     access_token=token,
                     model_id=model_id,
-                    base_model_id=model_id,
+                    base_model_id=self.config.model_id,
                     model_name=input.model_name,
                     metadata={"thirdai_version": str(thirdai.__version__)},
                 )

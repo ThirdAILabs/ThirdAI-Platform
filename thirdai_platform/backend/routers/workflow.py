@@ -735,6 +735,7 @@ async def start_workflow(
                         "/model_bazaar/license/ndb_enterprise_license.json",
                     )
                 )["boltLicenseKey"],
+                # TODO(Anyone): replace this env variable with query parameter
                 autoscaling_enabled=bool(os.getenv("AUTOSCALING_ENABLED", "false")),
                 model_options=model_options,
             )
