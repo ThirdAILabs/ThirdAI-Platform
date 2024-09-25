@@ -61,7 +61,7 @@ job "llm-cache" {
           ]
         {% elif platform == "local" %}
           command = "{{ python_path }}"
-          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ llm_cache_app_dir }}","--reload","--host","0.0.0.0","--port","{{ port }}"]
+          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ llm_cache_app_dir }}","--host","0.0.0.0","--port","{{ port }}"]
         {% endif %}
       }
 

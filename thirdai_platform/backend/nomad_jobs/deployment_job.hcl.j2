@@ -103,7 +103,7 @@ EOF
           ]
         {% elif platform == "local" %}
           command = "{{ python_path }}"
-          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ deployment_app_dir }}","--reload","--host","0.0.0.0","--port","${NOMAD_PORT_{{ model_id | replace("-", "_") }}_http}"]
+          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ deployment_app_dir }}","--host","0.0.0.0","--port","${NOMAD_PORT_{{ model_id | replace("-", "_") }}_http}"]
         {% endif %}
       }
 
