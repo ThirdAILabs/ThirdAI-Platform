@@ -107,8 +107,13 @@ NDB:
     params:
       model: check_supervised
 
-  delete_model:
+  get_logs:
     dependencies: [undeploy]
+    params:
+      model: check_unsupervised_supervised
+
+  delete_model:
+    dependencies: [get_logs]
     params:
       model: check_unsupervised_supervised
   

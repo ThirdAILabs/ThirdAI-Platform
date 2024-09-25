@@ -173,6 +173,18 @@ class CommonFunctions:
         flow.bazaar_client.delete(model_identifier=model.model_identifier)
         logging.info(f"Deleted the model {model.model_identifier}")
 
+    @staticmethod
+    def get_logs(inputs: Dict[str, Any]):
+        """
+        Get the logs for the model.
+        """
+        logging.info(f"Getting the model logs with inputs: {inputs}")
+        model = inputs.get("model")
+        flow.bazaar_client.logs(model)
+        logging.info(f"Got the logs for {model.model_identifier}")
+        flow.bazaar_client.cleanup_cache()
+        logging.info(f"Bazaar cache is cleaned")
+
 
 class NDBFunctions:
     @staticmethod
@@ -241,6 +253,8 @@ class NDBFunctions:
                     use_cache=True,
                 )
                 logging.info(f"Openai generated answer: {generated_answer}")
+                if not generated_answer:
+                    raise Exception(f"Openai answer is not generated")
 
             if on_prem:
                 flow.bazaar_client.start_on_prem(autoscaling_enabled=False)
@@ -253,6 +267,8 @@ class NDBFunctions:
                     use_cache=False,
                 )
                 logging.info(f"on-prem generated answer: {generated_answer}")
+                if not generated_answer:
+                    raise Exception(f"On prem answer is not generated")
 
     @staticmethod
     def check_unsupervised(inputs: Dict[str, Any]) -> Any:

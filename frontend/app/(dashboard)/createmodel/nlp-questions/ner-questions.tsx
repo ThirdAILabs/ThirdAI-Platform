@@ -8,7 +8,7 @@ import {
 } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Button, TextField } from '@mui/material';
 import {
   Table,
   TableBody,
@@ -252,8 +252,8 @@ const NERQuestions = ({
   return (
     <div>
       <span className="block text-lg font-semibold">App Name</span>
-      <Input
-        className="text-md"
+      <TextField
+        className="text-md w-full"
         value={modelName}
         onChange={(e) => {
           const name = e.target.value;
@@ -299,7 +299,13 @@ const NERQuestions = ({
           </span>
           <CardDescription>Define your own categories or select existing ones</CardDescription>
           <form onSubmit={handleSubmit}>
-            <div style={{ display: 'flex', flexDirection: 'column', marginTop: '10px' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                marginTop: '10px',
+              }}
+            >
               {categories.map((category, index) => (
                 <div
                   key={index}
@@ -312,13 +318,17 @@ const NERQuestions = ({
                   }}
                 >
                   <div style={{ width: '100%' }}>
-                    <Input
-                      list={`category-options-${index}`}
+                    <TextField
                       style={{ width: '95%' }}
-                      className="text-sm"
+                      className="text-sm w-fit"
                       placeholder="Category Name"
                       value={category.name}
                       onChange={(e) => handleCategoryChange(index, 'name', e.target.value)}
+                      InputProps={{
+                        inputProps: {
+                          list: `category-options-${index}`, // Linking to the datalist
+                        },
+                      }}
                     />
                     <datalist id={`category-options-${index}`}>
                       {predefinedChoices.map((choice, i) => (
@@ -326,26 +336,31 @@ const NERQuestions = ({
                       ))}
                     </datalist>
                   </div>
-                  <Input
+                  <TextField
                     style={{ width: '75%' }}
-                    className="text-sm"
+                    className="text-sm w-fit"
                     placeholder="Example"
                     value={category.example}
                     onChange={(e) => handleCategoryChange(index, 'example', e.target.value)}
                   />
-                  <Input
+                  <TextField
                     style={{ width: '130%' }}
-                    className="text-sm"
+                    className="text-sm w-fit"
                     placeholder="What this category is about."
                     value={category.description}
                     onChange={(e) => handleCategoryChange(index, 'description', e.target.value)}
                   />
-                  <Button variant="destructive" onClick={() => handleRemoveCategory(index)}>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    onClick={() => handleRemoveCategory(index)}
+                  >
                     Remove
                   </Button>
                 </div>
               ))}
               <Button
+                variant="contained"
                 style={{ marginTop: '10px', width: 'fit-content' }}
                 onClick={handleAddAndReviewCategory}
               >
@@ -353,7 +368,8 @@ const NERQuestions = ({
               </Button>
               {categories.length > 0 && (
                 <Button
-                  variant={isDataGenerating ? 'secondary' : 'default'}
+                  variant="contained"
+                  color={isDataGenerating ? 'success' : 'primary'}
                   style={{ marginTop: '30px' }}
                   onClick={generateData}
                 >
@@ -424,7 +440,7 @@ const NERQuestions = ({
             }}
           >
             <Button
-              variant="outline"
+              variant="outlined"
               style={{ width: '100%' }}
               onClick={() => setGeneratedData([])}
             >

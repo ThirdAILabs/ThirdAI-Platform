@@ -2,10 +2,10 @@ import os
 import traceback
 import uuid
 from enum import Enum
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List
 
 from auth.jwt import AuthenticatedUser, verify_access_token
+from backend.train_config import JobOptions
 from backend.datagen import (
     TextClassificationGenerateArgs,
     TokenClassificationGenerateArgs,
@@ -18,7 +18,7 @@ from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, Form, status
 from licensing.verify.verify_license import valid_job_allocation, verify_license
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 data_router = APIRouter()

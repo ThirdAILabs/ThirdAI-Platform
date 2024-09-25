@@ -108,7 +108,12 @@ export default function Dashboard() {
         }}
       >
         <div
-          style={{ width: '80%', display: 'flex', justifyContent: 'center', height: 'fit-content' }}
+          style={{
+            width: '80%',
+            display: 'flex',
+            justifyContent: 'center',
+            height: 'fit-content',
+          }}
         >
           {table(system, 'System Info')}
           <div style={{ width: '30px' }} />

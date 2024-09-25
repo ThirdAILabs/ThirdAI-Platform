@@ -1,5 +1,6 @@
 import os
 import shutil
+import zipfile
 
 from storage.interface import StorageInterface
 from storage.utils import create_token, verify_token
@@ -203,3 +204,23 @@ class LocalStorage(StorageInterface):
         checkpoint_dir = os.path.join(self.root, str(model_id))
         if os.path.exists(checkpoint_dir):
             shutil.rmtree(checkpoint_dir)
+
+    def logs(self, model_id: str):
+        model_dir = os.path.join(self.root, f"models/{model_id}")
+        if not os.path.exists(model_dir):
+            raise ValueError(f"Model with ID {model_id} does not exist.")
+
+        zip_filepath = os.path.join(self.root, "logs.zip")
+
+        with zipfile.ZipFile(zip_filepath, "w") as zipf:
+            # Traverse the directory structure and add all log files to the zip
+            for root, _, files in os.walk(model_dir):
+                for file in files:
+                    if file.endswith(".log"):  # Filter for log files
+                        file_path = os.path.join(root, file)
+                        arcname = os.path.relpath(
+                            file_path, model_dir
+                        )  # Relative path for the zip file structure
+                        zipf.write(file_path, arcname)
+
+        return zip_filepath

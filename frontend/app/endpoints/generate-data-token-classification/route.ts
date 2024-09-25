@@ -66,7 +66,11 @@ const generateSyntheticSentence = (
   realValuesMap: { [key: string]: string[] }
 ) => {
   let syntheticSentence = template;
-  let entityReplacements: { placeholder: string; value: string; category: string }[] = [];
+  let entityReplacements: {
+    placeholder: string;
+    value: string;
+    category: string;
+  }[] = [];
 
   for (const [category, values] of Object.entries(realValuesMap)) {
     const placeholder = `[${category}]`;
@@ -160,7 +164,9 @@ export const POST = async (req: NextRequest) => {
 
       if (realValuesMap[category.name].length < 10) {
         return NextResponse.json(
-          { error: `Generating real values for category [${category.name}] has failed` },
+          {
+            error: `Generating real values for category [${category.name}] has failed`,
+          },
           { status: 500 }
         );
       }

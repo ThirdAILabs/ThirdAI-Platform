@@ -1,8 +1,7 @@
 import os
 import traceback
-from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from backend.train_config import (
     DatagenOptions,
@@ -23,7 +22,6 @@ from backend.utils import (
 from database import schema
 from database.session import get_session
 from fastapi import Depends, status
-from licensing.verify.verify_license import valid_job_allocation, verify_license
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 

@@ -3,7 +3,6 @@ import os
 import sys
 import time
 from functools import wraps
-from pathlib import Path
 from urllib.parse import urljoin
 
 import requests
@@ -180,8 +179,6 @@ def create_s3_client():
 # Note(pratik): We do have a S3 storage handler, however repetition here is to make sure
 # the client code is easily packageable
 def download_files_from_s3(bucket_name, local_dir):
-    import boto3
-
     s3_client = create_s3_client()
     os.makedirs(local_dir, exist_ok=True)
 

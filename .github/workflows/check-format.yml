@@ -24,15 +24,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Prepare Black
+
+      # Install autoflake, black, and isort
+      - name: Prepare autoflake, Black, and isort
         run: |
-          sudo pip3 install black
-      - name: Prepare isort
+          sudo pip3 install autoflake black isort
+
+      # Check for unused imports without modifying files
+      - name: Check for unused imports with autoflake
         run: |
-          sudo pip3 install isort
+          autoflake --check --remove-all-unused-imports --ignore-pass-statements --recursive .
+        continue-on-error: false  # Fails the job if unused imports are found
+
+      # Check Black format
       - name: Check Black format 
         run: |
           black  --check --diff --exclude "build|.venv|venv|.env|env|deps" .
+
+      # Check isort format
       - name: Check isort format
         run: |
           isort --diff --check --profile black --skip-glob deps --skip _deps .

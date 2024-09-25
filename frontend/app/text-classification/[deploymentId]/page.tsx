@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Container, TextField, Box } from '@mui/material';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
+import { useState } from 'react';
+import { Container, Box, Button, TextField } from '@mui/material';
+import { Tabs } from '@/components/ui/tabs';
+// import { Input } from '@/components/ui/input';
 import * as _ from 'lodash';
 import { useTextClassificationEndpoints } from '@/lib/backend';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,7 +27,12 @@ export default function Page() {
   return (
     <div
       className="bg-muted"
-      style={{ width: '100%', display: 'flex', justifyContent: 'center', height: '100vh' }}
+      style={{
+        width: '100%',
+        display: 'flex',
+        justifyContent: 'center',
+        height: '100vh',
+      }}
     >
       <Tabs defaultValue="interact" style={{ width: '100%' }}>
         <div style={{ position: 'fixed', top: '20px', left: '20px' }}>
@@ -47,9 +51,9 @@ export default function Page() {
           }}
         >
           <Box display="flex" justifyContent="center" alignItems="center" width="100%">
-            <Input
+            <TextField
               autoFocus
-              className="text-md"
+              className="text-md w-full"
               style={{ height: '3rem' }}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
@@ -63,7 +67,8 @@ export default function Page() {
               }}
             />
             <Button
-              size="sm"
+              size="small"
+              variant="contained"
               style={{ height: '3rem', marginLeft: '10px', padding: '0 20px' }}
               onClick={handleRun}
             >

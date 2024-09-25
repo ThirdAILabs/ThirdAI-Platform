@@ -1,6 +1,4 @@
-import json
 import os
-from abc import ABC, abstractmethod
 from typing import List
 
 import boto3

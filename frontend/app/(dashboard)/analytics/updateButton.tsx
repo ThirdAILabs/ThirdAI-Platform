@@ -125,7 +125,12 @@ export default function UpdateButton() {
 
   return (
     <div
-      style={{ display: 'flex', justifyContent: 'center', marginTop: '20px', marginBottom: '20vh' }}
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        marginTop: '20px',
+        marginBottom: '20vh',
+      }}
     >
       <Button onClick={handleUpdate} disabled={loading}>
         {loading ? 'Updating...' : 'Update model with feedback'}

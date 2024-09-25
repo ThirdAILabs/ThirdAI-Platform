@@ -91,6 +91,9 @@ async def start_on_prem_generate_job(
         cores_per_allocation=7,
         memory_per_allocation=job_memory_mb,
         model_name=model_name,
+        registry=os.getenv("DOCKER_REGISTRY"),
+        docker_username=os.getenv("DOCKER_USERNAME"),
+        docker_password=os.getenv("DOCKER_PASSWORD"),
         autoscaling_enabled="true" if autoscaling_enabled else "false",
     )
 
@@ -256,6 +259,9 @@ async def restart_telemetry_jobs():
         promfile="/model_bazaar/nomad-monitoring/node_discovery/prometheus.yaml",  # Promfile_path could be different based on whether it is being run on `local-docker` or `docker`. But victoriametric should always find this file somewhere in the mounted volume. That's why it is being hardcoded here
         share_dir=share_dir,
         target_count=str(len(targets)),
+        registry=os.getenv("DOCKER_REGISTRY"),
+        docker_username=os.getenv("DOCKER_USERNAME"),
+        docker_password=os.getenv("DOCKER_PASSWORD"),
     )
     if response.status_code != 200:
         raise Exception(f"{response.text}")
