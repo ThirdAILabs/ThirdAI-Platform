@@ -1,8 +1,8 @@
 {
     "license": {
-        "cpuMhzLimit": "1000000000",
-        "expiryDate": "2025-04-03T00:00:00+00:00",
+        "cpuMhzLimit": "100000000",
+        "expiryDate": "2030-04-03T00:00:00+00:00",
         "boltLicenseKey": "236C00-47457C-4641C5-52E3BB-3D1F34-V3"
     },
-    "signature": "HVieKDm/UT0jP5sbld8ISKEy3UgYROB11XXEtyY5sYBRrcHu7psUiJkDjFRfFrIivt9Fou0TGyu6EKI+Mj04OffpMZoO1kXTjwkHUjBVWF40Lg81k/6/uaBKgb/aTWWTkoy0Kqt0U7t0PibkUKkoakYqRbgHDHQ/oe/KW5MJ5sg4SdrOHj2zv80u3lB/djaJPZHvqJisdOVQ9TgShfwMxp5dutVmB5fVnVY7hrnBQkLXSoglNtfpYfYK71DhQLDPo71O0hmhKR1SvLMCzFm76XC3hf114BrsLl+yQblvm52/lkzVY/pVWmPgqTk5kt4yvZZOi+HXY8nTU8Bz1ftanA=="
+    "signature": "SM8NMmVhdW23u9g97LnmkbG1lqiG7U07RkUdXIVll9XYI6qVYfRPbLZVNYJiYoo/iY6Jrpom/ga+NRYGDz8P+9cfpwF3CfAsdjlH41CkBTB3aZr/0t1JC/M4J3IQe5DXMF30DDjmhrrTsYsSfFcvtq8J4GG9QnMiveoB2nozuwA8Xz7XlSCujJcTFwpqFvEsJ5RGH6OuJaNXT2auuCO0EdAsNxyDOxmYxnTlKH9NdeZT9DLoEYjSfmfk4b3gLxNpmMoXPk8MJWGeoSdM99TR1wtb1JbGg/KtJSKkFkmzdCNz2dXc2ol28AkIq3eqGiU7VLh/fVZ8hvUqe7yw+FTUEw=="
 }
