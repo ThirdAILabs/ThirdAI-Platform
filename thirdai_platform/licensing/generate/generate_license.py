@@ -1,5 +1,6 @@
 # license_generation.py
 
+import argparse
 import base64
 import json
 import os
@@ -8,7 +9,6 @@ from datetime import datetime, timezone
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
-import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
