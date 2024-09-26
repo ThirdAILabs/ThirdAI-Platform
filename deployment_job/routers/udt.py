@@ -65,7 +65,7 @@ class UDTRouter:
         Example Request Body:
         ```
         {
-            "query": "What is artificial intelligence?",
+            "text": "What is artificial intelligence?",
             "top_k": 5
         }
         ```
@@ -78,7 +78,7 @@ class UDTRouter:
                 len([tags[0] for tags in results.predicted_tags if tags[0] != "O"])
             )
             self.queries_ingested.log(1)
-            self.queries_ingested_bytes.log(len(params["query"]))
+            self.queries_ingested_bytes.log(len(params.text))
 
         return response(
             status_code=status.HTTP_200_OK,

@@ -70,7 +70,7 @@ class UDTFunctions:
 
         logging.info("Calling predict on the deployment")
         return deployment.predict(
-            query="Can autism and down syndrome be in conjunction",
+            text="Can autism and down syndrome be in conjunction",
             top_k=5,
         )
 
