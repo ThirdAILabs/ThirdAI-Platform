@@ -33,8 +33,8 @@ class NDBModel(Model):
     Base class for NeuralDB (NDB) models.
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, config: DeploymentConfig):
+        super().__init__(config=config)
         self.chat_instances = {}
 
     @abstractmethod
