@@ -168,10 +168,12 @@ class NDBExtraParams(BaseModel):
 class ChatInput(BaseModel):
     user_input: str
     session_id: Optional[str] = None
+    provider: str = "openai"
 
 
 class ChatHistoryInput(BaseModel):
     session_id: Optional[str] = None
+    provider: str = "openai"
 
 
 class ChatSettings(BaseModel):

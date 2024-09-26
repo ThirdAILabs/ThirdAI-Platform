@@ -633,26 +633,12 @@ export class ModelService {
     }
   }
 
-  getChatHistory(): Promise<ChatMessage[]> {
+  getChatHistory(provider: string): Promise<ChatMessage[]> {
     return fetch(this.url + '/get-chat-history', {
-      method: 'POST',
-      body: JSON.stringify({ session_id: this.sessionId }),
-      headers: {
-        'Content-type': 'application/json; charset=UTF-8',
-        ...this.authHeader(),
-      },
-    })
-      .then(this.handleInvalidAuth())
-      .then((res) => res.json())
-      .then((response) => response['data']['chat_history'] as ChatMessage[]);
-  }
-
-  chat(textInput: string): Promise<ChatResponse> {
-    return fetch(this.url + '/chat', {
       method: 'POST',
       body: JSON.stringify({
         session_id: this.sessionId,
-        user_input: textInput,
+        provider: provider,
       }),
       headers: {
         'Content-type': 'application/json; charset=UTF-8',
@@ -660,8 +646,87 @@ export class ModelService {
       },
     })
       .then(this.handleInvalidAuth())
-      .then((res) => res.json())
-      .then((response) => response['data'] as ChatResponse);
+      .then((res) => {
+        if (res.ok) {
+          return res.json();
+        } else {
+          return res.json().then((err) => {
+            throw new Error(err.detail || 'Failed to fetch chat history');
+          });
+        }
+      })
+      .then((response) => response['data']['chat_history'] as ChatMessage[])
+      .catch((e) => {
+        console.error('Error fetching chat history:', e);
+        alert('Error fetching chat history: ' + e);
+        throw e;
+      });
+  }
+
+  chat(textInput: string, provider: string): Promise<ChatResponse> {
+    return fetch(this.url + '/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        session_id: this.sessionId,
+        user_input: textInput,
+        provider: provider,
+      }),
+      headers: {
+        'Content-type': 'application/json; charset=UTF-8',
+        ...this.authHeader(),
+      },
+    })
+      .then(this.handleInvalidAuth())
+      .then((res) => {
+        if (res.ok) {
+          return res.json();
+        } else {
+          return res.json().then((err) => {
+            throw new Error(err.detail || 'Failed to fetch chat response');
+          });
+        }
+      })
+      .then((response) => response['data'] as ChatResponse)
+      .catch((e) => {
+        console.error('Error in chat:', e);
+        alert('Error in chat: ' + e);
+        throw e;
+      });
+  }
+
+  setChat(provider: string): Promise<any> {
+    const url = new URL(this.url + '/update-chat-settings');
+    const settings = {
+      provider,
+    };
+
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.authHeader(),
+      },
+      body: JSON.stringify(settings),
+    })
+      .then(this.handleInvalidAuth())
+      .then((res) => {
+        if (res.ok) {
+          return res.json();
+        } else {
+          return res.json().then((json) => {
+            throw new Error(json.message);
+          });
+        }
+      })
+      .then((data) => {
+        console.log('Chat settings updated successfully:', data);
+        return data;
+      })
+      .catch((e) => {
+        console.error('Error updating chat settings:', e);
+        alert('Error updating chat settings: ' + e);
+        throw e;
+      });
   }
 
   async recordImplicitFeedback(feedback: ImplicitFeecback) {

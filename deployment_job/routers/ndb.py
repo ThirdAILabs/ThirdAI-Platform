@@ -418,9 +418,10 @@ class NDBRouter:
         input: inputs.ChatHistoryInput,
         token=Depends(Permissions.verify_permission("read")),
     ):
-        if not self.model.chat:
+        chat = self.model.get_chat(provider=input.provider)
+        if not chat:
             raise Exception(
-                "Chat is not enabled. Please provide an GenAI key to enable chat."
+                f"Chat is not enabled for provider: {input.provider}. Please set up the provider."
             )
 
         if not input.session_id:
@@ -436,7 +437,7 @@ class NDBRouter:
         else:
             session_id = input.session_id
 
-        chat_history = {"chat_history": self.model.chat.get_chat_history(session_id)}
+        chat_history = {"chat_history": chat.get_chat_history(session_id)}
 
         return response(
             status_code=status.HTTP_200_OK,
@@ -450,9 +451,10 @@ class NDBRouter:
         input: inputs.ChatInput,
         token=Depends(Permissions.verify_permission("read")),
     ):
-        if not self.model.chat:
+        chat = self.model.get_chat(provider=input.provider)
+        if not chat:
             raise Exception(
-                "Chat is not enabled. Please provide an GENAI key to enable chat."
+                f"Chat is not enabled for provider: {input.provider}. Please set up the provider."
             )
 
         if not input.session_id:
@@ -468,7 +470,7 @@ class NDBRouter:
         else:
             session_id = input.session_id
 
-        chat_result = {"response": self.model.chat.chat(input.user_input, session_id)}
+        chat_result = {"response": chat.chat(input.user_input, session_id)}
 
         return response(
             status_code=status.HTTP_200_OK,

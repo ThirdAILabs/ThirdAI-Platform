@@ -33,6 +33,10 @@ class NDBModel(Model):
     Base class for NeuralDB (NDB) models.
     """
 
+    def __init__(self):
+        super().__init__()
+        self.chat_instances = {}
+
     @abstractmethod
     def predict(self, query: str, top_k: int, **kwargs: Any) -> inputs.SearchResultsNDB:
         """
@@ -105,23 +109,44 @@ class NDBModel(Model):
         raise NotImplementedError
 
     def set_chat(self, **kwargs):
+        """
+        Set up a chat instance for the given provider, if it hasn't been set already.
+        """
+        provider = kwargs.get("provider", "openai")
         try:
             sqlite_db_path = os.path.join(self.model_dir, "chat_history.db")
 
             chat_history_sql_uri = f"sqlite:///{sqlite_db_path}"
 
-            llm_chat_interface = llm_providers.get(kwargs.get("provider", "openai"))
+            if provider not in llm_providers:
+                raise ValueError(f"Unsupported chat provider: {provider}")
 
-            self.chat = llm_chat_interface(
+            llm_chat_interface = llm_providers.get(provider)
+
+            key = kwargs.get("key") or self.config.model_options.genai_key
+
+            # Remove 'key' from kwargs if present
+            kwargs.pop("key", None)
+
+            self.chat_instances[provider] = llm_chat_interface(
                 db=self.db,
                 chat_history_sql_uri=chat_history_sql_uri,
-                key=self.config.model_options.genai_key,
+                key=key,
                 base_url=self.config.model_bazaar_endpoint,
                 **kwargs,
             )
-        except Exception as err:
+        except Exception:
             traceback.print_exc()
-            self.chat = None
+            self.chat_instances[provider] = None
+
+    def get_chat(self, provider: str):
+        """
+        Retrieve the chat instance for the specified provider.
+        """
+        if provider in self.chat_instances:
+            return self.chat_instances[provider]
+        else:
+            raise ValueError(f"No chat instance available for provider: {provider}")
 
     def get_ndb_path(self, model_id: str) -> Path:
         """
