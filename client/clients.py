@@ -206,7 +206,7 @@ class NeuralDBClient(BaseClient):
         print(self.base_url)
 
         response = http_post_with_error(
-            urljoin(self.base_url, "predict"),
+            urljoin(self.base_url, "search"),
             json={"query": query, "top_k": top_k, "constraints": constraints},
             headers=auth_header(self.login_instance.access_token),
         )
