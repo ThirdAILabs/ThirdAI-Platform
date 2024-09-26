@@ -161,15 +161,13 @@ export class ModelService {
   async piiDetect(query: string): Promise<any> {
     const url = new URL(this.tokenModelUrl + '/predict');
 
-    const baseParams = { query: query, top_k: 1 };
-
     return fetch(url, {
       method: 'POST',
       headers: {
         ...this.authHeader(),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(baseParams),
+      body: JSON.stringify({ text: query, top_k: 1 }),
     })
       .then(this.handleInvalidAuth())
       .then((response) => {
