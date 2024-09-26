@@ -60,6 +60,19 @@ class UDTFunctions:
             datagen_job_options=UDTFunctions.build_job_options(config),
             train_job_options=UDTFunctions.build_job_options(config),
         )
+    
+    @staticmethod
+    def check_predict(inputs: Dict[str, Any]):
+        logging.info(f"inputs: {inputs}")
+        deployment = inputs.get("deployment")
+
+        logging.info(f"checking the deployment for {deployment.model_identifier}")
+
+        logging.info("Calling predict on the deployment")
+        return deployment.predict(
+            query="Can autism and down syndrome be in conjunction",
+            top_k=5,
+        )
 
     @staticmethod
     def udt_deploy(inputs: Dict[str, Any]) -> Any:
@@ -120,19 +133,6 @@ class CommonFunctions:
         flow.bazaar_client.undeploy(deployment)
 
     @staticmethod
-    def check_search(inputs: Dict[str, Any]):
-        logging.info(f"inputs: {inputs}")
-        deployment = inputs.get("deployment")
-
-        logging.info(f"checking the deployment for {deployment.model_identifier}")
-
-        logging.info("Searching the deployment")
-        return deployment.search(
-            query="Can autism and down syndrome be in conjunction",
-            top_k=5,
-        )
-
-    @staticmethod
     def await_deploy(inputs: Dict[str, Any]):
         """
         Awaits the completion of model deployment.
@@ -187,6 +187,19 @@ class CommonFunctions:
 
 
 class NDBFunctions:
+    @staticmethod
+    def check_search(inputs: Dict[str, Any]):
+        logging.info(f"inputs: {inputs}")
+        deployment = inputs.get("deployment")
+
+        logging.info(f"checking the deployment for {deployment.model_identifier}")
+
+        logging.info("Searching the deployment")
+        return deployment.search(
+            query="Can autism and down syndrome be in conjunction",
+            top_k=5,
+        )
+
     @staticmethod
     def check_deployment_ndb(inputs: Dict[str, Any]):
         """
