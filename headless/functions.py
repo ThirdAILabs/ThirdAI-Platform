@@ -60,7 +60,7 @@ class UDTFunctions:
             datagen_job_options=UDTFunctions.build_job_options(config),
             train_job_options=UDTFunctions.build_job_options(config),
         )
-    
+
     @staticmethod
     def check_predict(inputs: Dict[str, Any]):
         logging.info(f"inputs: {inputs}")
