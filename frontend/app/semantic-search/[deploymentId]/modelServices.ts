@@ -308,15 +308,12 @@ export class ModelService {
   }
 
   async predict(queryText: string, topK: number, queryId?: string): Promise<SearchResult | null> {
-    const url = new URL(this.url + '/predict');
+    const url = new URL(this.url + '/search');
 
     // TODO(Geordie): Accept a "timeout" / "longer than expected" callback.
     // E.g. if the query takes too long, then we can display a message
     // saying that they should check the url, or maybe it's just taking a
     // while.
-
-    const baseParams = { query: queryText, top_k: topK };
-    const ndbParams = { constraints: {} };
 
     return fetch(url, {
       method: 'POST',
@@ -324,7 +321,7 @@ export class ModelService {
         ...this.authHeader(),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ base_params: baseParams, ndb_params: ndbParams }),
+      body: JSON.stringify({ query: queryText, top_k: topK, constraints: {} }),
     })
       .then(this.handleInvalidAuth())
       .then((response) => {

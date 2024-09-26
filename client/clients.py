@@ -205,13 +205,9 @@ class NeuralDBClient(BaseClient):
         """
         print(self.base_url)
 
-        base_params = {"query": query, "top_k": top_k}
-
-        ndb_params = {"constraints": constraints}
-
         response = http_post_with_error(
             urljoin(self.base_url, "predict"),
-            json={"base_params": base_params, "ndb_params": ndb_params},
+            json={"query": query, "top_k": top_k, "constraints": constraints},
             headers=auth_header(self.login_instance.access_token),
         )
 
@@ -432,7 +428,7 @@ class UDTClient(BaseClient):
         )
 
     @check_deployment_decorator
-    def search(self, query, top_k=1):
+    def predict(self, text, top_k=1):
         """
         Queries the UDT Model
 
@@ -442,11 +438,9 @@ class UDTClient(BaseClient):
         """
         print(self.base_url)
 
-        base_params = {"query": query, "top_k": top_k}
-
         response = http_post_with_error(
             urljoin(self.base_url, "predict"),
-            json=base_params,
+            json={"text": text, "top_k": top_k},
             headers=auth_header(self.login_instance.access_token),
         )
 

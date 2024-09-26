@@ -10,7 +10,10 @@ from models.classification_models import (
 )
 from permissions import Permissions
 from prometheus_client import Summary
-from pydantic_models.inputs import BaseQueryParams, SearchResultsTokenClassification
+from pydantic_models.inputs import (
+    SearchResultsTokenClassification,
+    TextAnalysisPredictParams,
+)
 from reporter import Reporter
 from throughput import Throughput
 from utils import propagate_error, response
@@ -46,7 +49,7 @@ class UDTRouter:
     @udt_predict_metric.time()
     def predict(
         self,
-        base_params: BaseQueryParams,
+        params: TextAnalysisPredictParams,
         token=Depends(Permissions.verify_permission("read")),
     ):
         """
@@ -67,8 +70,7 @@ class UDTRouter:
         }
         ```
         """
-        params = base_params.model_dump()
-        results = self.model.predict(**params)
+        results = self.model.predict(**params.model_dump())
 
         # TODO(pratik/geordie/yash): Add logging for search results text classification
         if isinstance(results, SearchResultsTokenClassification):
