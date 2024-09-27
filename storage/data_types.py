@@ -1,14 +1,9 @@
 from __future__ import annotations
 
 import json
-import re
 import typing
 import uuid
-from abc import abstractmethod, abstractproperty, abstractstaticmethod
-from dataclasses import dataclass
-
-import pandas as pd
-from sqlalchemy import UUID
+from abc import abstractmethod, abstractstaticmethod
 
 
 class DataType:

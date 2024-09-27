@@ -1,5 +1,13 @@
 azure:
   branches:
+    daily-update:
+      pull_credentials:
+        password: xDHBncnAPPXcsodP6AqAo8kEDxNoOR5X8r5krtaZp++ACRAwcL6j
+        username: thirdaiplatform-pull-daily-update
+      push_credentials:
+        password: Kl0pYEl2c2iEJfK6rIo/fI3Vva1KOmhxd+cDwQtZTb+ACRDxWxvv
+        username: thirdaiplatform-push-daily-update
+      version: 0.0.1
     docker_tests:
       pull_credentials:
         password: ojqTob8LipMFHD5CUtYQqKFT4Yj0dgA42fpzKm08Uu+ACRB3D2G8
@@ -8,6 +16,13 @@ azure:
         password: F2yp3m5uWE/8liQ6lFyGTtZxlMgpirMRStAcdQc6Mu+ACRB6nTfH
         username: thirdaiplatform-push-docker-tests
       version: 0.0.1
+    local_registry:
+      pull_credentials:
+        password: 1N7CsVddLTv4+enVywVCgjOkDkMqpv63WenU0bWihF+ACRBVBnXz
+        username: thirdaiplatform-pull-local-registry
+      push_credentials:
+        password: rt/BPKK778qUWXa3YZjHUTNsVc9MkwU53kydXmSscF+ACRAfiMQq
+        username: thirdaiplatform-push-local-registry
     mshift:
       pull_credentials:
         password: uGpzj1Ylkgc+PBbQ5e3r1nEFC+BtiQK2cNeFdRW1NP+ACRCsrcq2
@@ -39,6 +54,14 @@ azure:
       push_credentials:
         password: c3P3qKGzI2dBE6fiKJfF+zHos70aRFcJ6vVLZh+zq0+ACRCEzI7T
         username: thirdaiplatform-push-release-test
+      version: 0.0.18
+    release-test-main:
+      pull_credentials:
+        password: 5Di/+qW2Q/++3mp0Ah/rkCq33n2N7f0E8G4+cSHnub+ACRClJvCj
+        username: thirdaiplatform-pull-release-test-main
+      push_credentials:
+        password: y/iKY+7IwCrcdd61Rp3vma3gTyYScI72TY7484cJ6c+ACRBkPJv/
+        username: thirdaiplatform-push-release-test-main
       version: 0.0.18
     test_1:
       pull_credentials:

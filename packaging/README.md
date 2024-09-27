@@ -15,7 +15,7 @@ Before running the script, ensure the following are installed on your machine:
 - `driver.sh`: The main script to automate the deployment.
 - `config.yml`: The configuration file required for Ansible to deploy the platform.
 - `models/qwen2-0_5b-instruct-fp16.gguf`: The generation model used by the platform.
-- `platform`: This contain Ansible playbooks and other necessary files.
+- `platform`: This contains Ansible playbooks and other necessary files.
 
 ## How to Run `driver.sh`
 
@@ -44,21 +44,48 @@ Before running the script, ensure the following are installed on your machine:
    chmod +x driver.sh
    ```
 
-3. **Run the Script**:
+3. **Specify Platform Image Branch (Optional)**:
+   
+   You can specify the `platform_image_branch` using the `--branch` or `-b` option. If you don’t provide this option, the script will default to using `release-test-main` and display a warning.
+
+   ```bash
+   ./driver.sh --branch your-branch-name ./config.yml
+   ```
+
+   If no branch is specified, the script will default to:
+
+   ```bash
+   WARNING: No platform_image_branch specified. Using default 'release-test-main'.
+   ```
+
+4. **Run the Script**:
    
    The `driver.sh` script requires the path to a `config.yml` file as an argument. You can use the default `config.yml` provided in the package or supply your own configuration file.
 
-   To run the script with the default configuration:
+   To run the script with the default configuration and without specifying a branch:
 
    ```bash
    ./driver.sh ./config.yml
    ```
 
-4. **What Happens During Execution**:
+5. **What Happens During Execution**:
    
    - The script checks for the installation of Ansible. If Ansible is not installed, the script will install it automatically.
-   - The script verifies if the model file (`qwen2-0_5b-instruct-fp16.gguf`) is present in the `models/` directory. If the file is not found, the script issues a warning but proceeds with the playbook execution.
-   - The script then navigates to the `platform/` directory and runs the `test_deploy.yml` Ansible playbook using the provided `config.yml` and the model path as extra variables.
+   - The script verifies if the model folder (`gen-ai-models/`) is present. If the folder is not found, the script issues a warning but proceeds with the playbook execution.
+   - The script searches for a `docker_images` folder and warns if it's not found, but proceeds with the playbook execution.
+   - The script then navigates to the `platform/` directory and runs the `test_deploy.yml` Ansible playbook using the provided `config.yml`, the model path, the Docker images path, and the platform image branch as extra variables.
+
+### Example Commands
+
+#### Run the script with a specified branch:
+```bash
+./driver.sh --branch your-branch-name ./config.yml
+```
+
+#### Run the script without specifying a branch (will default to `release-test-main`):
+```bash
+./driver.sh ./config.yml
+```
 
 ### Troubleshooting
 

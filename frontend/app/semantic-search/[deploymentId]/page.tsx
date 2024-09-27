@@ -373,7 +373,11 @@ function App() {
           if (matchedEntry) {
             return `[${tag} #${matchedEntry[1].id}]`;
           } else {
-            piiMap.set(sentence, { id: currentId, originalToken: sentence, tag });
+            piiMap.set(sentence, {
+              id: currentId,
+              originalToken: sentence,
+              tag,
+            });
             currentId++;
             return `[${tag} #${piiMap.get(sentence)?.id}]`;
           }
@@ -624,7 +628,7 @@ function App() {
               <Teach />
             </TopRightCorner>
             {chatMode ? (
-              <Chat />
+              <Chat provider={genAiProvider || 'openai'} />
             ) : (
               <>
                 <SearchContainer $center={results === null}>

@@ -203,7 +203,11 @@ export default function Sources(props: SourcesProps) {
           {matches.map((source, i) => (
             <DropdownMenuItem
               key={i}
-              style={{ display: 'flex', paddingRight: '10px', justifyContent: 'space-between' }}
+              style={{
+                display: 'flex',
+                paddingRight: '10px',
+                justifyContent: 'space-between',
+              }}
               onClick={() => {
                 if (source.source) {
                   // Ensure source.source is defined
@@ -223,7 +227,11 @@ export default function Sources(props: SourcesProps) {
                 {/* Add margin here */}
                 <Button
                   className="bg-transparent hover:bg-red-500 text-red-500 hover:text-white"
-                  style={{ height: '2rem', width: '2rem', border: '1px solid red' }}
+                  style={{
+                    height: '2rem',
+                    width: '2rem',
+                    border: '1px solid red',
+                  }}
                   onClick={(e) => {
                     e.stopPropagation();
                     modelService!.deleteSources([source.source_id]);

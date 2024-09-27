@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import NERQuestions from './ner-questions';
 import SCQQuestions from './sentence-classification-questions';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Button, TextField } from '@mui/material';
 import { CardDescription } from '@/components/ui/card';
 import { Divider } from '@mui/material';
 
@@ -76,8 +76,8 @@ const NLPQuestions = ({ workflowNames }: NLPQuestionsProps) => {
               margin: '20px 0',
             }}
           >
-            <Input
-              className="text-md"
+            <TextField
+              className="text-md w-full"
               value={question}
               onChange={handleInputChange}
               placeholder="Describe your use case..."
@@ -91,7 +91,8 @@ const NLPQuestions = ({ workflowNames }: NLPQuestionsProps) => {
           </div>
           <Button
             onClick={submit}
-            variant={loadingAnswer ? 'secondary' : 'default'}
+            variant="contained"
+            color={loadingAnswer ? 'success' : 'primary'}
             style={{ width: '100%' }}
           >
             {loadingAnswer ? 'Understanding your use case...' : 'Submit'}
@@ -114,7 +115,7 @@ const NLPQuestions = ({ workflowNames }: NLPQuestionsProps) => {
               gap: '10px',
             }}
           >
-            <Button style={{ width: '100%' }} variant="outline" onClick={() => setAnswer('')}>
+            <Button style={{ width: '100%' }} variant="outlined" onClick={() => setAnswer('')}>
               Retry
             </Button>
             <Button style={{ width: '100%' }} onClick={() => setConfirmedAnswer(true)}>

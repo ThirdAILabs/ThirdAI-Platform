@@ -240,7 +240,13 @@ export default function Reference({
   }, [prediction]);
 
   return (
-    <Card style={{ animation: 'fade-in 0.5s', display: 'flex', flexDirection: 'row' }}>
+    <Card
+      style={{
+        animation: 'fade-in 0.5s',
+        display: 'flex',
+        flexDirection: 'row',
+      }}
+    >
       <TextContainer>
         <Header
           onClick={(e) => {

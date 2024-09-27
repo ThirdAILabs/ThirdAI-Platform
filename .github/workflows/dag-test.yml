@@ -9,6 +9,9 @@ on:
       - main
   merge_group:
     types: [checks_requested]
+  
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -123,7 +126,7 @@ jobs:
 
     - name: Write All Environment Variables to .env File
       run: |
-        echo "LICENSE_PATH=${{ github.workspace }}/local_setup/ndb_enterprise_license.json" >> $GITHUB_WORKSPACE/.env
+        echo "LICENSE_PATH=${{ github.workspace }}/thirdai_platform/tests/ndb_enterprise_license.json" >> $GITHUB_WORKSPACE/.env
         echo "JWT_SECRET=CsnCr3lebs9eJQ" >> $GITHUB_WORKSPACE/.env
         echo "SENDGRID_KEY=sendgrid-key" >> $GITHUB_WORKSPACE/.env
         echo "GENAI_KEY=${{ secrets.GENAI_KEY }}" >> $GITHUB_WORKSPACE/.env

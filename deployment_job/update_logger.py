@@ -3,7 +3,7 @@ import uuid
 from enum import Enum
 from typing import List, Literal, Union
 
-from file_handler import FileInfo, FileLocation
+from file_handler import FileInfo
 from pydantic import BaseModel, Field
 
 

@@ -98,7 +98,7 @@ const Placeholder = styled.section`
   height: 80%;
 `;
 
-export default function Chat(props: any) {
+export default function Chat(props: { provider: string }) {
   const modelService = useContext<ModelService | null>(ModelServiceContext);
 
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -107,8 +107,19 @@ export default function Chat(props: any) {
   const scrollableAreaRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    modelService?.getChatHistory().then(setChatHistory);
-  }, []);
+    if (modelService && props.provider) {
+      // Set the chat settings based on the provider
+      modelService
+        .setChat(props.provider)
+        .then(() => {
+          // After setting chat settings, fetch chat history
+          modelService.getChatHistory(props.provider).then(setChatHistory);
+        })
+        .catch((e) => {
+          console.error('Failed to update chat settings:', e);
+        });
+    }
+  }, [modelService, props.provider]);
 
   function onEnterPress(e: any) {
     if (e.keyCode === 13 && e.shiftKey === false) {
@@ -123,13 +134,15 @@ export default function Chat(props: any) {
       if (scrollableAreaRef.current) {
         scrollableAreaRef.current.scrollTop = 0;
       }
+
       const lastTextInput = textInput;
       const lastChatHistory = chatHistory;
       setAiLoading(true);
       setChatHistory((history) => [...history, { sender: 'human', content: textInput }]);
       setTextInput('');
+
       modelService
-        ?.chat(textInput)
+        ?.chat(textInput, props.provider)
         .then(({ response }) => {
           setChatHistory((history) => [...history, { sender: 'AI', content: response }]);
           setAiLoading(false);

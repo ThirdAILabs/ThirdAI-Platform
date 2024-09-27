@@ -1,10 +1,12 @@
 import json
-import math
 import os
+import shutil
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urljoin
+
+import requests
 
 from client.clients import BaseClient, Login, Model, NeuralDBClient, UDTClient
 from client.utils import (
@@ -549,6 +551,54 @@ class ModelBazaar:
             print("Training: In progress", end="", flush=True)
             print_progress_dots(duration=10)
 
+    def logs(self, model: Model):
+        """
+        Fetches logs for a given model by calling the backend API and downloads them as a zip file.
+
+        Args:
+            model (Model): The Model instance for which to fetch the logs.
+        """
+        url = urljoin(self._base_url, f"model/logs")
+
+        # Call the backend to fetch the logs
+        response = requests.get(
+            url,
+            params={"model_identifier": model.model_identifier},
+            headers=auth_header(self._access_token),
+            stream=True,  # We want to stream the file content to avoid loading it all at once
+        )
+
+        # Define the file path to save the logs (inside the cache directory)
+        log_file_path = self._cache_dir / f"{model.model_identifier}_logs.zip"
+
+        log_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Save the zip file
+        with open(log_file_path, "wb") as log_file:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    log_file.write(chunk)
+
+        print(
+            f"Logs for {model.model_identifier} downloaded and saved at {log_file_path}"
+        )
+        return log_file_path
+
+    def cleanup_cache(self):
+        """
+        Cleans up the entire bazaar_cache directory, removing all files and subdirectories.
+        """
+        # Check if the cache directory exists
+        if self._cache_dir.exists() and self._cache_dir.is_dir():
+            # Remove the entire cache directory and its contents
+            shutil.rmtree(self._cache_dir)
+            print(f"Cache directory {self._cache_dir} has been cleaned up.")
+
+            # Optionally recreate the cache directory to maintain structure
+            self._cache_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            print(f"Cache directory {self._cache_dir} does not exist.")
+
     def deploy(
         self,
         model_identifier: str,
@@ -662,7 +712,6 @@ class ModelBazaar:
     # TODO(pratik): add a unit tests for this function
     @staticmethod
     def full_backup_restore(bucket_name, local_dir, database_uri):
-        import boto3
 
         os.environ["DATABASE_URI"] = database_uri
         os.environ["SHARE_DIR"] = local_dir

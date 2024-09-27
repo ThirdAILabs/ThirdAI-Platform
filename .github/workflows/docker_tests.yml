@@ -75,7 +75,7 @@ jobs:
     strategy:
       fail-fast: false
 
-    runs-on: self-hosted
+    runs-on: [self-hosted, docker-tests]
 
     if: github.event_name != 'pull_request'
 

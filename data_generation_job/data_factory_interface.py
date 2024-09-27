@@ -1,4 +1,3 @@
-import csv
 import random
 import traceback
 from abc import ABC, abstractmethod
@@ -9,7 +8,7 @@ from llms import llm_classes
 from prompt_resources.common_prompts import extended_description_prompt
 from prompt_resources.util_data import random_prompts, vocab
 from tqdm import tqdm
-from utils import count_csv_lines, save_dict
+from utils import count_csv_lines
 from variables import Entity, GeneralVariables
 
 

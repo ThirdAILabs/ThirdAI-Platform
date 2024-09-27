@@ -1,9 +1,11 @@
 import datetime
 from threading import Lock
 from typing import Callable, Dict, List, Tuple
+from urllib.parse import urljoin
 
 import fastapi
-from variables import GeneralVariables
+import requests
+from fastapi import status
 
 CREDENTIALS_EXCEPTION = fastapi.HTTPException(
     status_code=fastapi.status.HTTP_401_UNAUTHORIZED,
@@ -43,40 +45,73 @@ def now() -> datetime.datetime:
 
 
 class Permissions:
-    def __init__(self, entry_expiration_min: int = 5):
-        """
-        Manages permissions for tokens with caching and expiration.
+    model_bazaar_endpoint: str = None
+    model_id: str = None
+    # entry_expiration_seconds: number of seconds until the permissions for a
+    # token needs to be refreshed. We refresh in case a previously invalid
+    # token becomes a valid token.
+    entry_expiration_min: int = 5
+    expirations: List[Tuple[datetime.datetime, str]] = []
+    cache: Dict[str, dict] = {}
+    cache_lock = Lock()
 
-        Args:
-            entry_expiration_min (int): Number of minutes until the permissions
-                                        for a token need to be refreshed.
-        """
-        # entry_expiration_seconds: number of seconds until the permissions for a
-        # token needs to be refreshed. We refresh in case a previously invalid
-        # token becomes a valid token.
-        self.general_variables = GeneralVariables.load_from_env()
-        self.entry_expiration_min = entry_expiration_min
-        self.expirations: List[Tuple[datetime.datetime, str]] = []
-        self.cache: Dict[str, dict] = {}
-        self.cache_lock = Lock()
+    @classmethod
+    def init(
+        cls, model_bazaar_endpoint: str, model_id: str, entry_expiration_min: int = 5
+    ):
+        cls.model_bazaar_endpoint = model_bazaar_endpoint
+        cls.model_id = model_id
+        cls.entry_expiration_min = entry_expiration_min
 
-    def _clear_expired_entries(self) -> None:
+    @classmethod
+    def _clear_expired_entries(cls) -> None:
         """
         Clears expired entries from the cache.
         """
         pos = 0
         curr_time = now()
-        for expiration, token in self.expirations:
+        for expiration, token in cls.expirations:
             if expiration > curr_time:
                 break
             try:
-                del self.cache[token]
+                del cls.cache[token]
             except KeyError:
                 pass
             pos += 1
-        self.expirations = self.expirations[pos:]
+        cls.expirations = cls.expirations[pos:]
 
-    def _get_permissions(self, token: str) -> Tuple[bool, bool, bool]:
+    @classmethod
+    def _deployment_permissions(cls, token: str):
+        deployment_permissions_endpoint = urljoin(
+            cls.model_bazaar_endpoint,
+            f"api/deploy/permissions/{cls.model_id}",
+        )
+        response = requests.get(
+            deployment_permissions_endpoint,
+            headers={"Authorization": "Bearer " + token},
+        )
+        if response.status_code == status.HTTP_401_UNAUTHORIZED:
+            return {
+                "read": False,
+                "write": False,
+                "exp": now() + datetime.timedelta(minutes=5),
+                "override": False,
+            }
+        elif response.status_code != status.HTTP_200_OK:
+            print(response.text)
+            return {
+                "read": False,
+                "write": False,
+                "exp": now(),
+                "override": False,
+            }
+        res_json = response.json()
+        permissions = res_json["data"]
+        permissions["exp"] = datetime.datetime.fromisoformat(permissions["exp"])
+        return permissions
+
+    @classmethod
+    def _get_permissions(cls, token: str) -> Tuple[bool, bool, bool]:
         """
         Retrieves permissions for a token, updating the cache if necessary.
 
@@ -86,24 +121,25 @@ class Permissions:
         Returns:
             Tuple[bool, bool, bool]: Read, write, and override permissions.
         """
-        self._clear_expired_entries()
+        cls._clear_expired_entries()
         curr_time = now()
-        if token not in self.cache:
-            permissions = self.general_variables.deployment_permissions(token)
-            self.expirations.append(
+        if token not in cls.cache:
+            permissions = cls._deployment_permissions(token)
+            cls.expirations.append(
                 (
-                    curr_time + datetime.timedelta(minutes=self.entry_expiration_min),
+                    curr_time + datetime.timedelta(minutes=cls.entry_expiration_min),
                     token,
                 )
             )
-            self.cache[token] = permissions
+            cls.cache[token] = permissions
             return permissions["read"], permissions["write"], permissions["override"]
-        if self.cache[token]["exp"] <= curr_time:
+        if cls.cache[token]["exp"] <= curr_time:
             return False, False, False
-        permissions = self.cache[token]
+        permissions = cls.cache[token]
         return permissions["read"], permissions["write"], permissions["override"]
 
-    def verify_permission(self, permission_type: str = "read") -> Callable[[str], str]:
+    @classmethod
+    def verify_permission(cls, permission_type: str = "read") -> Callable[[str], str]:
         """
         Creates a function that verifies a specific permission type for the token.
 
@@ -115,8 +151,8 @@ class Permissions:
         """
 
         def dependency(token: str = fastapi.Depends(optional_token_bearer)) -> str:
-            with self.cache_lock:
-                permissions = self._get_permissions(token)
+            with cls.cache_lock:
+                permissions = cls._get_permissions(token)
                 permission_map = {
                     "read": permissions[0],
                     "write": permissions[1],
@@ -128,7 +164,8 @@ class Permissions:
 
         return dependency
 
-    def check_permission(self, token: str, permission_type: str = "read") -> bool:
+    @classmethod
+    def check_permission(cls, token: str, permission_type: str = "read") -> bool:
         """
         Checks if a specific permission type is granted for the token.
 
@@ -139,8 +176,8 @@ class Permissions:
         Returns:
             bool: True if the token has the required permission, False otherwise.
         """
-        with self.cache_lock:
-            permissions = self._get_permissions(token)
+        with cls.cache_lock:
+            permissions = cls._get_permissions(token)
             permission_map = {
                 "read": permissions[0],
                 "write": permissions[1],

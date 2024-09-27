@@ -22,9 +22,18 @@ from backend.utils import (
 )
 from database import schema
 from database.session import get_session
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    Header,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
@@ -1042,4 +1051,49 @@ def delete_model(
 
     return response(
         status_code=status.HTTP_200_OK, message="Successfully deleted the model."
+    )
+
+
+@model_router.get("/logs", dependencies=[Depends(is_model_owner)])
+def get_model_logs(
+    model_identifier: str,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+):
+    """
+    Get the logs for a specified model and provide them as a downloadable zip file.
+    The zip file will be deleted after being sent to the client.
+
+    Parameters:
+    - model_identifier: str - The identifier of the model to retrieve logs for.
+
+    Returns:
+    - FileResponse: A zip file containing the model logs, which will be deleted after sending.
+    """
+    try:
+        # Retrieve the model from the database
+        model: schema.Model = get_model_from_identifier(model_identifier, session)
+    except Exception as error:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=str(error),
+        )
+
+    # Fetch the logs from the storage system and zip them
+    try:
+        zip_filepath = storage.logs(model.id)
+    except Exception as error:
+        return response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Error zipping logs: {str(error)}",
+        )
+
+    # Schedule the deletion of the zip file after the response is completed
+    background_tasks.add_task(os.remove, zip_filepath)
+
+    # Return the zip file as a downloadable file
+    return FileResponse(
+        path=zip_filepath,
+        media_type="application/zip",
+        filename=f"{model_identifier}_logs.zip",
     )

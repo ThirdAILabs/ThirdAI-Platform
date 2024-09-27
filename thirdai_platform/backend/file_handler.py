@@ -1,10 +1,8 @@
-import json
 import os
-from abc import ABC, abstractmethod
 from typing import List
 
 import boto3
-from backend.config import FileInfo, FileLocation
+from backend.train_config import FileInfo, FileLocation
 from fastapi import HTTPException, UploadFile, status
 
 

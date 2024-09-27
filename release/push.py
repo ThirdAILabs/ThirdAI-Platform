@@ -1,12 +1,11 @@
 import argparse
-import os
 from pathlib import Path
 from typing import Dict
 
 import yaml
 from azure_provider import AzureProvider
 from cloud_provider_interface import CloudProviderInterface
-from docker_constants import image_base_names
+from docker_constants import image_base_names, images_to_pull_from_private
 from utils import Credentials, image_name_for_branch, load_config
 
 
@@ -259,7 +258,8 @@ def main() -> None:
                 image_names=[
                     image_name_for_branch(name, args.branch)
                     for name in image_base_names.to_list()
-                ],
+                ]
+                + images_to_pull_from_private,
                 push_access=True,
             )
             push_username = new_push_credentials["username"]
@@ -276,7 +276,8 @@ def main() -> None:
                     image_names=[
                         image_name_for_branch(name, args.branch)
                         for name in image_base_names.to_list()
-                    ],
+                    ]
+                    + images_to_pull_from_private,
                     push_access=True,
                 )
 
@@ -286,7 +287,8 @@ def main() -> None:
                 image_names=[
                     image_name_for_branch(name, args.branch)
                     for name in image_base_names.to_list()
-                ],
+                ]
+                + images_to_pull_from_private,
                 push_access=False,
             )
             pull_username = new_pull_credentials["username"]
@@ -303,7 +305,8 @@ def main() -> None:
                     image_names=[
                         image_name_for_branch(name, args.branch)
                         for name in image_base_names.to_list()
-                    ],
+                    ]
+                    + images_to_pull_from_private,
                     push_access=False,
                 )
 
