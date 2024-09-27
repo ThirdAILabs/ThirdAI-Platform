@@ -36,7 +36,7 @@ class DummyReporter(Reporter):
 
 MODEL_BAZAAR_DIR = "./model_bazaar_tmp"
 
-THIRDAI_LICENSE = "002099-64C584-3E02C8-7E51A0-DE65D9-V3"
+THIRDAI_LICENSE = "236C00-47457C-4641C5-52E3BB-3D1F34-V3"
 
 
 def file_dir():

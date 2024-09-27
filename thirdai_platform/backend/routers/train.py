@@ -8,7 +8,9 @@ from typing import Dict, List, Optional
 
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
-from backend.config import (
+from backend.datagen import generate_data_for_train_job
+from backend.file_handler import download_local_files
+from backend.train_config import (
     DatagenOptions,
     FileInfo,
     FileLocation,
@@ -26,8 +28,6 @@ from backend.config import (
     UDTOptions,
     UDTSubType,
 )
-from backend.datagen import generate_data_for_train_job
-from backend.file_handler import download_local_files
 from backend.utils import (
     get_model,
     get_model_from_identifier,

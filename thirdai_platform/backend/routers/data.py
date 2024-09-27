@@ -5,13 +5,13 @@ from enum import Enum
 from typing import List
 
 from auth.jwt import AuthenticatedUser, verify_access_token
-from backend.config import JobOptions
 from backend.datagen import (
     TextClassificationGenerateArgs,
     TokenClassificationGenerateArgs,
     generate_text_data,
     generate_token_data,
 )
+from backend.train_config import JobOptions
 from backend.utils import response
 from database import schema
 from database.session import get_session

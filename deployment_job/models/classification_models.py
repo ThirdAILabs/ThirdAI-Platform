@@ -1,28 +1,25 @@
 from abc import abstractmethod
 from typing import Optional
 
+from config import DeploymentConfig
 from models.model import Model
 from pydantic_models import inputs
 from thirdai import bolt
 
 
 class ClassificationModel(Model):
-    def __init__(
-        self, model_id: Optional[str] = None, model_path: Optional[str] = None
-    ):
-        super().__init__()
-        if model_path:
-            self.model_path = model_path
-        else:
-            self.model_path = self.get_udt_path(model_id)
+    def __init__(self, config: DeploymentConfig):
+        super().__init__(config=config)
         self.model: bolt.UniversalDeepTransformer = self.load()
 
     def get_udt_path(self, model_id: Optional[str] = None) -> str:
-        model_id = model_id or self.general_variables.model_id
-        return str(self.general_variables.get_model_dir() / "model.udt")
+        model_id = model_id or self.config.model_id
+        return str(self.get_model_dir(model_id) / "model.udt")
 
     def load(self):
-        return bolt.UniversalDeepTransformer.load(self.model_path)
+        return bolt.UniversalDeepTransformer.load(
+            self.get_udt_path(self.config.model_id)
+        )
 
     def save(self, model_id):
         self.model.save(self.get_udt_path(model_id))
@@ -33,15 +30,12 @@ class ClassificationModel(Model):
 
 
 class TextClassificationModel(ClassificationModel):
-    def __init__(
-        self, model_id: Optional[str] = None, model_path: Optional[str] = None
-    ):
-        super().__init__(model_id, model_path)
+    def __init__(self, config: DeploymentConfig):
+        super().__init__(config=config)
         self.num_classes = self.model.predict({"text": "test"}).shape[-1]
 
-    def predict(self, **kwargs):
-        query = kwargs["query"]
-        top_k = min(kwargs["top_k"], self.num_classes)
+    def predict(self, query: str, top_k: int, **kwargs):
+        top_k = min(top_k, self.num_classes)
         prediction = self.model.predict({"text": query}, top_k=top_k)
         predicted_classes = [
             (self.model.class_name(class_id), activation)
@@ -55,14 +49,7 @@ class TextClassificationModel(ClassificationModel):
 
 
 class TokenClassificationModel(ClassificationModel):
-    def __init__(
-        self, model_id: Optional[str] = None, model_path: Optional[str] = None
-    ):
-        super().__init__(model_id, model_path)
-
-    def predict(self, **kwargs):
-        query = kwargs["query"]
-
+    def predict(self, query: str, **kwargs):
         predicted_tags = self.model.predict({"source": query}, top_k=1)
         predictions = []
         for predicted_tag in predicted_tags:
