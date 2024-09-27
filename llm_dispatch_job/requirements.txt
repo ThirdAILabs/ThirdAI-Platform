@@ -2,7 +2,7 @@ aiohttp
 fastapi==0.109.2
 gunicorn==20.1.0
 pydantic>=2.0.0
-uvicorn[standard]==0.18.2
+uvicorn[standard]
 python-dotenv
 websockets
 requests<2.32.0
