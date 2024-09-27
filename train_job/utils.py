@@ -9,7 +9,7 @@ from config import FileInfo, FileLocation
 from fastapi import Response
 from thirdai import neural_db as ndb
 
-from platform_common.file_handler import S3StorageHandler
+from platform_common.file_handler import create_s3_client
 
 GB_1 = 1024 * 1024 * 1024  # Define 1 GB in bytes
 
@@ -75,7 +75,7 @@ def process_file(doc: FileInfo, tmp_dir: str) -> ndb.Document:
     """
     if doc.path.startswith("s3://"):
         s3 = True
-        s3_client = S3StorageHandler.create_s3_client()
+        s3_client = create_s3_client()
         bucket_name, prefix = doc.path.replace("s3://", "").split("/", 1)
         local_file_path = os.path.join(tmp_dir, os.path.basename(prefix))
 

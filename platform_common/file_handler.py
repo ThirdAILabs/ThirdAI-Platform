@@ -124,6 +124,33 @@ def expand_s3_buckets_and_directories(file_infos: List[FileInfo]) -> List[FileIn
     return expanded_files
 
 
+def create_s3_client(self) -> boto3.client:
+    """
+    Create and return an S3 client using environment variables.
+    """
+    aws_access_key = os.getenv("AWS_ACCESS_KEY")
+    aws_secret_access_key = os.getenv("AWS_ACCESS_SECRET")
+
+    config_params = {
+        "retries": {"max_attempts": 10, "mode": "standard"},
+        "connect_timeout": 5,
+        "read_timeout": 60,
+    }
+
+    if not aws_access_key or not aws_secret_access_key:
+        config_params["signature_version"] = UNSIGNED
+        s3_client = boto3.client("s3", config=Config(**config_params))
+    else:
+        s3_client = boto3.client(
+            "s3",
+            aws_access_key_id=aws_access_key,
+            aws_secret_access_key=aws_secret_access_key,
+            config=Config(**config_params),
+        )
+
+    return s3_client
+
+
 class S3StorageHandler:
     """
     S3 storage handler for processing and validating S3 files.
@@ -135,33 +162,7 @@ class S3StorageHandler:
     """
 
     def __init__(self):
-        self.s3_client = self.create_s3_client()
-
-    def create_s3_client(self) -> boto3.client:
-        """
-        Create and return an S3 client using environment variables.
-        """
-        aws_access_key = os.getenv("AWS_ACCESS_KEY")
-        aws_secret_access_key = os.getenv("AWS_ACCESS_SECRET")
-
-        config_params = {
-            "retries": {"max_attempts": 10, "mode": "standard"},
-            "connect_timeout": 5,
-            "read_timeout": 60,
-        }
-
-        if not aws_access_key or not aws_secret_access_key:
-            config_params["signature_version"] = UNSIGNED
-            s3_client = boto3.client("s3", config=Config(**config_params))
-        else:
-            s3_client = boto3.client(
-                "s3",
-                aws_access_key_id=aws_access_key,
-                aws_secret_access_key=aws_secret_access_key,
-                config=Config(**config_params),
-            )
-
-        return s3_client
+        self.s3_client = create_s3_client()
 
     def list_s3_files(self, filename):
         bucket_name, prefix = filename.replace("s3://", "").split("/", 1)

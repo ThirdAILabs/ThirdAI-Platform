@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Tuple
 from fastapi import Response
 from thirdai import neural_db_v2 as ndbv2
 
-from platform_common.file_handler import FileInfo, FileLocation, S3StorageHandler
+from platform_common.file_handler import FileInfo, FileLocation, create_s3_client
 
 
 def convert_to_ndb_doc(
@@ -84,7 +84,7 @@ def parse_doc(
     """
     if doc.location == FileLocation.s3:
         try:
-            s3_client = S3StorageHandler.create_s3_client()
+            s3_client = create_s3_client()
             bucket_name, prefix = doc.path.replace("s3://", "").split("/", 1)
             local_file_path = os.path.join(tmp_dir, os.path.basename(prefix))
 
