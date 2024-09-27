@@ -6,7 +6,6 @@ import requests
 import yaml
 from backend.utils import (
     delete_nomad_job,
-    get_empty_port,
     get_platform,
     get_python_path,
     get_root_absolute_path,
@@ -150,7 +149,6 @@ async def restart_llm_cache_job():
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "llm_cache_job.hcl.j2"),
         platform=platform,
-        port=None if platform == "docker" else get_empty_port(),
         tag=os.getenv("TAG"),
         registry=os.getenv("DOCKER_REGISTRY"),
         docker_username=os.getenv("DOCKER_USERNAME"),

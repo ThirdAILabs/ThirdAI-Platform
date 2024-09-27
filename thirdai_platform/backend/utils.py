@@ -3,7 +3,6 @@ import logging
 import math
 import os
 import re
-import socket
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -465,20 +464,6 @@ def model_accessible(model: schema.Model, user: schema.User) -> bool:
         return False
 
     return True
-
-
-def get_empty_port():
-    """
-    Get an empty port.
-
-    Returns:
-    - int: The empty port number.
-    """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(("", 0))  # Bind to an empty
-    port = sock.getsockname()[1]
-    sock.close()
-    return port
 
 
 def get_expiry_min(size: int):
