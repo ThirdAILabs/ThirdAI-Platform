@@ -75,7 +75,7 @@ def test_llm_cache(temp_share):
     os.environ["JWT_SECRET"] = "12345"
     os.environ["LLM_CACHE_THRESHOLD"] = "0.7"
     os.environ["MODEL_BAZAAR_DIR"] = temp_share
-    os.environ["LICENSE_KEY"] = "002099-64C584-3E02C8-7E51A0-DE65D9-V3"
+    os.environ["LICENSE_KEY"] = "236C00-47457C-4641C5-52E3BB-3D1F34-V3"
 
     from permissions import Permissions
 

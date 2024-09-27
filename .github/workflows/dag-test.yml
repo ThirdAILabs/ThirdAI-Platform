@@ -9,6 +9,9 @@ on:
       - main
   merge_group:
     types: [checks_requested]
+  
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -123,7 +126,7 @@ jobs:
 
     - name: Write All Environment Variables to .env File
       run: |
-        echo "LICENSE_PATH=${{ github.workspace }}/local_setup/ndb_enterprise_license.json" >> $GITHUB_WORKSPACE/.env
+        echo "LICENSE_PATH=${{ github.workspace }}/thirdai_platform/tests/ndb_enterprise_license.json" >> $GITHUB_WORKSPACE/.env
         echo "JWT_SECRET=CsnCr3lebs9eJQ" >> $GITHUB_WORKSPACE/.env
         echo "SENDGRID_KEY=sendgrid-key" >> $GITHUB_WORKSPACE/.env
         echo "GENAI_KEY=${{ secrets.GENAI_KEY }}" >> $GITHUB_WORKSPACE/.env
@@ -145,7 +148,7 @@ jobs:
       run: |
         source ${{ github.workspace }}/venv/bin/activate
         cd $GITHUB_WORKSPACE/thirdai_platform
-        nohup sudo uvicorn main:app --reload --host 0.0.0.0 --port 8000 > uvicorn.log 2>&1 &
+        nohup sudo uvicorn main:app --host 0.0.0.0 --port 8000 > uvicorn.log 2>&1 &
     
     - name: List files in local_setup
       run: ls -la local_setup

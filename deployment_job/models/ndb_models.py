@@ -18,6 +18,7 @@ import models.ndbv1_parser as ndbv1_parser
 import models.ndbv2_parser as ndbv2_parser
 import thirdai.neural_db_v2.chunk_stores.constraints as ndbv2_constraints
 from chat import llm_providers
+from config import DeploymentConfig
 from models.model import Model
 from pydantic_models import inputs
 from thirdai import neural_db as ndb
@@ -32,6 +33,10 @@ class NDBModel(Model):
     """
     Base class for NeuralDB (NDB) models.
     """
+
+    def __init__(self, config: DeploymentConfig):
+        super().__init__(config=config)
+        self.chat_instances = {}
 
     @abstractmethod
     def predict(self, query: str, top_k: int, **kwargs: Any) -> inputs.SearchResultsNDB:
@@ -100,31 +105,55 @@ class NDBModel(Model):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def load(self, write_mode: bool):
+        raise NotImplementedError
+
     def set_chat(self, **kwargs):
+        """
+        Set up a chat instance for the given provider, if it hasn't been set already.
+        """
+        provider = kwargs.get("provider", "openai")
         try:
             sqlite_db_path = os.path.join(self.model_dir, "chat_history.db")
 
             chat_history_sql_uri = f"sqlite:///{sqlite_db_path}"
 
-            llm_chat_interface = llm_providers.get(kwargs.get("provider", "openai"))
+            if provider not in llm_providers:
+                raise ValueError(f"Unsupported chat provider: {provider}")
 
-            self.chat = llm_chat_interface(
+            llm_chat_interface = llm_providers.get(provider)
+
+            key = kwargs.get("key") or self.config.model_options.genai_key
+
+            # Remove 'key' from kwargs if present
+            kwargs.pop("key", None)
+
+            self.chat_instances[provider] = llm_chat_interface(
                 db=self.db,
                 chat_history_sql_uri=chat_history_sql_uri,
-                key=self.general_variables.genai_key,
-                base_url=self.general_variables.model_bazaar_endpoint,
+                key=key,
+                base_url=self.config.model_bazaar_endpoint,
                 **kwargs,
             )
-        except Exception as err:
+        except Exception:
             traceback.print_exc()
-            self.chat = None
+            self.chat_instances[provider] = None
 
+    def get_chat(self, provider: str):
+        """
+        Retrieve the chat instance for the specified provider.
+        """
+        if provider in self.chat_instances:
+            return self.chat_instances[provider]
+        else:
+            raise ValueError(f"No chat instance available for provider: {provider}")
 
-def get_ndb_path(general_variables, model_id: str) -> Path:
-    """
-    Returns the NDB model path for the given model ID.
-    """
-    return Path(general_variables.model_bazaar_dir) / "models" / model_id / "model.ndb"
+    def get_ndb_path(self, model_id: str) -> Path:
+        """
+        Returns the NDB model path for the given model ID.
+        """
+        return self.get_model_dir(model_id) / "model.ndb"
 
 
 class NDBV1Model(NDBModel):
@@ -132,14 +161,14 @@ class NDBV1Model(NDBModel):
     Base class for NeuralDBV1 (NDB) models.
     """
 
-    def __init__(self, write_mode: bool = False) -> None:
+    def __init__(self, config: DeploymentConfig, write_mode: bool = False) -> None:
         """
         Initializes NDB model with paths and NeuralDB.
         """
-        super().__init__()
+        super().__init__(config=config)
         self.model_path: Path = self.model_dir / "model.ndb"
         self.db: ndb.NeuralDB = self.load(write_mode=write_mode)
-        self.set_chat(provider=self.general_variables.llm_provider)
+        self.set_chat(provider=self.config.model_options.llm_provider)
 
     def upvote(
         self, text_id_pairs: List[inputs.UpvoteInputSingle], **kwargs: Any
@@ -155,11 +184,18 @@ class NDBV1Model(NDBModel):
             ]
         )
 
-    def predict(self, query: str, top_k: int, **kwargs: Any) -> inputs.SearchResultsNDB:
+    def predict(
+        self,
+        query: str,
+        top_k: int,
+        constraints: Dict[str, Dict[str, Any]],
+        rerank: bool,
+        context_radius: int,
+        **kwargs: Any,
+    ) -> inputs.SearchResultsNDB:
         """
         Makes a prediction using the NDB model.
         """
-        constraints: Dict[str, Dict[str, Any]] = kwargs.get("constraints")
 
         ndb_constraints = {
             key: getattr(ndb, constraints[key]["constraint_type"])(
@@ -171,13 +207,12 @@ class NDBV1Model(NDBModel):
             query=query,
             top_k=top_k,
             constraints=ndb_constraints,
-            rerank=kwargs.get("rerank", False),
-            top_k_rerank=kwargs.get("top_k_rerank", 100),
-            rerank_threshold=kwargs.get("rerank_threshold", 1.5),
-            top_k_threshold=kwargs.get("top_k_threshold", 10),
+            rerank=rerank,
+            top_k_rerank=2 * top_k,
+            top_k_threshold=top_k,
         )
         pydantic_references = [
-            inputs.convert_reference_to_pydantic(ref, kwargs.get("context_radius", 1))
+            inputs.convert_reference_to_pydantic(ref, context_radius=context_radius)
             for ref in references
         ]
 
@@ -255,11 +290,11 @@ class NDBV1Model(NDBModel):
         """
         return ndb.NeuralDB.from_checkpoint(self.model_path, read_only=not write_mode)
 
-    def save(self, **kwargs: Any) -> None:
+    def save(self, model_id: str, **kwargs) -> None:
         """
         Saves the NDB model to a model path.
         """
-        model_path = get_ndb_path(self.general_variables, kwargs.get("model_id"))
+        model_path = self.get_ndb_path(model_id)
         temp_dir = None
 
         try:
@@ -268,7 +303,7 @@ class NDBV1Model(NDBModel):
                 self.db.save(save_to=temp_model_path)
                 if model_path.exists():
                     backup_id = str(uuid.uuid4())
-                    backup_path = get_ndb_path(self.general_variables, backup_id)
+                    backup_path = self.get_ndb_path(backup_id)
                     print(f"Creating backup: {backup_id}")
                     shutil.copytree(model_path, backup_path)
 
@@ -293,11 +328,11 @@ class NDBV1Model(NDBModel):
 
 
 class NDBV2Model(NDBModel):
-    def __init__(self, write_mode: bool = False):
-        super().__init__()
+    def __init__(self, config: DeploymentConfig, write_mode: bool = False):
+        super().__init__(config=config)
 
         self.db = self.load(write_mode=write_mode)
-        self.set_chat(provider=self.general_variables.llm_provider)
+        self.set_chat(provider=self.config.model_options.llm_provider)
 
     def ndb_save_path(self):
         return os.path.join(self.model_dir, "model.ndb")
@@ -324,6 +359,7 @@ class NDBV2Model(NDBModel):
         query: str,
         top_k: int,
         constraints: Dict[str, Dict[str, Any]],
+        rerank: bool,
         **kwargs: Any,
     ) -> inputs.SearchResultsNDB:
         constraints = {
@@ -334,7 +370,7 @@ class NDBV2Model(NDBModel):
         }
 
         results = self.db.search(
-            query=query, top_k=top_k, constraints=constraints, **kwargs
+            query=query, top_k=top_k, constraints=constraints, rerank=rerank
         )
 
         results = [self.chunk_to_pydantic_ref(chunk, score) for chunk, score in results]
@@ -475,7 +511,7 @@ class NDBV2Model(NDBModel):
         return ndbv2.NeuralDB.load(self.ndb_save_path(), read_only=not write_mode)
 
     def save(self, model_id: str, **kwargs) -> None:
-        model_path = get_ndb_path(self.general_variables, model_id)
+        model_path = self.get_ndb_path(model_id)
         backup_path = None
 
         try:
@@ -484,7 +520,7 @@ class NDBV2Model(NDBModel):
                 self.db.save(temp_model_path)
                 if model_path.exists():
                     backup_id = str(uuid.uuid4())
-                    backup_path = get_ndb_path(self.general_variables, backup_id)
+                    backup_path = self.get_ndb_path(backup_id)
                     print(f"Creating backup: {backup_id}")
                     shutil.copytree(model_path, backup_path)
 

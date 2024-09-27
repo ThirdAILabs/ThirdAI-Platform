@@ -67,24 +67,10 @@ EOF
       {% endif %}
 
       env {
-        MODEL_ID = "{{ model_id }}"
-        MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
-        LICENSE_KEY = "{{ license_key }}"
-        GENAI_KEY = "{{ genai_key }}"
-        LLM_PROVIDER = "{{ llm_provider }}"
-        TYPE = "{{ type }}"
-        SUB_TYPE = "{{ sub_type }}"
+        CONFIG_PATH = "{{ config_path }}"
         AWS_ACCESS_KEY = "{{ aws_access_key }}"
         AWS_ACCESS_SECRET = "{{ aws_access_secret }}"
-        {% if platform == "local" %}
-          MODEL_BAZAAR_DIR = "{{ share_dir }}"
-        {% elif platform == "docker" %}  
-          MODEL_BAZAAR_DIR = "/model_bazaar"
-        {% endif %}
-
         TASK_RUNNER_TOKEN = "${TASK_RUNNER_TOKEN}"
-
-        AUTOSCALING_ENABLED = "{{ autoscaling_enabled }}"
       }
 
       config {
@@ -103,7 +89,7 @@ EOF
           ]
         {% elif platform == "local" %}
           command = "{{ python_path }}"
-          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ deployment_app_dir }}","--reload","--host","0.0.0.0","--port","${NOMAD_PORT_{{ model_id | replace("-", "_") }}_http}"]
+          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ deployment_app_dir }}","--host","0.0.0.0","--port","${NOMAD_PORT_{{ model_id | replace("-", "_") }}_http}"]
         {% endif %}
       }
 

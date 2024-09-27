@@ -54,7 +54,6 @@ def create_s3_client() -> boto3.client:
     return s3_client
 
 
-
 def download_local_file(file_info: FileInfo, upload_file: UploadFile, dest_dir: str):
     assert os.path.basename(file_info.path) == upload_file.filename
     destination_path = os.path.join(dest_dir, upload_file.filename)
@@ -98,7 +97,6 @@ def download_local_files(
             all_files.append(file_info)
 
     return all_files
-
 
 
 def list_s3_files(path: str):

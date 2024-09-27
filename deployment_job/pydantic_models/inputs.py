@@ -5,8 +5,30 @@ Defines input models for Pydantic validation and utility functions for conversio
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
+from file_handler import FileInfo
 from pydantic import BaseModel, Field
 from pydantic_models.constraints import Constraints
+
+
+class NDBSearchParams(BaseModel):
+    """
+    Represents extra parameters for NDB search queries.
+    """
+
+    query: str
+    top_k: int = 5
+    constraints: Constraints = Field(default_factory=Constraints)
+    rerank: bool = False
+    context_radius: int = 1
+
+
+class TextAnalysisPredictParams(BaseModel):
+    """
+    Represents the base query parameters.
+    """
+
+    text: str
+    top_k: int = 5
 
 
 class AssociateInputSingle(BaseModel):
@@ -78,6 +100,10 @@ class SearchResultsNDB(BaseModel):
     references: List[Reference]
 
 
+class DocumentList(BaseModel):
+    documents: List[FileInfo]
+
+
 class DeleteInput(BaseModel):
     """
     Represents a list of source IDs to be deleted.
@@ -138,35 +164,15 @@ def convert_reference_to_pydantic(input: Any, context_radius: int) -> Reference:
     )
 
 
-class BaseQueryParams(BaseModel):
-    """
-    Represents the base query parameters.
-    """
-
-    query: str
-    top_k: int = 5
-
-
-class NDBExtraParams(BaseModel):
-    """
-    Represents extra parameters for NDB search queries.
-    """
-
-    rerank: bool = False
-    top_k_rerank: int = 100
-    context_radius: int = 1
-    rerank_threshold: float = 1.5
-    top_k_threshold: Optional[int] = None
-    constraints: Constraints = Field(default_factory=Constraints)
-
-
 class ChatInput(BaseModel):
     user_input: str
     session_id: Optional[str] = None
+    provider: str = "openai"
 
 
 class ChatHistoryInput(BaseModel):
     session_id: Optional[str] = None
+    provider: str = "openai"
 
 
 class ChatSettings(BaseModel):

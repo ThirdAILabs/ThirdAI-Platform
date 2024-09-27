@@ -154,13 +154,13 @@ UDT:
     params:
       deployment: udt_deploy
 
-  check_search:
+  check_predict:
     dependencies: [await_deploy]
     params:
       deployment: udt_deploy
 
   undeploy:
-    dependencies: [check_search]
+    dependencies: [check_predict]
     params:
       deployment: udt_deploy
   delete_model:
@@ -193,13 +193,13 @@ UDT_DATAGEN:
     params:
       deployment: udt_deploy
 
-  check_search:
+  check_predict:
     dependencies: [await_deploy]
     params:
       deployment: udt_deploy
 
   undeploy:
-    dependencies: [check_search]
+    dependencies: [check_predict]
     params:
       deployment: udt_deploy
   
