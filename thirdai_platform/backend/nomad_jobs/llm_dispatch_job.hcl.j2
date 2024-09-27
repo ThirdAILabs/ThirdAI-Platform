@@ -47,8 +47,8 @@ job "llm-dispatch" {
             server_address = "{{ registry }}"
           }
         {% elif platform == "local" %}
-          command = "{{ python_path }}"
-          args    = ["-m", "uvicorn", "main:app","--app-dir","{{ generate_app_dir }}","--reload","--host","0.0.0.0","--port","${NOMAD_PORT_llm_dispatch_http}"]
+          command = "/bin/sh"
+          args    = ["-c", "cd /home/david/ThirdAI-Platform && {{ python_path }} -m uvicorn main:app --app-dir {{ generate_app_dir }} --reload --host 0.0.0.0 --port ${NOMAD_PORT_llm_dispatch_http}"]
         {% endif %}
       }
 
