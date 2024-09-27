@@ -1,10 +1,5 @@
 import os
-
-pass
-
 import boto3
-
-pass
 from fastapi import HTTPException, status
 
 

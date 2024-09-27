@@ -1,11 +1,3 @@
-from platform_common.util_file import func
-
-func()
-
-from folder.letsgo import func
-
-func()
-
 from dotenv import load_dotenv
 
 load_dotenv()
