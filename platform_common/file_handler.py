@@ -22,6 +22,10 @@ class FileInfo(BaseModel):
     options: Dict[str, Any] = {}
     metadata: Optional[Dict[str, Any]] = None
 
+    def ext(self) -> str:
+        _, ext = os.path.splitext(self.path)
+        return ext
+
 
 def create_s3_client() -> boto3.client:
     """
@@ -48,51 +52,6 @@ def create_s3_client() -> boto3.client:
         )
 
     return s3_client
-
-
-def download_local_file(file_info: FileInfo, upload_file: UploadFile, dest_dir: str):
-    assert os.path.basename(file_info.path) == upload_file.filename
-    destination_path = os.path.join(dest_dir, upload_file.filename)
-    os.makedirs(os.path.dirname(destination_path), exist_ok=True)
-    with open(destination_path, "wb") as f:
-        f.write(upload_file.file.read())
-    upload_file.file.close()
-    return destination_path
-
-
-def download_local_files(
-    files: List[UploadFile], file_infos: List[FileInfo], dest_dir: str
-) -> List[FileInfo]:
-    filename_to_file = {file.filename: file for file in files}
-
-    os.makedirs(dest_dir, exist_ok=True)
-
-    all_files = []
-    for file_info in file_infos:
-        if file_info.location == FileLocation.local:
-            try:
-                local_path = download_local_file(
-                    file_info=file_info,
-                    upload_file=filename_to_file[os.path.basename(file_info.path)],
-                    dest_dir=dest_dir,
-                )
-            except Exception as error:
-                raise ValueError(
-                    f"Error processing file '{file_info.path}' from '{file_info.location}': {error}"
-                )
-            all_files.append(
-                FileInfo(
-                    path=local_path,
-                    location=file_info.location,
-                    doc_id=file_info.doc_id,
-                    options=file_info.options,
-                    metadata=file_info.metadata,
-                )
-            )
-        else:
-            all_files.append(file_info)
-
-    return all_files
 
 
 def list_s3_files(path: str):
@@ -159,3 +118,48 @@ def expand_s3_buckets_and_directories(file_infos: List[FileInfo]) -> List[FileIn
                 expand_file_info(paths=directory_files, file_info=file_info)
             )
     return expanded_files
+
+
+def download_local_file(file_info: FileInfo, upload_file: UploadFile, dest_dir: str):
+    assert os.path.basename(file_info.path) == upload_file.filename
+    destination_path = os.path.join(dest_dir, upload_file.filename)
+    os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+    with open(destination_path, "wb") as f:
+        f.write(upload_file.file.read())
+    upload_file.file.close()
+    return destination_path
+
+
+def download_local_files(
+    files: List[UploadFile], file_infos: List[FileInfo], dest_dir: str
+) -> List[FileInfo]:
+    filename_to_file = {file.filename: file for file in files}
+
+    os.makedirs(dest_dir, exist_ok=True)
+
+    all_files = []
+    for file_info in file_infos:
+        if file_info.location == FileLocation.local:
+            try:
+                local_path = download_local_file(
+                    file_info=file_info,
+                    upload_file=filename_to_file[os.path.basename(file_info.path)],
+                    dest_dir=dest_dir,
+                )
+            except Exception as error:
+                raise ValueError(
+                    f"Error processing file '{file_info.path}' from '{file_info.location}': {error}"
+                )
+            all_files.append(
+                FileInfo(
+                    path=local_path,
+                    location=file_info.location,
+                    doc_id=file_info.doc_id,
+                    options=file_info.options,
+                    metadata=file_info.metadata,
+                )
+            )
+        else:
+            all_files.append(file_info)
+
+    return all_files

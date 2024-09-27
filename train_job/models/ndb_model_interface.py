@@ -12,9 +12,10 @@ from utils import (
     check_csv_only,
     check_local_nfs_only,
     convert_supervised_to_ndb_file,
-    expand_s3_buckets_and_directories,
     get_directory_size,
 )
+
+from platform_common.file_handler import expand_s3_buckets_and_directories
 
 
 @apply_exception_handler

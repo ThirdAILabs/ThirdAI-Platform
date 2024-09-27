@@ -9,7 +9,6 @@ import jwt
 import thirdai
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
-from file_handler import FileInfo, download_local_files
 from permissions import Permissions
 from prometheus_client import Counter, Summary
 from pydantic import BaseModel, ValidationError
@@ -27,6 +26,8 @@ from update_logger import (
 )
 from utils import propagate_error, response, validate_name
 from variables import GeneralVariables
+
+from platform_common.file_handler import FileInfo, download_local_files
 
 permissions = Permissions()
 general_variables = GeneralVariables.load_from_env()

@@ -1,6 +1,6 @@
-import os
+pass
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -14,24 +14,6 @@ class ModelDataType(str, Enum):
     NDB = "ndb"
     UDT = "udt"
     UDT_DATAGEN = "udt_datagen"
-
-
-class FileLocation(str, Enum):
-    local = "local"
-    nfs = "nfs"
-    s3 = "s3"
-
-
-class FileInfo(BaseModel):
-    path: str
-    location: FileLocation
-    doc_id: Optional[str] = None
-    options: Dict[str, Any] = {}
-    metadata: Optional[Dict[str, Any]] = None
-
-    def ext(self) -> str:
-        _, ext = os.path.splitext(self.path)
-        return ext
 
 
 class MachOptions(BaseModel):

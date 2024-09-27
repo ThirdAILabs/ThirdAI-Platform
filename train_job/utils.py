@@ -5,107 +5,13 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import boto3
-from botocore import UNSIGNED
-from botocore.client import Config
 from config import FileInfo, FileLocation
 from fastapi import Response
 from thirdai import neural_db as ndb
 
+from platform_common.file_handler import create_s3_client
+
 GB_1 = 1024 * 1024 * 1024  # Define 1 GB in bytes
-
-
-def create_s3_client() -> boto3.client:
-    """
-    Create and return an S3 client using environment variables.
-    """
-    aws_access_key = os.getenv("AWS_ACCESS_KEY")
-    aws_secret_access_key = os.getenv("AWS_ACCESS_SECRET")
-
-    config_params = {
-        "retries": {"max_attempts": 10, "mode": "standard"},
-        "connect_timeout": 5,
-        "read_timeout": 60,
-    }
-
-    if not aws_access_key or not aws_secret_access_key:
-        config_params["signature_version"] = UNSIGNED
-        s3_client = boto3.client("s3", config=Config(**config_params))
-    else:
-        s3_client = boto3.client(
-            "s3",
-            aws_access_key_id=aws_access_key,
-            aws_secret_access_key=aws_secret_access_key,
-            config=Config(**config_params),
-        )
-
-    return s3_client
-
-
-def list_s3_files(path: str):
-    s3_client = create_s3_client()
-
-    bucket_name, prefix = path.replace("s3://", "").split("/", 1)
-    paginator = s3_client.get_paginator("list_objects_v2")
-    pages = paginator.paginate(Bucket=bucket_name, Prefix=prefix)
-
-    file_keys = []
-    for page in pages:
-        if "Contents" in page:
-            for obj in page["Contents"]:
-                file_keys.append(f"s3://{bucket_name}/{obj['Key']}")
-
-    return file_keys
-
-
-def expand_file_info(paths: List[str], file_info: FileInfo):
-    return [
-        FileInfo(
-            path=path,
-            location=file_info.location,
-            doc_id=file_info.doc_id if len(paths) == 1 else None,
-            options=file_info.options,
-            metadata=file_info.metadata,
-        )
-        for path in paths
-    ]
-
-
-def list_files_in_nfs_dir(path: str):
-    if os.path.isdir(path):
-        return [
-            os.path.join(root, file)
-            for root, _, files_in_dir in os.walk(path)
-            for file in files_in_dir
-        ]
-    return [path]
-
-
-def expand_s3_buckets_and_directories(file_infos: List[FileInfo]) -> List[FileInfo]:
-    """
-    This function takes in a list of file infos and expands it so that each file info
-    represents a single file that can be passed to NDB or UDT. This is because we allow
-    users to specify s3 buckets or nfs directories in train, that could contain multiple
-    files, however UDT only accepts single files, and we need the individual docs themselves
-    so that we can parallelize doc parsing in NDB. If one of the input file infos
-    is an s3 bucket with N documents in it, then this will replace it with N file infos,
-    one per document in the bucket.
-    """
-    expanded_files = []
-    for file_info in file_infos:
-        if file_info.location == FileLocation.local:
-            expanded_files.append(file_info)
-        elif file_info.location == FileLocation.s3:
-            s3_objects = list_s3_files(file_info.path)
-            expanded_files.extend(
-                expand_file_info(paths=s3_objects, file_info=file_info)
-            )
-        elif file_info.location == FileLocation.nfs:
-            directory_files = list_files_in_nfs_dir(file_info.path)
-            expanded_files.extend(
-                expand_file_info(paths=directory_files, file_info=file_info)
-            )
-    return expanded_files
 
 
 def check_csv_only(all_files: List[FileInfo]):
