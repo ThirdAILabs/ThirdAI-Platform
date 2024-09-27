@@ -56,7 +56,8 @@ class UDTRouter:
         Predicts the output based on the provided query parameters.
 
         Parameters:
-        - base_params: BaseQueryParams - The base query parameters required for prediction.
+        - text: str - The text for the sample to perform inference on.
+        - top_k: int - The number of results to return.
         - token: str - Authorization token (inferred from permissions dependency).
 
         Returns:

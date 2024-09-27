@@ -97,16 +97,11 @@ class NDBRouter:
         Query the NDB model with specified parameters.
 
         Parameters:
-        - base_params: BaseQueryParams - Basic query parameters.
-            - query: str - The query text.
-            - top_k: int - The number of top results to return (default: 5).
-        - ndb_params: Optional[NDBExtraParams] - Extra NDB-specific query parameters.
-            - rerank: bool - Whether to rerank the results (default: False).
-            - top_k_rerank: int - The number of top results to rerank (default: 100).
-            - context_radius: int - The context radius for the results (default: 1).
-            - rerank_threshold: float - The threshold for reranking (default: 1.5).
-            - top_k_threshold: Optional[int] - The threshold for top_k results.
-            - constraints: Constraints - Additional constraints for the query.
+        - query: str - The query text.
+        - top_k: int - The number of top results to return (default: 5).
+        - constraints: Constraints - Additional constraints for the query.
+        - rerank: bool - Whether to rerank the results (default: False).
+        - context_radius: int - The context radius for the results (default: 1).
         - token: str - Authorization token.
 
         Returns:
