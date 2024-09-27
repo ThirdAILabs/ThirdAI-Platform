@@ -124,7 +124,7 @@ def expand_s3_buckets_and_directories(file_infos: List[FileInfo]) -> List[FileIn
     return expanded_files
 
 
-def create_s3_client(self) -> boto3.client:
+def create_s3_client() -> boto3.client:
     """
     Create and return an S3 client using environment variables.
     """
