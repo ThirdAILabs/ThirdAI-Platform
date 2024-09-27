@@ -2,7 +2,8 @@ from abc import ABC
 from pathlib import Path
 
 from config import DeploymentConfig
-from logger import LoggerConfig
+
+from platform_common.logging import LoggerConfig
 
 
 class Model(ABC):
