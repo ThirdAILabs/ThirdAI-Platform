@@ -13,11 +13,11 @@ from feedback_logs import ActionType, FeedbackLog
 from models.model import Model
 from reporter import Reporter
 from thirdai import neural_db_v2 as ndbv2
-from utils import (
-    check_disk,
-    create_s3_client,
+from utils import check_disk, get_directory_size
+
+from platform_common.file_handler import (
+    S3StorageHandler,
     expand_s3_buckets_and_directories,
-    get_directory_size,
 )
 
 
@@ -96,7 +96,7 @@ def parse_doc(
     """
     if doc.path.startswith("s3://"):
         try:
-            s3_client = create_s3_client()
+            s3_client = S3StorageHandler.create_s3_client()
             bucket_name, prefix = doc.path.replace("s3://", "").split("/", 1)
             local_file_path = os.path.join(tmp_dir, os.path.basename(prefix))
 
