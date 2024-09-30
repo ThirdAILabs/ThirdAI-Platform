@@ -4,18 +4,20 @@ from typing import AsyncGenerator
 from urllib.parse import urljoin
 
 import aiohttp
+from utils import Reference, combine_query_and_context
+from typing import List
 
 
 class LLMBase:
     async def stream(
-        self, key: str, query: str, model: str
+        self, key: str, query: str, prompt: str, references: List[Reference], model: str
     ) -> AsyncGenerator[str, None]:
         raise NotImplementedError("Subclasses must implement this method")
 
 
 class OpenAILLM(LLMBase):
     async def stream(
-        self, key: str, query: str, model: str
+        self, key: str, query: str, prompt: str, references: List[Reference], model: str
     ) -> AsyncGenerator[str, None]:
         url = "https://api.openai.com/v1/chat/completions"
         headers = {
@@ -27,7 +29,9 @@ class OpenAILLM(LLMBase):
             "messages": [
                 {
                     "role": "user",
-                    "content": query,
+                    "content": combine_query_and_context(
+                        query=query, prompt=prompt, references=references
+                    ),
                 }
             ],
             "stream": True,
@@ -57,7 +61,7 @@ class OpenAILLM(LLMBase):
 
 class CohereLLM(LLMBase):
     async def stream(
-        self, key: str, query: str, model: str
+        self, key: str, query: str, prompt: str, references: List[Reference], model: str
     ) -> AsyncGenerator[str, None]:
         url = "https://api.cohere.com/v1/chat"
         headers = {
@@ -70,7 +74,9 @@ class CohereLLM(LLMBase):
             "chat_history": [
                 {
                     "role": "USER",
-                    "message": query,
+                    "message": combine_query_and_context(
+                        query=query, prompt=prompt, references=references
+                    ),
                 }
             ],
             "stream": True,
@@ -99,7 +105,7 @@ class CohereLLM(LLMBase):
 
 class OnPremLLM(LLMBase):
     async def stream(
-        self, key: str, query: str, model: str
+        self, key: str, query: str, prompt: str, references: List[Reference], model: str
     ) -> AsyncGenerator[str, None]:
         backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
 
@@ -111,7 +117,10 @@ class OnPremLLM(LLMBase):
         headers = {"Content-Type": "application/json"}
         data = {
             "system_prompt": "You are a helpful assistant. Please be concise in your answers.",
-            "prompt": query + "<|assistant|>",
+            "prompt": combine_query_and_context(
+                query=query, prompt=prompt, references=references
+            )
+            + "<|assistant|>",
             "stream": True,
             # Occasionally the model will repeat itself infinitely, this cuts off
             # the model at 1000 output tokens so that doesn't occur. Alternatively

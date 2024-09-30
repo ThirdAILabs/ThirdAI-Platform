@@ -5,15 +5,15 @@ load_dotenv()
 import asyncio
 import logging
 import os
-from typing import Optional
+from typing import Optional, Dict, Any, List
 from urllib.parse import urljoin
 
 import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from llms import default_keys, model_classes
-from pydantic import BaseModel
+from llms import default_keys, model_classes, LLMBase
+from utils import GenerateArgs
 
 app = FastAPI()
 
@@ -28,18 +28,6 @@ app.add_middleware(
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-
-
-class GenerateArgs(BaseModel):
-    query: str
-    key: Optional[str] = None
-    model: str = "gpt-4o-mini"
-    provider: str = "openai"
-    workflow_id: Optional[str] = None
-
-    # For caching we want just the query, not the entire prompt.
-    original_query: Optional[str] = None
-    cache_access_token: Optional[str] = None
 
 
 @app.post("/llm-dispatch/generate")
@@ -96,13 +84,17 @@ async def generate(generate_args: GenerateArgs):
         f"Starting generation with provider '{generate_args.provider.lower()}':",
     )
 
-    llm = llm_class()
+    llm: LLMBase = llm_class()
 
     async def generate_stream():
         generated_response = ""
         try:
             async for next_word in llm.stream(
-                key=key, query=generate_args.query, model=generate_args.model
+                key=key,
+                query=generate_args.query,
+                prompt=generate_args.prompt,
+                references=generate_args.references,
+                model=generate_args.model,
             ):
                 generated_response += next_word
                 yield next_word
@@ -116,12 +108,9 @@ async def generate(generate_args: GenerateArgs):
                 status_code=500, detail=f"Error while generating content: {e}"
             )
         else:
-            if (
-                generate_args.original_query is not None
-                and generate_args.cache_access_token is not None
-            ):
+            if generate_args.cache_access_token is not None:
                 await insert_into_cache(
-                    generate_args.original_query,
+                    generate_args.query,
                     generated_response,
                     generate_args.cache_access_token,
                 )
