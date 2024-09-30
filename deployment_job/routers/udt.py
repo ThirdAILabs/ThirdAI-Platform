@@ -10,7 +10,10 @@ from models.classification_models import (
 )
 from permissions import Permissions
 from prometheus_client import Summary
-from pydantic_models.inputs import BaseQueryParams, SearchResultsTokenClassification
+from pydantic_models.inputs import (
+    SearchResultsTokenClassification,
+    TextAnalysisPredictParams,
+)
 from reporter import Reporter
 from throughput import Throughput
 from utils import propagate_error, response
@@ -46,14 +49,15 @@ class UDTRouter:
     @udt_predict_metric.time()
     def predict(
         self,
-        base_params: BaseQueryParams,
+        params: TextAnalysisPredictParams,
         token=Depends(Permissions.verify_permission("read")),
     ):
         """
         Predicts the output based on the provided query parameters.
 
         Parameters:
-        - base_params: BaseQueryParams - The base query parameters required for prediction.
+        - text: str - The text for the sample to perform inference on.
+        - top_k: int - The number of results to return.
         - token: str - Authorization token (inferred from permissions dependency).
 
         Returns:
@@ -62,13 +66,12 @@ class UDTRouter:
         Example Request Body:
         ```
         {
-            "query": "What is artificial intelligence?",
+            "text": "What is artificial intelligence?",
             "top_k": 5
         }
         ```
         """
-        params = base_params.model_dump()
-        results = self.model.predict(**params)
+        results = self.model.predict(**params.model_dump())
 
         # TODO(pratik/geordie/yash): Add logging for search results text classification
         if isinstance(results, SearchResultsTokenClassification):
@@ -76,7 +79,7 @@ class UDTRouter:
                 len([tags[0] for tags in results.predicted_tags if tags[0] != "O"])
             )
             self.queries_ingested.log(1)
-            self.queries_ingested_bytes.log(len(params["query"]))
+            self.queries_ingested_bytes.log(len(params.text))
 
         return response(
             status_code=status.HTTP_200_OK,

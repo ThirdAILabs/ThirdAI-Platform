@@ -897,7 +897,7 @@ export function useTokenClassificationEndpoints() {
     axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
     try {
       const response = await axios.post(`${deploymentUrl}/predict`, {
-        query,
+        text: query,
         top_k: 1,
       });
       return response.data.data;
@@ -1039,7 +1039,7 @@ export function useTextClassificationEndpoints() {
     axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
     try {
       const response = await axios.post(`${deploymentUrl}/predict`, {
-        query,
+        text: query,
         top_k: 5,
       });
       return response.data.data;

@@ -100,12 +100,10 @@ class ModelBazaarLoadTest(TaskSet):
             headers = {
                 "Authorization": f"Bearer {self.auth_token}",
             }
-            base_params = {"query": query, "top_k": 5}
-            ndb_params = {"constraints": {}}
 
             response = self.client.post(
-                f"/{args.deployment_id}/predict",
-                json={"base_params": base_params, "ndb_params": ndb_params},
+                f"/{args.deployment_id}/search",
+                json={"query": query, "top_k": 5},
                 headers=headers,
             )
 

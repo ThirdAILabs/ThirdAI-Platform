@@ -34,29 +34,29 @@ class TextClassificationModel(ClassificationModel):
         super().__init__(config=config)
         self.num_classes = self.model.predict({"text": "test"}).shape[-1]
 
-    def predict(self, query: str, top_k: int, **kwargs):
+    def predict(self, text: str, top_k: int, **kwargs):
         top_k = min(top_k, self.num_classes)
-        prediction = self.model.predict({"text": query}, top_k=top_k)
+        prediction = self.model.predict({"text": text}, top_k=top_k)
         predicted_classes = [
             (self.model.class_name(class_id), activation)
             for class_id, activation in zip(*prediction)
         ]
 
         return inputs.SearchResultsTextClassification(
-            query_text=query,
+            query_text=text,
             predicted_classes=predicted_classes,
         )
 
 
 class TokenClassificationModel(ClassificationModel):
-    def predict(self, query: str, **kwargs):
-        predicted_tags = self.model.predict({"source": query}, top_k=1)
+    def predict(self, text: str, **kwargs):
+        predicted_tags = self.model.predict({"source": text}, top_k=1)
         predictions = []
         for predicted_tag in predicted_tags:
             predictions.append([x[0] for x in predicted_tag])
 
         return inputs.SearchResultsTokenClassification(
-            query_text=query,
-            tokens=query.split(),
+            query_text=text,
+            tokens=text.split(),
             predicted_tags=predictions,
         )

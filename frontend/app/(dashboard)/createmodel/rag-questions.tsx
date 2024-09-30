@@ -7,6 +7,7 @@ import { CardDescription } from '@/components/ui/card';
 import { Button, TextField } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import DropdownMenu from '@/components/ui/dropDownMenu';
 
 interface RAGQuestionsProps {
   models: SelectModel[];
@@ -141,6 +142,40 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
       setIsLoading(false);
     }
   };
+  //creting dropDownList for choosing model....
+  const modelDropDownList = models.map((model) => {
+    return {
+      id: model.user_id,
+      name: model.username + '/' + model.model_name,
+    };
+  });
+
+  const grDropDownList = existingNERModels.map((model) => {
+    return {
+      id: model.user_id,
+      name: model.username + '/' + model.model_name,
+    };
+  });
+
+  const handleSSIdentifier = (ssID: string) => {
+    setSsIdentifier(ssID);
+    const ssModel = existingSSmodels.find(
+      (model) => `${model.username}/${model.model_name}` === ssID
+    );
+    if (ssModel) {
+      setSsModelId(ssModel.model_id);
+    }
+  };
+
+  const handleGrIdentifier = (grID: string) => {
+    setGrIdentifier(grID);
+    const grModel = existingNERModels.find(
+      (model) => `${model.username}/${model.model_name}` === grID
+    );
+    if (grModel) {
+      setGrModelId(grModel.model_id);
+    }
+  };
 
   const [warningMessage, setWarningMessage] = useState('');
 
@@ -230,30 +265,15 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
           )}
 
           {ifUseExistingSS === 'Yes' && (
-            <div className="mb-4">
+            <div className="mb-4 mt-2">
               <CardDescription>Choose from existing semantic search model(s)</CardDescription>
-              <select
-                id="semanticSearchModels"
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                value={ssIdentifier || ''}
-                onChange={(e) => {
-                  const ssID = e.target.value;
-                  setSsIdentifier(ssID);
-                  const ssModel = existingSSmodels.find(
-                    (model) => `${model.username}/${model.model_name}` === ssID
-                  );
-                  if (ssModel) {
-                    setSsModelId(ssModel.model_id);
-                  }
-                }}
-              >
-                <option value="">-- Please choose a model --</option>
-                {existingSSmodels.map((model, index) => (
-                  <option key={index} value={`${model.username}/${model.model_name}`}>
-                    {`${model.username}/${model.model_name}`}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-2">
+                <DropdownMenu
+                  title=" Please choose a model  "
+                  handleSelectedTeam={handleSSIdentifier}
+                  teams={modelDropDownList}
+                />
+              </div>
             </div>
           )}
 
@@ -353,29 +373,16 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
 
                   {ifUseExistingLGR === 'Yes' && (
                     <div style={{ marginTop: '20px' }}>
-                      <CardDescription>Choose from existing NLP App(s)</CardDescription>
-                      <select
-                        id="nerModels"
-                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                        value={grIdentifier ? grIdentifier : ''}
-                        onChange={(e) => {
-                          const grID = e.target.value;
-                          setGrIdentifier(grID);
-                          const grModel = existingNERModels.find(
-                            (model) => `${model.username}/${model.model_name}` === grID
-                          );
-                          if (grModel) {
-                            setGrModelId(grModel.model_id);
-                          }
-                        }}
-                      >
-                        <option value="">-- Please choose a model --</option>
-                        {existingNERModels.map((model) => (
-                          <option key={model.id} value={`${model.username}/${model.model_name}`}>
-                            {`${model.username}/${model.model_name}`}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="mb-4 mt-2">
+                        <CardDescription>Choose from existing NLP App(s)</CardDescription>
+                        <div className="mt-2">
+                          <DropdownMenu
+                            title=" Please choose a model  "
+                            handleSelectedTeam={handleGrIdentifier}
+                            teams={grDropDownList}
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
 

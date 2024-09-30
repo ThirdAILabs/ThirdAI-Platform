@@ -183,11 +183,18 @@ class NDBV1Model(NDBModel):
             ]
         )
 
-    def predict(self, query: str, top_k: int, **kwargs: Any) -> inputs.SearchResultsNDB:
+    def predict(
+        self,
+        query: str,
+        top_k: int,
+        constraints: Dict[str, Dict[str, Any]],
+        rerank: bool,
+        context_radius: int,
+        **kwargs: Any,
+    ) -> inputs.SearchResultsNDB:
         """
         Makes a prediction using the NDB model.
         """
-        constraints: Dict[str, Dict[str, Any]] = kwargs.get("constraints")
 
         ndb_constraints = {
             key: getattr(ndb, constraints[key]["constraint_type"])(
@@ -199,13 +206,12 @@ class NDBV1Model(NDBModel):
             query=query,
             top_k=top_k,
             constraints=ndb_constraints,
-            rerank=kwargs.get("rerank", False),
-            top_k_rerank=kwargs.get("top_k_rerank", 100),
-            rerank_threshold=kwargs.get("rerank_threshold", 1.5),
-            top_k_threshold=kwargs.get("top_k_threshold", 10),
+            rerank=rerank,
+            top_k_rerank=2 * top_k,
+            top_k_threshold=top_k,
         )
         pydantic_references = [
-            inputs.convert_reference_to_pydantic(ref, kwargs.get("context_radius", 1))
+            inputs.convert_reference_to_pydantic(ref, context_radius=context_radius)
             for ref in references
         ]
 
@@ -352,6 +358,7 @@ class NDBV2Model(NDBModel):
         query: str,
         top_k: int,
         constraints: Dict[str, Dict[str, Any]],
+        rerank: bool,
         **kwargs: Any,
     ) -> inputs.SearchResultsNDB:
         constraints = {
@@ -362,7 +369,7 @@ class NDBV2Model(NDBModel):
         }
 
         results = self.db.search(
-            query=query, top_k=top_k, constraints=constraints, **kwargs
+            query=query, top_k=top_k, constraints=constraints, rerank=rerank
         )
 
         results = [self.chunk_to_pydantic_ref(chunk, score) for chunk, score in results]

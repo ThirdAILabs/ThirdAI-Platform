@@ -15,7 +15,8 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import exists
+from sqlalchemy.orm import Session, selectinload
 
 user_router = APIRouter()
 basic_security = HTTPBasic()
@@ -222,11 +223,10 @@ def demote_global_admin(
         )
 
     # Check if there is more than one global admin
-    another_admin_exists = (
-        session.query(schema.User)
-        .filter(schema.User.global_admin == True, schema.User.id != user.id)
-        .first()
-    )
+    # Dont need the data so just fetching whether another admin exists or not.
+    another_admin_exists = session.query(
+        exists().where(schema.User.global_admin == True, schema.User.id != user.id)
+    ).scalar()
 
     if not another_admin_exists:
         raise HTTPException(
@@ -270,7 +270,7 @@ def delete_user(
     email = admin_request.email
     user: Optional[schema.User] = (
         session.query(schema.User)
-        .options(joinedload(schema.User.models))
+        .options(selectinload(schema.User.models))
         .filter(schema.User.email == email)
         .first()
     )
@@ -391,15 +391,16 @@ def email_login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             message="User is not yet registered.",
         )
-    byte_password = credentials.password.encode("utf-8")
-    if not bcrypt.checkpw(byte_password, user.password_hash.encode("utf-8")):
-        return response(
-            status_code=status.HTTP_401_UNAUTHORIZED, message="Invalid password."
-        )
 
     if not user.verified:
         return response(
             status_code=status.HTTP_400_BAD_REQUEST, message="User is not verified yet."
+        )
+
+    byte_password = credentials.password.encode("utf-8")
+    if not bcrypt.checkpw(byte_password, user.password_hash.encode("utf-8")):
+        return response(
+            status_code=status.HTTP_401_UNAUTHORIZED, message="Invalid password."
         )
 
     return response(
@@ -489,9 +490,12 @@ def list_all_users(session: Session = Depends(get_session)):
     Returns:
     - A JSON response with the list of all users and their team details.
     """
+    # selectinload loads related collections more efficiently when dealing with large datasets
+    # by fetching related records in a separate, batched query, avoiding heavy JOINs. useful in cases
+    # one to many/ many to many. joinedload will be helpful for many to one case.
     users: List[schema.User] = (
         session.query(schema.User)
-        .options(joinedload(schema.User.teams).joinedload(schema.UserTeam.team))
+        .options(selectinload(schema.User.teams).selectinload(schema.UserTeam.team))
         .all()
     )
 
@@ -537,7 +541,7 @@ def get_user_info(
     """
     user: Optional[schema.User] = (
         session.query(schema.User)
-        .options(joinedload(schema.User.teams).joinedload(schema.UserTeam.team))
+        .options(selectinload(schema.User.teams).selectinload(schema.UserTeam.team))
         .filter(schema.User.id == authenticated_user.user.id)
         .first()
     )

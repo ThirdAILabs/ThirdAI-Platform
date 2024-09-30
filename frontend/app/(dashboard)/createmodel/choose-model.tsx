@@ -16,7 +16,7 @@ import {
 } from '@/lib/backend';
 import { Divider } from '@mui/material';
 import { CardDescription } from '@/components/ui/card';
-
+import DropdownMenu from '@/components/ui/dropDownMenu';
 export default function ChooseProblem() {
   const [modelType, setModelType] = useState('');
 
@@ -78,34 +78,21 @@ export default function ChooseProblem() {
   // const TABULAR_CLASSIFICATION = "Tabular Classification";
 
   // const useCases = [RETRIEVAL, NLP, RAG, DOC_CLASSIFICATION, TABULAR_CLASSIFICATION];
-  const useCases = [RETRIEVAL, NLP, RAG];
-
+  const useCases = [{ name: RETRIEVAL }, { name: NLP }, { name: RAG }];
+  const handleSetModelType = (model: string) => {
+    setModelType(model);
+  };
   return (
     <>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <span className="block text-lg font-semibold">Use case</span>
         <CardDescription>Please select the app type based on your use case.</CardDescription>
         <div style={{ marginTop: '10px' }}>
-          <select
-            value={modelType || ''}
-            onChange={(e) => setModelType(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px',
-              fontSize: '16px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-            }}
-          >
-            <option value="" disabled>
-              Select a use case
-            </option>
-            {useCases.map((type, index) => (
-              <option key={index} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
+          <DropdownMenu
+            title="Select a use case"
+            handleSelectedTeam={handleSetModelType}
+            teams={useCases}
+          />
         </div>
 
         {modelType && (

@@ -13,6 +13,7 @@ from database import schema
 from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
 from jinja2 import Template
+from licensing.verify.verify_license import valid_job_allocation, verify_license
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger("ThirdAI_Platform")
@@ -523,3 +524,23 @@ def get_workflow(session, workflow_id, authenticated_user):
 def save_dict(obj: dict, path: str):
     with open(path, "w") as fp:
         json.dump(obj, fp, indent=4)
+
+
+def validate_license_info():
+    try:
+        license_info = verify_license(
+            os.getenv(
+                "LICENSE_PATH", "/model_bazaar/license/ndb_enterprise_license.json"
+            )
+        )
+        if not valid_job_allocation(license_info, os.getenv("NOMAD_ENDPOINT")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Resource limit reached, cannot allocate new jobs.",
+            )
+        return license_info
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"License is not valid. {str(e)}",
+        )

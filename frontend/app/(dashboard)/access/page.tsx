@@ -22,7 +22,7 @@ import { useContext } from 'react';
 import { UserContext } from '../../user_wrapper';
 import AutocompleteInput from '@/components/ui/AutocompleteInput';
 import { TextField, Button } from '@mui/material';
-
+import DropdownMenu from '@/components/ui/dropDownMenu';
 // Define types for the models, teams, and users
 type Model = {
   name: string;
@@ -545,7 +545,20 @@ export default function AccessPage() {
       }
     };
   };
-
+  const handleSelectedTeamAdd = (team: string) => {
+    setSelectedTeamForAdd(team);
+    // console.log("Selected Team to add -> ", team.name);
+  };
+  const handleSelectedTeamRemove = (team: string) => {
+    setSelectedTeamForRemove(team);
+    // console.log("Selected team to remove -> ", team.name);
+  };
+  const handleAdminAdd = (team: string) => {
+    setSelectedTeamForAddAdmin(team);
+  };
+  const handleAdminRemove = (team: string) => {
+    setSelectedTeamForRemoveAdmin(team);
+  };
   // Handle OpenAI key change
   const [apiKey, setApiKey] = useState(''); // Display the masked API key
   const [newApiKey, setNewApiKey] = useState(''); // For storing the new API key
@@ -834,18 +847,11 @@ export default function AccessPage() {
             <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
               <h4 className="text-lg font-semibold text-gray-800">Add Member to Team</h4>
               <div className="grid grid-cols-1 gap-4 mt-4">
-                <select
-                  value={selectedTeamForAdd}
-                  onChange={(e) => setSelectedTeamForAdd(e.target.value)}
-                  className="border border-gray-300 rounded px-4 py-2"
-                >
-                  <option value="">Select Team</option>
-                  {teams.map((team) => (
-                    <option key={team.name} value={team.name}>
-                      {team.name}
-                    </option>
-                  ))}
-                </select>
+                <DropdownMenu
+                  title="Select Team"
+                  handleSelectedTeam={handleSelectedTeamAdd}
+                  teams={teams}
+                />
 
                 <AutocompleteInput
                   key={selectedTeamForAdd + newMember} // Use a key to force re-render
@@ -875,18 +881,12 @@ export default function AccessPage() {
             <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
               <h4 className="text-lg font-semibold text-gray-800">Remove Member from Team</h4>
               <div className="grid grid-cols-1 gap-4 mt-4">
-                <select
-                  value={selectedTeamForRemove}
-                  onChange={(e) => setSelectedTeamForRemove(e.target.value)}
-                  className="border border-gray-300 rounded px-4 py-2"
-                >
-                  <option value="">Select Team</option>
-                  {teams.map((team) => (
-                    <option key={team.id} value={team.name}>
-                      {team.name}
-                    </option>
-                  ))}
-                </select>
+                <DropdownMenu
+                  title="Select Team"
+                  handleSelectedTeam={handleSelectedTeamRemove}
+                  teams={teams}
+                />
+
                 <AutocompleteInput
                   key={selectedTeamForRemove + memberToRemove} // Use a dynamic key to force re-render
                   value={memberToRemove}
@@ -908,18 +908,12 @@ export default function AccessPage() {
             <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
               <h4 className="text-lg font-semibold text-gray-800">Add Admin to Team</h4>
               <div className="grid grid-cols-1 gap-4 mt-4">
-                <select
-                  value={selectedTeamForAddAdmin}
-                  onChange={(e) => setSelectedTeamForAddAdmin(e.target.value)}
-                  className="border border-gray-300 rounded px-4 py-2"
-                >
-                  <option value="">Select Team</option>
-                  {teams.map((team) => (
-                    <option key={team.name} value={team.name}>
-                      {team.name}
-                    </option>
-                  ))}
-                </select>
+                <DropdownMenu
+                  title="Select Team"
+                  handleSelectedTeam={handleAdminAdd}
+                  teams={teams}
+                />
+
                 <AutocompleteInput
                   key={selectedTeamForAddAdmin + newAdmin} // Use a dynamic key to force re-render
                   value={newAdmin}
@@ -937,18 +931,12 @@ export default function AccessPage() {
             <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
               <h4 className="text-lg font-semibold text-gray-800">Remove Admin from Team</h4>
               <div className="grid grid-cols-1 gap-4 mt-4">
-                <select
-                  value={selectedTeamForRemoveAdmin}
-                  onChange={(e) => setSelectedTeamForRemoveAdmin(e.target.value)}
-                  className="border border-gray-300 rounded px-4 py-2"
-                >
-                  <option value="">Select Team</option>
-                  {teams.map((team) => (
-                    <option key={team.name} value={team.name}>
-                      {team.name}
-                    </option>
-                  ))}
-                </select>
+                <DropdownMenu
+                  title="Select Team"
+                  handleSelectedTeam={handleAdminRemove}
+                  teams={teams}
+                />
+
                 <AutocompleteInput
                   key={selectedTeamForRemoveAdmin + adminToRemove} // Use a dynamic key to force re-render
                   value={adminToRemove}

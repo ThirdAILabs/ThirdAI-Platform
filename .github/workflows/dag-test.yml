@@ -148,7 +148,7 @@ jobs:
       run: |
         source ${{ github.workspace }}/venv/bin/activate
         cd $GITHUB_WORKSPACE/thirdai_platform
-        nohup sudo uvicorn main:app --reload --host 0.0.0.0 --port 8000 > uvicorn.log 2>&1 &
+        nohup sudo uvicorn main:app --host 0.0.0.0 --port 8000 > uvicorn.log 2>&1 &
     
     - name: List files in local_setup
       run: ls -la local_setup

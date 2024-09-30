@@ -2,7 +2,7 @@ import io
 import traceback
 import uuid
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import fitz
 import jwt
@@ -16,7 +16,7 @@ from permissions import Permissions
 from prometheus_client import Counter, Summary
 from pydantic import ValidationError
 from pydantic_models import inputs
-from pydantic_models.inputs import BaseQueryParams, NDBExtraParams
+from pydantic_models.inputs import NDBSearchParams
 from reporter import Reporter
 from update_logger import (
     AssociateLog,
@@ -53,7 +53,7 @@ class NDBRouter:
         self.deletion_logger = UpdateLogger.get_deletion_logger(self.model.data_dir)
 
         self.router = APIRouter()
-        self.router.add_api_route("/predict", self.query, methods=["POST"])
+        self.router.add_api_route("/search", self.search, methods=["POST"])
         self.router.add_api_route("/insert", self.insert, methods=["POST"])
         self.router.add_api_route("/delete", self.delete, methods=["POST"])
         self.router.add_api_route("/upvote", self.upvote, methods=["POST"])
@@ -88,26 +88,20 @@ class NDBRouter:
 
     @ndb_query_metric.time()
     @propagate_error
-    def query(
+    def search(
         self,
-        base_params: BaseQueryParams,
-        ndb_params: Optional[NDBExtraParams] = NDBExtraParams(),
+        params: NDBSearchParams,
         token: str = Depends(Permissions.verify_permission("read")),
     ):
         """
         Query the NDB model with specified parameters.
 
         Parameters:
-        - base_params: BaseQueryParams - Basic query parameters.
-            - query: str - The query text.
-            - top_k: int - The number of top results to return (default: 5).
-        - ndb_params: Optional[NDBExtraParams] - Extra NDB-specific query parameters.
-            - rerank: bool - Whether to rerank the results (default: False).
-            - top_k_rerank: int - The number of top results to rerank (default: 100).
-            - context_radius: int - The context radius for the results (default: 1).
-            - rerank_threshold: float - The threshold for reranking (default: 1.5).
-            - top_k_threshold: Optional[int] - The threshold for top_k results.
-            - constraints: Constraints - Additional constraints for the query.
+        - query: str - The query text.
+        - top_k: int - The number of top results to return (default: 5).
+        - constraints: Constraints - Additional constraints for the query.
+        - rerank: bool - Whether to rerank the results (default: False).
+        - context_radius: int - The context radius for the results (default: 1).
         - token: str - Authorization token.
 
         Returns:
@@ -116,37 +110,29 @@ class NDBRouter:
         Example Request Body:
         ```
         {
-            "base_params": {
-                "query": "What is the capital of France?",
-                "top_k": 5
-            },
-            "ndb_params": {
-                "rerank": true,
-                "top_k_rerank": 100,
-                "context_radius": 1,
-                "rerank_threshold": 1.5,
-                "constraints": {
-                    "field1": {
-                        "constraint_type": "AnyOf",
-                        "values": ["value1", "value2"]
-                    },
-                    "field2": {
-                        "constraint_type": "InRange",
-                        "minimum": 0,
-                        "maximum": 10,
-                        "inclusive_min": true,
-                        "inclusive_max": true
-                    }
+            "query": "What is the capital of France?",
+            "top_k": 5
+            "rerank": true,
+            "top_k_rerank": 100,
+            "context_radius": 1,
+            "rerank_threshold": 1.5,
+            "constraints": {
+                "field1": {
+                    "constraint_type": "AnyOf",
+                    "values": ["value1", "value2"]
+                },
+                "field2": {
+                    "constraint_type": "InRange",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "inclusive_min": true,
+                    "inclusive_max": true
                 }
             }
         }
         ```
         """
-        params = base_params.model_dump()
-        extra_params = ndb_params.model_dump()
-        params.update(extra_params)
-
-        results = self.model.predict(**params)
+        results = self.model.predict(**params.model_dump())
 
         return response(
             status_code=status.HTTP_200_OK,

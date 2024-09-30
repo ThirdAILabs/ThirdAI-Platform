@@ -62,6 +62,19 @@ class UDTFunctions:
         )
 
     @staticmethod
+    def check_predict(inputs: Dict[str, Any]):
+        logging.info(f"inputs: {inputs}")
+        deployment = inputs.get("deployment")
+
+        logging.info(f"checking the deployment for {deployment.model_identifier}")
+
+        logging.info("Calling predict on the deployment")
+        return deployment.predict(
+            text="Can autism and down syndrome be in conjunction",
+            top_k=5,
+        )
+
+    @staticmethod
     def udt_deploy(inputs: Dict[str, Any]) -> Any:
         logging.info(f"inputs: {inputs}")
         model = inputs.get("model")
@@ -120,19 +133,6 @@ class CommonFunctions:
         flow.bazaar_client.undeploy(deployment)
 
     @staticmethod
-    def check_search(inputs: Dict[str, Any]):
-        logging.info(f"inputs: {inputs}")
-        deployment = inputs.get("deployment")
-
-        logging.info(f"checking the deployment for {deployment.model_identifier}")
-
-        logging.info("Searching the deployment")
-        return deployment.search(
-            query="Can autism and down syndrome be in conjunction",
-            top_k=5,
-        )
-
-    @staticmethod
     def await_deploy(inputs: Dict[str, Any]):
         """
         Awaits the completion of model deployment.
@@ -188,6 +188,19 @@ class CommonFunctions:
 
 class NDBFunctions:
     @staticmethod
+    def check_search(inputs: Dict[str, Any]):
+        logging.info(f"inputs: {inputs}")
+        deployment = inputs.get("deployment")
+
+        logging.info(f"checking the deployment for {deployment.model_identifier}")
+
+        logging.info("Searching the deployment")
+        return deployment.search(
+            query="Can autism and down syndrome be in conjunction",
+            top_k=5,
+        )
+
+    @staticmethod
     def check_deployment_ndb(inputs: Dict[str, Any]):
         """
         Checks the status and functionality of a deployment.
@@ -209,23 +222,27 @@ class NDBFunctions:
         good_answer = references[2]
 
         logging.info("Associating the model")
-        deployment.associate(
+        associate_response = deployment.associate(
             [
                 {"source": "authors", "target": "contributors"},
                 {"source": "paper", "target": "document"},
             ]
         )
 
+        assert associate_response.status_code == 200
+
         logging.info(f"upvoting the model")
-        deployment.upvote(
+        upvote_response = deployment.upvote(
             [
                 {"query_text": query_text, "reference_id": best_answer["id"]},
                 {"query_text": query_text, "reference_id": good_answer["id"]},
             ]
         )
 
+        assert upvote_response.status_code == 200
+
         logging.info(f"inserting the docs to the model")
-        deployment.insert(
+        insert_response = deployment.insert(
             [
                 {
                     "path": os.path.join(config.base_path, file),
@@ -234,6 +251,7 @@ class NDBFunctions:
                 for file in config.insert_paths
             ],
         )
+        assert insert_response.status_code == 200
 
         logging.info("Checking the sources")
         deployment.sources()

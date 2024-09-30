@@ -82,7 +82,7 @@ def create_config(tmp_dir: str, sub_type: NDBSubType, autoscaling: bool):
 
 
 def get_query_result(client: TestClient, query: str):
-    res = client.post("/predict", json={"base_params": {"query": query}})
+    res = client.post("/search", json={"query": query})
     assert res.status_code == 200
     return res.json()["data"]["references"][0]["id"]
 
