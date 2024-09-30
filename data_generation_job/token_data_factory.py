@@ -500,12 +500,10 @@ Example : {str(random.sample(tag_values[tag.name], k=2))} not limited to given b
         tag_values: Dict[str, List[str]],
         sentences_to_generate: int,
     ) -> List[str]:
-        template = re.sub("\s+", " ", template).strip()
         if not template:
             return [None]
 
-        seperator = " "
-        words = template.split(sep=seperator)
+        words = template.strip().split()
 
         data_points = [
             {TokenDataFactory.SOURCE_COLUMN: [], TokenDataFactory.TARGET_COLUMN: []}
@@ -525,9 +523,9 @@ Example : {str(random.sample(tag_values[tag.name], k=2))} not limited to given b
                     return [None]
 
                 for idx in range(sentences_to_generate):
-                    splitted_word_tag_value = random.choice(tag_values[word_tag]).split(
-                        sep=seperator
-                    )
+                    splitted_word_tag_value = random.choice(
+                        tag_values[word_tag]
+                    ).split()
                     data_points[idx][TokenDataFactory.SOURCE_COLUMN].extend(
                         splitted_word_tag_value
                     )
@@ -570,10 +568,10 @@ Example : {str(random.sample(tag_values[tag.name], k=2))} not limited to given b
             else:
                 sentences.append(
                     {
-                        TokenDataFactory.SOURCE_COLUMN: seperator.join(
+                        TokenDataFactory.SOURCE_COLUMN: " ".join(
                             data[TokenDataFactory.SOURCE_COLUMN]
                         ),
-                        TokenDataFactory.TARGET_COLUMN: seperator.join(
+                        TokenDataFactory.TARGET_COLUMN: " ".join(
                             data[TokenDataFactory.TARGET_COLUMN]
                         ),
                     }

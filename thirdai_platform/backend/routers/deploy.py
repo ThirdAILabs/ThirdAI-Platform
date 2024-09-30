@@ -28,12 +28,12 @@ from backend.utils import (
     model_accessible,
     response,
     submit_nomad_job,
+    validate_license_info,
 )
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
-from licensing.verify.verify_license import valid_job_allocation, verify_license
 from sqlalchemy.orm import Session
 
 deploy_router = APIRouter()
@@ -173,22 +173,7 @@ def deploy_model(
     """
     user = authenticated_user.user
 
-    try:
-        license_info = verify_license(
-            os.getenv(
-                "LICENSE_PATH", "/model_bazaar/license/ndb_enterprise_license.json"
-            )
-        )
-        if not valid_job_allocation(license_info, os.getenv("NOMAD_ENDPOINT")):
-            return response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                message="Resource limit reached, cannot allocate new jobs.",
-            )
-    except Exception as e:
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"License is not valid. {str(e)}",
-        )
+    license_info = validate_license_info()
 
     try:
         model: schema.Model = get_model_from_identifier(model_identifier, session)

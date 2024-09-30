@@ -222,23 +222,27 @@ class NDBFunctions:
         good_answer = references[2]
 
         logging.info("Associating the model")
-        deployment.associate(
+        associate_response = deployment.associate(
             [
                 {"source": "authors", "target": "contributors"},
                 {"source": "paper", "target": "document"},
             ]
         )
 
+        assert associate_response.status_code == 200
+
         logging.info(f"upvoting the model")
-        deployment.upvote(
+        upvote_response = deployment.upvote(
             [
                 {"query_text": query_text, "reference_id": best_answer["id"]},
                 {"query_text": query_text, "reference_id": good_answer["id"]},
             ]
         )
 
+        assert upvote_response.status_code == 200
+
         logging.info(f"inserting the docs to the model")
-        deployment.insert(
+        insert_response = deployment.insert(
             [
                 {
                     "path": os.path.join(config.base_path, file),
@@ -247,6 +251,7 @@ class NDBFunctions:
                 for file in config.insert_paths
             ],
         )
+        assert insert_response.status_code == 200
 
         logging.info("Checking the sources")
         deployment.sources()

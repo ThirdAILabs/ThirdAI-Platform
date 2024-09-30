@@ -39,36 +39,16 @@ from backend.utils import (
     response,
     submit_nomad_job,
     update_json,
+    validate_license_info,
     validate_name,
 )
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
-from licensing.verify.verify_license import valid_job_allocation, verify_license
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 train_router = APIRouter()
-
-
-def validate_license_info():
-    try:
-        license_info = verify_license(
-            os.getenv(
-                "LICENSE_PATH", "/model_bazaar/license/ndb_enterprise_license.json"
-            )
-        )
-        if not valid_job_allocation(license_info, os.getenv("NOMAD_ENDPOINT")):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Resource limit reached, cannot allocate new jobs.",
-            )
-        return license_info
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"License is not valid. {str(e)}",
-        )
 
 
 def get_base_model(base_model_identifier: str, user: schema.User, session: Session):
@@ -677,22 +657,7 @@ def train_udt(
             message="Invalid options format: " + str(e),
         )
 
-    try:
-        license_info = verify_license(
-            os.getenv(
-                "LICENSE_PATH", "/model_bazaar/license/ndb_enterprise_license.json"
-            )
-        )
-        if not valid_job_allocation(license_info, os.getenv("NOMAD_ENDPOINT")):
-            return response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                message="Resource limit reached, cannot allocate new jobs.",
-            )
-    except Exception as e:
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"License is not valid. {str(e)}",
-        )
+    license_info = validate_license_info()
 
     try:
         validate_name(model_name)

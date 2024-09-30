@@ -251,7 +251,7 @@ class NeuralDBClient(BaseClient):
             )
         )
 
-        http_post_with_error(
+        return http_post_with_error(
             urljoin(self.base_url, "insert"),
             files=files,
             headers=auth_header(self.login_instance.access_token),
@@ -265,7 +265,7 @@ class NeuralDBClient(BaseClient):
         Args:
             files (List[str]): A list of source ids to delete from the ndb model.
         """
-        http_post_with_error(
+        return http_post_with_error(
             urljoin(self.base_url, "delete"),
             json={"source_ids": source_ids},
             headers=auth_header(self.login_instance.access_token),
@@ -279,7 +279,7 @@ class NeuralDBClient(BaseClient):
         Args:
             text_pairs (List[Dict[str, str]]): List of dictionaries where each dictionary has 'source' and 'target' keys.
         """
-        http_post_with_error(
+        return http_post_with_error(
             urljoin(self.base_url, "associate"),
             json={"text_pairs": text_pairs},
             headers=auth_header(self.login_instance.access_token),
@@ -315,7 +315,7 @@ class NeuralDBClient(BaseClient):
         Args:
             text_id_pairs: (List[Dict[str, Union[str, int]]]): List of dictionaries where each dictionary has 'query_text' and 'reference_id' keys.
         """
-        http_post_with_error(
+        return http_post_with_error(
             urljoin(self.base_url, "upvote"),
             json={"text_id_pairs": text_id_pairs},
             headers=auth_header(self.login_instance.access_token),

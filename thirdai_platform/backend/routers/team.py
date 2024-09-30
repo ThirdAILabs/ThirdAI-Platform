@@ -10,7 +10,7 @@ from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, selectinload
 
 team_router = APIRouter()
 
@@ -27,10 +27,8 @@ def add_team(name: str, session: Session = Depends(get_session)):
     Returns:
     - A JSON response with the team ID and name upon successful creation.
     """
-    existing_team: Optional[schema.Team] = (
-        session.query(schema.Team).filter_by(name=name).first()
-    )
-    if existing_team:
+    # `exists()` for existence check
+    if session.query(session.query(schema.Team).filter_by(name=name).exists()).scalar():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Team with this name already exists",
@@ -81,12 +79,12 @@ def add_user_to_team(
             status_code=status.HTTP_404_NOT_FOUND, detail="Team not found"
         )
 
-    user_team: Optional[schema.UserTeam] = (
+    # Use `exists()` instead of fetching whole object
+    if session.query(
         session.query(schema.UserTeam)
         .filter_by(user_id=user.id, team_id=team.id)
-        .first()
-    )
-    if user_team:
+        .exists()
+    ).scalar():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User already a member of this team",
@@ -128,7 +126,7 @@ def assign_team_admin(
         .join(schema.User)
         .join(schema.Team)
         .filter(schema.User.email == email, schema.Team.id == team_id)
-        .options(joinedload(schema.UserTeam.user), joinedload(schema.UserTeam.team))
+        .options(selectinload(schema.UserTeam.user), selectinload(schema.UserTeam.team))
         .first()
     )
 
@@ -178,7 +176,7 @@ def delete_team(team_id: str, session: Session = Depends(get_session)):
     """
     team: Optional[schema.Team] = (
         session.query(schema.Team)
-        .options(joinedload(schema.Team.users), joinedload(schema.Team.models))
+        .options(selectinload(schema.Team.users), selectinload(schema.Team.models))
         .get(team_id)
     )
 
@@ -188,12 +186,14 @@ def delete_team(team_id: str, session: Session = Depends(get_session)):
         )
 
     # Delete all user-team relationships and update model access levels
-    for user_team in team.users:
-        session.delete(user_team)
-
-    for model in team.models:
-        model.access_level = schema.Access.private
-        model.team_id = None
+    # Bulk delete and update operations
+    session.query(schema.UserTeam).filter_by(team_id=team.id).delete(
+        synchronize_session=False
+    )
+    session.query(schema.Model).filter_by(team_id=team.id).update(
+        {"access_level": schema.Access.private, "team_id": None},
+        synchronize_session=False,
+    )
 
     session.delete(team)
     session.commit()
@@ -316,14 +316,13 @@ def remove_user_from_team(
             detail="User or Team not found",
         )
 
-    models: List[schema.Model] = (
-        session.query(schema.Model)
-        .filter_by(user_id=user_team.user_id, team_id=team_id)
-        .all()
+    # Bulk update models
+    session.query(schema.Model).filter_by(
+        user_id=user_team.user_id, team_id=team_id
+    ).update(
+        {"access_level": schema.Access.private, "team_id": None},
+        synchronize_session=False,
     )
-    for model in models:
-        model.access_level = schema.Access.private
-        model.team_id = None
 
     session.delete(user_team)
     session.commit()
@@ -428,7 +427,7 @@ def list_team_users(
     """
     user_teams: List[schema.UserTeam] = (
         session.query(schema.UserTeam)
-        .options(joinedload(schema.UserTeam.user))
+        .options(selectinload(schema.UserTeam.user))
         .filter(schema.UserTeam.team_id == team_id)
         .all()
     )

@@ -1,4 +1,4 @@
-import hvac
+import hvac  # type: ignore
 from auth.jwt import verify_access_token
 from backend.auth_dependencies import get_vault_client, global_admin_only
 from backend.utils import response
