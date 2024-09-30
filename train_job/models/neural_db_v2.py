@@ -32,7 +32,7 @@ def convert_to_ndb_doc(
     filename, ext = os.path.splitext(resource_path)
 
     if ext == ".pdf":
-        doc_keywords = None
+        doc_keywords = ""
         if options.get("title_as_keywords", False):
             pdf_title = pdftitle.get_title_from_file(resource_path)
             filename_as_keywords = (
