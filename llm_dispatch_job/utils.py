@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class Reference(BaseModel):
@@ -51,7 +51,7 @@ def combine_query_and_context(
     query: str, prompt: Optional[str], references: List[Reference]
 ):
     if prompt or references:
-        context = "\n\n".join(map(references, reference_content))
+        context = "\n\n".join(map(reference_content, references))
         context = " ".join(context.split(" ")[:2000])
 
         return f"{prompt or DEFAULT_PROMPT}\n\nContext: '{context}'\nQuery: '{query}'\nAnswer: "

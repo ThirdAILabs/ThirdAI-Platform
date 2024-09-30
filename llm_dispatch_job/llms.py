@@ -1,11 +1,10 @@
 import json
 import os
-from typing import AsyncGenerator
+from typing import AsyncGenerator, List
 from urllib.parse import urljoin
 
 import aiohttp
 from utils import Reference, combine_query_and_context
-from typing import List
 
 
 class LLMBase:
