@@ -583,7 +583,9 @@ export class ModelService {
       const args: any = {
         query: question,
         prompt: genaiPrompt,
-        references: references.map(ref => { return { text: ref.content, source: ref.sourceName, metadata: ref.metadata } }),
+        references: references.map((ref) => {
+          return { text: ref.content, source: ref.sourceName, metadata: ref.metadata };
+        }),
         key: apiKey,
         provider: genAiProvider,
         workflow_id: workflowId,
