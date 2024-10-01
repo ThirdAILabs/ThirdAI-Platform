@@ -185,18 +185,17 @@ class Model(SQLDeclarativeBase):
         "MetaData", back_populates="model", uselist=False, cascade="all, delete-orphan"
     )
 
-    model_shards = relationship(
-        "ModelShard", back_populates="model", cascade="all, delete-orphan"
-    )
     model_permissions = relationship(
         "ModelPermission", back_populates="model", cascade="all, delete-orphan"
     )
 
     dependencies = relationship(
-        "ModelDependency", back_populates="model", cascade="all, delete-orphan"
+        "ModelDependency",
+        back_populates="model",
+        cascade="all, delete-orphan",
+        foreign_keys="ModelDependency.model_id",
     )
 
-    # TODO support sharded model names
     def get_train_job_name(self):
         return f"train-{self.id}-{self.type}-{self.sub_type}"
 
@@ -312,15 +311,13 @@ class ModelDependency(SQLDeclarativeBase):
         primary_key=True,
     )
 
-    model = relationship(
-        "Model", back_populates="dependencies", foreign_keys=["model_id"]
-    )
-    dependency = relationship("Model", foreign_keys=["dependency_id"])
+    model = relationship("Model", back_populates="dependencies", foreign_keys=model_id)
+    dependency = relationship("Model", foreign_keys=dependency_id)
 
     __table_args__ = (
         Index("model_dependency_index", "model_id"),
-        Index("dependency_model_index", "dependency"),
-        UniqueConstraint("model_id", "dependency", name="unique_model_dependency"),
+        Index("dependency_model_index", "dependency_id"),
+        UniqueConstraint("model_id", "dependency_id", name="unique_model_dependency"),
     )
 
 

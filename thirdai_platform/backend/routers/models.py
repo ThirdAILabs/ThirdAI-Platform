@@ -110,7 +110,9 @@ def list_models(
     accessible_models = (
         session.query(schema.Model)
         .join(
-            schema.ModelPermission, schema.Model.id == schema.ModelPermission.model_id
+            schema.ModelPermission,
+            schema.Model.id == schema.ModelPermission.model_id,
+            isouter=True,  # To ensure that models without entries in permissions table are included
         )
         .filter(
             or_(
@@ -128,7 +130,7 @@ def list_models(
                 ),
             )
         )
-        .distinct()
+        .distinct(schema.Model.id)
         .all()
     )
 
@@ -136,7 +138,7 @@ def list_models(
         {
             "id": str(model.id),
             "name": model.name,
-            "type": model.type.name,
+            "type": model.type,
             "train_status": model.train_status,
             "deploy_status": model.deploy_status,
             "publish_date": str(model.published_date),

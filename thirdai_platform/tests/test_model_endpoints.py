@@ -62,6 +62,27 @@ def test_list_public_models(create_models_and_users):
     assert data[0]["username"] == "user_x"
 
 
+def test_search_models(create_models_and_users):
+    client, user_tokens = create_models_and_users
+
+    for token, expected_models in [
+        (user_tokens[0], ["user_x/test_model_a"]),
+        (user_tokens[1], ["user_x/test_model_a", "user_y/test_model_b"]),
+        (user_tokens[2], ["user_x/test_model_a"]),
+    ]:
+        res = client.get(
+            "/api/model/search",
+            params={"name": "test_model"},
+            headers=auth_header(token),
+        )
+        assert res.status_code == 200
+
+        data = res.json()["data"]
+        assert len(data) == len(expected_models)
+        model_names = set(f"{m['username']}/{m['model_name']}" for m in data)
+        assert model_names == set(expected_models)
+
+
 def test_list_models(create_models_and_users):
     client, user_tokens = create_models_and_users
 
@@ -72,14 +93,13 @@ def test_list_models(create_models_and_users):
     ]:
         res = client.get(
             "/api/model/list",
-            params={"name": "test_model"},
             headers=auth_header(token),
         )
         assert res.status_code == 200
 
         data = res.json()["data"]
         assert len(data) == len(expected_models)
-        model_names = set(f"{m['username']}/{m['model_name']}" for m in data)
+        model_names = set(f"{m['created_by']['username']}/{m['name']}" for m in data)
         assert model_names == set(expected_models)
 
 

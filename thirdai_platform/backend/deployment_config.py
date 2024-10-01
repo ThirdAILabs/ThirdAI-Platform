@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 class ModelType(str, Enum):
     NDB = "ndb"
     UDT = "udt"
+    RAG = "rag"
 
 
 class NDBSubType(str, Enum):
