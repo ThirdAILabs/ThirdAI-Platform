@@ -491,36 +491,6 @@ def get_expiry_min(size: int):
     return 60 * (1 + math.floor(size / 1500))
 
 
-def list_workflow_models(workflow: schema.Workflow):
-    models_info = []
-    for workflow_model in workflow.workflow_models:
-        model_info = get_high_level_model_info(workflow_model.model)
-        model_info["component"] = workflow_model.component  # Append the component info
-        models_info.append(model_info)
-    return models_info
-
-
-def get_workflow(session, workflow_id, authenticated_user):
-    workflow: schema.Workflow = session.query(schema.Workflow).get(workflow_id)
-
-    if not workflow:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workflow not found.",
-        )
-
-    if (
-        workflow.user_id != authenticated_user.user.id
-        and not authenticated_user.user.is_global_admin()
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have owner permissions to this workflow",
-        )
-
-    return workflow
-
-
 def save_dict(obj: dict, path: str):
     with open(path, "w") as fp:
         json.dump(obj, fp, indent=4)

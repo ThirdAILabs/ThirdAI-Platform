@@ -101,6 +101,63 @@ def list_public_models(
 
 @model_router.get("/list")
 def list_models(
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
+    user: schema.User = authenticated_user.user
+    user_teams = [ut.team_id for ut in user.teams]
+
+    accessible_models = (
+        session.query(schema.Model)
+        .join(
+            schema.ModelPermission, schema.Model.id == schema.ModelPermission.model_id
+        )
+        .filter(
+            or_(
+                schema.Model.access_level == schema.Access.public,
+                and_(
+                    schema.Model.access_level == schema.Access.protected,
+                    schema.Model.team_id.in_(user_teams),
+                ),
+                and_(
+                    schema.Model.access_level == schema.Access.private,
+                    schema.Model.user_id == user.id,
+                ),
+                and_(
+                    schema.ModelPermission.user_id == user.id,
+                ),
+            )
+        )
+        .distinct()
+        .all()
+    )
+
+    model_list = [
+        {
+            "id": str(model.id),
+            "name": model.name,
+            "type": model.type.name,
+            "train_status": model.train_status,
+            "deploy_status": model.deploy_status,
+            "publish_date": str(model.published_date),
+            "created_by": {
+                "id": str(model.user.id),
+                "username": model.user.username,
+                "email": model.user.email,
+            },
+        }
+        for model in accessible_models
+    ]
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Successfully retrieved accessible models.",
+        data=jsonable_encoder(model_list),
+    )
+
+
+@model_router.get("/search")
+def search_models(
     name: str,
     domain: Optional[str] = None,
     username: Optional[str] = None,

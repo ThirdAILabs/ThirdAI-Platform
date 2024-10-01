@@ -35,6 +35,7 @@ from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
+from collections import defaultdict
 
 deploy_router = APIRouter()
 
@@ -136,57 +137,30 @@ def get_model_permissions(
     )
 
 
-@deploy_router.post("/run", dependencies=[Depends(is_model_owner)])
-def deploy_model(
-    model_identifier: str,
-    memory: Optional[int] = None,
-    autoscaling_enabled: bool = False,
-    autoscaler_max_count: int = 1,
-    llm_provider: Optional[str] = None,
-    genai_key: Optional[str] = None,
-    session: Session = Depends(get_session),
-    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+def deploy_single_model(
+    model_id: str,
+    memory: Optional[int],
+    autoscaling_enabled: bool,
+    autoscaler_max_count: int,
+    llm_provider: Optional[str],
+    genai_key: Optional[str],
+    session: Session,
+    user: schema.User,
 ):
-    """
-    Deploy a model.
-
-    Parameters:
-    - model_identifier: The identifier of the model to deploy.
-    - memory: Optional memory allocation for the deployment.
-    - autoscaling_enabled: Whether autoscaling is enabled.
-    - autoscaler_max_count: The maximum count for the autoscaler.
-    - genai_key: Optional GenAI key.
-    - session: The database session (dependency).
-    - authenticated_user: The authenticated user (dependency).
-
-    Example Usage:
-    ```json
-    {
-        "deployment_name": "my_deployment",
-        "model_identifier": "model_123",
-        "memory": 2048,
-        "autoscaling_enabled": true,
-        "autoscaler_max_count": 5,
-        "genai_key": "your_genai_key"
-    }
-    ```
-    """
-    user = authenticated_user.user
-
     license_info = validate_license_info()
 
     try:
-        model: schema.Model = get_model_from_identifier(model_identifier, session)
+        model: schema.Model = session.query(schema.Model).get(model_id)
     except Exception as error:
-        return response(
+        raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            message=str(error),
+            detail=str(error),
         )
 
     if model.train_status != schema.Status.complete:
-        return response(
+        raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"Training isn't complete yet. Current status: {str(model.train_status)}",
+            detail=f"Training isn't complete yet. Current status: {str(model.train_status)}",
         )
 
     if model.deploy_status in [
@@ -194,19 +168,16 @@ def deploy_model(
         schema.Status.in_progress,
         schema.Status.complete,
     ]:
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"Deployment is already {model.deploy_status}.",
-        )
+        return
 
     model.deploy_status = schema.Status.not_started
     session.commit()
     session.refresh(model)
 
     if not model_accessible(model, user):
-        return response(
+        raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            message="You don't have access to deploy this model.",
+            detail="You don't have access to deploy this model.",
         )
 
     if not memory:
@@ -214,9 +185,9 @@ def deploy_model(
             meta_data = json.loads(model.meta_data.train)
             size_in_memory = int(meta_data["size_in_memory"])
         except (json.JSONDecodeError, KeyError) as e:
-            return response(
+            raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                message="Failed to parse model metadata or missing 'size_in_memory'.",
+                detail="Failed to parse model metadata or missing 'size_in_memory'.",
             )
         memory = (size_in_memory // 1000000) + 1000  # MB required for deployment
 
@@ -232,9 +203,9 @@ def deploy_model(
     elif model.type == ModelType.UDT:
         model_options = UDTDeploymentOptions(udt_sub_type=model.sub_type)
     else:
-        return response(
+        raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"Unsupported model type '{model.type}'.",
+            detail=f"Unsupported model type '{model.type}'.",
         )
 
     config = DeploymentConfig(
@@ -276,10 +247,85 @@ def deploy_model(
         model.deploy_status = schema.Status.failed
         session.commit()
         logger.info(traceback.format_exc())
-        return response(
+        raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message=str(err),
+            detail=str(err),
         )
+
+
+@deploy_router.post("/run", dependencies=[Depends(is_model_owner)])
+def deploy_model(
+    model_identifier: str,
+    memory: Optional[int] = None,
+    autoscaling_enabled: bool = False,
+    autoscaler_max_count: int = 1,
+    llm_provider: Optional[str] = None,
+    genai_key: Optional[str] = None,
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
+    """
+    Deploy a model.
+
+    Parameters:
+    - model_identifier: The identifier of the model to deploy.
+    - memory: Optional memory allocation for the deployment.
+    - autoscaling_enabled: Whether autoscaling is enabled.
+    - autoscaler_max_count: The maximum count for the autoscaler.
+    - genai_key: Optional GenAI key.
+    - session: The database session (dependency).
+    - authenticated_user: The authenticated user (dependency).
+
+    Example Usage:
+    ```json
+    {
+        "deployment_name": "my_deployment",
+        "model_identifier": "model_123",
+        "memory": 2048,
+        "autoscaling_enabled": true,
+        "autoscaler_max_count": 5,
+        "genai_key": "your_genai_key"
+    }
+    ```
+    """
+    user = authenticated_user.user
+
+    try:
+        model: schema.Model = get_model_from_identifier(model_identifier, session)
+    except Exception as error:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=str(error),
+        )
+
+    for dependency in model.dependencies:
+        try:
+            deploy_single_model(
+                model_id=dependency.dependency_id,
+                memory=memory,
+                autoscaling_enabled=autoscaling_enabled,
+                autoscaler_max_count=autoscaler_max_count,
+                llm_provider=llm_provider,
+                genai_key=genai_key,
+                session=session,
+                user=user,
+            )
+        except HTTPException as err:
+            raise HTTPException(
+                status_code=err.status_code,
+                detail="Error deploying dependent model: " + err.detail,
+            )
+
+    deploy_single_model(
+        model_id=model.id,
+        memory=memory,
+        autoscaling_enabled=autoscaling_enabled,
+        autoscaler_max_count=autoscaler_max_count,
+        llm_provider=llm_provider,
+        genai_key=genai_key,
+        session=session,
+        user=user,
+    )
 
     return response(
         status_code=status.HTTP_202_ACCEPTED,
@@ -319,10 +365,47 @@ def deployment_status(
             message=str(error),
         )
 
+    # If the model hasn't yet been started, then the status of it's dependent models
+    # doesn't need to be checked. If the model
+    if model.deploy_status in [schema.Status.not_started, schema.Status.stopped]:
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successfully got the deployment status",
+            data={"deploy_status": model.deploy_status, "model_id": str(model.id)},
+        )
+
+    statuses = defaultdict(int)
+
+    for model_id in [dep.id for dep in model.dependencies] + [model.id]:
+        try:
+            model: schema.Model = session.query(schema.Model).get(model_id)
+        except Exception as error:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(error),
+            )
+        statuses[model.deploy_status] += 1
+
+    status_priority = [
+        schema.Status.failed,
+        schema.Status.not_started,
+        schema.Status.stopped,
+        schema.Status.starting,
+        schema.Status.in_progress,
+        schema.Status.complete,
+    ]
+
+    for deploy_status in status_priority:
+        if statuses[deploy_status] > 0:
+            return response(
+                status_code=status.HTTP_200_OK,
+                message="Successfully got the deployment status",
+                data={"deploy_status": deploy_status, "model_id": str(model.id)},
+            )
+
     return response(
-        status_code=status.HTTP_200_OK,
-        message="Successfully got the deployment status",
-        data={"deploy_status": model.deploy_status, "model_id": str(model.id)},
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        message="Unable to locate models to get status",
     )
 
 
@@ -365,6 +448,27 @@ def update_deployment_status(
     return {"message": "successfully updated"}
 
 
+def active_deployments_using_model(model_id: str, session: Session):
+    return (
+        session.query(schema.Model)
+        .join(
+            schema.ModelDependency,
+            schema.Model.id == schema.ModelDependency.model_id,
+        )
+        .filter(
+            schema.ModelDependency.dependency_id == model_id,
+            schema.Model.deploy_status.in_(
+                [
+                    schema.Status.starting,
+                    schema.Status.in_progress,
+                    schema.Status.complete,
+                ]
+            ),
+        )
+        .count()
+    )
+
+
 @deploy_router.post("/stop", dependencies=[Depends(is_model_owner)])
 def undeploy_model(
     model_identifier: str,
@@ -392,6 +496,12 @@ def undeploy_model(
             message=str(error),
         )
 
+    if active_deployments_using_model(model_id=model.id) > 0:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"Unable to stop deployment for model {model_identifier} since it is used by other active workflows.",
+        )
+
     try:
         delete_nomad_job(
             job_id=f"deployment-{str(model.id)}",
@@ -417,43 +527,16 @@ def undeploy_model(
     )
 
 
-@deploy_router.get("/info", dependencies=[Depends(is_model_owner)])
-def get_deployment_info(
-    model_identifier: str,
-    session: Session = Depends(get_session),
-):
-    """
-    Retrieve deployment information.
-
-    Parameters:
-    - model_identifier: The identifier of the model.
-
-    Example Usage:
-    ```json
-    {
-        "model_identifier": "username/modelname",
-    }
-    ```
-    """
-    try:
-        model: schema.Model = get_model_from_identifier(model_identifier, session)
-    except Exception as error:
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message=str(error),
-        )
-
-    # Prepare the response data
-    deployment_info = {
-        "name": model.name,
-        "status": model.deploy_status,
-        "model_id": str(model.id),
-    }
-
+@deploy_router.get("/active-deployment-count")
+def active_deployment_count(model_id: str, session: Session = Depends(get_session)):
     return response(
         status_code=status.HTTP_200_OK,
-        message="Deployment info retrieved successfully",
-        data=jsonable_encoder(deployment_info),
+        message="Successfully retrieved number of deployments using model.",
+        data={
+            "deployment_count": active_deployments_using_model(
+                model_id=model_id, session=session
+            )
+        },
     )
 
 

@@ -35,11 +35,6 @@ class Status(str, enum.Enum):
     failed = "failed"
 
 
-class WorkflowStatus(str, enum.Enum):
-    inactive = "inactive"
-    active = "active"
-
-
 class Role(enum.Enum):
     user = "user"
     team_admin = "team_admin"
@@ -102,9 +97,7 @@ class User(SQLDeclarativeBase):
         "UserTeam", back_populates="user", cascade="all, delete-orphan"
     )
     models = relationship("Model", back_populates="user", cascade="all, delete-orphan")
-    workflows = relationship(
-        "Workflow", back_populates="user", cascade="all, delete-orphan"
-    )
+
     model_permissions = relationship(
         "ModelPermission", back_populates="user", cascade="all, delete-orphan"
     )
@@ -183,6 +176,8 @@ class Model(SQLDeclarativeBase):
     )
     team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id"), nullable=True)
 
+    definition = Column(JSON, nullable=True)
+
     user = relationship("User", back_populates="models")
     team = relationship("Team", back_populates="models")
 
@@ -195,6 +190,10 @@ class Model(SQLDeclarativeBase):
     )
     model_permissions = relationship(
         "ModelPermission", back_populates="model", cascade="all, delete-orphan"
+    )
+
+    dependencies = relationship(
+        "ModelDependency", back_populates="model", cascade="all, delete-orphan"
     )
 
     # TODO support sharded model names
@@ -299,148 +298,29 @@ class MetaData(SQLDeclarativeBase):
     model = relationship("Model", back_populates="meta_data")
 
 
-class ModelShard(SQLDeclarativeBase):
-    __tablename__ = "model_shards"
-
-    shard_num = Column(Integer, primary_key=True, nullable=False)
-    train_status = Column(ENUM(Status), nullable=False, default=Status.not_started)
+class ModelDependency(SQLDeclarativeBase):
+    __tablename__ = "model_dependencies"
 
     model_id = Column(
         UUID(as_uuid=True),
         ForeignKey("models.id", ondelete="CASCADE"),
         primary_key=True,
     )
-
-    model = relationship("Model", back_populates="model_shards")
-
-
-class WorkflowType(SQLDeclarativeBase):
-    __tablename__ = "workflow_types"
-
-    id = Column(
-        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
-    )
-    name = Column(String(256), nullable=False, unique=True)
-    description = Column(String(512), nullable=True)
-    model_requirements = Column(JSON, nullable=False)
-
-
-class Workflow(SQLDeclarativeBase):
-    __tablename__ = "workflows"
-
-    id = Column(
-        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
-    )
-    name = Column(String(256), nullable=False)
-    type_id = Column(
-        UUID(as_uuid=True), ForeignKey("workflow_types.id"), nullable=False
-    )
-    user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
-    status = Column(
-        ENUM(WorkflowStatus), nullable=False, default=WorkflowStatus.inactive
-    )
-    published_date = Column(
-        DateTime, default=datetime.utcnow().isoformat(), nullable=True
-    )
-
-    user = relationship("User", back_populates="workflows")
-    workflow_models = relationship(
-        "WorkflowModel", back_populates="workflow", cascade="all, delete-orphan"
-    )
-    gen_ai_provider = Column(String(256), nullable=True)
-    workflow_type = relationship("WorkflowType")
-
-    __table_args__ = (
-        UniqueConstraint("name", "user_id", name="unique_workflow_name_user"),
-    )
-
-    def can_access(self, user) -> bool:
-        """
-        Determines if the given user can access this workflow based on the most restrictive model.
-
-        Args:
-            user (User): The user whose access is to be checked.
-
-        Returns:
-            bool: True if the user can access the workflow, False otherwise.
-        """
-        most_restrictive_access = Access.public  # Start with the least restrictive
-        most_restrictive_model = (
-            None  # Track the model that imposes the most restrictive access
-        )
-        required_teams = set()  # To track teams associated with protected models
-
-        for workflow_model in self.workflow_models:
-            model = workflow_model.model
-
-            user_permission = model.get_user_permission(user)
-
-            if user_permission:
-                # If the user has permission, treat as public for this model
-                model_access = Access.public
-            else:
-                # Use the model's access level if no explicit permission
-                model_access = model.access_level
-
-            if (
-                model_access.restrictiveness()
-                > most_restrictive_access.restrictiveness()
-            ):
-                most_restrictive_access = model_access
-                most_restrictive_model = model
-                required_teams.clear()  # Clear teams as we're now dealing with a new, more restrictive level
-
-            if model_access == Access.protected:
-                required_teams.add(model.team_id)
-
-        # Based on the most restrictive access, check if the user can access
-        if most_restrictive_access == Access.public:
-            return True
-        elif most_restrictive_access == Access.protected:
-            # Check if the user is part of all required teams or is a global admin
-            return (
-                all(
-                    any(ut.team_id == team_id for ut in user.teams)
-                    for team_id in required_teams
-                )
-                or user.is_global_admin()
-            )
-        elif most_restrictive_access == Access.private:
-            return most_restrictive_model.user_id == user.id or user.is_global_admin()
-
-        return False
-
-
-# Many to Many relationship for workflow and models.
-class WorkflowModel(SQLDeclarativeBase):
-    __tablename__ = "workflow_models"
-
-    workflow_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("workflows.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    model_id = Column(
+    dependency_id = Column(
         UUID(as_uuid=True),
         ForeignKey("models.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    component = Column(String(256), nullable=False, primary_key=True)
 
-    workflow = relationship("Workflow", back_populates="workflow_models")
-    model = relationship("Model")
+    model = relationship(
+        "Model", back_populates="dependencies", foreign_keys=["model_id"]
+    )
+    dependency = relationship("Model", foreign_keys=["dependency_id"])
 
     __table_args__ = (
-        Index("workflow_model_index", "workflow_id"),
-        Index("model_workflow_index", "model_id"),
-        UniqueConstraint(
-            "workflow_id",
-            "model_id",
-            "component",
-            name="unique_workflow_model_component",
-        ),
+        Index("model_dependency_index", "model_id"),
+        Index("dependency_model_index", "dependency"),
+        UniqueConstraint("model_id", "dependency", name="unique_model_dependency"),
     )
 
 

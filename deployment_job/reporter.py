@@ -176,18 +176,17 @@ class Reporter:
         )
         print(content)
 
-    def active_workflow_count(
+    def active_deployment_count(
         self,
         model_id: str,
     ):
         content = self._request(
             "get",
-            "api/workflow/count",
+            "api/deploy/active-deployment-count",
             params={
                 "model_id": model_id,
-                "status_filter": "active",
             },
         )
         print(content)
 
-        return content["data"]["workflows_count"]
+        return content["data"]["deployment_count"]

@@ -74,10 +74,7 @@ async def async_timer() -> None:
             reset_event.clear()  # Clear the event if the endpoint was hit within the timeout period
         except asyncio.TimeoutError:
             # Timer expired, initiate shutdown
-            active_workflows_count = reporter.active_workflow_count(
-                model_id=config.model_id
-            )
-            if active_workflows_count == 0:
+            if reporter.active_deployment_count(config.model_id) == 0:
                 response, job_id = delete_deployment_job(
                     config.get_nomad_endpoint(),
                     config.model_id,
