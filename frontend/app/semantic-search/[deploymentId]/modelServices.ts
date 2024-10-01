@@ -1,4 +1,3 @@
-import { genaiQuery } from './genai';
 import { Box, Chunk, DocChunks } from './components/pdf_viewer/interfaces';
 import { temporaryCacheToken } from '@/lib/backend';
 import _ from 'lodash';
@@ -582,11 +581,14 @@ export class ModelService {
         console.error('Error getting cache access token:', error);
       }
       const args: any = {
-        query: genaiQuery(question, references, genaiPrompt),
+        query: question,
+        prompt: genaiPrompt,
+        references: references.map((ref) => {
+          return { text: ref.content, source: ref.sourceName, metadata: ref.metadata };
+        }),
         key: apiKey,
         provider: genAiProvider,
         workflow_id: workflowId,
-        original_query: question,
         cache_access_token: cache_access_token,
       };
 
