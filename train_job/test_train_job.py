@@ -83,6 +83,7 @@ def run_ndb_train_job(ndb_options, extra_supervised_files=[]):
                     path=os.path.join(file_dir(), "mutual_nda.pdf"),
                     location="local",
                     metadata={"file_type": "pdf"},
+                    options={"title_as_keywords": True, "keyword_weight": 5}
                 ),
             ],
             supervised_files=[
