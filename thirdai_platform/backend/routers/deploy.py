@@ -496,7 +496,7 @@ def undeploy_model(
             message=str(error),
         )
 
-    if active_deployments_using_model(model_id=model.id) > 0:
+    if active_deployments_using_model(model_id=model.id, session=session) > 0:
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
             message=f"Unable to stop deployment for model {model_identifier} since it is used by other active workflows.",
