@@ -1,9 +1,10 @@
-from urllib.parse import urljoin
-import requests
-from fastapi import status, HTTPException
-from typing import List, Dict
-from collections import defaultdict
 import re
+from collections import defaultdict
+from typing import Dict, List
+from urllib.parse import urljoin
+
+import requests
+from fastapi import HTTPException, status
 
 
 class LabelMap:
