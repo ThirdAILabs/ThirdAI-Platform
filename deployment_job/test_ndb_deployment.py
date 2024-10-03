@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from permissions import Permissions
 from thirdai import neural_db as ndbv1
 from thirdai import neural_db_v2 as ndbv2
+from unittest.mock import patch
 
 MODEL_ID = "xyz"
 LICENSE_KEY = "236C00-47457C-4641C5-52E3BB-3D1F34-V3"
@@ -57,10 +58,6 @@ def mock_verify_permission(permission_type: str = "read"):
 
 def mock_check_permission(token: str, permission_type: str = "read"):
     return True
-
-
-Permissions.verify_permission = mock_verify_permission
-Permissions.check_permission = mock_check_permission
 
 
 def create_config(tmp_dir: str, sub_type: NDBSubType, autoscaling: bool):
@@ -176,6 +173,8 @@ def check_deletion_dev_mode(client: TestClient):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("sub_type", ["v1", "v2"])
+@patch.object(Permissions, "verify_permission", mock_verify_permission)
+@patch.object(Permissions, "check_permission", mock_check_permission)
 def test_deploy_ndb_dev_mode(tmp_dir, sub_type):
     from routers.ndb import NDBRouter
 
@@ -282,6 +281,8 @@ def check_log_lines(logdir, expected_lines):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("sub_type", ["v1", "v2"])
+@patch.object(Permissions, "verify_permission", mock_verify_permission)
+@patch.object(Permissions, "check_permission", mock_check_permission)
 def test_deploy_ndb_prod_mode(tmp_dir, sub_type):
     from routers.ndb import NDBRouter
 
