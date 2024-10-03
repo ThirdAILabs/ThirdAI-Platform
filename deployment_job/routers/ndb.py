@@ -14,6 +14,7 @@ from file_handler import download_local_files
 from models.ndb_models import NDBModel, NDBV1Model, NDBV2Model
 from permissions import Permissions
 from prometheus_client import Counter, Summary
+from guardrail import Guardrail, LabelMap
 from pydantic import ValidationError
 from pydantic_models import inputs
 from pydantic_models.inputs import NDBSearchParams
@@ -47,6 +48,14 @@ class NDBRouter:
         self.reporter = reporter
 
         self.model: NDBModel = NDBRouter.get_model(config)
+
+        if self.config.model_options.guardrail_model_id:
+            self.guardrail = Guardrail(
+                guardrail_model_id=self.config.model_options.guardrail_model_id,
+                model_bazaar_endpoint=self.config.model_bazaar_endpoint,
+            )
+        else:
+            self.guardrail = None
 
         self.feedback_logger = UpdateLogger.get_feedback_logger(self.model.data_dir)
         self.insertion_logger = UpdateLogger.get_insertion_logger(self.model.data_dir)
@@ -132,7 +141,21 @@ class NDBRouter:
         }
         ```
         """
+
         results = self.model.predict(**params.model_dump())
+
+        if self.guardrail:
+            label_map = LabelMap()
+
+            results.query_text = self.guardrail.redact_pii(
+                text=results.query_text, access_token=token, label_map=label_map
+            )
+
+            for ref in results.references:
+                ref.text = self.guardrail.redact_pii(
+                    text=results.query_text, access_token=token, label_map=label_map
+                )
+            results.pii_map = label_map.tag_to_entities
 
         return response(
             status_code=status.HTTP_200_OK,

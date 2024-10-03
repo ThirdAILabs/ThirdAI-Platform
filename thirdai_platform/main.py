@@ -16,7 +16,6 @@ from backend.routers.telemetry import telemetry_router as telemetry
 from backend.routers.train import train_router as train
 from backend.routers.user import user_router as user
 from backend.routers.vault import vault_router as vault
-from backend.routers.workflow import workflow_router as workflow
 from backend.startup_jobs import (
     restart_generate_job,
     restart_llm_cache_job,
@@ -42,7 +41,6 @@ app.include_router(user, prefix="/api/user", tags=["user"])
 app.include_router(train, prefix="/api/train", tags=["train"])
 app.include_router(model, prefix="/api/model", tags=["model"])
 app.include_router(deploy, prefix="/api/deploy", tags=["deploy"])
-app.include_router(workflow, prefix="/api/workflow", tags=["workflow"])
 app.include_router(vault, prefix="/api/vault", tags=["vault"])
 app.include_router(team, prefix="/api/team", tags=["team"])
 app.include_router(recovery, prefix="/api/recovery", tags=["recovery"])

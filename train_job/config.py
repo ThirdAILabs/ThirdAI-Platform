@@ -85,12 +85,19 @@ class NDBv2Options(BaseModel):
     on_disk: bool = True
 
 
+class RagOptions(BaseModel):
+    guardrail_model_id: Optional[str] = None
+    genai_provider: Optional[str] = None
+
+
 class NDBOptions(BaseModel):
     model_type: Literal[ModelType.NDB] = ModelType.NDB
 
     ndb_options: Union[NDBv1Options, NDBv2Options] = Field(
         NDBv2Options(), discriminator="ndb_sub_type"
     )
+
+    rag_options: Optional[RagOptions] = None
 
 
 class NDBData(BaseModel):

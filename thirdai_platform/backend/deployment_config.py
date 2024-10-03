@@ -29,6 +29,8 @@ class NDBDeploymentOptions(BaseModel):
     llm_provider: str = "openai"
     genai_key: Optional[str] = None
 
+    guardrail_model_id: Optional[str] = None
+
 
 class UDTDeploymentOptions(BaseModel):
     model_type: Literal[ModelType.UDT] = ModelType.UDT

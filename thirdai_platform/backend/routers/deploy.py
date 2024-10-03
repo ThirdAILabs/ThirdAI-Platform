@@ -199,6 +199,7 @@ def deploy_single_model(
             ndb_sub_type=model.sub_type,
             llm_provider=(llm_provider or os.getenv("LLM_PROVIDER", "openai")),
             genai_key=(genai_key or os.getenv("GENAI_KEY", "")),
+            guardrail_model_id=json.loads(model.options)["guardrail_model_id"],
         )
     elif model.type == ModelType.UDT:
         model_options = UDTDeploymentOptions(udt_sub_type=model.sub_type)

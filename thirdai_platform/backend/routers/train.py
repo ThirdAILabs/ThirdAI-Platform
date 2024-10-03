@@ -149,6 +149,11 @@ def train_ndb(
         job_options=job_options,
     )
 
+    if model_options.rag_options:
+        options = model_options.rag_options.model_dump_json()
+    else:
+        options = base_model.options if base_model else None
+
     try:
         new_model = schema.Model(
             id=model_id,
@@ -161,6 +166,7 @@ def train_ndb(
             domain=user.domain,
             access_level=schema.Access.private,
             parent_id=base_model.id if base_model else None,
+            options=options,
         )
 
         session.add(new_model)
@@ -298,9 +304,7 @@ def retrain_ndb(
         )
 
     unsupervised_files = list_insertions(deployment_dir)
-    print("INSERTIONS:", unsupervised_files)
     deletions = list_deletions(deployment_dir)
-    print("DELETIONS:", deletions)
 
     feedback_dir = os.path.join(deployment_dir, "feedback")
     supervised_train_dir = os.path.join(
@@ -338,6 +342,7 @@ def retrain_ndb(
             domain=user.domain,
             access_level=schema.Access.private,
             parent_id=base_model.id,
+            options=base_model.options,
         )
 
         session.add(new_model)
@@ -487,6 +492,7 @@ def nlp_datagen(
             domain=user.email.split("@")[1],
             access_level=schema.Access.private,
             parent_id=base_model.id if base_model else None,
+            options=base_model.options if base_model else None,
         )
 
         session.add(new_model)
@@ -733,6 +739,7 @@ def train_udt(
             domain=user.email.split("@")[1],
             access_level=schema.Access.private,
             parent_id=base_model.id if base_model else None,
+            options=base_model.options if base_model else None,
         )
 
         session.add(new_model)

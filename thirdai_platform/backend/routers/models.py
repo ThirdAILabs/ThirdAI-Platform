@@ -134,22 +134,7 @@ def list_models(
         .all()
     )
 
-    model_list = [
-        {
-            "id": str(model.id),
-            "name": model.name,
-            "type": model.type,
-            "train_status": model.train_status,
-            "deploy_status": model.deploy_status,
-            "publish_date": str(model.published_date),
-            "created_by": {
-                "id": str(model.user.id),
-                "username": model.user.username,
-                "email": model.user.email,
-            },
-        }
-        for model in accessible_models
-    ]
+    model_list = [get_high_level_model_info(model) for model in accessible_models]
 
     return response(
         status_code=status.HTTP_200_OK,
@@ -318,6 +303,7 @@ def save_deployed_model(
         parent_id=base_model.id,
         type=base_model.type,
         sub_type=base_model.sub_type,
+        options=base_model.options,
     )
 
     session.add(new_model)
