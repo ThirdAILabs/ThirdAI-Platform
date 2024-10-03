@@ -307,6 +307,14 @@ def save_deployed_model(
     )
 
     session.add(new_model)
+
+    for dependency in base_model.dependencies:
+        session.add(
+            schema.ModelDependency(
+                model_id=body.model_id, dependency_id=dependency.dependency_id
+            )
+        )
+
     session.commit()
     session.refresh(new_model)
 
@@ -482,7 +490,11 @@ def upload_chunk(
     try:
         chunk_data = chunk.file.read()
         storage.upload_chunk(
-            payload["model_id"], chunk_data, chunk_number, model_type, compressed
+            model_id=payload["model_id"],
+            chunk_data=chunk_data,
+            chunk_number=chunk_number,
+            model_type=model_type,
+            compressed=compressed,
         )
     except Exception as error:
         return response(
@@ -500,6 +512,7 @@ def upload_chunk(
 def upload_commit(
     total_chunks: int,
     body: ModelInfo,
+    compressed: bool = True,
     authorization: str = Header(None),
     session: Session = Depends(get_session),
 ):
@@ -577,7 +590,12 @@ def upload_commit(
         )
 
     try:
-        storage.commit_upload(payload["model_id"], total_chunks)
+        storage.commit_upload(
+            model_id=payload["model_id"],
+            total_chunks=total_chunks,
+            model_type=body.type,
+            compressed=compressed,
+        )
     except Exception as error:
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -619,6 +637,7 @@ def upload_commit(
     return response(
         status_code=status.HTTP_200_OK,
         message="Committed model",
+        data={"model_id": str(new_model.id)},
     )
 
 

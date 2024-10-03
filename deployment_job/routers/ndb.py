@@ -63,6 +63,7 @@ class NDBRouter:
 
         self.router = APIRouter()
         self.router.add_api_route("/search", self.search, methods=["POST"])
+        self.router.add_api_route("/unredact", self.unredact, methods=["POST"])
         self.router.add_api_route("/insert", self.insert, methods=["POST"])
         self.router.add_api_route("/delete", self.delete, methods=["POST"])
         self.router.add_api_route("/upvote", self.upvote, methods=["POST"])
@@ -162,6 +163,25 @@ class NDBRouter:
             message="Successful",
             data=jsonable_encoder(results),
         )
+
+    @propagate_error
+    def unredact(
+        self,
+        args: inputs.UnredactArgs,
+        token: str = Depends(Permissions.verify_permission("read")),
+    ):
+        if self.guardrail:
+            unredacted_text = self.guardrail.unredact_pii(args.text, args.pii_map)
+            return response(
+                status_code=status.HTTP_200_OK,
+                message="Successful",
+                data={"unredacted_text": unredacted_text},
+            )
+        else:
+            return response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Cannot unredact text since this model was not configured with guardrails.",
+            )
 
     @propagate_error
     @ndb_insert_metric.time()

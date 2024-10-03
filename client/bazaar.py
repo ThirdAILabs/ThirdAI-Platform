@@ -728,3 +728,48 @@ class ModelBazaar:
         )
 
         print(f"Successfully deleted the model {model_identifier}")
+
+    def upload_model(
+        self,
+        local_path: str,
+        model_name: str,
+        model_type: str,
+        model_subtype: str,
+        chunksize: int = 10**6,
+    ):
+        if os.path.isdir(local_path):
+            shutil.make_archive(local_path, "zip", local_path)
+            local_path = local_path + ".zip"
+            compressed = True
+        else:
+            compressed = False
+
+        res = http_get_with_error(
+            urljoin(self._base_url, "/api/model/upload-token"),
+            headers=auth_header(self._access_token),
+            params={"model_name": model_name, "size": os.stat(local_path).st_size},
+        )
+        upload_token = res.json()["data"]["token"]
+
+        with open(local_path, "rb") as file:
+            chunk_number = 0
+            while chunk := file.read(chunksize):
+                chunk_number += 1
+                http_post_with_error(
+                    urljoin(self._base_url, "/api/model/upload-chunk"),
+                    params={
+                        "chunk_number": chunk_number,
+                        "compressed": compressed,
+                        "model_type": model_type,
+                    },
+                    files={"chunk": chunk},
+                    headers=auth_header(upload_token),
+                )
+
+        res = http_post_with_error(
+            urljoin(self._base_url, "/api/model/upload-commit"),
+            params={"total_chunks": chunk_number, "compressed": compressed},
+            json={"type": model_type, "sub_type": model_subtype},
+            headers=auth_header(upload_token),
+        )
+        return res.json()["data"]

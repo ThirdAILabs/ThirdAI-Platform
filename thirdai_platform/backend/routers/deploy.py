@@ -383,7 +383,7 @@ def deployment_status(
 
     statuses = defaultdict(int)
 
-    for model_id in [dep.id for dep in model.dependencies] + [model.id]:
+    for model_id in [dep.model_id for dep in model.dependencies] + [model.id]:
         try:
             model: schema.Model = session.query(schema.Model).get(model_id)
         except Exception as error:

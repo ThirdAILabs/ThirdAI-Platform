@@ -28,7 +28,7 @@ class LabelMap:
 
 class Guardrail:
     def __init__(self, guardrail_model_id: str, model_bazaar_endpoint: str):
-        self.endpoint = urljoin(model_bazaar_endpoint, guardrail_model_id, "predict")
+        self.endpoint = urljoin(model_bazaar_endpoint, f"{guardrail_model_id}/predict")
 
     def query_pii_model(self, text: str, access_token: str):
         res = requests.post(
@@ -37,12 +37,13 @@ class Guardrail:
                 "User-Agent": "NDB Deployment job",
                 "Authorization": f"Bearer {access_token}",
             },
-            json={"text": text, "top_k": 1, "return_offsets": True},
+            json={"text": text, "top_k": 1},
         )
 
         if res.status_code != status.HTTP_200_OK:
             raise HTTPException(
-                status_code=status.HTTP_500, detail="Unable to access guardrail model."
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Unable to access guardrail model: error {res.status_code}",
             )
 
         return res.json()["data"]
@@ -59,7 +60,7 @@ class Guardrail:
 
         return " ".join(entities)
 
-    def unredact_pii(self, redacted_text: str, entity_map: Dict[str, Dict[int, str]]):
+    def unredact_pii(self, redacted_text: str, entity_map: Dict[str, Dict[str, str]]):
         def replace(match):
             tag = match[1]
             if tag in entity_map:

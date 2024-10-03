@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+from unittest.mock import patch
 
 import pytest
 import thirdai
@@ -9,7 +10,6 @@ from fastapi.testclient import TestClient
 from permissions import Permissions
 from thirdai import neural_db as ndbv1
 from thirdai import neural_db_v2 as ndbv2
-from unittest.mock import patch
 
 MODEL_ID = "xyz"
 LICENSE_KEY = "236C00-47457C-4641C5-52E3BB-3D1F34-V3"

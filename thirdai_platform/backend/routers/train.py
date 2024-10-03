@@ -150,9 +150,11 @@ def train_ndb(
     )
 
     if model_options.rag_options:
-        options = model_options.rag_options.model_dump_json()
+        options = model_options.rag_options.model_dump()
+    elif base_model and base_model.options:
+        options = json.loads(base_model.options)
     else:
-        options = base_model.options if base_model else None
+        options = None
 
     try:
         new_model = schema.Model(
@@ -166,10 +168,18 @@ def train_ndb(
             domain=user.domain,
             access_level=schema.Access.private,
             parent_id=base_model.id if base_model else None,
-            options=options,
+            options=json.dumps(options) if options else None,
         )
 
         session.add(new_model)
+
+        if options and "guardrail_model_id" in options:
+            session.add(
+                schema.ModelDependency(
+                    model_id=model_id, dependency_id=options["guardrail_model_id"]
+                )
+            )
+
         session.commit()
         session.refresh(new_model)
     except Exception as err:
@@ -346,6 +356,15 @@ def retrain_ndb(
         )
 
         session.add(new_model)
+
+        if base_model:
+            for dependency in base_model.dependencies:
+                session.add(
+                    schema.ModelDependency(
+                        model_id=model_id, dependency_id=dependency.dependency_id
+                    )
+                )
+
         session.commit()
         session.refresh(new_model)
     except Exception as err:

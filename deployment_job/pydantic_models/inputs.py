@@ -99,7 +99,12 @@ class SearchResultsNDB(BaseModel):
     query_text: str
     references: List[Reference]
 
-    pii_map: Optional[Dict[str, Dict[int, str]]] = None
+    pii_map: Optional[Dict[str, Dict[str, str]]] = None
+
+
+class UnredactArgs(BaseModel):
+    text: str
+    pii_map: Optional[Dict[str, Dict[str, str]]]
 
 
 class DocumentList(BaseModel):
