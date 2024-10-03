@@ -99,7 +99,7 @@ def test_list_models(create_models_and_users):
 
         data = res.json()["data"]
         assert len(data) == len(expected_models)
-        model_names = set(f"{m['created_by']['username']}/{m['name']}" for m in data)
+        model_names = set(f"{m['username']}/{m['model_name']}" for m in data)
         assert model_names == set(expected_models)
 
 
