@@ -3,7 +3,7 @@ import uuid
 from urllib.parse import urljoin
 
 import pytest
-from thirdai import bolt
+from thirdai import bolt, licensing
 from utils import doc_dir
 
 from client.bazaar import ModelBazaar
@@ -11,6 +11,8 @@ from client.utils import auth_header, http_post_with_error
 
 
 def upload_guardrail_model(admin_client: ModelBazaar):
+    licensing.activate("236C00-47457C-4641C5-52E3BB-3D1F34-V3")
+
     model = bolt.UniversalDeepTransformer(
         data_types={
             "source": bolt.types.text(),
