@@ -31,6 +31,7 @@ from backend.train_config import (
 from backend.utils import (
     get_model,
     get_model_from_identifier,
+    get_model_status,
     get_platform,
     get_python_path,
     get_root_absolute_path,
@@ -40,7 +41,6 @@ from backend.utils import (
     submit_nomad_job,
     update_json,
     validate_license_info,
-    get_model_status,
     validate_name,
 )
 from database import schema

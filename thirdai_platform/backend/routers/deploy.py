@@ -21,23 +21,23 @@ from backend.startup_jobs import start_on_prem_generate_job
 from backend.utils import (
     delete_nomad_job,
     get_model_from_identifier,
+    get_model_status,
     get_platform,
     get_python_path,
     get_root_absolute_path,
+    list_all_dependencies,
     logger,
     model_accessible,
     response,
     submit_nomad_job,
     validate_license_info,
-    list_all_dependencies,
-    get_model_status,
 )
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
 
 pass
-from collections import defaultdict
+pass
 
 from sqlalchemy.orm import Session
 

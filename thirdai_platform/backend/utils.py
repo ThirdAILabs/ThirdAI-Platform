@@ -4,10 +4,10 @@ import math
 import os
 import re
 import socket
+from collections import defaultdict, deque
 from pathlib import Path
-from urllib.parse import urljoin
-from collections import deque, defaultdict
 from typing import List
+from urllib.parse import urljoin
 
 import bcrypt
 import requests
@@ -165,7 +165,8 @@ def get_high_level_model_info(result: schema.Model):
         "sub_type": result.sub_type,
     }
 
-    info.update(result.get_attributes())
+    attributes = result.get_attributes()
+    info.update(attributes)
 
     # Include metadata if it exists
     if result.meta_data:
