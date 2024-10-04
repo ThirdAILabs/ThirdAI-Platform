@@ -24,6 +24,8 @@ export interface SearchResult {
   queryId: string;
   query: string;
   references: ReferenceInfo[];
+
+  pii_map: Map<string, Map<string, string>> | null;
 }
 
 export interface PdfInfo {
@@ -101,12 +103,10 @@ export class ModelService {
   url: string;
   sessionId: string;
   authToken: string | null;
-  tokenModelUrl: string;
 
-  constructor(url: string, tokenModelUrl: string, sessionId: string) {
+  constructor(url: string, sessionId: string) {
     this.url = url;
     this.sessionId = sessionId;
-    this.tokenModelUrl = tokenModelUrl;
     this.authToken = window.localStorage.getItem('accessToken');
   }
 
@@ -155,39 +155,6 @@ export class ModelService {
       })
       .catch((e) => {
         return [];
-      });
-  }
-
-  async piiDetect(query: string): Promise<any> {
-    const url = new URL(this.tokenModelUrl + '/predict');
-
-    return fetch(url, {
-      method: 'POST',
-      headers: {
-        ...this.authHeader(),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ text: query, top_k: 1 }),
-    })
-      .then(this.handleInvalidAuth())
-      .then((response) => {
-        // console.log('response', response)
-        if (response.ok) {
-          return response.json();
-        } else {
-          return response.json().then((err) => {
-            throw new Error(err.detail || 'Unknown error occurred');
-          });
-        }
-      })
-      .then(({ data }) => {
-        // console.log(data);
-        return data as PIIDetectionResult;
-      })
-      .catch((e) => {
-        console.error(e);
-        alert(e);
-        throw new Error('Failed to detect PII');
       });
   }
 
@@ -338,12 +305,38 @@ export class ModelService {
             content: ref.text,
             metadata: ref.metadata,
           })),
+          pii_map: data.pii_map,
         };
         return searchResults;
       })
       .catch((e) => {
         console.log(e);
         return null;
+      });
+  }
+
+  async unredact(text: string, pii_map: Map<string, Map<string, string>>): Promise<string> {
+    const url = new URL(this.url + "/unredact")
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        ...this.authHeader(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: text, pii_map: pii_map })
+    })
+      .then(this.handleInvalidAuth())
+      .then((response) => {
+        if (response.ok) {
+          return response.json();
+        }
+      })
+      .then(({ data }) => {
+        return data["unredacted_text"]
+      })
+      .catch((e) => {
+        console.log(e);
+        return ""
       });
   }
 

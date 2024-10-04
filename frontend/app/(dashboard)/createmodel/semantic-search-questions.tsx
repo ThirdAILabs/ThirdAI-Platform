@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUsername, train_ndb, create_workflow, add_models_to_workflow } from '@/lib/backend';
+import { train_ndb } from '@/lib/backend';
 import { Button, TextField } from '@mui/material';
 import { CardDescription } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
@@ -140,24 +140,6 @@ const SemanticSearchQuestions = ({
       if (onCreateModel) {
         onCreateModel(modelId);
       }
-
-      // Step 2: Create the workflow
-      const workflowName = modelName;
-      const workflowTypeName = 'semantic_search'; // You can change this as needed
-      const workflowResponse = await create_workflow({
-        name: workflowName,
-        typeName: workflowTypeName,
-      });
-      const workflowId = workflowResponse.data.workflow_id;
-
-      // Step 3: Add the model to the workflow
-      const addModelsResponse = await add_models_to_workflow({
-        workflowId,
-        modelIdentifiers: [modelId],
-        components: ['search'], // Adjust components as needed
-      });
-
-      console.log('addModelsResponse', addModelsResponse);
 
       if (!stayOnPage) {
         router.push('/');

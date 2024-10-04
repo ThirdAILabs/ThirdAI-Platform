@@ -98,6 +98,8 @@ interface SearchResult {
   queryId: string;
   query: string;
   references: ReferenceInfo[];
+
+  pii_map: Map<string, Map<string, string>> | null;
 }
 
 const defaultPrompt =
@@ -161,30 +163,16 @@ function App() {
     const fetchWorkflowDetails = async () => {
       try {
         const details = await getWorkflowDetails(receievedWorkflowId as string);
-        console.log('Models:', details.data.models);
 
         // Filter and find the model with component "search"
-        const searchModel = details.data.models.find((model) => model.component === 'search');
-        const serviceUrl = searchModel
-          ? createDeploymentUrl(searchModel.model_id)
-          : createDeploymentUrl('');
-
-        // Filter and find the model with component "nlp"
-        const nlpModel = details.data.models.find((model) => model.component === 'nlp');
-        const tokenModelUrl = nlpModel
-          ? createTokenModelUrl(nlpModel.model_id)
-          : createTokenModelUrl('');
-
-        if (nlpModel) {
-          setIfGuardRailOn(true);
-        }
+        const serviceUrl = createDeploymentUrl(details.data.model_id);
 
         if (!generationOn) {
           // if generation is off, turn off cache
           setCacheEnabled(false);
         }
 
-        const newModelService = new ModelService(serviceUrl, tokenModelUrl, uuidv4());
+        const newModelService = new ModelService(serviceUrl, uuidv4());
         setModelService(newModelService);
         newModelService.sources().then((fetchedSources) => setSources(fetchedSources));
       } catch (error) {
@@ -272,121 +260,11 @@ function App() {
   async function submit(query: string, genaiPrompt: string, bypassCache = false) {
     function replacePlaceholdersWithOriginal(
       text: string,
-      piiMap: Map<string, PiiMapValue>
-    ): string {
-      const placeholderPattern = /\[([A-Z]+) #(\d+)\]/g;
-      return text.replace(placeholderPattern, (match, tag, id) => {
-        // Find the original value in piiMap by ID
-        for (const [originalSentence, value] of piiMap.entries()) {
-          if (value.id.toString() === id && value.tag === tag) {
-            return originalSentence;
-          }
-        }
-        return match; // Return the placeholder if no match is found (should not happen)
-      });
-    }
-
-    async function replacePIIWithPlaceholders(
-      content: string,
-      piiMap: Map<string, PiiMapValue>
+      piiMap: Map<string, Map<string, string>>
     ): Promise<string> {
-      function getSubstringOverlap(str1: string, str2: string): number {
-        const len1 = str1.length;
-        const len2 = str2.length;
-
-        let maxOverlap = 0;
-        for (let i = 0; i < len1; i++) {
-          for (let j = 0; j < len2; j++) {
-            let overlap = 0;
-            while (
-              i + overlap < len1 &&
-              j + overlap < len2 &&
-              str1[i + overlap] === str2[j + overlap]
-            ) {
-              overlap++;
-            }
-            maxOverlap = Math.max(maxOverlap, overlap);
-          }
-        }
-        return maxOverlap;
-      }
-
-      const prediction = await modelService!.piiDetect(content);
-      const { tokens, predicted_tags } = prediction;
-
-      // Step 1: Concatenate tokens into sentences
-      let sentences: string[] = [];
-      let sentenceTags: string[] = [];
-      let currentSentence = '';
-      let currentTag = '';
-
-      for (let i = 0; i < tokens.length; i++) {
-        const word = tokens[i];
-        if (!(predicted_tags && predicted_tags[i])) {
-          continue;
-        }
-        const tag = predicted_tags[i][0];
-        // console.log('tag:', tag)
-
-        if (tag === currentTag) {
-          currentSentence += ` ${word}`;
-        } else {
-          if (currentSentence) {
-            sentences.push(currentSentence.trim());
-            sentenceTags.push(currentTag);
-          }
-          currentSentence = word;
-          currentTag = tag;
-        }
-      }
-
-      // Push the last sentence and tag
-      if (currentSentence) {
-        sentences.push(currentSentence.trim());
-        sentenceTags.push(currentTag);
-      }
-
-      // console.log('sentences:', sentences)
-      // console.log('sentenceTags:', sentenceTags)
-
-      // Step 2: Operate on the level of sentences
-      let currentId = piiMap.size + 1;
-      const processedSentences = sentences.map((sentence, index) => {
-        const tag = sentenceTags[index];
-
-        if (tag !== 'O') {
-          // Filter existing entries in piiMap by the same tag
-          const filteredMapEntries = Array.from(piiMap.entries()).filter(
-            ([_, value]) => value.tag === tag
-          );
-
-          let matchedEntry: [string, PiiMapValue] | undefined;
-
-          // Check for substring overlap
-          for (const [existingToken, value] of filteredMapEntries) {
-            if (getSubstringOverlap(sentence, value.originalToken) > 5) {
-              matchedEntry = [existingToken, value];
-              break;
-            }
-          }
-
-          if (matchedEntry) {
-            return `[${tag} #${matchedEntry[1].id}]`;
-          } else {
-            piiMap.set(sentence, {
-              id: currentId,
-              originalToken: sentence,
-              tag,
-            });
-            currentId++;
-            return `[${tag} #${piiMap.get(sentence)?.id}]`;
-          }
-        } else {
-          return sentence;
-        }
-      });
-
-      return processedSentences.join(' ');
+      return modelService!.unredact(
+        text, piiMap
+      );
     }
 
     if (websocketRef.current) {
@@ -394,112 +272,46 @@ function App() {
     }
     setAnswer('');
     setUpvoteQuery(query);
-    setResults({ queryId: '', query: '', references: [] });
+    setResults({ queryId: '', query: '', references: [], pii_map: null });
     setCheckedIds(new Set<number>());
     setCanSearchMore(true);
     setNumReferences(c.numReferencesFirstLoad);
 
     if (query.trim().length > 0) {
-      if (ifGuardRailOn) {
-        // Case 1: Guardrail is ON
-        const piiMap = new Map<string, PiiMapValue>();
+      // Case 1: Guardrail is ON
+      const results = await getResults(
+        query,
+        c.numReferencesFirstLoad + 1 * c.numReferencesLoadMore
+      );
 
-        const results = await getResults(
-          query,
-          c.numReferencesFirstLoad + 1 * c.numReferencesLoadMore
-        );
+      if (results && ifGenerationOn) {
+        console.log('processedQuery:', results.query);
+        console.log('piiMap:', results.pii_map);
+        console.log('processedReferences:');
+        results.references.forEach((reference) => {
+          console.log(reference.content);
+        });
 
-        if (results && ifGenerationOn) {
-          const processedReferences = await Promise.all(
-            results.references.map(async (reference) => {
-              const processedContent = await replacePIIWithPlaceholders(reference.content, piiMap);
-              return { ...reference, content: processedContent };
-            })
-          );
+        modelService!.generateAnswer(
+          results.query,
+          `${genaiPrompt}. [TAG #id] is sensitive information replaced as a placeholder, use them in your response for consistency.`,
+          results.references,
+          (next) => {
+            setAnswer((prev) => {
+              // Concatenate previous answer and the new part
+              const fullAnswer = prev + next;
 
-          const processedQuery = await replacePIIWithPlaceholders(query, piiMap);
-
-          console.log('processedQuery:', processedQuery);
-          console.log('piiMap:', piiMap);
-          console.log('processedReferences:');
-          processedReferences.forEach((reference) => {
-            console.log(reference.content);
-          });
-
-          modelService!.generateAnswer(
-            processedQuery,
-            `${genaiPrompt}. [TAG #id] is sensitive information replaced as a placeholder, use them in your response for consistency.`,
-            processedReferences,
-            (next) => {
-              setAnswer((prev) => {
-                // Concatenate previous answer and the new part
-                const fullAnswer = prev + next;
-
-                // Replace placeholders in the concatenated string
-                const replacedAnswer = replacePlaceholdersWithOriginal(fullAnswer, piiMap);
-
-                // Return the final processed answer to update the state
-                return replacedAnswer;
-              });
-            },
-            genAiProvider || undefined, // Convert null to undefined
-            workflowId || undefined
-          );
-        }
-      } else {
-        // Case 2: Guardrail is OFF (Normal generation)
-        const results = await getResults(
-          query,
-          c.numReferencesFirstLoad + 1 * c.numReferencesLoadMore
-        );
-
-        if (results && ifGenerationOn) {
-          const modelId = modelService?.getModelID();
-
-          // If we don't want to bypassCache AND cache generation is enabled
-          if (!bypassCache && cacheEnabled) {
-            try {
-              const cachedResult = await fetchCachedGeneration(modelId!, query);
-              console.log('cachedResult', cachedResult);
-
-              if (cachedResult && cachedResult.llm_res) {
-                console.log('cached query is', cachedResult.query);
-                console.log('cached generation is', cachedResult.llm_res);
-
-                const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-                setQueryInfo(null);
-                for (const token of cachedResult.llm_res.split(' ')) {
-                  setAnswer((prev) => prev + ' ' + token);
-                  await sleep(20);
-                }
-
-                // Set the query information including whether they differ
-                setQueryInfo({
-                  cachedQuery: cachedResult.query,
-                  userQuery: query,
-                  isDifferent: cachedResult.query !== query,
-                });
-
-                return; // Stop further execution since the answer was found in cache
+              // Replace placeholders in the concatenated string
+              if (results.pii_map) {
+                // return replacePlaceholdersWithOriginal(fullAnswer, results.pii_map);
               }
-            } catch (error) {
-              console.error('Failed to retrieve cached result:', error);
-              // Continue to generate a new answer if there's an error in fetching from the cache
-            }
-          }
-
-          // No cache hit or cache not used, proceed with generation
-          setQueryInfo(null); // Indicates no cached data was used
-
-          modelService!.generateAnswer(
-            query,
-            genaiPrompt,
-            results.references,
-            (next) => setAnswer((prev) => prev + next),
-            genAiProvider || undefined, // Convert null to undefined
-            workflowId || undefined
-          );
-        }
+              // Return the final processed answer to update the state
+              return fullAnswer;
+            });
+          },
+          genAiProvider || undefined, // Convert null to undefined
+          workflowId || undefined
+        );
       }
     } else {
       setResults(null);
