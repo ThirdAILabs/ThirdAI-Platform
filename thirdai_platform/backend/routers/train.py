@@ -521,7 +521,6 @@ def nlp_datagen(
             domain=user.email.split("@")[1],
             access_level=schema.Access.private,
             parent_id=base_model.id if base_model else None,
-            options=base_model.options if base_model else None,
         )
 
         session.add(new_model)
@@ -768,7 +767,6 @@ def train_udt(
             domain=user.email.split("@")[1],
             access_level=schema.Access.private,
             parent_id=base_model.id if base_model else None,
-            options=base_model.options if base_model else None,
         )
 
         session.add(new_model)

@@ -165,12 +165,7 @@ def get_high_level_model_info(result: schema.Model):
         "sub_type": result.sub_type,
     }
 
-    if result.options:
-        try:
-            options = json.loads(result.options)
-            info.update(options)
-        except json.JSONDecodeError as e:
-            print(f"Error decoding json for options: {e}")
+    info.update(result.get_attributes())
 
     # Include metadata if it exists
     if result.meta_data:
