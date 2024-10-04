@@ -12,9 +12,9 @@ from fastapi.responses import JSONResponse
 from permissions import Permissions
 from prometheus_client import make_asgi_app
 from reporter import Reporter
+from routers.enterprise_search import EnterpriseSearchRouter
 from routers.ndb import NDBRouter
 from routers.udt import UDTRouter
-from routers.enterprise_search import EnterpriseSearchRouter
 from thirdai import licensing
 from utils import delete_deployment_job
 

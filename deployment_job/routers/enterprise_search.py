@@ -1,14 +1,14 @@
+from urllib.parse import urljoin
+
+import requests
 from config import DeploymentConfig
 from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
-from urllib.parse import urljoin
 from guardrail import Guardrail, LabelMap
 from permissions import Permissions
-import requests
 from prometheus_client import Summary
 from pydantic_models import inputs
 from reporter import Reporter
-
 from utils import propagate_error, response
 
 query_metric = Summary("enterprise_search_query", "Enterprise Search Queries")

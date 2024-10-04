@@ -11,7 +11,8 @@ from config import DeploymentConfig, NDBSubType
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from file_handler import download_local_files
-from guardrail import Guardrail, LabelMap
+
+pass
 from models.ndb_models import NDBModel, NDBV1Model, NDBV2Model
 from permissions import Permissions
 from prometheus_client import Counter, Summary

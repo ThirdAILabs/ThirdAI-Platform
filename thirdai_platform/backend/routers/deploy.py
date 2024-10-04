@@ -13,10 +13,10 @@ from auth.jwt import (
 from backend.auth_dependencies import is_model_owner
 from backend.deployment_config import (
     DeploymentConfig,
+    EnterpriseSearchOptions,
     ModelType,
     NDBDeploymentOptions,
     UDTDeploymentOptions,
-    EnterpriseSearchOptions,
 )
 from backend.startup_jobs import start_on_prem_generate_job
 from backend.utils import (
