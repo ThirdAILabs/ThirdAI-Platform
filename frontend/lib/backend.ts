@@ -315,6 +315,8 @@ export interface Workflow {
   username: string;
   genai_provider?: string;
   default_mode?: string;
+  size: string;
+  size_in_memory: string;
 }
 
 export function fetchWorkflows(): Promise<Workflow[]> {
@@ -395,7 +397,7 @@ export function stop_workflow(username: string, model_name: string): Promise<Sto
 
   return new Promise((resolve, reject) => {
     axios
-      .post(`${thirdaiPlatformBaseUrl}/api/model/stop`, null, {
+      .post(`${thirdaiPlatformBaseUrl}/api/deploy/stop`, null, {
         params: { model_identifier: createModelIdentifier(username, model_name) },
       })
       .then((res) => {

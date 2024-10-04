@@ -114,6 +114,8 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       setDeployStatus(DeployStatus.Inactive);
     } else if (workflow.deploy_status === "complete") {
       setDeployStatus(DeployStatus.Active);
+    } else if (workflow.deploy_status === 'stopped') {
+      setDeployStatus(DeployStatus.Inactive);
     }
 
     if (deployStatus == DeployStatus.Inactive && deployRequested) {
@@ -311,6 +313,13 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
                       <td className="border px-4 py-2">{formatBytesToMB(model.size_in_memory)}</td>
                     </tr>
                   ))} */}
+                  {/* {workflow.models.map((model, index) => ( */}
+                    <tr className="hover:bg-gray-100">
+                      <td className="border px-4 py-2">{workflow.model_name}</td>
+                      <td className="border px-4 py-2">{formatBytesToMB(workflow.size)}</td>
+                      <td className="border px-4 py-2">{formatBytesToMB(workflow.size_in_memory)}</td>
+                    </tr>
+                  {/* ))} */}
                 </tbody>
               </table>
             </div>
