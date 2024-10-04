@@ -103,6 +103,18 @@ class CohereLLM(LLMBase):
 
 
 class OnPremLLM(LLMBase):
+    def __init__(self):
+        self.model_prompts = [
+            GPT4Scientific(),
+            CodingAssistant(),
+            DefaultPattern()
+        ]
+    
+    def get_model_prompt(self, model, query, references):
+        for pattern in self.model_prompts:
+            if pattern.matches(model):
+                return pattern.prompt(query, references)
+
     async def stream(
         self, key: str, query: str, prompt: str, references: List[Reference], model: str
     ) -> AsyncGenerator[str, None]:
@@ -113,16 +125,12 @@ class OnPremLLM(LLMBase):
 
         url = urljoin(backend_endpoint, "/on-prem-llm/completion")
 
+        system_prompt, input_prompt = self.get_model_prompt(model)
+
         headers = {"Content-Type": "application/json"}
         data = {
-            "system_prompt": "You are a helpful assistant. Please be concise in your answers.",
-            "prompt": combine_query_and_context(
-                query=query,
-                prompt=prompt,
-                references=references,
-                reverse_ref_order=True,
-            )
-            + "<|assistant|>",
+            "system_prompt": system_prompt,
+            "prompt": input_prompt,
             "stream": True,
             # Occasionally the model will repeat itself infinitely, this cuts off
             # the model at 1000 output tokens so that doesn't occur. Alternatively
@@ -161,3 +169,37 @@ default_keys = {
     "cohere": os.getenv("COHERE_KEY", ""),
     "on-prem": "no key",  # TODO(david) add authentication to the service
 }
+
+
+
+from typing import List, Tuple
+from abc import ABC, abstractmethod
+
+
+class PromptPattern(ABC):
+    @abstractmethod
+    def matches(self, model: str) -> bool:
+        pass
+
+    @abstractmethod
+    def prompt(self, query: str, references: List[Reference]) -> Tuple[str, str]:
+        pass
+
+
+class DefaultPattern(PromptPattern):
+    def matches(self, model: str) -> bool:
+        return True
+
+    def prompt(self, query: str, references: List[Reference]) -> Tuple[str, str]:
+        system_prompt = "Answer the user's questions based on the below context:"
+        input_prompt = combine_query_and_context(query=query, prompt="", references=references, reverse_ref_order=True)
+        return system_prompt, input_prompt
+
+class GPT4ScientificPattern(PromptPattern):
+    def matches(self, model: str) -> bool:
+        return model.startswith("gpt-4")
+
+    def prompt(self, query: str, references: List[Reference]) -> Tuple[str, str]:
+        system_prompt = "You are an advanced AI assistant specializing in scientific explanations. Provide detailed and accurate responses."
+        input_prompt = f"Scientific query: {query}\n\nContext:\n" + "\n".join(ref.content for ref in references)
+        return system_prompt, input_prompt
