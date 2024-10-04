@@ -143,6 +143,28 @@ def list_models(
     )
 
 
+@model_router.get("/details")
+def list_models(
+    model_id: str,
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
+    user: schema.User = authenticated_user.user
+    model: schema.Model = session.query(schema.Model).get(model_id)
+
+    if model.get_user_permission(user):
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successfully retrieved model details.",
+            data=jsonable_encoder(get_high_level_model_info(model)),
+        )
+
+    return response(
+        status_code=status.HTTP_403_FORBIDDEN,
+        message="User does not have access to requested model.",
+    )
+
+
 @model_router.get("/search")
 def search_models(
     name: str,
@@ -303,7 +325,6 @@ def save_deployed_model(
         parent_id=base_model.id,
         type=base_model.type,
         sub_type=base_model.sub_type,
-        options=base_model.options,
     )
 
     session.add(new_model)
@@ -312,6 +333,13 @@ def save_deployed_model(
         session.add(
             schema.ModelDependency(
                 model_id=body.model_id, dependency_id=dependency.dependency_id
+            )
+        )
+
+    for attribute in base_model.attributes:
+        session.add(
+            schema.ModelAttribute(
+                model_id=body.model_id, key=attribute.key, value=attribute.value
             )
         )
 

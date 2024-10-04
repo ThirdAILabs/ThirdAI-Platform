@@ -6,6 +6,8 @@ import re
 import socket
 from pathlib import Path
 from urllib.parse import urljoin
+from collections import deque, defaultdict
+from typing import List
 
 import bcrypt
 import requests
@@ -87,6 +89,57 @@ def hash_password(password: str):
     return bcrypt.hashpw(byte_password, salt).decode()
 
 
+def list_all_dependencies(model: schema.Model) -> List[schema.Model]:
+    queue = deque()
+    queue.append(model)
+    visited = set()
+
+    all_models = []
+
+    while len(queue) > 0:
+        m: schema.Model = queue.popleft()
+        if m.id in visited:
+            continue
+
+        visited.add(m.id)
+
+        all_models.append(m)
+
+        queue.extend(dep.dependency for dep in m.dependencies)
+
+    return all_models
+
+
+def get_model_status(model: schema.Model, train_status: bool) -> schema.Status:
+    # If the model train/deployment hasn't yet been started, was stopped, or has
+    # already failed, then the status of its dependencies is irrelevant.
+    status = model.train_status if train_status else model.deploy_status
+    if status in [
+        schema.Status.not_started,
+        schema.Status.stopped,
+        schema.Status.failed,
+    ]:
+        return status
+
+    statuses = defaultdict(int)
+    for m in list_all_dependencies(model):
+        status = m.train_status if train_status else m.deploy_status
+        statuses[status] += 1
+
+    status_priority_order = [
+        schema.Status.failed,
+        schema.Status.not_started,
+        schema.Status.stopped,
+        schema.Status.starting,
+        schema.Status.in_progress,
+        schema.Status.complete,
+    ]
+
+    for status_type in status_priority_order:
+        if statuses[status_type] > 0:
+            return status_type
+
+
 def get_high_level_model_info(result: schema.Model):
     """
     Get high-level information about a model.
@@ -105,8 +158,8 @@ def get_high_level_model_info(result: schema.Model):
         "access_level": result.access_level,
         "domain": result.domain,
         "type": result.type,
-        "train_status": result.train_status,
-        "deploy_status": result.deploy_status,
+        "train_status": get_model_status(result, train_status=True),
+        "deploy_status": get_model_status(result, train_status=False),
         "team_id": str(result.team_id),
         "model_id": str(result.id),
         "sub_type": result.sub_type,

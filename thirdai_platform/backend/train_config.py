@@ -84,6 +84,7 @@ class NDBv2Options(BaseModel):
 class RagOptions(BaseModel):
     guardrail_model_id: Optional[str] = None
     genai_provider: Optional[str] = None
+    default_mode: Optional[str] = None
 
 
 class NDBOptions(BaseModel):

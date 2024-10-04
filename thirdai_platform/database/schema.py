@@ -176,8 +176,6 @@ class Model(SQLDeclarativeBase):
     )
     team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id"), nullable=True)
 
-    options = Column(JSON, nullable=True)
-
     user = relationship("User", back_populates="models")
     team = relationship("Team", back_populates="models")
 
@@ -187,6 +185,10 @@ class Model(SQLDeclarativeBase):
 
     model_permissions = relationship(
         "ModelPermission", back_populates="model", cascade="all, delete-orphan"
+    )
+
+    attributes = relationship(
+        "ModelAttribute", back_populates="model", cascade="all, delete-orphan"
     )
 
     dependencies = relationship(
@@ -264,11 +266,31 @@ class Model(SQLDeclarativeBase):
 
         return False
 
+    def get_attributes(self):
+        return {attribute.key: attribute.value for attribute in self.attributes}
+
     __table_args__ = (
         Index("train_status_index", "train_status"),
         Index("model_identifier_index", "user_id", "name"),
         UniqueConstraint("user_id", "name"),
     )
+
+
+class ModelAttribute(SQLDeclarativeBase):
+    __tablename__ = "model_attributes"
+
+    model_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("models.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    key = Column(String, primary_key=True)
+    value = Column(String, nullable=True)
+
+    model = relationship("Model", back_populates="attributes")
+
+    __table_args__ = (Index("model_attribute", "model_id"),)
 
 
 class ModelPermission(SQLDeclarativeBase):

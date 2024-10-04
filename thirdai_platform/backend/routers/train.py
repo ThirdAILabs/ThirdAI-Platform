@@ -40,6 +40,7 @@ from backend.utils import (
     submit_nomad_job,
     update_json,
     validate_license_info,
+    get_model_status,
     validate_name,
 )
 from database import schema
@@ -150,11 +151,9 @@ def train_ndb(
     )
 
     if model_options.rag_options:
-        options = model_options.rag_options.model_dump()
-    elif base_model and base_model.options:
-        options = json.loads(base_model.options)
+        attributes = model_options.rag_options.model_dump()
     else:
-        options = None
+        attributes = {}
 
     try:
         new_model = schema.Model(
@@ -168,17 +167,24 @@ def train_ndb(
             domain=user.domain,
             access_level=schema.Access.private,
             parent_id=base_model.id if base_model else None,
-            options=json.dumps(options) if options else None,
         )
 
         session.add(new_model)
 
-        if options and "guardrail_model_id" in options:
+        if base_model:
+            for attribute in base_model.attributes:
+                if attribute.key not in attributes or attributes[attribute.key] is None:
+                    attributes[attribute.key] = attribute.value
+
+        if "guardrail_model_id" in attributes:
             session.add(
                 schema.ModelDependency(
-                    model_id=model_id, dependency_id=options["guardrail_model_id"]
+                    model_id=model_id, dependency_id=attributes["guardrail_model_id"]
                 )
             )
+
+        for key, value in attributes.items():
+            session.add(schema.ModelAttribute(model_id=model_id, key=key, value=value))
 
         session.commit()
         session.refresh(new_model)
@@ -352,18 +358,22 @@ def retrain_ndb(
             domain=user.domain,
             access_level=schema.Access.private,
             parent_id=base_model.id,
-            options=base_model.options,
         )
 
         session.add(new_model)
 
-        if base_model:
-            for dependency in base_model.dependencies:
-                session.add(
-                    schema.ModelDependency(
-                        model_id=model_id, dependency_id=dependency.dependency_id
-                    )
+        for dependency in base_model.dependencies:
+            session.add(
+                schema.ModelDependency(
+                    model_id=model_id, dependency_id=dependency.dependency_id
                 )
+            )
+        for attribute in base_model.attributes:
+            session.add(
+                schema.ModelAttribute(
+                    model_id=model_id, key=attribute.key, value=attribute.value
+                )
+            )
 
         session.commit()
         session.refresh(new_model)
@@ -947,6 +957,6 @@ def train_status(
         message="Successfully got the train status.",
         data={
             "model_identifier": model_identifier,
-            "train_status": model.train_status,
+            "train_status": get_model_status(model, train_status=True),
         },
     )

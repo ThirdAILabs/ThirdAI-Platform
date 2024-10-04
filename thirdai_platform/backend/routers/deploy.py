@@ -29,6 +29,8 @@ from backend.utils import (
     response,
     submit_nomad_job,
     validate_license_info,
+    list_all_dependencies,
+    get_model_status,
 )
 from database import schema
 from database.session import get_session
@@ -201,11 +203,7 @@ def deploy_single_model(
             ndb_sub_type=model.sub_type,
             llm_provider=(llm_provider or os.getenv("LLM_PROVIDER", "openai")),
             genai_key=(genai_key or os.getenv("GENAI_KEY", "")),
-            guardrail_model_id=(
-                json.loads(model.options)["guardrail_model_id"]
-                if model.options
-                else None
-            ),
+            guardrail_model_id=model.get_attributes().get("guardrail_model_id", None),
         )
     elif model.type == ModelType.UDT:
         model_options = UDTDeploymentOptions(udt_sub_type=model.sub_type)
@@ -305,10 +303,10 @@ def deploy_model(
             message=str(error),
         )
 
-    for dependency in model.dependencies:
+    for dependency in list_all_dependencies(model=model):
         try:
             deploy_single_model(
-                model_id=dependency.dependency_id,
+                model_id=dependency.id,
                 memory=memory,
                 autoscaling_enabled=autoscaling_enabled,
                 autoscaler_max_count=autoscaler_max_count,
@@ -372,47 +370,13 @@ def deployment_status(
             message=str(error),
         )
 
-    # If the model hasn't yet been started, then the status of it's dependent models
-    # doesn't need to be checked. If the model
-    if model.deploy_status in [schema.Status.not_started, schema.Status.stopped]:
-        return response(
-            status_code=status.HTTP_200_OK,
-            message="Successfully got the deployment status",
-            data={"deploy_status": model.deploy_status, "model_id": str(model.id)},
-        )
-
-    statuses = defaultdict(int)
-
-    for model_id in [dep.model_id for dep in model.dependencies] + [model.id]:
-        try:
-            model: schema.Model = session.query(schema.Model).get(model_id)
-        except Exception as error:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(error),
-            )
-        statuses[model.deploy_status] += 1
-
-    status_priority = [
-        schema.Status.failed,
-        schema.Status.not_started,
-        schema.Status.stopped,
-        schema.Status.starting,
-        schema.Status.in_progress,
-        schema.Status.complete,
-    ]
-
-    for deploy_status in status_priority:
-        if statuses[deploy_status] > 0:
-            return response(
-                status_code=status.HTTP_200_OK,
-                message="Successfully got the deployment status",
-                data={"deploy_status": deploy_status, "model_id": str(model.id)},
-            )
-
     return response(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        message="Unable to locate models to get status",
+        status_code=status.HTTP_200_OK,
+        message="Successfully got the deployment status",
+        data={
+            "deploy_status": get_model_status(model, train_status=False),
+            "model_id": str(model.id),
+        },
     )
 
 
