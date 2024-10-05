@@ -304,6 +304,54 @@ export function retrain_ndb({
   });
 }
 
+export interface EnterpriseSearchOptions {
+  retrieval_id: string;
+  guardrail_id?: string;
+  nlp_classifier_id?: string;
+  llm_provider: string;
+}
+
+interface CreateWorkflowParams {
+  workflow_name: string;
+  options: EnterpriseSearchOptions;
+}
+
+export function create_enterprise_search_workflow({
+  workflow_name,
+  options,
+}: CreateWorkflowParams): Promise<any> {
+  const accessToken = getAccessToken();
+
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  // Prepare URLSearchParams to pass workflow_name as a query parameter
+  const params = new URLSearchParams({
+    workflow_name,
+  });
+
+  return new Promise((resolve, reject) => {
+    axios
+      .post(
+        `${thirdaiPlatformBaseUrl}/api/workflow/enterprise-search?${params.toString()}`,
+        options // Pass the options object as the request body
+      )
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        if (err.response && err.response.data) {
+          reject(
+            new Error(err.response.data.message || 'Failed to create workflow')
+          );
+        } else {
+          reject(new Error('Failed to create workflow'));
+        }
+      });
+  });
+}
+
+
+
 export interface Workflow {
   model_id: string;
   model_name: string;

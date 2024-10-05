@@ -138,6 +138,8 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       }
     } else if (workflow.type === 'udt') {
       setDeployType('Natural Language Processing');
+    } else if (workflow.type === 'enterprise-search') {
+      setDeployType("Enterprise Search & Summarizer")
     }
   }, [workflow.type]);
 
