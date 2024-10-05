@@ -1,6 +1,6 @@
 'use client';
 
-import { Container, TextField, Box } from '@mui/material';
+import { Container, Box, CircularProgress, Typography } from '@mui/material';
 import { Button } from '@/components/ui/button';
 import { MouseEventHandler, ReactNode, useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
@@ -14,6 +14,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import Fuse from 'fuse.js';
+import mammoth from 'mammoth'; // DOCX Parsing
+
+// @ts-ignore
+import * as pdfjsLib from 'pdfjs-dist/build/pdf'; // Importing PDF.js as you do in your PdfViewer
+// @ts-ignore
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry'; // Importing worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface Token {
   text: string;
@@ -182,8 +189,8 @@ export default function Interact() {
 
   const [inputText, setInputText] = useState<string>('');
   const [annotations, setAnnotations] = useState<Token[]>([]);
-
   const [tagColors, setTagColors] = useState<Record<string, HighlightColor>>({});
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const [mouseDownIndex, setMouseDownIndex] = useState<number | null>(null);
   const [mouseUpIndex, setMouseUpIndex] = useState<number | null>(null);
@@ -213,6 +220,53 @@ export default function Interact() {
     setInputText(event.target.value);
   };
 
+  const handleFileChange = async (event: any) => {
+    const file = event.target.files[0];
+    if (file) {
+      const fileExtension = file.name.split('.').pop().toLowerCase();
+      setIsLoading(true); // Set loading to true when file is being processed
+
+      let text = '';
+      if (fileExtension === 'txt') {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          text = e.target?.result as string;
+          setInputText(text);
+          handleRun(text);
+        };
+        reader.readAsText(file);
+      } else if (fileExtension === 'pdf') {
+        text = await parsePDF(file);
+        setInputText(text);
+        handleRun(text);
+      } else if (fileExtension === 'docx') {
+        text = await parseDOCX(file);
+        setInputText(text);
+        handleRun(text);
+      }
+    }
+  };
+
+  const parsePDF = async (file: File) => {
+    const loadingTask = pdfjsLib.getDocument(URL.createObjectURL(file));
+    const pdf = await loadingTask.promise;
+    let fullText = '';
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item: any) => item.str).join(' ');
+      fullText += pageText + '\n';
+    }
+    return fullText;
+  };
+
+  const parseDOCX = async (file: File) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
+  };
+
   const updateTagColors = (tags: string[][]) => {
     const pastels = ['#E5A49C', '#F6C886', '#FBE7AA', '#99E3B5', '#A6E6E7', '#A5A1E1', '#D8A4E2'];
     const darkers = ['#D34F3E', '#F09336', '#F7CF5F', '#5CC96E', '#65CFD0', '#597CE2', '#B64DC8'];
@@ -233,8 +287,9 @@ export default function Interact() {
     });
   };
 
-  const handleRun = () => {
-    predict(inputText).then((result) => {
+  const handleRun = (text: string) => {
+    setIsLoading(true); // Set loading to true when starting the prediction
+    predict(text).then((result) => {
       updateTagColors(result.predicted_tags);
       setAnnotations(
         _.zip(result.tokens, result.predicted_tags).map(([text, tag]) => ({
@@ -242,6 +297,7 @@ export default function Interact() {
           tag: tag![0] as string,
         }))
       );
+      setIsLoading(false); // Set loading to false after prediction is done
     });
   };
 
@@ -271,86 +327,103 @@ export default function Interact() {
       }}
     >
       <Box display="flex" justifyContent="center" alignItems="center" width="100%">
+        <label htmlFor="file-upload" style={{ marginRight: '10px' }}>
+          <Button size="sm" asChild>
+            <span>Upload File</span>
+          </Button>
+        </label>
+        <input
+          id="file-upload"
+          type="file"
+          accept=".txt,.pdf,.docx"
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+        />
         <Input
           autoFocus
           className="text-md"
-          style={{ height: '3rem' }}
+          style={{ height: '3rem', flex: 1 }}
           value={inputText}
           onChange={handleInputChange}
           placeholder="Enter your text..."
-          onSubmit={handleRun}
+          onSubmit={() => handleRun(inputText)}
           onKeyDown={(e) => {
             if (e.keyCode === 13 && e.shiftKey === false) {
               e.preventDefault();
-              handleRun();
+              handleRun(inputText);
             }
           }}
         />
-        <Button
-          size="sm"
-          style={{ height: '3rem', marginLeft: '10px', padding: '0 20px' }}
-          onClick={handleRun}
-        >
-          Run
-        </Button>
       </Box>
-      {annotations.length > 0 && (
-        <Box mt={4}>
-          <Card
-            className="p-7 text-start"
-            style={{ lineHeight: 2 }}
-            onMouseUp={(e) => {
-              setSelecting(false);
-              if (startIndex !== null && endIndex !== null) {
-                setSelectedRange([startIndex, endIndex]);
-                triggers.current[endIndex]?.click();
-              }
-            }}
-          >
-            {annotations.map((token, index) => {
-              const nextToken = index === annotations.length - 1 ? null : annotations[index + 1];
-              return (
-                <>
-                  <Highlight
-                    key={index}
-                    currentToken={token}
-                    nextToken={nextToken}
-                    tagColors={tagColors}
-                    onMouseOver={(e) => {
-                      if (selecting) {
-                        setMouseUpIndex(index);
-                      }
-                    }}
-                    onMouseDown={(e) => {
-                      e.stopPropagation();
-                      setSelecting(true);
-                      setMouseDownIndex(index);
-                      setMouseUpIndex(index);
-                      setSelectedRange(null);
-                    }}
-                    selecting={
-                      selecting &&
-                      startIndex !== null &&
-                      endIndex !== null &&
-                      index >= startIndex &&
-                      index <= endIndex
-                    }
-                    selected={
-                      selectedRange !== null &&
-                      index >= selectedRange[0] &&
-                      index <= selectedRange[1]
-                    }
-                  />
-                  <TagSelector
-                    open={!!selectedRange && index === selectedRange[1]}
-                    choices={Object.keys(tagColors)}
-                    onSelect={finetuneTags}
-                  />
-                </>
-              );
-            })}
-          </Card>
+
+
+      <Typography variant="caption" display="block" mt={1}>
+        Supported file types: .txt, .pdf, .docx
+      </Typography>
+
+      {isLoading ? (
+        <Box mt={4} display="flex" justifyContent="center">
+          <CircularProgress />
         </Box>
+      ) : (
+        annotations.length > 0 && (
+          <Box mt={4}>
+            <Card
+              className="p-7 text-start"
+              style={{ lineHeight: 2 }}
+              onMouseUp={(e) => {
+                setSelecting(false);
+                if (startIndex !== null && endIndex !== null) {
+                  setSelectedRange([startIndex, endIndex]);
+                  triggers.current[endIndex]?.click();
+                }
+              }}
+            >
+              {annotations.map((token, index) => {
+                const nextToken = index === annotations.length - 1 ? null : annotations[index + 1];
+                return (
+                  <>
+                    <Highlight
+                      key={index}
+                      currentToken={token}
+                      nextToken={nextToken}
+                      tagColors={tagColors}
+                      onMouseOver={(e) => {
+                        if (selecting) {
+                          setMouseUpIndex(index);
+                        }
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setSelecting(true);
+                        setMouseDownIndex(index);
+                        setMouseUpIndex(index);
+                        setSelectedRange(null);
+                      }}
+                      selecting={
+                        selecting &&
+                        startIndex !== null &&
+                        endIndex !== null &&
+                        index >= startIndex &&
+                        index <= endIndex
+                      }
+                      selected={
+                        selectedRange !== null &&
+                        index >= selectedRange[0] &&
+                        index <= selectedRange[1]
+                      }
+                    />
+                    <TagSelector
+                      open={!!selectedRange && index === selectedRange[1]}
+                      choices={Object.keys(tagColors)}
+                      onSelect={finetuneTags}
+                    />
+                  </>
+                );
+              })}
+            </Card>
+          </Box>
+        )
       )}
     </Container>
   );
