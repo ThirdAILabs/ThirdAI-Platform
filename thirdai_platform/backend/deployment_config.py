@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 class ModelType(str, Enum):
     NDB = "ndb"
     UDT = "udt"
-    RAG = "rag"
+    ENTERPRISE_SEARCH = "enterprise-search"
 
 
 class NDBSubType(str, Enum):
@@ -29,13 +29,18 @@ class NDBDeploymentOptions(BaseModel):
     llm_provider: str = "openai"
     genai_key: Optional[str] = None
 
-    guardrail_model_id: Optional[str] = None
-
 
 class UDTDeploymentOptions(BaseModel):
     model_type: Literal[ModelType.UDT] = ModelType.UDT
 
     udt_sub_type: UDTSubType
+
+
+class EnterpriseSearchOptions(BaseModel):
+    model_type: Literal[ModelType.ENTERPRISE_SEARCH] = ModelType.ENTERPRISE_SEARCH
+
+    retrieval_id: str
+    guardrail_id: Optional[str] = None
 
 
 class DeploymentConfig(BaseModel):
@@ -46,9 +51,9 @@ class DeploymentConfig(BaseModel):
 
     autoscaling_enabled: bool = False
 
-    model_options: Union[NDBDeploymentOptions, UDTDeploymentOptions] = Field(
-        ..., discriminator="model_type"
-    )
+    model_options: Union[
+        NDBDeploymentOptions, UDTDeploymentOptions, EnterpriseSearchOptions
+    ] = Field(..., discriminator="model_type")
 
     def get_nomad_endpoint(self) -> str:
         # Parse the model_bazaar_endpoint to extract scheme and host

@@ -16,7 +16,7 @@ def convert_to_ndb_file(
     filename, ext = os.path.splitext(file)
 
     if ext == ".pdf":
-        return ndb.PDF(file, metadata=metadata, save_extra_info=False)
+        return ndb.PDF(file, metadata=metadata, save_extra_info=False, version="v1")
     elif ext == ".docx":
         return ndb.DOCX(file, metadata=metadata)
     elif ext == ".html":

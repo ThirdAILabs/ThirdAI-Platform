@@ -13,6 +13,7 @@ from auth.jwt import (
 from backend.auth_dependencies import is_model_owner
 from backend.deployment_config import (
     DeploymentConfig,
+    EnterpriseSearchOptions,
     ModelType,
     NDBDeploymentOptions,
     UDTDeploymentOptions,
@@ -203,10 +204,15 @@ def deploy_single_model(
             ndb_sub_type=model.sub_type,
             llm_provider=(llm_provider or os.getenv("LLM_PROVIDER", "openai")),
             genai_key=(genai_key or os.getenv("GENAI_KEY", "")),
-            guardrail_model_id=model.get_attributes().get("guardrail_model_id", None),
         )
     elif model.type == ModelType.UDT:
         model_options = UDTDeploymentOptions(udt_sub_type=model.sub_type)
+    elif model.type == ModelType.ENTERPRISE_SEARCH:
+        attributes = model.get_attributes()
+        model_options = EnterpriseSearchOptions(
+            retrieval_id=attributes["retrieval_id"],
+            guardrail_id=attributes.get("guardrail_id", None),
+        )
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

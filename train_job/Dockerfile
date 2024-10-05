@@ -9,6 +9,7 @@ COPY requirements.txt /app/
 
 # Install dependencies from requirements.txt
 RUN python3 -m pip install --no-cache-dir -r requirements.txt
+RUN python3 -m pip install pdftitle
 
 # Copy the current directory contents into the container at /app
 COPY . /app

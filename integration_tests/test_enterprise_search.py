@@ -40,7 +40,7 @@ def upload_guardrail_model(admin_client: ModelBazaar):
 
 
 @pytest.mark.unit
-def test_rag_with_guardrails():
+def test_enterprise_search_with_guardrails():
     base_url = "http://127.0.0.1:80/api/"
 
     admin_client = ModelBazaar(base_url)
@@ -59,11 +59,19 @@ def test_rag_with_guardrails():
         supervised_docs=[],
     )
 
-    client = admin_client.deploy(model.model_identifier, memory=1500)
+    workflow_name = f"search_{uuid.uuid4()}"
+
+    res = http_post_with_error(
+        urljoin(admin_client._base_url, "workflow/enterprise-search"),
+        headers=auth_header(admin_client._access_token),
+        params={"workflow_name": workflow_name},
+        json={"retrieval_id": model.model_id, "guardrail_id": guardrail_id},
+    )
+
+    client = admin_client.deploy(f"admin/{workflow_name}", memory=1500)
 
     query = "American Express Profit Rises 14. my phone number is 123-457-2490"
     results = client.search(query)
-
     assert results["query_text"] == query.replace("123-457-2490", "[PHONENUMBER #0]")
 
     res = http_post_with_error(
@@ -71,15 +79,18 @@ def test_rag_with_guardrails():
         json={"text": results["query_text"], "pii_map": results["pii_map"]},
         headers=auth_header(client.login_instance.access_token),
     )
-    assert res.status_code == 200
-
     assert res.json()["data"]["unredacted_text"] == query
 
     admin_client.undeploy(client)
 
-    url = urljoin(admin_client._base_url, f"deploy/stop")
     http_post_with_error(
-        url,
+        urljoin(admin_client._base_url, f"deploy/stop"),
+        params={"model_identifier": model.model_identifier},
+        headers=auth_header(admin_client._access_token),
+    )
+
+    http_post_with_error(
+        urljoin(admin_client._base_url, f"deploy/stop"),
         params={"model_identifier": f"admin/{guardrail_name}"},
         headers=auth_header(admin_client._access_token),
     )

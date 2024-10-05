@@ -128,6 +128,7 @@ function App() {
   const [selectedPdfChunk, setSelectedPdfChunk] = useState<Chunk | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
   const [chatMode, setChatMode] = useState(false);
+  const [chatEnabled, setChatEnabled] = useState(false);
   const [checkedIds, setCheckedIds] = useState(new Set<number>());
   const onCheck = (id: number) =>
     setCheckedIds((prev) => {
@@ -147,6 +148,12 @@ function App() {
   const [genAiProvider, setGenAiProvider] = useState<string | null>(null);
   const [workflowId, setWorkflowId] = useState<string | null>(null);
 
+  const [sentimentClassifierExists, setSentimentClassifierExists] = useState(false);
+  const [tokenClassifierExists, setTokenClassifierExists] = useState(false);
+  const [sentimentClassifierWorkflowId, setSentimentClassifierWorkflowId] = useState<string | null>(
+    null
+  );
+
   useEffect(() => {
     const receievedWorkflowId = searchParams.get('workflowId');
     const generationOn = searchParams.get('ifGenerationOn') === 'true';
@@ -165,14 +172,49 @@ function App() {
         const details = await getWorkflowDetails(receievedWorkflowId as string);
 
         // Filter and find the model with component "search"
-        const serviceUrl = createDeploymentUrl(details.data.model_id);
+        const searchModel = details.data.models.find((model) => model.component === 'search');
+        const serviceUrl = searchModel
+          ? createDeploymentUrl(searchModel.model_id)
+          : createDeploymentUrl('');
+
+        // Filter and find the model with component "nlp"
+        const nlpModel = details.data.models.find((model) => model.component === 'nlp');
+        const tokenModelUrl = nlpModel
+          ? createTokenModelUrl(nlpModel.model_id)
+          : createTokenModelUrl('');
+
+        // Filter and find the model with component "nlp-classifier"
+        const sentimentClassifier = details.data.models.find(
+          (model) => model.component === 'nlp-classifier'
+        );
+
+        if (nlpModel) {
+          setIfGuardRailOn(true);
+        }
+
+        // Set whether token classifier exists
+        setTokenClassifierExists(!!nlpModel);
 
         if (!generationOn) {
           // if generation is off, turn off cache
           setCacheEnabled(false);
         }
 
-        const newModelService = new ModelService(serviceUrl, uuidv4());
+        // Set whether sentiment classifier exists
+        setSentimentClassifierExists(!!sentimentClassifier);
+
+        // Set the sentiment classifier workflow ID if the model exists
+        if (sentimentClassifier) {
+          setSentimentClassifierWorkflowId(sentimentClassifier.model_id);
+        }
+
+        // Only enable the chat option if the workflow is of type RAG
+        const chatWorkflows = ['rag'];
+        if (chatWorkflows.includes(details.data.type)) {
+          setChatEnabled(true);
+        }
+
+        const newModelService = new ModelService(serviceUrl, tokenModelUrl, uuidv4());
         setModelService(newModelService);
         newModelService.sources().then((fetchedSources) => setSources(fetchedSources));
       } catch (error) {
@@ -435,12 +477,22 @@ function App() {
               <Logo src={LogoImg.src} alt="Logo" />
             </a>
             <TopRightCorner>
-              <ChatToggle active={chatMode} onClick={() => setChatMode((chatMode) => !chatMode)} />
+              {chatEnabled && (
+                <ChatToggle
+                  active={chatMode}
+                  onClick={() => setChatMode((chatMode) => !chatMode)}
+                />
+              )}
               <Spacer $width="40px" />
               <Teach />
             </TopRightCorner>
             {chatMode ? (
-              <Chat provider={genAiProvider || 'openai'} />
+              <Chat
+                tokenClassifierExists={tokenClassifierExists}
+                sentimentClassifierExists={sentimentClassifierExists}
+                sentimentWorkflowId={sentimentClassifierWorkflowId} // Pass the workflow ID for sentiment classifier
+                provider={genAiProvider || 'openai'}
+              />
             ) : (
               <>
                 <SearchContainer $center={results === null}>

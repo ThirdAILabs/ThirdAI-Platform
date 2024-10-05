@@ -23,6 +23,7 @@ def convert_to_ndb_doc(
             doc_metadata=metadata,
             display_path=display_path,
             doc_id=doc_id,
+            version="v1",
         )
     elif ext == ".docx":
         return ndbv2.DOCX(

@@ -150,11 +150,6 @@ def train_ndb(
         job_options=job_options,
     )
 
-    if model_options.rag_options:
-        attributes = model_options.rag_options.model_dump()
-    else:
-        attributes = {}
-
     try:
         new_model = schema.Model(
             id=model_id,
@@ -170,22 +165,6 @@ def train_ndb(
         )
 
         session.add(new_model)
-
-        if base_model:
-            for attribute in base_model.attributes:
-                if attribute.key not in attributes or attributes[attribute.key] is None:
-                    attributes[attribute.key] = attribute.value
-
-        if "guardrail_model_id" in attributes:
-            session.add(
-                schema.ModelDependency(
-                    model_id=model_id, dependency_id=attributes["guardrail_model_id"]
-                )
-            )
-
-        for key, value in attributes.items():
-            session.add(schema.ModelAttribute(model_id=model_id, key=key, value=value))
-
         session.commit()
         session.refresh(new_model)
     except Exception as err:
@@ -361,20 +340,6 @@ def retrain_ndb(
         )
 
         session.add(new_model)
-
-        for dependency in base_model.dependencies:
-            session.add(
-                schema.ModelDependency(
-                    model_id=model_id, dependency_id=dependency.dependency_id
-                )
-            )
-        for attribute in base_model.attributes:
-            session.add(
-                schema.ModelAttribute(
-                    model_id=model_id, key=attribute.key, value=attribute.value
-                )
-            )
-
         session.commit()
         session.refresh(new_model)
     except Exception as err:

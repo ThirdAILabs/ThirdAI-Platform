@@ -11,7 +11,8 @@ from config import DeploymentConfig, NDBSubType
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from file_handler import download_local_files
-from guardrail import Guardrail, LabelMap
+
+pass
 from models.ndb_models import NDBModel, NDBV1Model, NDBV2Model
 from permissions import Permissions
 from prometheus_client import Counter, Summary
@@ -49,21 +50,12 @@ class NDBRouter:
 
         self.model: NDBModel = NDBRouter.get_model(config)
 
-        if self.config.model_options.guardrail_model_id:
-            self.guardrail = Guardrail(
-                guardrail_model_id=self.config.model_options.guardrail_model_id,
-                model_bazaar_endpoint=self.config.model_bazaar_endpoint,
-            )
-        else:
-            self.guardrail = None
-
         self.feedback_logger = UpdateLogger.get_feedback_logger(self.model.data_dir)
         self.insertion_logger = UpdateLogger.get_insertion_logger(self.model.data_dir)
         self.deletion_logger = UpdateLogger.get_deletion_logger(self.model.data_dir)
 
         self.router = APIRouter()
         self.router.add_api_route("/search", self.search, methods=["POST"])
-        self.router.add_api_route("/unredact", self.unredact, methods=["POST"])
         self.router.add_api_route("/insert", self.insert, methods=["POST"])
         self.router.add_api_route("/delete", self.delete, methods=["POST"])
         self.router.add_api_route("/upvote", self.upvote, methods=["POST"])
@@ -145,43 +137,11 @@ class NDBRouter:
 
         results = self.model.predict(**params.model_dump())
 
-        if self.guardrail:
-            label_map = LabelMap()
-
-            results.query_text = self.guardrail.redact_pii(
-                text=results.query_text, access_token=token, label_map=label_map
-            )
-
-            for ref in results.references:
-                ref.text = self.guardrail.redact_pii(
-                    text=results.query_text, access_token=token, label_map=label_map
-                )
-            results.pii_map = label_map.tag_to_entities
-
         return response(
             status_code=status.HTTP_200_OK,
             message="Successful",
             data=jsonable_encoder(results),
         )
-
-    @propagate_error
-    def unredact(
-        self,
-        args: inputs.UnredactArgs,
-        token: str = Depends(Permissions.verify_permission("read")),
-    ):
-        if self.guardrail:
-            unredacted_text = self.guardrail.unredact_pii(args.text, args.pii_map)
-            return response(
-                status_code=status.HTTP_200_OK,
-                message="Successful",
-                data={"unredacted_text": unredacted_text},
-            )
-        else:
-            return response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                message="Cannot unredact text since this model was not configured with guardrails.",
-            )
 
     @propagate_error
     @ndb_insert_metric.time()
