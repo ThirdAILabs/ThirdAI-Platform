@@ -6,6 +6,16 @@ import { EyeIcon, EyeOffIcon } from '@heroicons/react/solid';
 import { userRegister } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { styled } from '@mui/material/styles';
+
+const StyledTextField = styled(TextField)(({ theme }) => ({
+  '& label': {
+    top: '-4px',
+  },
+  '& label.Mui-focused': {
+    top: '0px',
+  },
+}));
 
 export default function SignupForm() {
   const [email, setEmail] = useState('');
@@ -35,25 +45,22 @@ export default function SignupForm() {
   return (
     <form onSubmit={handleSubmit} className="w-full">
       <div className="mb-4">
-        {/* <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-          Email
-        </label> */}
-        <TextField
+        <StyledTextField
           type="email"
           id="email"
           className="w-full"
-          placeholder="Email"
+          label="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
         />
       </div>
       <div className="mb-4 relative">
-        <TextField
+        <StyledTextField
           type={showPassword ? 'text' : 'password'}
           id="password"
           className="w-full"
-          placeholder="Password"
+          label="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -71,11 +78,11 @@ export default function SignupForm() {
         </button>
       </div>
       <div className="mb-4">
-        <TextField
+        <StyledTextField
           type="text"
           id="username"
           className="w-full"
-          placeholder="Username"
+          label="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           required
