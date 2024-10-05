@@ -109,7 +109,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
       ) as EnterpriseSearchOptions;
 
       // Call create_workflow
-      const workflowResponse = await create_workflow({
+      const workflowResponse = await create_enterprise_search_workflow({
         workflow_name: workflowName,
         options,
       });
