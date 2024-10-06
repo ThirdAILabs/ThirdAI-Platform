@@ -677,7 +677,7 @@ export class ModelService {
     provider: string,
     onNextWord: (str: string) => void,
     onComplete?: (finalResponse: string) => void,
-    signal?: AbortSignal // Accept the signal
+    signal?: AbortSignal
   ): Promise<void> {
     try {
       const response = await fetch(this.url + '/chat', {
@@ -691,7 +691,7 @@ export class ModelService {
           'Content-type': 'application/json; charset=UTF-8',
           ...this.authHeader(),
         },
-        signal, // Pass the signal here
+        signal,
       });
   
       if (!response.ok) {
@@ -717,9 +717,18 @@ export class ModelService {
       if (onComplete) {
         onComplete(finalResponse);
       }
-    } catch (error) {
-      console.error('Error in chat:', error);
-      alert('Error in chat: ' + error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          console.log('Chat was aborted');
+        } else {
+          console.error('Error in chat:', error);
+          alert('Error in chat: ' + error);
+        }
+      } else {
+        console.error('An unknown error occurred:', error);
+        alert('An unknown error occurred');
+      }
       throw error;
     }
   }

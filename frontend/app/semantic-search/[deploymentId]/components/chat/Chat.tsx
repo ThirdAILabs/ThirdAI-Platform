@@ -351,17 +351,17 @@ export default function Chat({
   const handleEnterPress = async (e: any) => {
     if (e.keyCode === 13 && e.shiftKey === false) {
       e.preventDefault();
-      if (aiLoading || !textInput.trim()) return;
+      if (!textInput.trim()) return;
   
-      // Abort existing controller if any
+      // If a generation is already in progress, abort it
       if (abortController) {
         abortController.abort();
+        setAiLoading(false);
       }
-
-      // Create a new AbortController
+  
       const controller = new AbortController();
       setAbortController(controller);
-
+  
       const lastTextInput = textInput;
       const lastChatHistory = chatHistory;
       const currentIndex = chatHistory.length;
@@ -404,7 +404,6 @@ export default function Chat({
             });
           },
           async (finalResponse: string) => {
-            // Perform PII detection on the AI's complete response
             if (tokenClassifierExists) {
               const aiTransformed = await performPIIDetection(finalResponse);
               setTransformedMessages((prev) => ({
@@ -412,16 +411,32 @@ export default function Chat({
                 [aiIndex]: aiTransformed,
               }));
             }
-            
             setAiLoading(false);
+            setAbortController(null);
           },
-          controller.signal // Pass the signal here
+          controller.signal
         );
       } catch (error) {
-        alert('Failed to send chat. Please try again.');
-        setChatHistory(lastChatHistory);
-        setTextInput(lastTextInput);
+        // Type guard for Error objects
+        if (error instanceof Error) {
+          if (error.name === 'AbortError') {
+            console.log('Chat was aborted');
+            // Don't reset the chat history or text input for aborted requests
+          } else {
+            console.error('Error in chat:', error);
+            alert('Failed to send chat. Please try again.');
+            setChatHistory(lastChatHistory);
+            setTextInput(lastTextInput);
+          }
+        } else {
+          console.error('An unknown error occurred:', error);
+          alert('Failed to send chat. Please try again.');
+          setChatHistory(lastChatHistory);
+          setTextInput(lastTextInput);
+        }
+      } finally {
         setAiLoading(false);
+        setAbortController(null);
       }
     }
   };
