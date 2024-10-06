@@ -540,6 +540,8 @@ function App() {
                   await sleep(20); // Mimic streaming response with a delay
                 }
 
+                setAbortController(null)
+
                 // Set the query information including whether they differ
                 setQueryInfo({
                   cachedQuery: cachedResult.query,
@@ -733,6 +735,10 @@ function App() {
                     setPrompt={setPrompt}
                     ifGenerationOn={ifGenerationOn}
                     cacheEnabled={cacheEnabled}
+
+                    abortController = {abortController}
+                    setAbortController = {setAbortController}
+                    setAnswer = {setAnswer}
                   />
                   {failed && (
                     <Pad $top="100px">
@@ -745,18 +751,6 @@ function App() {
                     <Pad $left="5px">
                       {ifGenerationOn && (
                         <>
-                          {
-                            abortController &&
-                            <PillButton
-                                onClick={() => {
-                                  abortController!.abort(); // Abort the fetch request
-                                  setAbortController(null); // Reset the controller
-                                  setAnswer(''); // Optionally clear the current answer
-                                }}
-                              >
-                                Pause Generation
-                            </PillButton>
-                          }
                           <Spacer $height="30px" />
                           <GeneratedAnswer
                             answer={answer}
@@ -766,6 +760,9 @@ function App() {
                             queryInfo={queryInfo}
                             cacheEnabled={cacheEnabled}
                             setCacheEnabled={setCacheEnabled}
+                            abortController={abortController} // Pass abortController here
+                            setAbortController={setAbortController} // Pass setAbortController
+                            setAnswer={setAnswer} // Pass setAnswer
                           />
                         </>
                       )}

@@ -3,9 +3,11 @@ import styled from 'styled-components';
 import { color, fontSizes } from '../stylingConstants';
 import { Spacer } from './Layout';
 import MoreInfo from './MoreInfo';
-// import { ReactMarkdown } from "react-markdown/lib/react-markdown";
 import ReactMarkdown from 'react-markdown';
 import TypingAnimation from './TypingAnimation';
+
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faStop } from '@fortawesome/free-solid-svg-icons';
 
 interface GeneratedAnswerProps {
   answer: string;
@@ -17,12 +19,39 @@ interface GeneratedAnswerProps {
   } | null; // Accept null as a possible type
   cacheEnabled: boolean;
   setCacheEnabled: (enabled: boolean) => void; // Update to accept a boolean argument
+  abortController: AbortController | null; // Add abortController, which can be null
+  setAbortController: (controller: AbortController | null) => void; // Function to set abortController
+  setAnswer: (answer: string) => void; // Function to update the answer
 }
+
+// Styled component for the button
+const PauseButton = styled.button`
+  width: 40px;       /* Ensure the width is equal to the height */
+  height: 40px;      /* Ensures the button remains a circle */
+  background-color: black;
+  border: none;
+  border-radius: 50%; /* This makes it a circle */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+  box-sizing: border-box; /* Ensures padding and border don't affect the circle size */
+  padding: 0;            /* Ensures no additional padding distorts the shape */
+  position: absolute;    /* Make the button absolute */
+  right: 20px;           /* Align it to the right */
+  top: 0;                /* Align it to the top */
+  &:hover {
+    background-color: #333; /* Changes color on hover */
+  }
+`;
 
 const Container = styled.section`
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  position: relative; /* Make the container relative for positioning */
+  padding-right: 60px; /* Add padding to avoid overlap with button */
 `;
 
 const Header = styled.section`
@@ -54,6 +83,9 @@ export default function GeneratedAnswer({
   regenerateAndBypassCache,
   cacheEnabled,
   setCacheEnabled,
+  abortController,  
+  setAbortController, 
+  setAnswer,  
 }: GeneratedAnswerProps) {
   return (
     <Container>
@@ -79,6 +111,7 @@ export default function GeneratedAnswer({
           width="240px"
         />
       </Header>
+
       {queryInfo && queryInfo.isDifferent && (
         <div className="text-sm mb-2">
           Showing result for &apos;{queryInfo.cachedQuery}&apos;
@@ -95,6 +128,7 @@ export default function GeneratedAnswer({
           </a>
         </div>
       )}
+
       {answer.length === 0 ? (
         <>
           <Spacer $height="20px" />
@@ -104,6 +138,18 @@ export default function GeneratedAnswer({
         <Answer>
           <ReactMarkdown>{answer}</ReactMarkdown>
         </Answer>
+      )}
+
+      {abortController && (
+        <PauseButton
+          onClick={() => {
+            abortController!.abort();
+            setAbortController(null);
+            setAnswer('');
+          }}
+        >
+          <FontAwesomeIcon icon={faStop} style={{ color: 'white', fontSize: '16px' }} />
+        </PauseButton>
       )}
 
       <Spacer $height="50px" />

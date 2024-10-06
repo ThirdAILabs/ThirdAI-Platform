@@ -676,7 +676,8 @@ export class ModelService {
     textInput: string,
     provider: string,
     onNextWord: (str: string) => void,
-    onComplete?: (finalResponse: string) => void
+    onComplete?: (finalResponse: string) => void,
+    signal?: AbortSignal // Accept the signal
   ): Promise<void> {
     try {
       const response = await fetch(this.url + '/chat', {
@@ -690,6 +691,7 @@ export class ModelService {
           'Content-type': 'application/json; charset=UTF-8',
           ...this.authHeader(),
         },
+        signal, // Pass the signal here
       });
   
       if (!response.ok) {

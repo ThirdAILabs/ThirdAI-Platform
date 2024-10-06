@@ -136,6 +136,10 @@ interface SearchBarProps {
   setPrompt: (prompt: string) => void;
   ifGenerationOn: boolean;
   cacheEnabled: boolean;
+
+  abortController: AbortController | null;
+  setAbortController: (controller: AbortController | null) => void;
+  setAnswer: (answer: string) => void;
 }
 
 export default function SearchBar({
@@ -148,6 +152,10 @@ export default function SearchBar({
   setPrompt,
   ifGenerationOn,
   cacheEnabled,
+  
+  abortController,
+  setAbortController,
+  setAnswer,
 }: SearchBarProps) {
   const modelService = useContext<ModelService | null>(ModelServiceContext);
   const [showSources, setShowSources] = useState(false);

@@ -6,6 +6,38 @@ import { ModelServiceContext } from '../../Context';
 import { ChatMessage, ModelService } from '../../modelServices';
 import TypingAnimation from '../TypingAnimation';
 import { useTextClassificationEndpoints, useSentimentClassification } from '@/lib/backend'; // Import for sentiment classification
+// Import FontAwesomeIcon and faPause
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faStop } from '@fortawesome/free-solid-svg-icons';
+
+// Styled component for the pause button
+const PauseButton = styled.button`
+  width: 40px;
+  height: 40px;
+  background-color: black;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+  box-sizing: border-box;
+  padding: 0;
+
+  &:hover {
+    background-color: #333;
+  }
+`;
+
+const ChatBarContainer = styled.div`
+  display: flex;
+  align-items: center;
+  width: 100%; // Ensure it takes the full width
+  margin: 10px 0 50px 0%; // Adjust margins as needed
+`;
+
+
 
 // Styled components for chat UI
 const ChatContainer = styled.section`
@@ -42,8 +74,7 @@ const TypingAnimationContainer = styled.section`
 const ChatBar = styled.textarea`
   background-color: ${color.textInput};
   font-size: ${fontSizes.m};
-  padding: 20px 20px 27px 20px;
-  margin: 10px 0 50px 0%;
+  padding: 20px;
   border-radius: ${borderRadius.textInput};
   outline: none;
   border: none;
@@ -51,6 +82,8 @@ const ChatBar = styled.textarea`
   height: ${fontSizes.xl};
   resize: none;
   font-family: Helvetica, Arial, sans-serif;
+  flex: 1; // Add this line to make it expand
+  margin-right: 10px; // Add some space between the ChatBar and the PauseButton
 
   &:focus {
     height: 100px;
@@ -313,11 +346,22 @@ export default function Chat({
     }
   };
 
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
+
   const handleEnterPress = async (e: any) => {
     if (e.keyCode === 13 && e.shiftKey === false) {
       e.preventDefault();
       if (aiLoading || !textInput.trim()) return;
   
+      // Abort existing controller if any
+      if (abortController) {
+        abortController.abort();
+      }
+
+      // Create a new AbortController
+      const controller = new AbortController();
+      setAbortController(controller);
+
       const lastTextInput = textInput;
       const lastChatHistory = chatHistory;
       const currentIndex = chatHistory.length;
@@ -370,7 +414,8 @@ export default function Chat({
             }
             
             setAiLoading(false);
-          }
+          },
+          controller.signal // Pass the signal here
         );
       } catch (error) {
         alert('Failed to send chat. Please try again.');
@@ -404,12 +449,26 @@ export default function Chat({
           <Placeholder> Ask anything to start chatting! </Placeholder>
         )}
       </ScrollableArea>
+      <ChatBarContainer>
+
       <ChatBar
         placeholder="Ask anything..."
         onKeyDown={handleEnterPress}
         value={textInput}
         onChange={(e) => setTextInput(e.target.value)}
       />
+      {abortController && aiLoading && (
+      <PauseButton
+        onClick={() => {
+          abortController.abort();
+          setAbortController(null);
+          setAiLoading(false);
+        }}
+      >
+        <FontAwesomeIcon icon={faStop} style={{ color: 'white', fontSize: '16px' }} />
+      </PauseButton>
+      )}
+      </ChatBarContainer>
     </ChatContainer>
   );
 }
