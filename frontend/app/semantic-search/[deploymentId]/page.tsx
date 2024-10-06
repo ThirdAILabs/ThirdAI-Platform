@@ -171,42 +171,44 @@ function App() {
       try {
         const details = await getWorkflowDetails(receievedWorkflowId as string);
 
+        console.log('details', details)
+
         // Filter and find the model with component "search"
-        const searchModel = details.data.models.find((model) => model.component === 'search');
+        const searchModel = details.data;
         const serviceUrl = searchModel
           ? createDeploymentUrl(searchModel.model_id)
           : createDeploymentUrl('');
 
-        // Filter and find the model with component "nlp"
-        const nlpModel = details.data.models.find((model) => model.component === 'nlp');
-        const tokenModelUrl = nlpModel
-          ? createTokenModelUrl(nlpModel.model_id)
-          : createTokenModelUrl('');
+        // // Filter and find the model with component "nlp"
+        // const nlpModel = details.data.models.find((model) => model.component === 'nlp');
+        // const tokenModelUrl = nlpModel
+        //   ? createTokenModelUrl(nlpModel.model_id)
+        //   : createTokenModelUrl('');
 
-        // Filter and find the model with component "nlp-classifier"
-        const sentimentClassifier = details.data.models.find(
-          (model) => model.component === 'nlp-classifier'
-        );
+        // // Filter and find the model with component "nlp-classifier"
+        // const sentimentClassifier = details.data.models.find(
+        //   (model) => model.component === 'nlp-classifier'
+        // );
 
-        if (nlpModel) {
-          setIfGuardRailOn(true);
-        }
+        // if (nlpModel) {
+        //   setIfGuardRailOn(true);
+        // }
 
-        // Set whether token classifier exists
-        setTokenClassifierExists(!!nlpModel);
+        // // Set whether token classifier exists
+        // setTokenClassifierExists(!!nlpModel);
 
-        if (!generationOn) {
-          // if generation is off, turn off cache
-          setCacheEnabled(false);
-        }
+        // if (!generationOn) {
+        //   // if generation is off, turn off cache
+        //   setCacheEnabled(false);
+        // }
 
-        // Set whether sentiment classifier exists
-        setSentimentClassifierExists(!!sentimentClassifier);
+        // // Set whether sentiment classifier exists
+        // setSentimentClassifierExists(!!sentimentClassifier);
 
-        // Set the sentiment classifier workflow ID if the model exists
-        if (sentimentClassifier) {
-          setSentimentClassifierWorkflowId(sentimentClassifier.model_id);
-        }
+        // // Set the sentiment classifier workflow ID if the model exists
+        // if (sentimentClassifier) {
+        //   setSentimentClassifierWorkflowId(sentimentClassifier.model_id);
+        // }
 
         // Only enable the chat option if the workflow is of type RAG
         const chatWorkflows = ['rag'];
@@ -214,12 +216,12 @@ function App() {
           setChatEnabled(true);
         }
 
-        const newModelService = new ModelService(serviceUrl, tokenModelUrl, uuidv4());
+        const newModelService = new ModelService(serviceUrl, uuidv4());
         setModelService(newModelService);
         newModelService.sources().then((fetchedSources) => setSources(fetchedSources));
       } catch (error) {
         console.error('Failed to fetch workflow details:', error);
-        alert('Failed to fetch workflow details:' + error);
+        // alert('Failed to fetch workflow details:' + error);
       }
     };
 

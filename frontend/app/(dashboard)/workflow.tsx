@@ -36,7 +36,6 @@ enum DeployStatus {
 export function WorkFlow({ workflow }: { workflow: Workflow }) {
   const router = useRouter();
   const [deployStatus, setDeployStatus] = useState<DeployStatus>(DeployStatus.None);
-  const [deployRequested, setDeployRequested] = useState<boolean>(false);
   const [deployType, setDeployType] = useState<string>('');
 
   function goToEndpoint() {
@@ -89,8 +88,6 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
   }
 
   const handleDeploy = async () => {
-    setDeployRequested(true);
-
     if (deployStatus == DeployStatus.Inactive) {
       setDeployStatus(DeployStatus.Starting);
       try {
@@ -108,25 +105,13 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       setDeployStatus(DeployStatus.Training);
     } else if (workflow.deploy_status === "failed") {
       setDeployStatus(DeployStatus.Failed);
-    } else if (workflow.deploy_status === "in_progress") {
+    } else if (workflow.deploy_status === "starting") {
       setDeployStatus(DeployStatus.Starting);
-    } else if (workflow.deploy_status === "not_started") {
+    } else if (workflow.deploy_status === "not_started" || workflow.deploy_status === 'stopped') {
       setDeployStatus(DeployStatus.Inactive);
     } else if (workflow.deploy_status === "complete") {
       setDeployStatus(DeployStatus.Active);
-    } else if (workflow.deploy_status === 'stopped') {
-      setDeployStatus(DeployStatus.Inactive);
     }
-
-    if (deployStatus == DeployStatus.Inactive && deployRequested) {
-      setDeployStatus(DeployStatus.Starting);
-      try {
-        start_workflow(workflow.username, workflow.model_name);
-      } catch (e) {
-        console.error('Failed to start workflow.', e);
-      }
-    }
-
   }, [workflow.train_status, workflow.deploy_status, deployStatus]);
 
   useEffect(() => {
