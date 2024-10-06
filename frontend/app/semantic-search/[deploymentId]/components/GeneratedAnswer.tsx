@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { color, fontSizes } from '../stylingConstants';
 import { Spacer } from './Layout';
@@ -87,6 +87,22 @@ export default function GeneratedAnswer({
   setAbortController, 
   setAnswer,  
 }: GeneratedAnswerProps) {
+
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    setIsGenerating(!!abortController);
+  }, [abortController]);
+
+  const handleAbort = () => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+      setAnswer('');
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <Container>
       <Header>
@@ -129,7 +145,7 @@ export default function GeneratedAnswer({
         </div>
       )}
 
-      {answer.length === 0 ? (
+      {isGenerating && answer.length === 0 ? (
         <>
           <Spacer $height="20px" />
           <TypingAnimation />
@@ -140,13 +156,9 @@ export default function GeneratedAnswer({
         </Answer>
       )}
 
-      {abortController && (
+      {isGenerating && (
         <PauseButton
-          onClick={() => {
-            abortController!.abort();
-            setAbortController(null);
-            setAnswer('');
-          }}
+          onClick={handleAbort}
         >
           <FontAwesomeIcon icon={faStop} style={{ color: 'white', fontSize: '16px' }} />
         </PauseButton>
