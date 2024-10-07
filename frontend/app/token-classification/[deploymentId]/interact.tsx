@@ -15,7 +15,8 @@ import {
 import { Input } from '@/components/ui/input';
 import Fuse from 'fuse.js';
 import mammoth from 'mammoth'; // DOCX Parsing
-
+import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
 // @ts-ignore
 import * as pdfjsLib from 'pdfjs-dist/build/pdf'; // Importing PDF.js as you do in your PdfViewer
 // @ts-ignore
@@ -223,28 +224,93 @@ export default function Interact() {
   const handleFileChange = async (event: any) => {
     const file = event.target.files[0];
     if (file) {
-      const fileExtension = file.name.split('.').pop().toLowerCase();
-      setIsLoading(true); // Set loading to true when file is being processed
-
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      setIsLoading(true);
+  
       let text = '';
       if (fileExtension === 'txt') {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          text = e.target?.result as string;
-          setInputText(text);
-          handleRun(text);
-        };
-        reader.readAsText(file);
+        text = await parseTXT(file);
       } else if (fileExtension === 'pdf') {
         text = await parsePDF(file);
-        setInputText(text);
-        handleRun(text);
       } else if (fileExtension === 'docx') {
         text = await parseDOCX(file);
-        setInputText(text);
-        handleRun(text);
+      } else if (fileExtension === 'csv') {
+        text = await parseCSV(file);
+      } else if (['xls', 'xlsx'].includes(fileExtension ?? '')) {
+        text = await parseExcel(file);
       }
+  
+      setInputText(text);
+      handleRun(text);
+      setIsLoading(false);
     }
+  };
+
+  const parseTXT = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        resolve(e.target?.result as string);
+      };
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  };
+
+  const parseCSV = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      Papa.parse(file, {
+        complete: (results) => {
+          const data = results.data as string[][];
+          if (data.length < 2) {
+            resolve('');
+            return;
+          }
+          const headers = data[0];
+          const rows = data.slice(1);
+          let text = '';
+          rows.forEach((row) => {
+            headers.forEach((header, index) => {
+              text += `${header}: ${row[index] || ''}\n`;
+            });
+            text += '\n';
+          });
+          resolve(text);
+        },
+        error: reject,
+      });
+    });
+  };
+
+  const parseExcel = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as (string | number)[][];
+        
+        if (jsonData.length < 2) {
+          resolve('');
+          return;
+        }
+        
+        const headers = jsonData[0].map(String);
+        const rows = jsonData.slice(1);
+        let text = '';
+        rows.forEach((row) => {
+          headers.forEach((header, index) => {
+            text += `${header}: ${row[index] || ''}\n`;
+          });
+          text += '\n';
+        });
+        resolve(text);
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
   };
 
   const parsePDF = async (file: File) => {
@@ -335,7 +401,7 @@ export default function Interact() {
         <input
           id="file-upload"
           type="file"
-          accept=".txt,.pdf,.docx"
+          accept=".txt,.pdf,.docx,.csv,.xls,.xlsx"
           onChange={handleFileChange}
           style={{ display: 'none' }}
         />
@@ -358,7 +424,7 @@ export default function Interact() {
 
 
       <Typography variant="caption" display="block" mt={1}>
-        Supported file types: .txt, .pdf, .docx
+        Supported file types: .txt, .pdf, .docx, .csv, .xls, .xlsx
       </Typography>
 
       {isLoading ? (
