@@ -1,6 +1,6 @@
 'use client';
 
-import { Container, Box, CircularProgress, Typography } from '@mui/material';
+import { Container, Box, CircularProgress, Typography, Switch, FormControlLabel } from '@mui/material';
 import { Button } from '@/components/ui/button';
 import { MouseEventHandler, ReactNode, useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
@@ -221,27 +221,99 @@ export default function Interact() {
     setInputText(event.target.value);
   };
 
+  // Add a new state to store the parsed rows
+  const [parsedRows, setParsedRows] = useState<{label: string, content: string}[]>([]);
+
+  const parseCSV = (file: File): Promise<{label: string, content: string}[]> => {
+    return new Promise((resolve, reject) => {
+      Papa.parse(file, {
+        complete: (results) => {
+          const data = results.data as string[][];
+          if (data.length < 2) {
+            resolve([]);
+            return;
+          }
+          const headers = data[0];
+          const rows = data.slice(1);
+          let parsedRows = rows
+            .filter(row => row.some(cell => cell.trim() !== '')) // Filter out completely empty rows
+            .map((row, rowIndex) => {
+              let content = headers.map((header, index) => `${header}: ${row[index] || ''}`).join('\n');
+              return {
+                label: `Row ${rowIndex + 1}`,
+                content: content
+              };
+            });
+          resolve(parsedRows);
+        },
+        error: reject,
+      });
+    });
+  };
+
+  const parseExcel = (file: File): Promise<{label: string, content: string}[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as (string | number | null)[][];
+        
+        if (jsonData.length < 2) {
+          resolve([]);
+          return;
+        }
+        
+        const headers = jsonData[0].map(String);
+        const rows = jsonData.slice(1);
+        
+        let parsedRows = rows.map((row, rowIndex) => {
+          if (row.some(cell => cell !== null && cell !== '')) {
+            let content = headers.map((header, index) => {
+              const cellValue = row[index];
+              return `${header}: ${cellValue !== null && cellValue !== undefined ? cellValue : ''}`;
+            }).join('\n');
+            return {
+              label: `Row ${rowIndex + 1}`,
+              content: content
+            };
+          }
+          return null;
+        }).filter((row): row is {label: string, content: string} => row !== null);
+        
+        resolve(parsedRows);
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  // Update the handleFileChange function
   const handleFileChange = async (event: any) => {
     const file = event.target.files[0];
     if (file) {
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
       setIsLoading(true);
-  
-      let text = '';
+
+      let parsedRows: {label: string, content: string}[] = [];
       if (fileExtension === 'txt') {
-        text = await parseTXT(file);
+        parsedRows = [{label: 'Text', content: await parseTXT(file)}];
       } else if (fileExtension === 'pdf') {
-        text = await parsePDF(file);
+        parsedRows = [{label: 'PDF', content: await parsePDF(file)}];
       } else if (fileExtension === 'docx') {
-        text = await parseDOCX(file);
+        parsedRows = [{label: 'DOCX', content: await parseDOCX(file)}];
       } else if (fileExtension === 'csv') {
-        text = await parseCSV(file);
+        parsedRows = await parseCSV(file);
       } else if (['xls', 'xlsx'].includes(fileExtension ?? '')) {
-        text = await parseExcel(file);
+        parsedRows = await parseExcel(file);
       }
-  
-      setInputText(text);
-      handleRun(text);
+
+      const fullText = parsedRows.map(row => row.content).join('\n\n');
+      setInputText(fullText);
+      setParsedRows(parsedRows);
+      handleRun(fullText);
       setIsLoading(false);
     }
   };
@@ -254,62 +326,6 @@ export default function Interact() {
       };
       reader.onerror = reject;
       reader.readAsText(file);
-    });
-  };
-
-  const parseCSV = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      Papa.parse(file, {
-        complete: (results) => {
-          const data = results.data as string[][];
-          if (data.length < 2) {
-            resolve('');
-            return;
-          }
-          const headers = data[0];
-          const rows = data.slice(1);
-          let text = '';
-          rows.forEach((row) => {
-            headers.forEach((header, index) => {
-              text += `${header}: ${row[index] || ''}\n`;
-            });
-            text += '\n';
-          });
-          resolve(text);
-        },
-        error: reject,
-      });
-    });
-  };
-
-  const parseExcel = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as (string | number)[][];
-        
-        if (jsonData.length < 2) {
-          resolve('');
-          return;
-        }
-        
-        const headers = jsonData[0].map(String);
-        const rows = jsonData.slice(1);
-        let text = '';
-        rows.forEach((row) => {
-          headers.forEach((header, index) => {
-            text += `${header}: ${row[index] || ''}\n`;
-          });
-          text += '\n';
-        });
-        resolve(text);
-      };
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
     });
   };
 
@@ -354,7 +370,7 @@ export default function Interact() {
   };
 
   const handleRun = (text: string) => {
-    setIsLoading(true); // Set loading to true when starting the prediction
+    setIsLoading(true);
     predict(text).then((result) => {
       updateTagColors(result.predicted_tags);
       setAnnotations(
@@ -363,7 +379,7 @@ export default function Interact() {
           tag: tag![0] as string,
         }))
       );
-      setIsLoading(false); // Set loading to false after prediction is done
+      setIsLoading(false);
     });
   };
 
@@ -380,6 +396,57 @@ export default function Interact() {
     setMouseDownIndex(null);
     setMouseUpIndex(null);
     setSelecting(false);
+  };
+
+  const [showHighlightedOnly, setShowHighlightedOnly] = useState(false);
+
+  const toggleHighlightedOnly = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setShowHighlightedOnly(event.target.checked);
+  };
+
+  const isWordHighlighted = (word: string) => {
+    return annotations.some(token => token.text === word && token.tag !== 'O');
+  };
+
+  const renderHighlightedContent = (content: string) => {
+    return content.split(' ').map((word, wordIndex) => {
+      const tokenIndex = annotations.findIndex(token => token.text === word);
+      if (tokenIndex !== -1 && annotations[tokenIndex].tag !== 'O') {
+        return (
+          <Highlight
+            key={wordIndex}
+            currentToken={annotations[tokenIndex]}
+            nextToken={annotations[tokenIndex + 1] || null}
+            tagColors={tagColors}
+            onMouseOver={(e) => {
+              if (selecting) {
+                setMouseUpIndex(tokenIndex);
+              }
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setSelecting(true);
+              setMouseDownIndex(tokenIndex);
+              setMouseUpIndex(tokenIndex);
+              setSelectedRange(null);
+            }}
+            selecting={
+              selecting &&
+              startIndex !== null &&
+              endIndex !== null &&
+              tokenIndex >= startIndex &&
+              tokenIndex <= endIndex
+            }
+            selected={
+              selectedRange !== null &&
+              tokenIndex >= selectedRange[0] &&
+              tokenIndex <= selectedRange[1]
+            }
+          />
+        );
+      }
+      return showHighlightedOnly ? null : <span key={wordIndex}>{word} </span>;
+    });
   };
 
   return (
@@ -427,6 +494,21 @@ export default function Interact() {
         Supported file types: .txt, .pdf, .docx, .csv, .xls, .xlsx
       </Typography>
 
+      {annotations.length > 0 && (
+        <Box mt={4} mb={2} display="flex" alignItems="center" justifyContent="flex-end">
+          <FormControlLabel
+            control={
+              <Switch
+                checked={showHighlightedOnly}
+                onChange={toggleHighlightedOnly}
+                color="primary"
+              />
+            }
+            label="Show highlighted only"
+          />
+        </Box>
+      )}
+
       {isLoading ? (
         <Box mt={4} display="flex" justifyContent="center">
           <CircularProgress />
@@ -445,48 +527,40 @@ export default function Interact() {
                 }
               }}
             >
-              {annotations.map((token, index) => {
-                const nextToken = index === annotations.length - 1 ? null : annotations[index + 1];
+              {parsedRows.map((row, rowIndex) => {
+                const columns = row.content.split('\n');
+                const visibleColumns = columns.filter(column => 
+                  !showHighlightedOnly || column.split(':').slice(1).join(':').split(' ').some(isWordHighlighted)
+                );
+
+                if (visibleColumns.length === 0) {
+                  return null; // Don't render the row if all columns are hidden
+                }
+
                 return (
-                  <>
-                    <Highlight
-                      key={index}
-                      currentToken={token}
-                      nextToken={nextToken}
-                      tagColors={tagColors}
-                      onMouseOver={(e) => {
-                        if (selecting) {
-                          setMouseUpIndex(index);
-                        }
-                      }}
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
-                        setSelecting(true);
-                        setMouseDownIndex(index);
-                        setMouseUpIndex(index);
-                        setSelectedRange(null);
-                      }}
-                      selecting={
-                        selecting &&
-                        startIndex !== null &&
-                        endIndex !== null &&
-                        index >= startIndex &&
-                        index <= endIndex
-                      }
-                      selected={
-                        selectedRange !== null &&
-                        index >= selectedRange[0] &&
-                        index <= selectedRange[1]
-                      }
-                    />
-                    <TagSelector
-                      open={!!selectedRange && index === selectedRange[1]}
-                      choices={Object.keys(tagColors)}
-                      onSelect={finetuneTags}
-                    />
-                  </>
+                  <div key={rowIndex} style={{ marginBottom: '20px', padding: '10px', border: '1px solid #ccc', borderRadius: '5px' }}>
+                    <strong>{row.label}:</strong>
+                    {visibleColumns.map((column, columnIndex) => {
+                      const [columnName, ...columnContent] = column.split(':');
+                      const content = columnContent.join(':').trim();
+                      return (
+                        <p key={columnIndex}>
+                          <strong>{columnName}:</strong>{' '}
+                          {renderHighlightedContent(content)}
+                        </p>
+                      );
+                    })}
+                  </div>
                 );
               })}
+              {annotations.map((_, index) => (
+                <TagSelector
+                  key={index}
+                  open={!!selectedRange && index === selectedRange[1]}
+                  choices={Object.keys(tagColors)}
+                  onSelect={finetuneTags}
+                />
+              ))}
             </Card>
           </Box>
         )
