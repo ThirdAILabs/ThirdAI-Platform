@@ -100,11 +100,13 @@ type ImplicitFeecback = {
 
 export class ModelService {
   url: string;
+  ragUrl: string | undefined;
   sessionId: string;
   authToken: string | null;
 
-  constructor(url: string, sessionId: string) {
+  constructor(url: string, ragUrl: string | undefined, sessionId: string) {
     this.url = url;
+    this.ragUrl = ragUrl;
     this.sessionId = sessionId;
     this.authToken = window.localStorage.getItem('accessToken');
   }
@@ -272,12 +274,8 @@ export class ModelService {
   }
 
   async predict(queryText: string, topK: number, queryId?: string): Promise<SearchResult | null> {
-    const url = new URL(this.url + '/search');
-
-    // TODO(Geordie): Accept a "timeout" / "longer than expected" callback.
-    // E.g. if the query takes too long, then we can display a message
-    // saying that they should check the url, or maybe it's just taking a
-    // while.
+    const requestUrl = this.ragUrl || this.url;
+    const url = new URL(requestUrl + '/search');
 
     return fetch(url, {
       method: 'POST',
@@ -292,6 +290,7 @@ export class ModelService {
         if (response.ok) {
           return response.json();
         }
+        throw new Error('Network response was not ok');
       })
       .then(({ data }) => {
         const searchResults: SearchResult = {
@@ -309,7 +308,7 @@ export class ModelService {
         return searchResults;
       })
       .catch((e) => {
-        console.log(e);
+        console.error('Error in predict method:', e);
         return null;
       });
   }

@@ -510,6 +510,12 @@ interface WorkflowModel {
   username: string;
 }
 
+interface Dependency {
+  model_id: string;
+  model_name: string;
+  username: string;
+}
+
 interface WorkflowDetailsResponse {
   status_code: number;
   message: string;
@@ -519,8 +525,19 @@ interface WorkflowDetailsResponse {
     type: string;
     train_status: string;
     deploy_status: string;
-    genai_provider?: string;
-    guardrail_model_id?: string;
+    llm_provider?: string;
+    guardrail_id?: string;
+    retrieval_id?: string;
+    dependencies: Dependency[];
+    username: string;
+    user_email: string;
+    publish_date: string;
+    access_level: string;
+    domain: string;
+    sub_type: string;
+    team_id: string;
+    used_by: string[];
+    default_mode: string | null;
   };
 }
 
@@ -539,9 +556,9 @@ export async function getWorkflowDetails(workflow_id: string): Promise<WorkflowD
         resolve(res.data);
       })
       .catch((err) => {
-        console.error('Error fetching workflow details:', err);
-        alert('Error fetching workflow details:' + err);
-        reject(new Error('Failed to fetch workflow details'));
+        console.error('Error fetching model details:', err);
+        alert('Error fetching model details:' + err);
+        reject(new Error('Failed to fetch model details'));
       });
   });
 }

@@ -183,21 +183,21 @@ export default function Reference({
   const [transformedPrediction, setTransformedPrediction] = useState<string[][]>([]);
 
   useEffect(() => {
-    if (ifGuardRailOn) {
-      // console.log('info.content', info.content)
+    // if (ifGuardRailOn) {
+    //   // console.log('info.content', info.content)
 
-      // Call piiDetect and handle the promise with .then
-      modelService
-        .piiDetect(info.content)
-        .then((result) => {
-          // console.log('result', result);
-          setPrediction(result);
-        })
-        .catch((error) => {
-          console.error('Error detecting PII:', error);
-          alert('Error detecting PII:' + error);
-        });
-    }
+    //   // Call piiDetect and handle the promise with .then
+    //   modelService
+    //     .piiDetect(info.content)
+    //     .then((result) => {
+    //       // console.log('result', result);
+    //       setPrediction(result);
+    //     })
+    //     .catch((error) => {
+    //       console.error('Error detecting PII:', error);
+    //       alert('Error detecting PII:' + error);
+    //     });
+    // }
   }, [info, ifGuardRailOn]);
 
   useEffect(() => {

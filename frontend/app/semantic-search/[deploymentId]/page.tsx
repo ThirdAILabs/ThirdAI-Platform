@@ -170,58 +170,56 @@ function App() {
     const fetchWorkflowDetails = async () => {
       try {
         const details = await getWorkflowDetails(receievedWorkflowId as string);
-
-        console.log('details', details)
-
-        // Filter and find the model with component "search"
-        const searchModel = details.data;
-        const serviceUrl = searchModel
-          ? createDeploymentUrl(searchModel.model_id)
-          : createDeploymentUrl('');
-
-        // // Filter and find the model with component "nlp"
-        // const nlpModel = details.data.models.find((model) => model.component === 'nlp');
-        // const tokenModelUrl = nlpModel
-        //   ? createTokenModelUrl(nlpModel.model_id)
-        //   : createTokenModelUrl('');
-
-        // // Filter and find the model with component "nlp-classifier"
-        // const sentimentClassifier = details.data.models.find(
-        //   (model) => model.component === 'nlp-classifier'
-        // );
-
-        // if (nlpModel) {
-        //   setIfGuardRailOn(true);
-        // }
-
-        // // Set whether token classifier exists
-        // setTokenClassifierExists(!!nlpModel);
-
-        // if (!generationOn) {
-        //   // if generation is off, turn off cache
-        //   setCacheEnabled(false);
-        // }
-
-        // // Set whether sentiment classifier exists
-        // setSentimentClassifierExists(!!sentimentClassifier);
-
-        // // Set the sentiment classifier workflow ID if the model exists
-        // if (sentimentClassifier) {
-        //   setSentimentClassifierWorkflowId(sentimentClassifier.model_id);
-        // }
-
-        // Only enable the chat option if the workflow is of type RAG
-        const chatWorkflows = ['rag'];
-        if (chatWorkflows.includes(details.data.type)) {
-          setChatEnabled(true);
+        console.log('details', details);
+    
+        const data = details.data;
+    
+        let serviceUrl: string;
+        let ragUrl: string | undefined; // Initialize as undefined
+        let chatEnabled = false;
+    
+        if (data.type === "enterprise-search") {
+          // Enterprise-search logic
+          const ragDependency = data.dependencies.find(dep => dep.model_name.toLowerCase().includes('rag') || dep.model_name.toLowerCase().includes('retrieval'));
+          
+          serviceUrl = ragDependency 
+            ? createDeploymentUrl(ragDependency.model_id)
+            : createDeploymentUrl('');
+          
+          // Only set ragUrl for enterprise-search case
+          ragUrl = data.model_id 
+            ? createDeploymentUrl(data.model_id)
+            : undefined;
+    
+          const nerDependency = data.dependencies.find(dep => dep.model_name.toLowerCase().includes('pii') || dep.model_name.toLowerCase().includes('ner'));
+    
+          setIfGuardRailOn(!!nerDependency);
+          setTokenClassifierExists(!!nerDependency);
+    
+          chatEnabled = true;
+    
+          setIfGenerationOn(!!data.llm_provider);
+          setGenAiProvider(data.llm_provider || null);
+        } else {
+          // Non-enterprise-search logic
+          serviceUrl = data
+            ? createDeploymentUrl(data.model_id)
+            : createDeploymentUrl('');
+    
+          const chatWorkflows = ['rag'];
+          chatEnabled = chatWorkflows.includes(data.type);
         }
-
-        const newModelService = new ModelService(serviceUrl, uuidv4());
+    
+        // Common logic for both cases
+        setChatEnabled(chatEnabled);
+    
+        const newModelService = new ModelService(serviceUrl, ragUrl, uuidv4());
         setModelService(newModelService);
         newModelService.sources().then((fetchedSources) => setSources(fetchedSources));
+    
       } catch (error) {
-        console.error('Failed to fetch workflow details:', error);
-        // alert('Failed to fetch workflow details:' + error);
+        console.error('Failed to fetch model details:', error);
+        // Optionally, handle the error (e.g., show a notification to the user)
       }
     };
 
@@ -272,6 +270,7 @@ function App() {
     return modelService!
       .predict(/* queryText= */ query, /* topK= */ topK, /* queryId= */ queryId)
       .then((searchResults) => {
+        console.log('searchResults', searchResults)
         if (searchResults) {
           setResults(searchResults);
           if (searchResults.references.length < topK) {
