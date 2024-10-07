@@ -361,7 +361,7 @@ export interface Workflow {
   deploy_status: string;
   publish_date: string;
   username: string;
-  genai_provider?: string;
+  llm_provider?: string;
   default_mode?: string;
   size: string;
   size_in_memory: string;

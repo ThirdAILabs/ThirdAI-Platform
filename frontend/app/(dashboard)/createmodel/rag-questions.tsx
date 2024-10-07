@@ -108,8 +108,6 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
         Object.entries(options).filter(([_, v]) => v !== undefined && v !== '')
       ) as EnterpriseSearchOptions;
 
-      console.log('options', options)
-
       // Call create_workflow
       const workflowResponse = await create_enterprise_search_workflow({
         workflow_name: workflowName,
@@ -119,7 +117,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
       console.log('Workflow created:', workflowId);
 
       // Go back home page
-      // router.push('/');
+      router.push('/');
     } catch (error) {
       console.error('Error during workflow creation:', error);
       alert('Error during workflow creation: ' + error);

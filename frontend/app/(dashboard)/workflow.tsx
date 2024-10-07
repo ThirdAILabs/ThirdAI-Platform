@@ -44,7 +44,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
         // enterprise-search is rag with generation
 
         // TODO don't use url params
-        const genAiProvider = `${workflow.genai_provider}`;
+        const genAiProvider = `${workflow.llm_provider}`;
         const ifGenerationOn = true;
         const newUrl = `/semantic-search/${workflow.model_id}?workflowId=${workflow.model_id}&ifGenerationOn=${ifGenerationOn}&genAiProvider=${genAiProvider}`;
         window.open(newUrl, '_blank');
