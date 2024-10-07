@@ -69,7 +69,7 @@ class EnterpriseSearchRouter:
 
             for ref in results.references:
                 ref.text = self.guardrail.redact_pii(
-                    text=results.query_text, access_token=token, label_map=label_map
+                    text=ref.text, access_token=token, label_map=label_map
                 )
             results.pii_map = label_map.tag_to_entities
 
