@@ -186,15 +186,18 @@ def deploy_single_model(
         )
 
     if not memory:
-        try:
-            meta_data = json.loads(model.meta_data.train)
-            size_in_memory = int(meta_data["size_in_memory"])
-        except (json.JSONDecodeError, KeyError) as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to parse model metadata or missing 'size_in_memory'.",
-            )
-        memory = (size_in_memory // 1000000) + 1000  # MB required for deployment
+        if model.meta_data and model.meta_data.train:
+            try:
+                meta_data = json.loads(model.meta_data.train)
+                size_in_memory = int(meta_data["size_in_memory"])
+            except (json.JSONDecodeError, KeyError) as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Failed to parse model metadata or missing 'size_in_memory'.",
+                )
+            memory = (size_in_memory // 1000000) + 1000  # MB required for deployment
+        else:
+            memory = 1000  # Default to avoid errors if meta_data isn't defined.
 
     work_dir = os.getcwd()
     platform = get_platform()
