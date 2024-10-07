@@ -504,7 +504,7 @@ export default function Interact() {
                 color="primary"
               />
             }
-            label="Show highlighted only"
+            label="Tagged Text Only"
           />
         </Box>
       )}
