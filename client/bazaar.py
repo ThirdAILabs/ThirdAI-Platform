@@ -709,6 +709,14 @@ class ModelBazaar:
 
         print("Deployment is shutting down.")
 
+    def model_details(self, model_id: str):
+        res = http_get_with_error(
+            urljoin(self._base_url, "model/details"),
+            params={"model_id": model_id},
+            headers=auth_header(self._access_token),
+        )
+        return res.json()["data"]
+
     # TODO(pratik): add a unit tests for this function
     @staticmethod
     def full_backup_restore(bucket_name, local_dir, database_uri):

@@ -70,6 +70,20 @@ def test_enterprise_search_with_guardrails():
 
     client = admin_client.deploy(f"admin/{workflow_name}", memory=500)
 
+    es_deps = admin_client.model_details(client.model_id)["dependencies"]
+    assert len(es_deps) == 2
+    assert set(m["model_id"] for m in es_deps) == set([guardrail_id, model.model_id])
+    assert set(m["model_name"] for m in es_deps) == set(
+        [guardrail_name, model.model_identifier.split("/")[1]]
+    )
+
+    ndb_used_by = admin_client.model_details(model.model_id)["used_by"]
+    assert len(ndb_used_by) == 1
+    assert [m["model_id"] for m in ndb_used_by] == [client.model_id]
+    assert [m["model_name"] for m in ndb_used_by] == [
+        client.model_identifier.split("/")[1]
+    ]
+
     query = "American Express Profit Rises 14. my phone number is 123-457-2490"
     results = client.search(query)
     assert results["query_text"] == query.replace("123-457-2490", "[PHONENUMBER #0]")

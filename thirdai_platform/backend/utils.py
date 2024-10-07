@@ -169,6 +169,24 @@ def get_high_level_model_info(result: schema.Model):
     attributes = result.get_attributes()
     info.update(attributes)
 
+    info["dependencies"] = [
+        {
+            "model_id": m.dependency_id,
+            "model_name": m.dependency.name,
+            "username": m.dependency.user.username,
+        }
+        for m in result.dependencies
+    ]
+
+    info["used_by"] = [
+        {
+            "model_id": m.model_id,
+            "model_name": m.model.name,
+            "username": m.model.user.username,
+        }
+        for m in result.used_by
+    ]
+
     # Include metadata if it exists
     if result.meta_data:
         metadata = result.meta_data
