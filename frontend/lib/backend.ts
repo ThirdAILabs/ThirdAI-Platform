@@ -766,7 +766,7 @@ export function useTokenClassificationEndpoints() {
       const accessToken = getAccessToken();
       axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-      const params = new URLSearchParams({ workflow_id: workflowId });
+      const params = new URLSearchParams({ model_id: workflowId });
 
       axios
         .get<WorkflowDetailsResponse>(
@@ -774,8 +774,8 @@ export function useTokenClassificationEndpoints() {
         )
         .then((res) => {
           setWorkflowName(res.data.data.model_name);
-          if (res.data.data.guardrail_model_id) {
-            setDeploymentUrl(`${deploymentBaseUrl}/${res.data.data.guardrail_model_id}`);
+          if (res.data.data.model_id) {
+            setDeploymentUrl(`${deploymentBaseUrl}/${res.data.data.model_id}`);
           }
         })
         .catch((err) => {
