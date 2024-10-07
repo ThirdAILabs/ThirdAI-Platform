@@ -8,6 +8,7 @@ from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
+import json
 from sqlalchemy.orm import Session
 
 workflow_router = APIRouter()
@@ -92,6 +93,11 @@ def create_enterprise_search_workflow(
             session.add(
                 schema.ModelAttribute(model_id=workflow_id, key=key, value=value)
             )
+        session.add(
+            schema.MetaData(
+                model_id=workflow_id, train=json.dumps({"size_in_memory": 0})
+            )
+        )
 
         session.commit()
         session.refresh(new_workflow)

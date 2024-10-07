@@ -68,7 +68,7 @@ def test_enterprise_search_with_guardrails():
         json={"retrieval_id": model.model_id, "guardrail_id": guardrail_id},
     )
 
-    client = admin_client.deploy(f"admin/{workflow_name}", memory=1500)
+    client = admin_client.deploy(f"admin/{workflow_name}", memory=500)
 
     query = "American Express Profit Rises 14. my phone number is 123-457-2490"
     results = client.search(query)
