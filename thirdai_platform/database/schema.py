@@ -198,6 +198,13 @@ class Model(SQLDeclarativeBase):
         foreign_keys="ModelDependency.model_id",
     )
 
+    used_by = relationship(
+        "ModelDependency",
+        back_populates="dependency",
+        cascade="all, delete-orphan",
+        foreign_keys="ModelDependency.dependency_id",
+    )
+
     def get_train_job_name(self):
         return f"train-{self.id}-{self.type}-{self.sub_type}"
 
@@ -334,7 +341,9 @@ class ModelDependency(SQLDeclarativeBase):
     )
 
     model = relationship("Model", back_populates="dependencies", foreign_keys=model_id)
-    dependency = relationship("Model", foreign_keys=dependency_id)
+    dependency = relationship(
+        "Model", back_populates="used_by", foreign_keys=dependency_id
+    )
 
     __table_args__ = (
         Index("model_dependency_index", "model_id"),

@@ -36,7 +36,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import and_, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from storage import interface, local
 
@@ -70,7 +70,12 @@ def list_public_models(
     """
     query = (
         session.query(schema.Model)
-        .options(joinedload(schema.Model.user))
+        .options(
+            joinedload(schema.Model.user),
+            selectinload(schema.Model.attributes),
+            selectinload(schema.Model.dependencies),
+            selectinload(schema.Model.used_by),
+        )
         .filter(
             schema.Model.name.ilike(f"%{name}%"),
             schema.Model.access_level == schema.Access.public,
@@ -109,6 +114,12 @@ def list_models(
 
     accessible_models = (
         session.query(schema.Model)
+        .options(
+            joinedload(schema.Model.user),
+            selectinload(schema.Model.attributes),
+            selectinload(schema.Model.dependencies),
+            selectinload(schema.Model.used_by),
+        )
         .join(
             schema.ModelPermission,
             schema.Model.id == schema.ModelPermission.model_id,
@@ -150,7 +161,16 @@ def list_models(
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
     user: schema.User = authenticated_user.user
-    model: schema.Model = session.query(schema.Model).get(model_id)
+    model: schema.Model = (
+        session.query(schema.Model)
+        .options(
+            joinedload(schema.Model.user),
+            selectinload(schema.Model.attributes),
+            selectinload(schema.Model.dependencies),
+            selectinload(schema.Model.used_by),
+        )
+        .get(model_id)
+    )
 
     if model.get_user_permission(user):
         return response(
@@ -197,7 +217,12 @@ def search_models(
 
     query = (
         session.query(schema.Model)
-        .options(joinedload(schema.Model.user))
+        .options(
+            joinedload(schema.Model.user),
+            selectinload(schema.Model.attributes),
+            selectinload(schema.Model.dependencies),
+            selectinload(schema.Model.used_by),
+        )
         .filter(
             schema.Model.name.ilike(f"%{name}%"),
             schema.Model.train_status == schema.Status.complete,
@@ -797,7 +822,12 @@ def list_team_models(
     results = (
         session.query(schema.Model)
         .filter(schema.Model.team_id == team.id)
-        .options(joinedload(schema.Model.user))
+        .options(
+            joinedload(schema.Model.user),
+            selectinload(schema.Model.attributes),
+            selectinload(schema.Model.dependencies),
+            selectinload(schema.Model.used_by),
+        )
         .all()
     )
 
