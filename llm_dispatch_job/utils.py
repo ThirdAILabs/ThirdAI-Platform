@@ -44,14 +44,15 @@ def reference_content(reference: Reference) -> str:
 
 
 def make_prompt(
-    query:str, 
-    prompt: Optional[str], 
+    query: str,
+    prompt: Optional[str],
     references: List[Reference],
     reverse_ref_order: bool = False,
     token_limit: int = 2000,
 ):
     if reverse_ref_order:
         references = references[::-1]
+
     processed_references = map(reference_content, references)
     context = "\n\n".join(processed_references)
 
