@@ -29,6 +29,7 @@ workflow_table = sa.Table(
     sa.MetaData(),
     sa.Column("id", sa.UUID(as_uuid=True), primary_key=True),
     sa.Column("name", sa.String(256), nullable=False),
+    sa.Column("type_id", sa.UUID(as_uuid=True), nullable=False),
     sa.Column(
         "user_id", sa.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False
     ),
@@ -97,7 +98,7 @@ def upgrade() -> None:
             workflow_table.c.published_date,
             workflow_table.c.user_id,
             workflow_table.c.gen_ai_provider,
-        ).where("workflows.type_id" == rag_type)
+        ).where(workflow_table.c.type_id == rag_type)
     ).all()
 
     op.bulk_insert(
@@ -136,7 +137,7 @@ def upgrade() -> None:
                 workflow_model_table.c.workflow_id == workflow_table.c.id,
             )
         )
-        .where("workflows.type_id" == rag_type)
+        .where(workflow_table.c.type_id == rag_type)
     ).all()
 
     op.bulk_insert(
