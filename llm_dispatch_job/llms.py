@@ -4,7 +4,8 @@ from typing import AsyncGenerator, List
 from urllib.parse import urljoin
 
 import aiohttp
-from utils import Reference, combine_query_and_context
+import requests
+from utils import Reference, make_prompt
 
 
 class LLMBase:
@@ -23,15 +24,14 @@ class OpenAILLM(LLMBase):
             "Content-Type": "application/json",
             "Authorization": f"Bearer {key}",
         }
+
+        system_prompt, user_prompt = make_prompt(query, prompt, references)
+
         body = {
             "model": model,
             "messages": [
-                {
-                    "role": "user",
-                    "content": combine_query_and_context(
-                        query=query, prompt=prompt, references=references
-                    ),
-                }
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
             ],
             "stream": True,
         }
@@ -67,16 +67,14 @@ class CohereLLM(LLMBase):
             "Content-Type": "application/json",
             "Authorization": f"Bearer {key}",
         }
+
+        system_prompt, user_prompt = make_prompt(query, prompt, references)
+
         body = {
-            "message": query,
             "model": model,
             "chat_history": [
-                {
-                    "role": "USER",
-                    "message": combine_query_and_context(
-                        query=query, prompt=prompt, references=references
-                    ),
-                }
+                {"role": "SYSTEM", "message": system_prompt},
+                {"role": "USER", "message": user_prompt},
             ],
             "stream": True,
         }
@@ -103,26 +101,24 @@ class CohereLLM(LLMBase):
 
 
 class OnPremLLM(LLMBase):
+    def __init__(self):
+        self.backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
+        if self.backend_endpoint is None:
+            raise ValueError("Could not read MODEL_BAZAAR_ENDPOINT.")
+
     async def stream(
         self, key: str, query: str, prompt: str, references: List[Reference], model: str
     ) -> AsyncGenerator[str, None]:
-        backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
+        system_prompt, user_prompt = make_prompt(query, prompt, references)
 
-        if backend_endpoint is None:
-            raise ValueError("Could not read MODEL_BAZAAR_ENDPOINT.")
-
-        url = urljoin(backend_endpoint, "/on-prem-llm/completion")
+        url = urljoin(self.backend_endpoint, "/on-prem-llm/v1/chat/completions")
 
         headers = {"Content-Type": "application/json"}
         data = {
-            "system_prompt": "Answer the user's questions based on the given context.",
-            "prompt": combine_query_and_context(
-                query=query,
-                prompt=prompt,
-                references=references,
-                reverse_ref_order=False,
-            ),
-            # + "<|assistant|>",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
             "stream": True,
             # Occasionally the model will repeat itself infinitely, this cuts off
             # the model at 1000 output tokens so that doesn't occur. Alternatively
@@ -131,6 +127,7 @@ class OnPremLLM(LLMBase):
             # sensitive to this. We set it to 1000 because throughput is important
             # and answers aren't super useful past 1000 tokens anyways.
             "n_predict": 1000,
+            "model": model,
         }
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=data) as response:
@@ -141,13 +138,11 @@ class OnPremLLM(LLMBase):
                 async for line in response.content.iter_any():
                     line = line.decode("utf-8").strip()
                     if line and line.startswith("data: "):
-                        offset = len("data: ")
-                        try:
-                            data = json.loads(line[offset:])
-                        except:
-                            continue
-                        if "content" in data:
-                            yield data["content"]
+                        line = line[len("data: ") :]
+                        if "[DONE]" in line:
+                            break
+                        data = json.loads(line)
+                        yield data["choices"][0]["delta"]["content"]
 
 
 model_classes = {
