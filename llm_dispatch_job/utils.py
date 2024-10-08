@@ -22,12 +22,13 @@ class GenerateArgs(BaseModel):
     cache_access_token: Optional[str] = None
 
 
-DEFAULT_PROMPT = (
-    "Write a short answer "
-    + "for the query, based on the provided context. "
-    + "If the context provides insufficient information, "
-    + 'reply "I cannot answer".'
+DEFAULT_SYSTEM_PROMPT = (
+    "Write a short answer for the user's query based on the provided context. "
+    "If the context provides insufficient information, mention it but answer to "
+    "the best of your abilities."
 )
+
+DEFAULT_PROMPT = "Given this context, "
 
 
 def reference_content(reference: Reference) -> str:
@@ -42,19 +43,24 @@ def reference_content(reference: Reference) -> str:
     return f"(From a webpage) {reference.text}"
 
 
-def combine_query_and_context(
-    query: str,
-    prompt: Optional[str],
+def make_prompt(
+    query:str, 
+    prompt: Optional[str], 
     references: List[Reference],
     reverse_ref_order: bool = False,
+    token_limit: int = 2000,
 ):
-    if prompt or references:
-        if reverse_ref_order:
-            references = references[::-1]
-        processed_references = map(reference_content, references)
-        context = "\n\n".join(processed_references)
-        context = " ".join(context.split(" ")[:2000])
+    if reverse_ref_order:
+        references = references[::-1]
+    processed_references = map(reference_content, references)
+    context = "\n\n".join(processed_references)
 
-        return f"Context: '{context}'\n\n Prompt: {prompt or DEFAULT_PROMPT}\n\nQuery: '{query}'\n\nAnswer: "
+    if reverse_ref_order:
+        context = " ".join(context.split(" ")[-token_limit:])
+    else:
+        context = " ".join(context.split(" ")[:token_limit])
 
-    return query
+    system_prompt = DEFAULT_SYSTEM_PROMPT
+    user_prompt = f"{context}\n\n {prompt or DEFAULT_PROMPT} {query}"
+
+    return system_prompt, user_prompt

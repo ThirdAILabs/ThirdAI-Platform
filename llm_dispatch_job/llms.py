@@ -4,7 +4,8 @@ from typing import AsyncGenerator, List
 from urllib.parse import urljoin
 
 import aiohttp
-from utils import Reference, combine_query_and_context
+import requests
+from utils import Reference, make_prompt
 
 
 class LLMBase:
@@ -23,15 +24,14 @@ class OpenAILLM(LLMBase):
             "Content-Type": "application/json",
             "Authorization": f"Bearer {key}",
         }
+
+        system_prompt, user_prompt = make_prompt(model, query, prompt, references)
+
         body = {
             "model": model,
             "messages": [
-                {
-                    "role": "user",
-                    "content": combine_query_and_context(
-                        query=query, prompt=prompt, references=references
-                    ),
-                }
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
             ],
             "stream": True,
         }
@@ -67,16 +67,14 @@ class CohereLLM(LLMBase):
             "Content-Type": "application/json",
             "Authorization": f"Bearer {key}",
         }
+
+        system_prompt, user_prompt = make_prompt(model, query, prompt, references)
+
         body = {
-            "message": query,
             "model": model,
             "chat_history": [
-                {
-                    "role": "USER",
-                    "message": combine_query_and_context(
-                        query=query, prompt=prompt, references=references
-                    ),
-                }
+                {"role": "SYSTEM", "message": system_prompt},
+                {"role": "USER", "message": user_prompt},
             ],
             "stream": True,
         }
@@ -104,33 +102,40 @@ class CohereLLM(LLMBase):
 
 class OnPremLLM(LLMBase):
     def __init__(self):
-        self.model_prompts = [
-            GPT4Scientific(),
-            CodingAssistant(),
-            DefaultPattern()
-        ]
-    
-    def get_model_prompt(self, model, query, references):
-        for pattern in self.model_prompts:
-            if pattern.matches(model):
-                return pattern.prompt(query, references)
+        self.backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
+
+        if self.backend_endpoint is None:
+            raise ValueError("Could not read MODEL_BAZAAR_ENDPOINT.")
+
+    def verify_model_name(self):
+        url = urljoin(self.backend_endpoint, "/on-prem-llm/models")
+        headers = {"Content-Type": "application/json"}
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise Exception(f"Request to {url} failed. Error: {response.text}")
+        model_path = response.json()["data"][0]["id"]
+        model_name = model_path.split("/")[-1].lower()
+        return model_name
 
     async def stream(
         self, key: str, query: str, prompt: str, references: List[Reference], model: str
     ) -> AsyncGenerator[str, None]:
-        backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
 
-        if backend_endpoint is None:
-            raise ValueError("Could not read MODEL_BAZAAR_ENDPOINT.")
+        # We use the model name from the server itself here because there's still
+        # experimentation going on with different models.
+        # TODO(david) Once we're settled on a couple models and can easily select
+        # from the UI, refactor this to use the passed in model name instead
+        model = self.verify_model_name()
+        system_prompt, user_prompt = make_prompt(model, query, prompt, references)
 
-        url = urljoin(backend_endpoint, "/on-prem-llm/completion")
-
-        system_prompt, input_prompt = self.get_model_prompt(model)
+        url = urljoin(self.backend_endpoint, "/on-prem-llm/v1/chat/completions")
 
         headers = {"Content-Type": "application/json"}
         data = {
-            "system_prompt": system_prompt,
-            "prompt": input_prompt,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
             "stream": True,
             # Occasionally the model will repeat itself infinitely, this cuts off
             # the model at 1000 output tokens so that doesn't occur. Alternatively
@@ -139,6 +144,7 @@ class OnPremLLM(LLMBase):
             # sensitive to this. We set it to 1000 because throughput is important
             # and answers aren't super useful past 1000 tokens anyways.
             "n_predict": 1000,
+            "model": model,
         }
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=data) as response:
@@ -169,37 +175,3 @@ default_keys = {
     "cohere": os.getenv("COHERE_KEY", ""),
     "on-prem": "no key",  # TODO(david) add authentication to the service
 }
-
-
-
-from typing import List, Tuple
-from abc import ABC, abstractmethod
-
-
-class PromptPattern(ABC):
-    @abstractmethod
-    def matches(self, model: str) -> bool:
-        pass
-
-    @abstractmethod
-    def prompt(self, query: str, references: List[Reference]) -> Tuple[str, str]:
-        pass
-
-
-class DefaultPattern(PromptPattern):
-    def matches(self, model: str) -> bool:
-        return True
-
-    def prompt(self, query: str, references: List[Reference]) -> Tuple[str, str]:
-        system_prompt = "Answer the user's questions based on the below context:"
-        input_prompt = combine_query_and_context(query=query, prompt="", references=references, reverse_ref_order=True)
-        return system_prompt, input_prompt
-
-class GPT4ScientificPattern(PromptPattern):
-    def matches(self, model: str) -> bool:
-        return model.startswith("gpt-4")
-
-    def prompt(self, query: str, references: List[Reference]) -> Tuple[str, str]:
-        system_prompt = "You are an advanced AI assistant specializing in scientific explanations. Provide detailed and accurate responses."
-        input_prompt = f"Scientific query: {query}\n\nContext:\n" + "\n".join(ref.content for ref in references)
-        return system_prompt, input_prompt
