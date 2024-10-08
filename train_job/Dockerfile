@@ -1,5 +1,5 @@
-# Use the official FastAPI image with Python 3.9
-FROM tiangolo/uvicorn-gunicorn-fastapi:python3.9
+# Use the official FastAPI image with Python 3.11
+FROM tiangolo/uvicorn-gunicorn-fastapi:python3.11
 
 # Set the working directory in the container to /app
 WORKDIR /app

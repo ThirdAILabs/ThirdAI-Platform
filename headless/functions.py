@@ -274,6 +274,22 @@ class NDBFunctions:
                 if not generated_answer:
                     raise Exception(f"Openai answer is not generated")
 
+                deployment.update_chat_settings(provider="openai")
+
+                chat_response = deployment.chat(
+                    user_input=best_answer["text"],
+                    session_id=deployment.model_id,
+                    provider="openai",
+                )
+
+                logging.info(f"OpenAI Chat response {chat_response}")
+
+                chat_history = deployment.get_chat_history(
+                    session_id=deployment.model_id
+                )
+
+                logging.info(f"OpenAI Chat history {chat_history}")
+
             if on_prem:
                 flow.bazaar_client.start_on_prem(autoscaling_enabled=False)
                 # waiting for our on-prem to start and trafeik to discover the service
@@ -287,6 +303,22 @@ class NDBFunctions:
                 logging.info(f"on-prem generated answer: {generated_answer}")
                 if not generated_answer:
                     raise Exception(f"On prem answer is not generated")
+
+                deployment.update_chat_settings(provider="on-prem")
+
+                deployment.chat(
+                    user_input=best_answer["text"],
+                    session_id=deployment.model_id,
+                    provider="on-prem",
+                )
+
+                logging.info(f"On prem Chat response {chat_response}")
+
+                chat_history = deployment.get_chat_history(
+                    session_id=deployment.model_id
+                )
+
+                logging.info(f"On prem Chat history {chat_history}")
 
     @staticmethod
     def check_unsupervised(inputs: Dict[str, Any]) -> Any:
