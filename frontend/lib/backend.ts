@@ -858,12 +858,12 @@ export interface TokenClassificationResult {
 export function useTokenClassificationEndpoints() {
   const accessToken = useAccessToken();
   const params = useParams();
-  console.log(params);
+  // console.log(params);
   const workflowId = params.deploymentId as string;
   const [workflowName, setWorkflowName] = useState<string>('');
   const [deploymentUrl, setDeploymentUrl] = useState<string | undefined>();
 
-  console.log('PARAMS', params);
+  // console.log('PARAMS', params);
 
   useEffect(() => {
     const init = async () => {
