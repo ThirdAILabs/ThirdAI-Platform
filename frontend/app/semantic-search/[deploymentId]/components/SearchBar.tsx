@@ -152,7 +152,7 @@ export default function SearchBar({
   setPrompt,
   ifGenerationOn,
   cacheEnabled,
-  
+
   abortController,
   setAbortController,
   setAnswer,

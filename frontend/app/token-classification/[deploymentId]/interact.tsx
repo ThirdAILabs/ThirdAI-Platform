@@ -1,6 +1,13 @@
 'use client';
-
-import { Container, Box, CircularProgress, Typography, Switch, FormControlLabel } from '@mui/material';
+import React from 'react';
+import {
+  Container,
+  Box,
+  CircularProgress,
+  Typography,
+  Switch,
+  FormControlLabel,
+} from '@mui/material';
 import { Button } from '@/components/ui/button';
 import { MouseEventHandler, ReactNode, useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
@@ -48,7 +55,6 @@ interface ParsedData {
   content: string;
   rows?: { label: string; content: string }[];
 }
-
 
 const SELECTING_COLOR = '#EFEFEF';
 const SELECTED_COLOR = '#DFDFDF';
@@ -228,10 +234,11 @@ export default function Interact() {
     setInputText(event.target.value);
     // Reset parsedData when manually typing
     setParsedData(null);
+    setAnnotations([]);
   };
 
   // Add a new state to store the parsed rows
-  const [parsedRows, setParsedRows] = useState<{label: string, content: string}[]>([]);
+  const [parsedRows, setParsedRows] = useState<{ label: string; content: string }[]>([]);
 
   const parseCSV = (file: File): Promise<ParsedData> => {
     return new Promise((resolve, reject) => {
@@ -245,15 +252,17 @@ export default function Interact() {
           const headers = data[0];
           const rows = data.slice(1);
           let parsedRows = rows
-            .filter(row => row.some(cell => cell.trim() !== ''))
+            .filter((row) => row.some((cell) => cell.trim() !== ''))
             .map((row, rowIndex) => {
-              let content = headers.map((header, index) => `${header}: ${row[index] || ''}`).join('\n');
+              let content = headers
+                .map((header, index) => `${header}: ${row[index] || ''}`)
+                .join('\n');
               return {
                 label: `Row ${rowIndex + 1}`,
-                content: content
+                content: content,
               };
             });
-          const fullContent = parsedRows.map(row => row.content).join('\n\n');
+          const fullContent = parsedRows.map((row) => row.content).join('\n\n');
           resolve({ type: 'csv', content: fullContent, rows: parsedRows });
         },
         error: reject,
@@ -261,7 +270,7 @@ export default function Interact() {
     });
   };
 
-  const parseExcel = (file: File): Promise<{label: string, content: string}[]> => {
+  const parseExcel = (file: File): Promise<{ label: string; content: string }[]> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -269,30 +278,38 @@ export default function Interact() {
         const workbook = XLSX.read(data, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as (string | number | null)[][];
-        
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as (
+          | string
+          | number
+          | null
+        )[][];
+
         if (jsonData.length < 2) {
           resolve([]);
           return;
         }
-        
+
         const headers = jsonData[0].map(String);
         const rows = jsonData.slice(1);
-        
-        let parsedRows = rows.map((row, rowIndex) => {
-          if (row.some(cell => cell !== null && cell !== '')) {
-            let content = headers.map((header, index) => {
-              const cellValue = row[index];
-              return `${header}: ${cellValue !== null && cellValue !== undefined ? cellValue : ''}`;
-            }).join('\n');
-            return {
-              label: `Row ${rowIndex + 1}`,
-              content: content
-            };
-          }
-          return null;
-        }).filter((row): row is {label: string, content: string} => row !== null);
-        
+
+        let parsedRows = rows
+          .map((row, rowIndex) => {
+            if (row.some((cell) => cell !== null && cell !== '')) {
+              let content = headers
+                .map((header, index) => {
+                  const cellValue = row[index];
+                  return `${header}: ${cellValue !== null && cellValue !== undefined ? cellValue : ''}`;
+                })
+                .join('\n');
+              return {
+                label: `Row ${rowIndex + 1}`,
+                content: content,
+              };
+            }
+            return null;
+          })
+          .filter((row): row is { label: string; content: string } => row !== null);
+
         resolve(parsedRows);
       };
       reader.onerror = reject;
@@ -301,6 +318,8 @@ export default function Interact() {
   };
 
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Update the handleFileChange function
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -316,7 +335,11 @@ export default function Interact() {
         parsed = await parsePDF(file);
       } else if (['xls', 'xlsx'].includes(fileExtension ?? '')) {
         const excelRows = await parseExcel(file);
-        parsed = { type: 'csv', content: excelRows.map(row => row.content).join('\n\n'), rows: excelRows };
+        parsed = {
+          type: 'csv',
+          content: excelRows.map((row) => row.content).join('\n\n'),
+          rows: excelRows,
+        };
       } else {
         // Handle other file types (txt, docx)
         const content = fileExtension === 'docx' ? await parseDOCX(file) : await parseTXT(file);
@@ -325,8 +348,13 @@ export default function Interact() {
 
       setInputText(parsed.content);
       setParsedData(parsed);
-      handleRun(parsed.content);
+      handleRun(parsed.content, true); // Pass true to indicate it's a file upload
       setIsLoading(false);
+    }
+
+    // Reset the file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -341,6 +369,14 @@ export default function Interact() {
     });
   };
 
+  interface PDFTextItem {
+    text: string;
+    x: number;
+    y: number;
+    fontName: string;
+    height: number;
+  }
+
   const parsePDF = async (file: File): Promise<ParsedData> => {
     const loadingTask = pdfjsLib.getDocument(URL.createObjectURL(file));
     const pdf = await loadingTask.promise;
@@ -349,24 +385,53 @@ export default function Interact() {
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => ({ 
-          text: item.str, 
-          fontName: item.fontName
+      let lastY = Infinity;
+      let lastHeight = 0;
+      let currentParagraph = '';
+      let paragraphs: string[] = [];
+
+      const pageItems = textContent.items
+        .map((item: any) => ({
+          text: item.str,
+          x: item.transform[4],
+          y: item.transform[5],
+          fontName: item.fontName,
+          height: item.height,
         }))
-        .reduce((acc: { text: string, fontName: string }[], curr: { text: string, fontName: string }) => {
-          if (acc.length && acc[acc.length - 1].fontName === curr.fontName) {
-            acc[acc.length - 1].text += ' ' + curr.text;
-          } else {
-            acc.push(curr);
+        .sort((a: PDFTextItem, b: PDFTextItem) => b.y - a.y || a.x - b.x); // Sort by y (descending) then x (ascending)
+
+      pageItems.forEach((curr: PDFTextItem, index: number) => {
+        const verticalGap = lastY - (curr.y + curr.height);
+
+        if (index > 0) {
+          // Check if this item is on a new paragraph
+          if (verticalGap > Math.max(lastHeight, curr.height) * 1.5) {
+            // Significant gap, likely a new paragraph
+            if (currentParagraph.trim() !== '') {
+              paragraphs.push(currentParagraph.trim());
+              currentParagraph = '';
+            }
+            if (paragraphs.length > 0) {
+              paragraphs.push(''); // Add an empty line between paragraphs
+            }
           }
-          return acc;
-        }, [] as { text: string, fontName: string }[])
-        .map((item: { text: string }) => item.text)
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      fullText += pageText + '\n\n';
+          // Add space if needed within the same paragraph
+          if (curr.x - (pageItems[index - 1].x + pageItems[index - 1].text.length * 5) > 10) {
+            currentParagraph += ' ';
+          }
+        }
+
+        currentParagraph += curr.text;
+        lastY = curr.y;
+        lastHeight = curr.height;
+      });
+
+      // Add the last paragraph if it's not empty
+      if (currentParagraph.trim() !== '') {
+        paragraphs.push(currentParagraph.trim());
+      }
+
+      fullText += paragraphs.join('\n') + '\n'; // Join paragraphs and add newline between pages
     }
 
     fullText = fullText.replace(/^PDF:\s*/i, '').trim();
@@ -399,7 +464,7 @@ export default function Interact() {
     });
   };
 
-  const handleRun = (text: string) => {
+  const handleRun = (text: string, isFileUpload: boolean = false) => {
     setIsLoading(true);
     predict(text).then((result) => {
       updateTagColors(result.predicted_tags);
@@ -409,10 +474,12 @@ export default function Interact() {
           tag: tag![0] as string,
         }))
       );
-      // If there's no parsedData, set it as a generic type
-      if (!parsedData) {
+
+      // Only set parsedData for direct text input, not file uploads
+      if (!isFileUpload && !parsedData) {
         setParsedData({ type: 'other', content: text });
       }
+
       setIsLoading(false);
     });
   };
@@ -422,8 +489,10 @@ export default function Interact() {
 
     if (parsedData.type === 'csv' && parsedData.rows) {
       return renderCSVContent(parsedData.rows);
-    } else {
+    } else if (parsedData.type === 'pdf') {
       return renderPDFContent(parsedData.content);
+    } else {
+      return renderHighlightedContent(parsedData.content);
     }
   };
 
@@ -449,35 +518,41 @@ export default function Interact() {
   };
 
   const isWordHighlighted = (word: string) => {
-    return annotations.some(token => 
-      token.text.toLowerCase() === word.toLowerCase() &&
-      token.tag !== 'O'
+    return annotations.some(
+      (token) => token.text.toLowerCase() === word.toLowerCase() && token.tag !== 'O'
     );
   };
 
   const renderCSVContent = (rows: { label: string; content: string }[]) => {
     return rows.map((row, rowIndex) => {
       const columns = row.content.split('\n');
-      const visibleColumns = columns.filter(column => {
+      const visibleColumns = columns.filter((column) => {
         const [columnName, ...columnContent] = column.split(':');
         const content = columnContent.join(':').trim();
         return !showHighlightedOnly || content.split(' ').some(isWordHighlighted);
       });
-  
+
       if (visibleColumns.length === 0) {
         return null;
       }
-  
+
       return (
-        <div key={rowIndex} style={{ marginBottom: '20px', padding: '10px', border: '1px solid #ccc', borderRadius: '5px' }}>
+        <div
+          key={rowIndex}
+          style={{
+            marginBottom: '20px',
+            padding: '10px',
+            border: '1px solid #ccc',
+            borderRadius: '5px',
+          }}
+        >
           <strong>{row.label}:</strong>
           {visibleColumns.map((column, columnIndex) => {
             const [columnName, ...columnContent] = column.split(':');
             const content = columnContent.join(':').trim();
             return (
               <p key={columnIndex}>
-                <strong>{columnName}:</strong>{' '}
-                {renderHighlightedContent(content)}
+                <strong>{columnName}:</strong> {renderHighlightedContent(content)}
               </p>
             );
           })}
@@ -486,17 +561,23 @@ export default function Interact() {
     });
   };
 
+  // Update the renderPDFContent function to handle the new format
   const renderPDFContent = (content: string) => {
-    return renderHighlightedContent(content);
+    return content.split('\n').map((paragraph, index) => (
+      <React.Fragment key={index}>
+        {paragraph === '' ? <br /> : renderHighlightedContent(paragraph)}
+        <br />
+      </React.Fragment>
+    ));
   };
 
   const renderHighlightedContent = (content: string) => {
     const words = content.split(/\s+/);
     return words.map((word, wordIndex) => {
-      const tokenIndex = annotations.findIndex(token => 
-        token.text.toLowerCase() === word.toLowerCase()
+      const tokenIndex = annotations.findIndex(
+        (token) => token.text.toLowerCase() === word.toLowerCase()
       );
-  
+
       if (tokenIndex !== -1 && annotations[tokenIndex].tag !== 'O') {
         return (
           <Highlight
@@ -552,6 +633,7 @@ export default function Interact() {
           </Button>
         </label>
         <input
+          ref={fileInputRef}
           id="file-upload"
           type="file"
           accept=".txt,.pdf,.docx,.csv,.xls,.xlsx"
@@ -572,11 +654,7 @@ export default function Interact() {
             }
           }}
         />
-        <Button 
-          size="sm" 
-          onClick={() => handleRun(inputText)} 
-          style={{ marginLeft: '10px' }}
-        >
+        <Button size="sm" onClick={() => handleRun(inputText)} style={{ marginLeft: '10px' }}>
           Run
         </Button>
       </Box>
@@ -609,7 +687,12 @@ export default function Interact() {
           <Box mt={4}>
             <Card
               className="p-7 text-start"
-              style={{ lineHeight: 2, fontWeight: 'normal' }}
+              style={{
+                lineHeight: 1.6, // Adjusted for better readability
+                fontWeight: 'normal',
+                whiteSpace: 'pre-wrap', // This will preserve whitespace and line breaks
+                wordWrap: 'break-word', // This will wrap long words
+              }}
               onMouseUp={(e) => {
                 setSelecting(false);
                 if (startIndex !== null && endIndex !== null) {

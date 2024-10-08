@@ -426,7 +426,7 @@ function App() {
       return processedSentences.join(' ');
     }
 
-      // If a generation is already in progress, abort it
+    // If a generation is already in progress, abort it
     if (abortController) {
       abortController.abort();
     }
@@ -472,30 +472,32 @@ function App() {
           const controller = new AbortController();
           setAbortController(controller); // Store it in state
 
-          modelService!.generateAnswer(
-            processedQuery,
-            `${genaiPrompt}. [TAG #id] is sensitive information replaced as a placeholder, use them in your response for consistency.`,
-            processedReferences,
-            (next) => {
-              setAnswer((prev) => {
-                // Concatenate previous answer and the new part
-                const fullAnswer = prev + next;
+          modelService!
+            .generateAnswer(
+              processedQuery,
+              `${genaiPrompt}. [TAG #id] is sensitive information replaced as a placeholder, use them in your response for consistency.`,
+              processedReferences,
+              (next) => {
+                setAnswer((prev) => {
+                  // Concatenate previous answer and the new part
+                  const fullAnswer = prev + next;
 
-                // Replace placeholders in the concatenated string
-                const replacedAnswer = replacePlaceholdersWithOriginal(fullAnswer, piiMap);
+                  // Replace placeholders in the concatenated string
+                  const replacedAnswer = replacePlaceholdersWithOriginal(fullAnswer, piiMap);
 
-                // Return the final processed answer to update the state
-                return replacedAnswer;
-              });
-            },
-            genAiProvider || undefined, // Convert null to undefined
-            workflowId || undefined,
-            undefined,
-            controller.signal // Pass the signal here
-          ).finally(() => {
-            // Cleanup after generation completes or is aborted
-            setAbortController(null);
-          });
+                  // Return the final processed answer to update the state
+                  return replacedAnswer;
+                });
+              },
+              genAiProvider || undefined, // Convert null to undefined
+              workflowId || undefined,
+              undefined,
+              controller.signal // Pass the signal here
+            )
+            .finally(() => {
+              // Cleanup after generation completes or is aborted
+              setAbortController(null);
+            });
         }
       } else {
         // Case 2: Guardrail is OFF (Normal generation)
@@ -534,13 +536,13 @@ function App() {
                     setAnswer(tokens.slice(0, currentStoppingIndex).join(' '));
                     break;
                   }
-                  
+
                   currentStoppingIndex = i + 1; // Update stopping index to current position
                   setAnswer(tokens.slice(0, currentStoppingIndex).join(' '));
                   await sleep(20); // Mimic streaming response with a delay
                 }
 
-                setAbortController(null)
+                setAbortController(null);
 
                 // Set the query information including whether they differ
                 setQueryInfo({
@@ -563,20 +565,22 @@ function App() {
           // Create a new AbortController instance
           const controller = new AbortController();
           setAbortController(controller); // Store it in state
-          
-          modelService!.generateAnswer(
-            query,
-            genaiPrompt,
-            results.references,
-            (next) => setAnswer((prev) => prev + next),
-            genAiProvider || undefined, // Convert null to undefined
-            workflowId || undefined,
-            undefined,
-            controller.signal // Pass the signal here
-          ).finally(() => {
-            // Cleanup after generation completes or is aborted
-            setAbortController(null);
-          });
+
+          modelService!
+            .generateAnswer(
+              query,
+              genaiPrompt,
+              results.references,
+              (next) => setAnswer((prev) => prev + next),
+              genAiProvider || undefined, // Convert null to undefined
+              workflowId || undefined,
+              undefined,
+              controller.signal // Pass the signal here
+            )
+            .finally(() => {
+              // Cleanup after generation completes or is aborted
+              setAbortController(null);
+            });
         }
       }
     } else {
@@ -735,10 +739,9 @@ function App() {
                     setPrompt={setPrompt}
                     ifGenerationOn={ifGenerationOn}
                     cacheEnabled={cacheEnabled}
-
-                    abortController = {abortController}
-                    setAbortController = {setAbortController}
-                    setAnswer = {setAnswer}
+                    abortController={abortController}
+                    setAbortController={setAbortController}
+                    setAnswer={setAnswer}
                   />
                   {failed && (
                     <Pad $top="100px">

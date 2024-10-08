@@ -26,8 +26,8 @@ interface GeneratedAnswerProps {
 
 // Styled component for the button
 const PauseButton = styled.button`
-  width: 40px;       /* Ensure the width is equal to the height */
-  height: 40px;      /* Ensures the button remains a circle */
+  width: 40px; /* Ensure the width is equal to the height */
+  height: 40px; /* Ensures the button remains a circle */
   background-color: black;
   border: none;
   border-radius: 50%; /* This makes it a circle */
@@ -37,10 +37,10 @@ const PauseButton = styled.button`
   cursor: pointer;
   transition: background-color 0.2s ease-in-out;
   box-sizing: border-box; /* Ensures padding and border don't affect the circle size */
-  padding: 0;            /* Ensures no additional padding distorts the shape */
-  position: absolute;    /* Make the button absolute */
-  right: 20px;           /* Align it to the right */
-  top: 0;                /* Align it to the top */
+  padding: 0; /* Ensures no additional padding distorts the shape */
+  position: absolute; /* Make the button absolute */
+  right: 20px; /* Align it to the right */
+  top: 0; /* Align it to the top */
   &:hover {
     background-color: #333; /* Changes color on hover */
   }
@@ -83,11 +83,10 @@ export default function GeneratedAnswer({
   regenerateAndBypassCache,
   cacheEnabled,
   setCacheEnabled,
-  abortController,  
-  setAbortController, 
-  setAnswer,  
+  abortController,
+  setAbortController,
+  setAnswer,
 }: GeneratedAnswerProps) {
-
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
@@ -157,9 +156,7 @@ export default function GeneratedAnswer({
       )}
 
       {isGenerating && (
-        <PauseButton
-          onClick={handleAbort}
-        >
+        <PauseButton onClick={handleAbort}>
           <FontAwesomeIcon icon={faStop} style={{ color: 'white', fontSize: '16px' }} />
         </PauseButton>
       )}

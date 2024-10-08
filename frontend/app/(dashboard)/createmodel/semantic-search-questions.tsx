@@ -46,7 +46,7 @@ const SemanticSearchQuestions = ({
 
   useEffect(() => {
     setExistingSSmodels(models.filter((model) => model.type === 'ndb'));
-  }, [models]);  
+  }, [models]);
 
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -139,7 +139,7 @@ const SemanticSearchQuestions = ({
       console.log(`Submitting model '${modelName}'`);
 
       let modelId;
-  
+
       if (ifUseExistingSS === 'Yes') {
         if (!ssModelId) {
           alert('Please select an existing retrieval app.');
@@ -149,17 +149,17 @@ const SemanticSearchQuestions = ({
         modelId = ssModelId;
       } else {
         const formData = makeFileFormData();
-  
+
         if (!formData) {
           alert('Please upload at least one file before submitting.');
           setIsLoading(false);
           return;
         }
-  
+
         // Step 1: Create the model
         const modelResponse = await train_ndb({ name: modelName, formData });
         modelId = modelResponse.data.model_id;
-  
+
         // This is called from RAG
         if (onCreateModel) {
           onCreateModel(modelId);
