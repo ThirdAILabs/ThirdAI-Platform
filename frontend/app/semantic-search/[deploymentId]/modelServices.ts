@@ -693,27 +693,27 @@ export class ModelService {
         },
         signal,
       });
-  
+
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-  
+
       const reader = response.body!.getReader();
       const decoder = new TextDecoder('utf-8');
       let finalResponse = '';
-  
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
           break;
         }
-  
+
         const newData = decoder.decode(value, { stream: true });
         finalResponse += newData;
-  
+
         onNextWord(newData);
       }
-  
+
       if (onComplete) {
         onComplete(finalResponse);
       }

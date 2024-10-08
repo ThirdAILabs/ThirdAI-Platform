@@ -2,7 +2,7 @@ import io
 import traceback
 import uuid
 from pathlib import Path
-from typing import List
+from typing import AsyncGenerator, List
 
 import fitz
 import jwt
@@ -10,6 +10,7 @@ import thirdai
 from config import DeploymentConfig, NDBSubType
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
 from file_handler import download_local_files
 from models.ndb_models import NDBModel, NDBV1Model, NDBV2Model
 from permissions import Permissions
@@ -28,8 +29,6 @@ from update_logger import (
     UpvoteLog,
 )
 from utils import propagate_error, response, validate_name
-from fastapi.responses import StreamingResponse
-from typing import AsyncGenerator
 
 ndb_query_metric = Summary("ndb_query", "NDB Queries")
 ndb_upvote_metric = Summary("ndb_upvote", "NDB upvotes")

@@ -1,6 +1,13 @@
 'use client';
 import React from 'react';
-import { Container, Box, CircularProgress, Typography, Switch, FormControlLabel } from '@mui/material';
+import {
+  Container,
+  Box,
+  CircularProgress,
+  Typography,
+  Switch,
+  FormControlLabel,
+} from '@mui/material';
 import { Button } from '@/components/ui/button';
 import { MouseEventHandler, ReactNode, useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
@@ -48,7 +55,6 @@ interface ParsedData {
   content: string;
   rows?: { label: string; content: string }[];
 }
-
 
 const SELECTING_COLOR = '#EFEFEF';
 const SELECTED_COLOR = '#DFDFDF';
@@ -232,7 +238,7 @@ export default function Interact() {
   };
 
   // Add a new state to store the parsed rows
-  const [parsedRows, setParsedRows] = useState<{label: string, content: string}[]>([]);
+  const [parsedRows, setParsedRows] = useState<{ label: string; content: string }[]>([]);
 
   const parseCSV = (file: File): Promise<ParsedData> => {
     return new Promise((resolve, reject) => {
@@ -246,15 +252,17 @@ export default function Interact() {
           const headers = data[0];
           const rows = data.slice(1);
           let parsedRows = rows
-            .filter(row => row.some(cell => cell.trim() !== ''))
+            .filter((row) => row.some((cell) => cell.trim() !== ''))
             .map((row, rowIndex) => {
-              let content = headers.map((header, index) => `${header}: ${row[index] || ''}`).join('\n');
+              let content = headers
+                .map((header, index) => `${header}: ${row[index] || ''}`)
+                .join('\n');
               return {
                 label: `Row ${rowIndex + 1}`,
-                content: content
+                content: content,
               };
             });
-          const fullContent = parsedRows.map(row => row.content).join('\n\n');
+          const fullContent = parsedRows.map((row) => row.content).join('\n\n');
           resolve({ type: 'csv', content: fullContent, rows: parsedRows });
         },
         error: reject,
@@ -262,7 +270,7 @@ export default function Interact() {
     });
   };
 
-  const parseExcel = (file: File): Promise<{label: string, content: string}[]> => {
+  const parseExcel = (file: File): Promise<{ label: string; content: string }[]> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -270,30 +278,38 @@ export default function Interact() {
         const workbook = XLSX.read(data, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as (string | number | null)[][];
-        
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as (
+          | string
+          | number
+          | null
+        )[][];
+
         if (jsonData.length < 2) {
           resolve([]);
           return;
         }
-        
+
         const headers = jsonData[0].map(String);
         const rows = jsonData.slice(1);
-        
-        let parsedRows = rows.map((row, rowIndex) => {
-          if (row.some(cell => cell !== null && cell !== '')) {
-            let content = headers.map((header, index) => {
-              const cellValue = row[index];
-              return `${header}: ${cellValue !== null && cellValue !== undefined ? cellValue : ''}`;
-            }).join('\n');
-            return {
-              label: `Row ${rowIndex + 1}`,
-              content: content
-            };
-          }
-          return null;
-        }).filter((row): row is {label: string, content: string} => row !== null);
-        
+
+        let parsedRows = rows
+          .map((row, rowIndex) => {
+            if (row.some((cell) => cell !== null && cell !== '')) {
+              let content = headers
+                .map((header, index) => {
+                  const cellValue = row[index];
+                  return `${header}: ${cellValue !== null && cellValue !== undefined ? cellValue : ''}`;
+                })
+                .join('\n');
+              return {
+                label: `Row ${rowIndex + 1}`,
+                content: content,
+              };
+            }
+            return null;
+          })
+          .filter((row): row is { label: string; content: string } => row !== null);
+
         resolve(parsedRows);
       };
       reader.onerror = reject;
@@ -319,7 +335,11 @@ export default function Interact() {
         parsed = await parsePDF(file);
       } else if (['xls', 'xlsx'].includes(fileExtension ?? '')) {
         const excelRows = await parseExcel(file);
-        parsed = { type: 'csv', content: excelRows.map(row => row.content).join('\n\n'), rows: excelRows };
+        parsed = {
+          type: 'csv',
+          content: excelRows.map((row) => row.content).join('\n\n'),
+          rows: excelRows,
+        };
       } else {
         // Handle other file types (txt, docx)
         const content = fileExtension === 'docx' ? await parseDOCX(file) : await parseTXT(file);
@@ -356,7 +376,7 @@ export default function Interact() {
     fontName: string;
     height: number;
   }
-  
+
   const parsePDF = async (file: File): Promise<ParsedData> => {
     const loadingTask = pdfjsLib.getDocument(URL.createObjectURL(file));
     const pdf = await loadingTask.promise;
@@ -371,27 +391,28 @@ export default function Interact() {
       let paragraphs: string[] = [];
 
       const pageItems = textContent.items
-        .map((item: any) => ({ 
-          text: item.str, 
+        .map((item: any) => ({
+          text: item.str,
           x: item.transform[4],
           y: item.transform[5],
           fontName: item.fontName,
-          height: item.height
+          height: item.height,
         }))
-        .sort((a: PDFTextItem, b: PDFTextItem) => b.y - a.y || a.x - b.x);  // Sort by y (descending) then x (ascending)
-  
+        .sort((a: PDFTextItem, b: PDFTextItem) => b.y - a.y || a.x - b.x); // Sort by y (descending) then x (ascending)
+
       pageItems.forEach((curr: PDFTextItem, index: number) => {
         const verticalGap = lastY - (curr.y + curr.height);
-        
+
         if (index > 0) {
           // Check if this item is on a new paragraph
-          if (verticalGap > Math.max(lastHeight, curr.height) * 1.5) {  // Significant gap, likely a new paragraph
+          if (verticalGap > Math.max(lastHeight, curr.height) * 1.5) {
+            // Significant gap, likely a new paragraph
             if (currentParagraph.trim() !== '') {
               paragraphs.push(currentParagraph.trim());
               currentParagraph = '';
             }
             if (paragraphs.length > 0) {
-              paragraphs.push('');  // Add an empty line between paragraphs
+              paragraphs.push(''); // Add an empty line between paragraphs
             }
           }
           // Add space if needed within the same paragraph
@@ -399,18 +420,18 @@ export default function Interact() {
             currentParagraph += ' ';
           }
         }
-        
+
         currentParagraph += curr.text;
         lastY = curr.y;
         lastHeight = curr.height;
       });
-  
+
       // Add the last paragraph if it's not empty
       if (currentParagraph.trim() !== '') {
         paragraphs.push(currentParagraph.trim());
       }
 
-      fullText += paragraphs.join('\n') + '\n';  // Join paragraphs and add newline between pages
+      fullText += paragraphs.join('\n') + '\n'; // Join paragraphs and add newline between pages
     }
 
     fullText = fullText.replace(/^PDF:\s*/i, '').trim();
@@ -453,12 +474,12 @@ export default function Interact() {
           tag: tag![0] as string,
         }))
       );
-  
+
       // Only set parsedData for direct text input, not file uploads
       if (!isFileUpload && !parsedData) {
         setParsedData({ type: 'other', content: text });
       }
-      
+
       setIsLoading(false);
     });
   };
@@ -497,35 +518,41 @@ export default function Interact() {
   };
 
   const isWordHighlighted = (word: string) => {
-    return annotations.some(token => 
-      token.text.toLowerCase() === word.toLowerCase() &&
-      token.tag !== 'O'
+    return annotations.some(
+      (token) => token.text.toLowerCase() === word.toLowerCase() && token.tag !== 'O'
     );
   };
 
   const renderCSVContent = (rows: { label: string; content: string }[]) => {
     return rows.map((row, rowIndex) => {
       const columns = row.content.split('\n');
-      const visibleColumns = columns.filter(column => {
+      const visibleColumns = columns.filter((column) => {
         const [columnName, ...columnContent] = column.split(':');
         const content = columnContent.join(':').trim();
         return !showHighlightedOnly || content.split(' ').some(isWordHighlighted);
       });
-  
+
       if (visibleColumns.length === 0) {
         return null;
       }
-  
+
       return (
-        <div key={rowIndex} style={{ marginBottom: '20px', padding: '10px', border: '1px solid #ccc', borderRadius: '5px' }}>
+        <div
+          key={rowIndex}
+          style={{
+            marginBottom: '20px',
+            padding: '10px',
+            border: '1px solid #ccc',
+            borderRadius: '5px',
+          }}
+        >
           <strong>{row.label}:</strong>
           {visibleColumns.map((column, columnIndex) => {
             const [columnName, ...columnContent] = column.split(':');
             const content = columnContent.join(':').trim();
             return (
               <p key={columnIndex}>
-                <strong>{columnName}:</strong>{' '}
-                {renderHighlightedContent(content)}
+                <strong>{columnName}:</strong> {renderHighlightedContent(content)}
               </p>
             );
           })}
@@ -547,10 +574,10 @@ export default function Interact() {
   const renderHighlightedContent = (content: string) => {
     const words = content.split(/\s+/);
     return words.map((word, wordIndex) => {
-      const tokenIndex = annotations.findIndex(token => 
-        token.text.toLowerCase() === word.toLowerCase()
+      const tokenIndex = annotations.findIndex(
+        (token) => token.text.toLowerCase() === word.toLowerCase()
       );
-  
+
       if (tokenIndex !== -1 && annotations[tokenIndex].tag !== 'O') {
         return (
           <Highlight
@@ -627,11 +654,7 @@ export default function Interact() {
             }
           }}
         />
-        <Button 
-          size="sm" 
-          onClick={() => handleRun(inputText)} 
-          style={{ marginLeft: '10px' }}
-        >
+        <Button size="sm" onClick={() => handleRun(inputText)} style={{ marginLeft: '10px' }}>
           Run
         </Button>
       </Box>
@@ -664,11 +687,11 @@ export default function Interact() {
           <Box mt={4}>
             <Card
               className="p-7 text-start"
-              style={{ 
-                lineHeight: 1.6,  // Adjusted for better readability
+              style={{
+                lineHeight: 1.6, // Adjusted for better readability
                 fontWeight: 'normal',
-                whiteSpace: 'pre-wrap',  // This will preserve whitespace and line breaks
-                wordWrap: 'break-word'   // This will wrap long words
+                whiteSpace: 'pre-wrap', // This will preserve whitespace and line breaks
+                wordWrap: 'break-word', // This will wrap long words
               }}
               onMouseUp={(e) => {
                 setSelecting(false);

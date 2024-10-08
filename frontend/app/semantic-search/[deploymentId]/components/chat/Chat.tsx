@@ -37,8 +37,6 @@ const ChatBarContainer = styled.div`
   margin: 10px 0 50px 0%; // Adjust margins as needed
 `;
 
-
-
 // Styled components for chat UI
 const ChatContainer = styled.section`
   position: fixed;
@@ -230,9 +228,7 @@ function ChatBox({
 
 // AI typing animation while the response is being processed
 function AILoadingChatBox() {
-  return (
-    <TypingAnimation />
-  );
+  return <TypingAnimation />;
 }
 
 export default function Chat({
@@ -352,29 +348,29 @@ export default function Chat({
     if (e.keyCode === 13 && e.shiftKey === false) {
       e.preventDefault();
       if (!textInput.trim()) return;
-  
+
       // If a generation is already in progress, abort it
       if (abortController) {
         abortController.abort();
         setAiLoading(false);
       }
-  
+
       const controller = new AbortController();
       setAbortController(controller);
-  
+
       const lastTextInput = textInput;
       const lastChatHistory = chatHistory;
       const currentIndex = chatHistory.length;
-  
+
       setAiLoading(true);
       setChatHistory((history) => [...history, { sender: 'human', content: lastTextInput }]);
       setTextInput('');
-  
+
       // Trigger sentiment classification if classifier exists
       if (sentimentClassifierExists) {
         classifySentiment(lastTextInput, currentIndex);
       }
-  
+
       // Perform PII detection on the human's message
       if (tokenClassifierExists) {
         const humanTransformed = await performPIIDetection(lastTextInput);
@@ -383,11 +379,11 @@ export default function Chat({
           [currentIndex]: humanTransformed,
         }));
       }
-  
+
       try {
         let aiResponse = '';
         const aiIndex = chatHistory.length + 1;
-  
+
         await modelService?.chat(
           lastTextInput,
           provider,
@@ -454,35 +450,34 @@ export default function Chat({
                 sentiment={sentiments[i]} // Pass sentiment for human message
               />
             ))}
-            {aiLoading && 
+            {aiLoading && (
               <AILoadingWrapper>
                 <AILoadingChatBox />
               </AILoadingWrapper>
-            }
+            )}
           </AllChatBoxes>
         ) : (
           <Placeholder> Ask anything to start chatting! </Placeholder>
         )}
       </ScrollableArea>
       <ChatBarContainer>
-
-      <ChatBar
-        placeholder="Ask anything..."
-        onKeyDown={handleEnterPress}
-        value={textInput}
-        onChange={(e) => setTextInput(e.target.value)}
-      />
-      {abortController && aiLoading && (
-      <PauseButton
-        onClick={() => {
-          abortController.abort();
-          setAbortController(null);
-          setAiLoading(false);
-        }}
-      >
-        <FontAwesomeIcon icon={faStop} style={{ color: 'white', fontSize: '16px' }} />
-      </PauseButton>
-      )}
+        <ChatBar
+          placeholder="Ask anything..."
+          onKeyDown={handleEnterPress}
+          value={textInput}
+          onChange={(e) => setTextInput(e.target.value)}
+        />
+        {abortController && aiLoading && (
+          <PauseButton
+            onClick={() => {
+              abortController.abort();
+              setAbortController(null);
+              setAiLoading(false);
+            }}
+          >
+            <FontAwesomeIcon icon={faStop} style={{ color: 'white', fontSize: '16px' }} />
+          </PauseButton>
+        )}
       </ChatBarContainer>
     </ChatContainer>
   );
