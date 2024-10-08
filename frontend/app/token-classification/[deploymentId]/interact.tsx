@@ -43,6 +43,13 @@ interface HighlightProps {
   selected: boolean;
 }
 
+interface ParsedData {
+  type: 'csv' | 'pdf' | 'other';
+  content: string;
+  rows?: { label: string; content: string }[];
+}
+
+
 const SELECTING_COLOR = '#EFEFEF';
 const SELECTED_COLOR = '#DFDFDF';
 
@@ -217,26 +224,28 @@ export default function Interact() {
     return stopSelectingOnOutsideClick;
   }, []);
 
-  const handleInputChange = (event: any) => {
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setInputText(event.target.value);
+    // Reset parsedData when manually typing
+    setParsedData(null);
   };
 
   // Add a new state to store the parsed rows
   const [parsedRows, setParsedRows] = useState<{label: string, content: string}[]>([]);
 
-  const parseCSV = (file: File): Promise<{label: string, content: string}[]> => {
+  const parseCSV = (file: File): Promise<ParsedData> => {
     return new Promise((resolve, reject) => {
       Papa.parse(file, {
         complete: (results) => {
           const data = results.data as string[][];
           if (data.length < 2) {
-            resolve([]);
+            resolve({ type: 'csv', content: '', rows: [] });
             return;
           }
           const headers = data[0];
           const rows = data.slice(1);
           let parsedRows = rows
-            .filter(row => row.some(cell => cell.trim() !== '')) // Filter out completely empty rows
+            .filter(row => row.some(cell => cell.trim() !== ''))
             .map((row, rowIndex) => {
               let content = headers.map((header, index) => `${header}: ${row[index] || ''}`).join('\n');
               return {
@@ -244,7 +253,8 @@ export default function Interact() {
                 content: content
               };
             });
-          resolve(parsedRows);
+          const fullContent = parsedRows.map(row => row.content).join('\n\n');
+          resolve({ type: 'csv', content: fullContent, rows: parsedRows });
         },
         error: reject,
       });
@@ -290,30 +300,32 @@ export default function Interact() {
     });
   };
 
+  const [parsedData, setParsedData] = useState<ParsedData | null>(null);
+
   // Update the handleFileChange function
-  const handleFileChange = async (event: any) => {
-    const file = event.target.files[0];
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
       setIsLoading(true);
 
-      let parsedRows: {label: string, content: string}[] = [];
-      if (fileExtension === 'txt') {
-        parsedRows = [{label: 'Text', content: await parseTXT(file)}];
+      let parsed: ParsedData;
+      if (fileExtension === 'csv') {
+        parsed = await parseCSV(file);
       } else if (fileExtension === 'pdf') {
-        parsedRows = [{label: 'PDF', content: await parsePDF(file)}];
-      } else if (fileExtension === 'docx') {
-        parsedRows = [{label: 'DOCX', content: await parseDOCX(file)}];
-      } else if (fileExtension === 'csv') {
-        parsedRows = await parseCSV(file);
+        parsed = await parsePDF(file);
       } else if (['xls', 'xlsx'].includes(fileExtension ?? '')) {
-        parsedRows = await parseExcel(file);
+        const excelRows = await parseExcel(file);
+        parsed = { type: 'csv', content: excelRows.map(row => row.content).join('\n\n'), rows: excelRows };
+      } else {
+        // Handle other file types (txt, docx)
+        const content = fileExtension === 'docx' ? await parseDOCX(file) : await parseTXT(file);
+        parsed = { type: 'other', content };
       }
 
-      const fullText = parsedRows.map(row => row.content).join('\n\n');
-      setInputText(fullText);
-      setParsedRows(parsedRows);
-      handleRun(fullText);
+      setInputText(parsed.content);
+      setParsedData(parsed);
+      handleRun(parsed.content);
       setIsLoading(false);
     }
   };
@@ -329,7 +341,7 @@ export default function Interact() {
     });
   };
 
-  const parsePDF = async (file: File) => {
+  const parsePDF = async (file: File): Promise<ParsedData> => {
     const loadingTask = pdfjsLib.getDocument(URL.createObjectURL(file));
     const pdf = await loadingTask.promise;
     let fullText = '';
@@ -337,10 +349,28 @@ export default function Interact() {
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
-      const pageText = textContent.items.map((item: any) => item.str).join(' ');
-      fullText += pageText + '\n';
+      const pageText = textContent.items
+        .map((item: any) => ({ 
+          text: item.str, 
+          fontName: item.fontName
+        }))
+        .reduce((acc: { text: string, fontName: string }[], curr: { text: string, fontName: string }) => {
+          if (acc.length && acc[acc.length - 1].fontName === curr.fontName) {
+            acc[acc.length - 1].text += ' ' + curr.text;
+          } else {
+            acc.push(curr);
+          }
+          return acc;
+        }, [] as { text: string, fontName: string }[])
+        .map((item: { text: string }) => item.text)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      fullText += pageText + '\n\n';
     }
-    return fullText;
+
+    fullText = fullText.replace(/^PDF:\s*/i, '').trim();
+    return { type: 'pdf', content: fullText };
   };
 
   const parseDOCX = async (file: File) => {
@@ -379,8 +409,22 @@ export default function Interact() {
           tag: tag![0] as string,
         }))
       );
+      // If there's no parsedData, set it as a generic type
+      if (!parsedData) {
+        setParsedData({ type: 'other', content: text });
+      }
       setIsLoading(false);
     });
+  };
+
+  const renderContent = () => {
+    if (!parsedData) return null;
+
+    if (parsedData.type === 'csv' && parsedData.rows) {
+      return renderCSVContent(parsedData.rows);
+    } else {
+      return renderPDFContent(parsedData.content);
+    }
   };
 
   const finetuneTags = (newTag: string) => {
@@ -405,12 +449,54 @@ export default function Interact() {
   };
 
   const isWordHighlighted = (word: string) => {
-    return annotations.some(token => token.text === word && token.tag !== 'O');
+    return annotations.some(token => 
+      token.text.toLowerCase() === word.toLowerCase() &&
+      token.tag !== 'O'
+    );
+  };
+
+  const renderCSVContent = (rows: { label: string; content: string }[]) => {
+    return rows.map((row, rowIndex) => {
+      const columns = row.content.split('\n');
+      const visibleColumns = columns.filter(column => {
+        const [columnName, ...columnContent] = column.split(':');
+        const content = columnContent.join(':').trim();
+        return !showHighlightedOnly || content.split(' ').some(isWordHighlighted);
+      });
+  
+      if (visibleColumns.length === 0) {
+        return null;
+      }
+  
+      return (
+        <div key={rowIndex} style={{ marginBottom: '20px', padding: '10px', border: '1px solid #ccc', borderRadius: '5px' }}>
+          <strong>{row.label}:</strong>
+          {visibleColumns.map((column, columnIndex) => {
+            const [columnName, ...columnContent] = column.split(':');
+            const content = columnContent.join(':').trim();
+            return (
+              <p key={columnIndex}>
+                <strong>{columnName}:</strong>{' '}
+                {renderHighlightedContent(content)}
+              </p>
+            );
+          })}
+        </div>
+      );
+    });
+  };
+
+  const renderPDFContent = (content: string) => {
+    return renderHighlightedContent(content);
   };
 
   const renderHighlightedContent = (content: string) => {
-    return content.split(' ').map((word, wordIndex) => {
-      const tokenIndex = annotations.findIndex(token => token.text === word);
+    const words = content.split(/\s+/);
+    return words.map((word, wordIndex) => {
+      const tokenIndex = annotations.findIndex(token => 
+        token.text.toLowerCase() === word.toLowerCase()
+      );
+  
       if (tokenIndex !== -1 && annotations[tokenIndex].tag !== 'O') {
         return (
           <Highlight
@@ -479,16 +565,21 @@ export default function Interact() {
           value={inputText}
           onChange={handleInputChange}
           placeholder="Enter your text..."
-          onSubmit={() => handleRun(inputText)}
           onKeyDown={(e) => {
-            if (e.keyCode === 13 && e.shiftKey === false) {
+            if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               handleRun(inputText);
             }
           }}
         />
+        <Button 
+          size="sm" 
+          onClick={() => handleRun(inputText)} 
+          style={{ marginLeft: '10px' }}
+        >
+          Run
+        </Button>
       </Box>
-
 
       <Typography variant="caption" display="block" mt={1}>
         Supported file types: .txt, .pdf, .docx, .csv, .xls, .xlsx
@@ -518,7 +609,7 @@ export default function Interact() {
           <Box mt={4}>
             <Card
               className="p-7 text-start"
-              style={{ lineHeight: 2 }}
+              style={{ lineHeight: 2, fontWeight: 'normal' }}
               onMouseUp={(e) => {
                 setSelecting(false);
                 if (startIndex !== null && endIndex !== null) {
@@ -527,32 +618,7 @@ export default function Interact() {
                 }
               }}
             >
-              {parsedRows.map((row, rowIndex) => {
-                const columns = row.content.split('\n');
-                const visibleColumns = columns.filter(column => 
-                  !showHighlightedOnly || column.split(':').slice(1).join(':').split(' ').some(isWordHighlighted)
-                );
-
-                if (visibleColumns.length === 0) {
-                  return null; // Don't render the row if all columns are hidden
-                }
-
-                return (
-                  <div key={rowIndex} style={{ marginBottom: '20px', padding: '10px', border: '1px solid #ccc', borderRadius: '5px' }}>
-                    <strong>{row.label}:</strong>
-                    {visibleColumns.map((column, columnIndex) => {
-                      const [columnName, ...columnContent] = column.split(':');
-                      const content = columnContent.join(':').trim();
-                      return (
-                        <p key={columnIndex}>
-                          <strong>{columnName}:</strong>{' '}
-                          {renderHighlightedContent(content)}
-                        </p>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+              {renderContent()}
               {annotations.map((_, index) => (
                 <TagSelector
                   key={index}
