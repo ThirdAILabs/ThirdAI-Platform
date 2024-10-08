@@ -106,24 +106,9 @@ class OnPremLLM(LLMBase):
         if self.backend_endpoint is None:
             raise ValueError("Could not read MODEL_BAZAAR_ENDPOINT.")
 
-    def verify_model_name(self):
-        url = urljoin(self.backend_endpoint, "/on-prem-llm/v1/models")
-        headers = {"Content-Type": "application/json"}
-        response = requests.get(url, headers=headers)
-        if response.status_code != 200:
-            raise Exception(f"Request to {url} failed. Error: {response.text}")
-        model_path = response.json()["data"][0]["id"]
-        model_name = model_path.split("/")[-1].lower()
-        return model_name
-
     async def stream(
         self, key: str, query: str, prompt: str, references: List[Reference], model: str
     ) -> AsyncGenerator[str, None]:
-        # We use the model name from the server itself here because there's still
-        # experimentation going on with different models.
-        # TODO(david) Once we're settled on a couple models and can easily select
-        # from the UI, refactor this to use the passed in model name instead
-        model = self.verify_model_name()
         system_prompt, user_prompt = make_prompt(query, prompt, references)
 
         url = urljoin(self.backend_endpoint, "/on-prem-llm/v1/chat/completions")
