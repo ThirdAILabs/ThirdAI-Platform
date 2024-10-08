@@ -76,10 +76,8 @@ def upgrade() -> None:
         ).where(workflow_table.c.type_id == rag_type.id)
     ).all()
 
-    # Using bulk insert here lead to foreign key constraints when adding new
-    # attributes/dependencies for new models
-    conn.execute(
-        sa.insert(model_table),
+    op.bulk_insert(
+        model_table,
         [
             {
                 "id": wf.id,
@@ -96,8 +94,6 @@ def upgrade() -> None:
             for wf in rag_workflows
         ],
     )
-
-    conn.commit()
 
     op.bulk_insert(
         model_attributes_table,
@@ -123,17 +119,6 @@ def upgrade() -> None:
         .where(workflow_table.c.type_id == rag_type.id)
     ).all()
 
-    print(
-        [
-            {
-                "model_id": comp.workflow_id,
-                "key": COMPONENT_TO_KEY[comp.component],
-                "value": comp.model_id,
-            }
-            for comp in rag_components
-            if comp.component in COMPONENT_TO_KEY
-        ]
-    )
     op.bulk_insert(
         model_attributes_table,
         [
