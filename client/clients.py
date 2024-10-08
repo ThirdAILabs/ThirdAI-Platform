@@ -338,6 +338,46 @@ class NeuralDBClient(BaseClient):
     def llm_client(self) -> LLMClient:
         return LLMClient(self.login_instance, self)
 
+    @check_deployment_decorator
+    def chat(
+        self, user_input: str, session_id: str, provider: str = "openai"
+    ) -> Dict[str, str]:
+        """
+        Returns a reply given the user_input and the chat history associated with session_id with given provider.
+        """
+        response = http_post_with_error(
+            urljoin(self.base_url, "chat"),
+            json={
+                "user_input": user_input,
+                "session_id": session_id,
+                "provider": provider,
+            },
+            headers=auth_header(self.login_instance.access_token),
+        )
+
+        return response.json()["data"]
+
+    @check_deployment_decorator
+    def get_chat_history(self, session_id: str) -> Dict[List[Dict[str, str]]]:
+        """
+        Returns chat history associated with session_id
+        """
+        response = http_post_with_error(
+            urljoin(self.base_url, "get-chat-history"),
+            json={"session_id": session_id},
+            headers=auth_header(self.login_instance.access_token),
+        )
+
+        return response.json()["data"]
+
+    @check_deployment_decorator
+    def update_chat_settings(self, provider: str = "openai"):
+        response = http_post_with_error(
+            urljoin(self.base_url, "update-chat-settings"),
+            json={"provider": provider},
+            headers=auth_header(self.login_instance.access_token),
+        )
+
 
 class LLMClient:
     def __init__(self, login_instance: Login, neuraldb_client: NeuralDBClient):
