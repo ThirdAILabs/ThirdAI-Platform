@@ -147,10 +147,6 @@ jobs:
         run: |
           pip install gitpython
 
-      - name: Checkout current branch
-        if: always()
-        uses: actions/checkout@v3
-
       - name: Latest alembic version in main
         if: always()
         id: version
@@ -158,6 +154,19 @@ jobs:
           alembic_version=$(python alembic_version.py)
           echo "::set-output name=alembic_version::$alembic_version"
           echo "$alembic_version"
+      
+      - name: Checkout current branch
+        if: always()
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: ls in alembic versions folder
+        if: always()
+        run: |
+          cd thirdai_platform/database/alembic/versions
+          ls
 
       - name: Install requirements
         if: always()
