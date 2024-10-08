@@ -85,7 +85,11 @@ def upgrade() -> None:
                 "id": wf.id,
                 "name": wf.name,
                 "train_status": "complete",
+                "deploy_status": "not_started",
                 "type": "enterprise-search",
+                "downloads": 0,
+                "access_level": "private",
+                "default_permission": "read",
                 "published_date": wf.published_date,
                 "user_id": wf.user_id,
             }
@@ -119,6 +123,17 @@ def upgrade() -> None:
         .where(workflow_table.c.type_id == rag_type.id)
     ).all()
 
+    print(
+        [
+            {
+                "model_id": comp.workflow_id,
+                "key": COMPONENT_TO_KEY[comp.component],
+                "value": comp.model_id,
+            }
+            for comp in rag_components
+            if comp.component in COMPONENT_TO_KEY
+        ]
+    )
     op.bulk_insert(
         model_attributes_table,
         [
