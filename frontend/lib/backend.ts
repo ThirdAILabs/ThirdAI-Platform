@@ -512,12 +512,19 @@ interface StartWorkflowResponse {
   };
 }
 
-export function start_workflow(workflowId: string): Promise<StartWorkflowResponse> {
+export function start_workflow(
+  workflowId: string,
+  autoscalingEnabled: boolean
+): Promise<StartWorkflowResponse> {
   const accessToken = getAccessToken();
 
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-  const params = new URLSearchParams({ workflow_id: workflowId });
+  // Modify the URL params to include autoscaling_enabled
+  const params = new URLSearchParams({
+    workflow_id: workflowId,
+    autoscaling_enabled: autoscalingEnabled.toString(), // Convert boolean to string for URL param
+  });
 
   return new Promise((resolve, reject) => {
     axios

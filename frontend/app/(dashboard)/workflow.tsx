@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@mui/material';
+import { Button, RadioGroup, Radio } from '@mui/material';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -104,16 +104,29 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
     return () => clearInterval(validateInterval);
   }, [workflow.id]);
 
+  const [selectedMode, setSelectedMode] = useState('Dev'); // Default to 'Dev' mode
+  const [showDeploymentModal, setShowDeploymentModal] = useState(false); // Renamed for clarity
+
   const handleDeploy = async () => {
     try {
       if (isValid) {
-        setDeployStatus('Starting'); // set to starting because user intends to start workflow
-        await start_workflow(workflow.id);
+        setDeployStatus('Starting'); // Set to starting because the user intends to start workflow
+        const autoscalingEnabled = selectedMode === 'Production'; // Enable autoscaling for Production mode
+        await start_workflow(workflow.id, autoscalingEnabled); // Call the API with the selected mode
       }
     } catch (e) {
       setDeployStatus('Starting'); // set to starting because user intends to start workflow
       console.error('Failed to start workflow.', e);
     }
+  };
+
+  const toggleDeploymentModal = () => {
+    setShowDeploymentModal(!showDeploymentModal);
+  };
+
+  const handleModeSelection = async () => {
+    toggleDeploymentModal(); // Close the modal after selection
+    await handleDeploy(); // Proceed with the deploy workflow after selecting mode
   };
 
   useEffect(() => {
@@ -239,7 +252,13 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       </TableCell>
       <TableCell className="hidden md:table-cell text-center font-medium">
         <Button
-          onClick={deployStatus === 'Active' ? goToEndpoint : handleDeploy}
+          onClick={() => {
+            if (deployStatus === 'Active') {
+              goToEndpoint();
+            } else {
+              setShowDeploymentModal(true); // Show modal when Start is clicked
+            }
+          }}
           variant="contained"
           style={{ width: '100px' }}
           disabled={
@@ -292,28 +311,26 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             {deployStatus === 'Active' && (
-              <>
-                <DropdownMenuItem>
-                  <form>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          const response = await stop_workflow(workflow.id);
-                          console.log('Workflow undeployed successfully:', response);
-                          // Optionally, update the UI state to reflect the undeployment
-                          setDeployStatus('Inactive');
-                        } catch (error) {
-                          console.error('Error undeploying workflow:', error);
-                          alert('Error undeploying workflow:' + error);
-                        }
-                      }}
-                    >
-                      Stop App
-                    </button>
-                  </form>
-                </DropdownMenuItem>
-              </>
+              <DropdownMenuItem>
+                <form>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const response = await stop_workflow(workflow.id);
+                        console.log('Workflow undeployed successfully:', response);
+                        // Optionally, update the UI state to reflect the undeployment
+                        setDeployStatus('Inactive');
+                      } catch (error) {
+                        console.error('Error undeploying workflow:', error);
+                        alert('Error undeploying workflow:' + error);
+                      }
+                    }}
+                  >
+                    Stop App
+                  </button>
+                </form>
+              </DropdownMenuItem>
             )}
             <DropdownMenuItem>
               <form>
@@ -373,6 +390,36 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal for selecting between Dev mode and Production mode */}
+      {showDeploymentModal && (
+        <Modal onClose={toggleDeploymentModal}>
+          <div className="p-4">
+            <h2 className="text-lg font-bold mb-4">Choose Configuration</h2>
+            <div>
+              <RadioGroup
+                aria-label="mode-selection"
+                value={selectedMode}
+                onChange={(e) => setSelectedMode(e.target.value)}
+              >
+                <div className="flex items-center">
+                  <Radio value="Dev" />
+                  <span>Dev Mode</span>
+                </div>
+                <div className="flex items-center">
+                  <Radio value="Production" />
+                  <span>Production Mode</span>
+                </div>
+              </RadioGroup>
+              <div className="mt-4">
+                <Button onClick={handleModeSelection} variant="contained">
+                  Confirm
+                </Button>
+              </div>
             </div>
           </div>
         </Modal>
