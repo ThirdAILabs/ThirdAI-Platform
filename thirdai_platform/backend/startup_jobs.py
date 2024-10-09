@@ -87,7 +87,7 @@ async def start_on_prem_generate_job(
         initial_allocations=1,
         min_allocations=1,
         max_allocations=5,
-        cores_per_allocation=7,
+        cores_per_allocation=16,
         memory_per_allocation=job_memory_mb,
         model_name=model_name,
         registry=os.getenv("DOCKER_REGISTRY"),
