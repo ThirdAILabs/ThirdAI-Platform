@@ -4,34 +4,43 @@ from typing import AsyncGenerator, List
 from urllib.parse import urljoin
 
 import aiohttp
-from utils import Reference, combine_query_and_context
+from utils import Reference, make_prompt
 
 
 class LLMBase:
     async def stream(
-        self, key: str, query: str, prompt: str, references: List[Reference], model: str
+        self,
+        key: str,
+        query: str,
+        task_prompt: str,
+        references: List[Reference],
+        model: str,
     ) -> AsyncGenerator[str, None]:
         raise NotImplementedError("Subclasses must implement this method")
 
 
 class OpenAILLM(LLMBase):
     async def stream(
-        self, key: str, query: str, prompt: str, references: List[Reference], model: str
+        self,
+        key: str,
+        query: str,
+        task_prompt: str,
+        references: List[Reference],
+        model: str,
     ) -> AsyncGenerator[str, None]:
         url = "https://api.openai.com/v1/chat/completions"
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {key}",
         }
+
+        system_prompt, user_prompt = make_prompt(query, task_prompt, references)
+
         body = {
             "model": model,
             "messages": [
-                {
-                    "role": "user",
-                    "content": combine_query_and_context(
-                        query=query, prompt=prompt, references=references
-                    ),
-                }
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
             ],
             "stream": True,
         }
@@ -60,23 +69,26 @@ class OpenAILLM(LLMBase):
 
 class CohereLLM(LLMBase):
     async def stream(
-        self, key: str, query: str, prompt: str, references: List[Reference], model: str
+        self,
+        key: str,
+        query: str,
+        task_prompt: str,
+        references: List[Reference],
+        model: str,
     ) -> AsyncGenerator[str, None]:
         url = "https://api.cohere.com/v1/chat"
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {key}",
         }
+
+        system_prompt, user_prompt = make_prompt(query, task_prompt, references)
+
         body = {
-            "message": query,
             "model": model,
             "chat_history": [
-                {
-                    "role": "USER",
-                    "message": combine_query_and_context(
-                        query=query, prompt=prompt, references=references
-                    ),
-                }
+                {"role": "SYSTEM", "message": system_prompt},
+                {"role": "USER", "message": user_prompt},
             ],
             "stream": True,
         }
@@ -103,26 +115,29 @@ class CohereLLM(LLMBase):
 
 
 class OnPremLLM(LLMBase):
-    async def stream(
-        self, key: str, query: str, prompt: str, references: List[Reference], model: str
-    ) -> AsyncGenerator[str, None]:
-        backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
-
-        if backend_endpoint is None:
+    def __init__(self):
+        self.backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
+        if self.backend_endpoint is None:
             raise ValueError("Could not read MODEL_BAZAAR_ENDPOINT.")
 
-        url = urljoin(backend_endpoint, "/on-prem-llm/completion")
+    async def stream(
+        self,
+        key: str,
+        query: str,
+        task_prompt: str,
+        references: List[Reference],
+        model: str,
+    ) -> AsyncGenerator[str, None]:
+        system_prompt, user_prompt = make_prompt(query, task_prompt, references)
+
+        url = urljoin(self.backend_endpoint, "/on-prem-llm/v1/chat/completions")
 
         headers = {"Content-Type": "application/json"}
         data = {
-            "system_prompt": "You are a helpful assistant. Please be concise in your answers.",
-            "prompt": combine_query_and_context(
-                query=query,
-                prompt=prompt,
-                references=references,
-                reverse_ref_order=True,
-            )
-            + "<|assistant|>",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
             "stream": True,
             # Occasionally the model will repeat itself infinitely, this cuts off
             # the model at 1000 output tokens so that doesn't occur. Alternatively
@@ -131,6 +146,9 @@ class OnPremLLM(LLMBase):
             # sensitive to this. We set it to 1000 because throughput is important
             # and answers aren't super useful past 1000 tokens anyways.
             "n_predict": 1000,
+            # Passing in model is just for logging purposes. For some reason
+            # llama.cpp returns gpt-3.5-turbo for this value if not specified
+            "model": model,
         }
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=data) as response:
@@ -141,13 +159,11 @@ class OnPremLLM(LLMBase):
                 async for line in response.content.iter_any():
                     line = line.decode("utf-8").strip()
                     if line and line.startswith("data: "):
-                        offset = len("data: ")
-                        try:
-                            data = json.loads(line[offset:])
-                        except:
-                            continue
-                        if "content" in data:
-                            yield data["content"]
+                        line = line[len("data: ") :]
+                        if "[DONE]" in line:
+                            break
+                        data = json.loads(line)
+                        yield data["choices"][0]["delta"]["content"]
 
 
 model_classes = {
