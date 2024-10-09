@@ -108,7 +108,7 @@ interface ReferenceProps {
   checked: boolean;
   onCheck: () => void;
   modelService: ModelService;
-  piiMap: object | null;
+  piiMap: Map<string, Map<string, string>> | null;
 }
 
 
@@ -129,8 +129,9 @@ function getTokensAndTags(text: string, piiMap: object): TokenTag[] {
       const label = `[${tag} ${items[1]}]`
 
       if (tag in piiMap) {
-        if (label in piiMap[tag]) {
-          token_tags.push({ token: piiMap[tag][label], tag: tag })
+        const candidates = piiMap[tag as keyof typeof piiMap]
+        if (label in candidates) {
+          token_tags.push({ token: candidates[label], tag: tag })
         } else {
           token_tags.push({ token: "[UNKNOWN]", tag: "" })
         }
