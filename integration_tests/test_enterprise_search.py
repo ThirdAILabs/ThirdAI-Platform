@@ -86,11 +86,11 @@ def test_enterprise_search_with_guardrails():
 
     query = "American Express Profit Rises 14. my phone number is 123-457-2490"
     results = client.search(query)
-    assert results["query_text"] == query.replace("123-457-2490", "[PHONENUMBER #0]")
+    assert results["query_text"] == query.replace("123-457-2490", "[PHONENUMBER#0]")
 
     res = http_post_with_error(
         urljoin(client.base_url, "unredact"),
-        json={"text": results["query_text"], "pii_map": results["pii_map"]},
+        json={"text": results["query_text"], "pii_entities": results["pii_entities"]},
         headers=auth_header(client.login_instance.access_token),
     )
     assert res.json()["data"]["unredacted_text"] == query

@@ -915,13 +915,13 @@ def train_status(
             message=str(error),
         )
 
-    status, reasons = get_model_status(model, train_status=True)
+    train_status, reasons = get_model_status(model, train_status=True)
     return response(
         status_code=status.HTTP_200_OK,
         message="Successfully got the train status.",
         data={
             "model_identifier": model_identifier,
-            "train_status": status,
+            "train_status": train_status,
             "message": " ".join(reasons),
         },
     )

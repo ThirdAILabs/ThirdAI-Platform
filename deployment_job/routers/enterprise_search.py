@@ -33,9 +33,6 @@ class EnterpriseSearchRouter:
 
         self.router = APIRouter()
         self.router.add_api_route("/search", self.search, methods=["POST"])
-        self.router.add_api_route(
-            "/retrieval_model", self.retrieval_model, methods=["GET"]
-        )
         self.router.add_api_route("/unredact", self.unredact, methods=["POST"])
 
     @query_metric.time()
@@ -58,7 +55,7 @@ class EnterpriseSearchRouter:
                 message="Unable to get resutls from retrieval model: " + str(res),
             )
 
-        results = inputs.SearchResultsNDB.model_validate(res.json()["data"])
+        results = inputs.EnterpriseSearchResults.model_validate(res.json()["data"])
 
         if self.guardrail:
             label_map = LabelMap()
@@ -71,22 +68,12 @@ class EnterpriseSearchRouter:
                 ref.text = self.guardrail.redact_pii(
                     text=ref.text, access_token=token, label_map=label_map
                 )
-            results.pii_map = label_map.tag_to_entities
+            results.pii_entities = label_map.get_entities()
 
         return response(
             status_code=status.HTTP_200_OK,
             message="Successful",
             data=jsonable_encoder(results),
-        )
-
-    @propagate_error
-    def retrieval_model(
-        self, token: str = Depends(Permissions.verify_permission("read"))
-    ):
-        return response(
-            status_code=status.HTTP_200_OK,
-            message="Success",
-            data={"retrieval_id": self.config.model_options.retrieval_id},
         )
 
     @propagate_error
@@ -96,7 +83,7 @@ class EnterpriseSearchRouter:
         token: str = Depends(Permissions.verify_permission("read")),
     ):
         if self.guardrail:
-            unredacted_text = self.guardrail.unredact_pii(args.text, args.pii_map)
+            unredacted_text = self.guardrail.unredact_pii(args.text, args.pii_entities)
             return response(
                 status_code=status.HTTP_200_OK,
                 message="Successful",

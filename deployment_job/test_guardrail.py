@@ -37,7 +37,7 @@ def test_guardrail():
 
     label_map = LabelMap()
 
-    expected_redacted_pii = "my neighbor is [NAME #0] on [ADDRESS #1] he has a cat named [NAME #2] we call him [NAME #2]"
+    expected_redacted_pii = "my neighbor is [NAME#0] on [ADDRESS#1] he has a cat named [NAME#2] we call him [NAME#2]"
 
     redacted = guardrail.redact_pii("", "", label_map)
     assert redacted == expected_redacted_pii
@@ -47,11 +47,11 @@ def test_guardrail():
 
     expected_unredacted_pii = "my neighbor is rick on main street he has a cat named robert we call him robert"
 
-    unredacted = guardrail.unredact_pii(redacted, label_map.tag_to_entities)
+    unredacted = guardrail.unredact_pii(redacted, label_map.get_entities())
 
     assert unredacted == expected_unredacted_pii
 
     assert (
-        guardrail.unredact_pii("[NAME #4]", label_map.tag_to_entities)
+        guardrail.unredact_pii("[NAME#4]", label_map.get_entities())
         == "[UNKNOWN ENTITY]"
     )

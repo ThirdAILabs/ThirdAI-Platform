@@ -369,12 +369,12 @@ def deployment_status(
             message=str(error),
         )
 
-    status, reasons = get_model_status(model, train_status=False)
+    deploy_status, reasons = get_model_status(model, train_status=False)
     return response(
         status_code=status.HTTP_200_OK,
         message="Successfully got the deployment status",
         data={
-            "deploy_status": status,
+            "deploy_status": deploy_status,
             "message": " ".join(reasons),
             "model_id": str(model.id),
         },

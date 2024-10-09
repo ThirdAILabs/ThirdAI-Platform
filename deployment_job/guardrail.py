@@ -2,6 +2,7 @@ import re
 from collections import defaultdict
 from typing import Dict, List
 from urllib.parse import urljoin
+from pydantic_models.inputs import PiiEntity
 
 import requests
 from fastapi import HTTPException, status
@@ -12,18 +13,23 @@ class LabelMap:
         self.tag_to_entities = defaultdict(dict)
         self.next_label = 0
 
-        self.decode_re = re.compile(r"\[([A-Z]+) #(\d+)\]")
-
     def get_label(self, tag: str, entity: str) -> str:
         for label, existing_entity in self.tag_to_entities[tag].items():
             if entity == existing_entity or max_overlap(entity, existing_entity) > 5:
                 return label
 
-        label = f"[{tag} #{self.next_label}]"
+        label = f"[{tag}#{self.next_label}]"
         self.next_label += 1
 
         self.tag_to_entities[tag][label] = entity
         return label
+
+    def get_entities(self) -> List[PiiEntity]:
+        return [
+            PiiEntity(token=token, label=label)
+            for labels in self.tag_to_entities.values()
+            for label, token in labels.items()
+        ]
 
 
 class Guardrail:
@@ -60,14 +66,13 @@ class Guardrail:
 
         return " ".join(entities)
 
-    def unredact_pii(self, redacted_text: str, entity_map: Dict[str, Dict[str, str]]):
-        def replace(match):
-            tag = match[1]
-            if tag in entity_map:
-                return entity_map[tag].get(match[0], "[UNKNOWN ENTITY]")
-            return "[UNKNOWN ENTITY]"
+    def unredact_pii(self, redacted_text: str, entities: List[PiiEntity]):
+        entity_map = {entity.label: entity.token for entity in entities}
 
-        return re.sub(r"\[([A-Z]+) #(\d+)\]", replace, redacted_text)
+        def replace(match):
+            return entity_map.get(match[0], "[UNKNOWN ENTITY]")
+
+        return re.sub(r"\[([A-Z]+)#(\d+)\]", replace, redacted_text)
 
 
 def max_overlap(a: str, b: str) -> int:
