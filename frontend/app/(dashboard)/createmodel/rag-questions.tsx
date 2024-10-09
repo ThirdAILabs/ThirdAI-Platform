@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { SelectModel } from '@/lib/db';
 import NERQuestions from './nlp-questions/ner-questions';
 import SemanticSearchQuestions from './semantic-search-questions';
-import { create_workflow, add_models_to_workflow, set_gen_ai_provider } from '@/lib/backend';
 import { CardDescription } from '@/components/ui/card';
 import { Button, TextField } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import DropdownMenu from '@/components/ui/dropDownMenu';
+import { create_enterprise_search_workflow, EnterpriseSearchOptions } from '@/lib/backend';
 
 interface RAGQuestionsProps {
   models: SelectModel[];
@@ -75,90 +75,52 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
     setIsLoading(true);
 
     const workflowName = modelName;
-    const workflowTypeName = 'rag';
 
     try {
-      // Step 1: Create the workflow
-      const workflowResponse = await create_workflow({
-        name: workflowName,
-        typeName: workflowTypeName,
-      });
-      const workflowId = workflowResponse.data.workflow_id;
-      console.log('Workflow created:', workflowId);
+      // Prepare options
+      let options: EnterpriseSearchOptions = {
+        retrieval_id: ssModelId || '',
+        guardrail_id: grModelId || '',
+        nlp_classifier_id: nlpClassifierModelId || '',
+        llm_provider: '',
+      };
 
-      // Step 2: Prepare the models to be added
-      const modelIdentifiers = [];
-      const components = [];
-
-      // Find and add the semantic search model
-      if (ssModelId) {
-        modelIdentifiers.push(ssModelId);
-        components.push('search');
-      } else {
-        console.error(`Semantic search model with identifier ${ssIdentifier} not found.`);
-        alert(`Semantic search model with identifier ${ssIdentifier} not found.`);
-      }
-
-      // Find and add the NER model if it exists
-      if (grModelId) {
-        modelIdentifiers.push(grModelId);
-        components.push('nlp');
-      } else {
-        console.error(`NER model with identifier ${grIdentifier} not found.`);
-        // alert(`NER model with identifier ${grIdentifier} not found.`)
-      }
-
-      // Add the NLP classifier model if it exists
-      if (nlpClassifierModelId) {
-        modelIdentifiers.push(nlpClassifierModelId);
-        components.push('nlp-classifier');
-      }
-
-      // Step 3: Add the models to the workflow
-      if (modelIdentifiers.length > 0) {
-        const addModelsResponse = await add_models_to_workflow({
-          workflowId,
-          modelIdentifiers,
-          components,
-        });
-        console.log('Models added to workflow:', addModelsResponse);
-      } else {
-        console.error('No models to add to the workflow');
-        alert('No models to add to the workflow');
-      }
-
-      // Step 4: Set the generation AI provider based on the selected LLM type
-      let provider = '';
+      // Set llm_provider based on llmType
       switch (llmType) {
         case 'OpenAI':
-          provider = 'openai';
+          options.llm_provider = 'openai';
           break;
         case 'On-prem':
-          provider = 'on-prem';
+          options.llm_provider = 'on-prem';
           break;
         case 'Self-host':
-          provider = 'self-host';
+          options.llm_provider = 'self-host';
           break;
         default:
-        // handle
+          console.error('Invalid LLM type selected');
+          alert('Invalid LLM type selected');
+          setIsLoading(false);
+          return;
       }
 
-      if (provider) {
-        const setProviderResponse = await set_gen_ai_provider({
-          workflowId,
-          provider,
-        });
-        console.log('Generation AI provider set:', setProviderResponse);
-      } else {
-        console.error('Invalid LLM type selected');
-        alert('Invalid LLM type selected');
-      }
+      // Clean up options by removing undefined or empty values
+      options = Object.fromEntries(
+        Object.entries(options).filter(([_, v]) => v !== undefined && v !== '')
+      ) as EnterpriseSearchOptions;
+
+      // Call create_workflow
+      const workflowResponse = await create_enterprise_search_workflow({
+        workflow_name: workflowName,
+        options,
+      });
+      const workflowId = workflowResponse.data.model_id;
+      console.log('Workflow created:', workflowId);
 
       // Go back home page
       router.push('/');
     } catch (error) {
-      console.error('Error during workflow creation or model addition:', error);
-      alert('Error during workflow creation or model addition:' + error);
+      console.error('Error during workflow creation:', error);
+      alert('Error during workflow creation: ' + error);
       setIsLoading(false);
     }
   };

@@ -36,10 +36,6 @@ from backend.utils import (
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
-
-pass
-pass
-
 from sqlalchemy.orm import Session
 
 deploy_router = APIRouter()
@@ -142,6 +138,7 @@ def get_model_permissions(
     )
 
 
+# TODO(Any): move args like llm_provider to model attributes.
 def deploy_single_model(
     model_id: str,
     memory: Optional[int],
@@ -197,7 +194,10 @@ def deploy_single_model(
                 )
             memory = (size_in_memory // 1000000) + 1000  # MB required for deployment
         else:
-            memory = 1000  # Default to avoid errors if meta_data isn't defined.
+            # This can be reached for models like enterprise-search which aren't
+            # trained, and thus don't have training metadata with size_in_memory.
+            # It can also be reached if a model is uploaded and not trained on platform.
+            memory = 1000
 
     work_dir = os.getcwd()
     platform = get_platform()
@@ -327,19 +327,9 @@ def deploy_model(
         except HTTPException as err:
             raise HTTPException(
                 status_code=err.status_code,
-                detail="Error deploying dependent model: " + err.detail,
+                detail=f"Error deploying dependent model {dependency.name}: "
+                + err.detail,
             )
-
-    deploy_single_model(
-        model_id=model.id,
-        memory=memory,
-        autoscaling_enabled=autoscaling_enabled,
-        autoscaler_max_count=autoscaler_max_count,
-        llm_provider=llm_provider,
-        genai_key=genai_key,
-        session=session,
-        user=user,
-    )
 
     return response(
         status_code=status.HTTP_202_ACCEPTED,
@@ -379,11 +369,13 @@ def deployment_status(
             message=str(error),
         )
 
+    status, reasons = get_model_status(model, train_status=False)
     return response(
         status_code=status.HTTP_200_OK,
         message="Successfully got the deployment status",
         data={
-            "deploy_status": get_model_status(model, train_status=False),
+            "deploy_status": status,
+            "message": " ".join(reasons),
             "model_id": str(model.id),
         },
     )

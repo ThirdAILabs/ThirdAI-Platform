@@ -9,6 +9,7 @@ from backend.auth_dependencies import (
     is_model_owner,
     team_admin_or_global_admin,
     verify_model_read_access,
+    verify_model_read_access_from_id,
 )
 from backend.utils import (
     delete_nomad_job,
@@ -120,11 +121,6 @@ def list_models(
             selectinload(schema.Model.dependencies),
             selectinload(schema.Model.used_by),
         )
-        .join(
-            schema.ModelPermission,
-            schema.Model.id == schema.ModelPermission.model_id,
-            isouter=True,  # To ensure that models without entries in permissions table are included
-        )
         .filter(
             or_(
                 schema.Model.access_level == schema.Access.public,
@@ -136,9 +132,14 @@ def list_models(
                     schema.Model.access_level == schema.Access.private,
                     schema.Model.user_id == user.id,
                 ),
-                and_(
-                    schema.ModelPermission.user_id == user.id,
-                ),
+                session.query(schema.ModelPermission)
+                .where(
+                    and_(
+                        schema.ModelPermission.model_id == schema.Model.id,
+                        schema.ModelPermission.user_id == user.id,
+                    )
+                )
+                .exists(),
             )
         )
         .distinct(schema.Model.id)
@@ -155,33 +156,15 @@ def list_models(
 
 
 @model_router.get("/details")
-def list_models(
+def get_model_details(
     model_id: str,
-    session: Session = Depends(get_session),
-    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+    model: schema.Model = Depends(verify_model_read_access_from_id),
 ):
-    user: schema.User = authenticated_user.user
-    model: schema.Model = (
-        session.query(schema.Model)
-        .options(
-            joinedload(schema.Model.user),
-            selectinload(schema.Model.attributes),
-            selectinload(schema.Model.dependencies),
-            selectinload(schema.Model.used_by),
-        )
-        .get(model_id)
-    )
-
-    if model.get_user_permission(user):
-        return response(
-            status_code=status.HTTP_200_OK,
-            message="Successfully retrieved model details.",
-            data=jsonable_encoder(get_high_level_model_info(model)),
-        )
 
     return response(
-        status_code=status.HTTP_403_FORBIDDEN,
-        message="User does not have access to requested model.",
+        status_code=status.HTTP_200_OK,
+        message="Successfully retrieved model details.",
+        data=jsonable_encoder(get_high_level_model_info(model)),
     )
 
 
@@ -230,7 +213,16 @@ def search_models(
     )
 
     if not user.is_global_admin():
-        access_conditions = []
+        access_conditions = [
+            session.query(schema.ModelPermission)
+            .where(
+                and_(
+                    schema.ModelPermission.model_id == schema.Model.id,
+                    schema.ModelPermission.user_id == user.id,
+                )
+            )
+            .exists(),
+        ]
 
         def add_access_condition(access, condition):
             if not access_level or access in access_level:
@@ -1140,6 +1132,12 @@ def delete_model(
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
             message=str(error),
+        )
+
+    if len(model.used_by) > 0:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"Cannot delete model '{model_identifier}' since it is used in other workflows.",
         )
 
     errors = []

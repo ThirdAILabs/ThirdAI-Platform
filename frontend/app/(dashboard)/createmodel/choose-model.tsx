@@ -69,7 +69,7 @@ export default function ChooseProblem() {
     getWorkflows();
   }, []);
 
-  const workflowNames = workflows.map((workflow) => workflow.name);
+  const workflowNames = workflows.map((workflow) => workflow.model_name);
 
   const RETRIEVAL = 'Retrieval';
   const NLP = 'Natural Language Processing';
