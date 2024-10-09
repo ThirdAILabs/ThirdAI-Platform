@@ -1,7 +1,7 @@
 """New workflow api
 
 Revision ID: 7750a526cecc
-Revises: 28ab48540cd7
+Revises: 263fef17a7b6
 Create Date: 2024-10-08 10:02:33.774774
 
 """
@@ -14,7 +14,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "7750a526cecc"
-down_revision: Union[str, None] = "28ab48540cd7"
+down_revision: Union[str, None] = "263fef17a7b6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

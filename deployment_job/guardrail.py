@@ -4,13 +4,45 @@ from typing import List
 from urllib.parse import urljoin
 
 import requests
+from typing import Dict
 from fastapi import HTTPException, status
 from pydantic_models.inputs import PiiEntity
 
 
+def max_overlap(a: str, b: str) -> int:
+    def longest_prefix(i: int, j: int) -> int:
+        cnt = 0
+        for k in range(0, min(len(a) - i, len(b) - j)):
+            if a[i + k] == b[j + k]:
+                cnt += 1
+            else:
+                break
+        return cnt
+
+    return max(longest_prefix(i, j) for i in range(len(a)) for j in range(len(b)))
+
+
+def merge_tags(tokens: List[str], tags: List[List[str]]):
+    merged_tokens = []
+    merged_tags = []
+
+    index = 0
+    while index < len(tokens):
+        start = index
+        curr_tag = tags[index][0]
+
+        while index < len(tokens) and tags[index][0] == curr_tag:
+            index += 1
+
+        merged_tokens.append(" ".join(tokens[start:index]))
+        merged_tags.append(curr_tag)
+
+    return merged_tokens, merged_tags
+
+
 class LabelMap:
     def __init__(self):
-        self.tag_to_entities = defaultdict(dict)
+        self.tag_to_entities: Dict[str, Dict[str, str]] = defaultdict(dict)
         self.next_label = 0
 
     def get_label(self, tag: str, entity: str) -> str:
@@ -73,34 +105,3 @@ class Guardrail:
             return entity_map.get(match[0], "[UNKNOWN ENTITY]")
 
         return re.sub(r"\[([A-Z]+)#(\d+)\]", replace, redacted_text)
-
-
-def max_overlap(a: str, b: str) -> int:
-    def longest_prefix(i: int, j: int) -> int:
-        cnt = 0
-        for k in range(0, min(len(a) - i, len(b) - j)):
-            if a[i + k] == b[j + k]:
-                cnt += 1
-            else:
-                break
-        return cnt
-
-    return max(longest_prefix(i, j) for i in range(len(a)) for j in range(len(b)))
-
-
-def merge_tags(tokens: List[str], tags: List[List[str]]):
-    merged_tokens = []
-    merged_tags = []
-
-    index = 0
-    while index < len(tokens):
-        start = index
-        curr_tag = tags[index][0]
-
-        while index < len(tokens) and tags[index][0] == curr_tag:
-            index += 1
-
-        merged_tokens.append(" ".join(tokens[start:index]))
-        merged_tags.append(curr_tag)
-
-    return merged_tokens, merged_tags

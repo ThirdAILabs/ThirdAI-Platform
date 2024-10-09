@@ -113,7 +113,6 @@ def create_enterprise_search_workflow(
             )
 
         session.commit()
-        session.refresh(new_workflow)
     except Exception as err:
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(err)

@@ -105,56 +105,6 @@ def list_public_models(
     )
 
 
-@model_router.get("/list")
-def list_models(
-    session: Session = Depends(get_session),
-    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
-):
-    user: schema.User = authenticated_user.user
-    user_teams = [ut.team_id for ut in user.teams]
-
-    accessible_models = (
-        session.query(schema.Model)
-        .options(
-            joinedload(schema.Model.user),
-            selectinload(schema.Model.attributes),
-            selectinload(schema.Model.dependencies),
-            selectinload(schema.Model.used_by),
-        )
-        .filter(
-            or_(
-                schema.Model.access_level == schema.Access.public,
-                and_(
-                    schema.Model.access_level == schema.Access.protected,
-                    schema.Model.team_id.in_(user_teams),
-                ),
-                and_(
-                    schema.Model.access_level == schema.Access.private,
-                    schema.Model.user_id == user.id,
-                ),
-                session.query(schema.ModelPermission)
-                .where(
-                    and_(
-                        schema.ModelPermission.model_id == schema.Model.id,
-                        schema.ModelPermission.user_id == user.id,
-                    )
-                )
-                .exists(),
-            )
-        )
-        .distinct(schema.Model.id)
-        .all()
-    )
-
-    model_list = [get_high_level_model_info(model) for model in accessible_models]
-
-    return response(
-        status_code=status.HTTP_200_OK,
-        message="Successfully retrieved accessible models.",
-        data=jsonable_encoder(model_list),
-    )
-
-
 @model_router.get("/details")
 def get_model_details(
     model_id: str,
@@ -168,9 +118,9 @@ def get_model_details(
     )
 
 
-@model_router.get("/search")
-def search_models(
-    name: str,
+@model_router.get("/list")
+def list_models(
+    name: Optional[str] = None,
     domain: Optional[str] = None,
     username: Optional[str] = None,
     type: Optional[str] = None,
@@ -198,19 +148,15 @@ def search_models(
     user: schema.User = authenticated_user.user
     user_teams = [ut.team_id for ut in user.teams]
 
-    query = (
-        session.query(schema.Model)
-        .options(
-            joinedload(schema.Model.user),
-            selectinload(schema.Model.attributes),
-            selectinload(schema.Model.dependencies),
-            selectinload(schema.Model.used_by),
-        )
-        .filter(
-            schema.Model.name.ilike(f"%{name}%"),
-            schema.Model.train_status == schema.Status.complete,
-        )
+    query = session.query(schema.Model).options(
+        joinedload(schema.Model.user),
+        selectinload(schema.Model.attributes),
+        selectinload(schema.Model.dependencies),
+        selectinload(schema.Model.used_by),
     )
+
+    if name:
+        query.filter(schema.Model.name.ilike(f"%{name}%"))
 
     if not user.is_global_admin():
         access_conditions = [
