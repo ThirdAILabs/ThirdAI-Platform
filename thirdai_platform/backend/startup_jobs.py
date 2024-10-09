@@ -80,6 +80,8 @@ async def start_on_prem_generate_job(
         raise ValueError(f"Cannot find model at location: {model_path}.")
     model_size = int(os.path.getsize(model_path) / 1e6)
     job_memory_mb = model_size * 2  # give some leeway
+    if os.cpu_count() < 8:
+        raise ValueError("Can't run LLM job on less than 8 cores")
     cores_per_allocation = min(16, os.cpu_count() - 2)
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
