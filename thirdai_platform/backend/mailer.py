@@ -4,10 +4,10 @@ from backend.utils import logger
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
-# Mailer Object which can be used to send mails from our webserver.
+# mailer which can be used to send mails from our webserver.
 
 
-def Mailer(to, subject, body, cc_emails=None):
+def mailer(to, subject, body, cc_emails=None):
     from_email = "ThirdAI <platform@thirdai.com>"
     message = Mail(
         from_email=from_email, to_emails=to, subject=subject, html_content=body
