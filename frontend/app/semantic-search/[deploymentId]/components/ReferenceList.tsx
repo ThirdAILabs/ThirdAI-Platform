@@ -17,7 +17,7 @@ interface ReferenceListProps {
   checkedIds: Set<number>;
   onCheck: (ref: number) => void;
   modelService: ModelService;
-  ifGuardRailOn: boolean;
+  piiMap: Map<string, Map<string, string>> | null;
 }
 
 const Container = styled.section`
@@ -50,7 +50,7 @@ export default function ReferenceList({
   checkedIds,
   onCheck,
   modelService,
-  ifGuardRailOn,
+  piiMap,
 }: ReferenceListProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   function handleMore() {
@@ -72,7 +72,7 @@ export default function ReferenceList({
             checked={checkedIds.has(ref.id)}
             onCheck={() => onCheck(ref.id)}
             modelService={modelService}
-            ifGuardRailOn={ifGuardRailOn}
+            piiMap={piiMap}
           />
           <Spacer $height="20px" />
         </Fragment>

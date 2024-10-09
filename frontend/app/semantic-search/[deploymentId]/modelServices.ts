@@ -151,7 +151,6 @@ export class ModelService {
         }
       })
       .then(({ data }) => {
-        console.log(data);
         return data;
       })
       .catch((e) => {

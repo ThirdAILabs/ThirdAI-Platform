@@ -171,33 +171,33 @@ function App() {
       try {
         const details = await getWorkflowDetails(receievedWorkflowId as string);
         console.log('details', details);
-    
+
         const data = details.data;
-    
+
         let serviceUrl: string;
         let ragUrl: string | undefined; // Initialize as undefined
         let chatEnabled = false;
-    
+
         if (data.type === "enterprise-search") {
           // Enterprise-search logic
           const ragDependency = data.dependencies.find(dep => dep.model_name.toLowerCase().includes('rag') || dep.model_name.toLowerCase().includes('retrieval'));
-          
-          serviceUrl = ragDependency 
+
+          serviceUrl = ragDependency
             ? createDeploymentUrl(ragDependency.model_id)
             : createDeploymentUrl('');
-          
+
           // Only set ragUrl for enterprise-search case
-          ragUrl = data.model_id 
+          ragUrl = data.model_id
             ? createDeploymentUrl(data.model_id)
             : undefined;
-    
+
           const nerDependency = data.dependencies.find(dep => dep.model_name.toLowerCase().includes('pii') || dep.model_name.toLowerCase().includes('ner'));
-    
+
           setIfGuardRailOn(!!nerDependency);
           setTokenClassifierExists(!!nerDependency);
-    
+
           chatEnabled = true;
-    
+
           setIfGenerationOn(!!data.llm_provider);
           setGenAiProvider(data.llm_provider || null);
         } else {
@@ -205,18 +205,18 @@ function App() {
           serviceUrl = data
             ? createDeploymentUrl(data.model_id)
             : createDeploymentUrl('');
-    
+
           const chatWorkflows = ['rag'];
           chatEnabled = chatWorkflows.includes(data.type);
         }
-    
+
         // Common logic for both cases
         setChatEnabled(chatEnabled);
-    
+
         const newModelService = new ModelService(serviceUrl, ragUrl, uuidv4());
         setModelService(newModelService);
         newModelService.sources().then((fetchedSources) => setSources(fetchedSources));
-    
+
       } catch (error) {
         console.error('Failed to fetch model details:', error);
         // Optionally, handle the error (e.g., show a notification to the user)
@@ -236,7 +236,6 @@ function App() {
     const fetchSources = async () => {
       try {
         const fetchedSources = await modelService.sources();
-        console.log('fetchedSources', fetchedSources);
         setSources(fetchedSources);
       } catch (error) {
         console.error('Failed to fetch sources:', error);
@@ -288,12 +287,6 @@ function App() {
       });
   }
 
-  interface PiiMapValue {
-    id: number;
-    originalToken: string;
-    tag: string;
-  }
-
   const [queryInfo, setQueryInfo] = useState<{
     cachedQuery: string;
     userQuery: string;
@@ -301,15 +294,6 @@ function App() {
   } | null>(null);
 
   async function submit(query: string, genaiPrompt: string, bypassCache = false) {
-    function replacePlaceholdersWithOriginal(
-      text: string,
-      piiMap: Map<string, Map<string, string>>
-    ): Promise<string> {
-      return modelService!.unredact(
-        text, piiMap
-      );
-    }
-
     if (websocketRef.current) {
       websocketRef.current.close();
     }
@@ -554,7 +538,7 @@ function App() {
                         checkedIds={checkedIds}
                         onCheck={onCheck}
                         modelService={modelService}
-                        ifGuardRailOn={ifGuardRailOn}
+                        piiMap={results.pii_map}
                       />
                     </Pad>
                   </Pad>
