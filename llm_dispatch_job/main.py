@@ -43,7 +43,7 @@ async def generate(generate_args: GenerateArgs):
         - references: List[Reference] - List of reference texts with optional sources and metadata.
         - key: Optional[str] - API key for the provider.
         - model: str - The model to use for text generation (default: "gpt-4o-mini").
-        - provider: str - The AI provider to use, either "on-prem" or "openai"
+        - provider: str - The AI provider to use (default: "openai"). Providers should be one of on-prem, openai, or cohere
         - workflow_id: Optional[str] - Workflow ID for tracking the request.
         - cache_access_token: Optional[str] - Authorization token for caching responses.
 
