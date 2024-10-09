@@ -621,11 +621,11 @@ interface TokenClassificationExample {
   description: string;
 }
 
-function tokenClassifierDatagenForm(modelGoal: string, examples: TokenClassificationExample[]) {
-  const tags = examples.map((example) => ({
-    name: example.name,
-    examples: [example.example],
-    description: example.description,
+function tokenClassifierDatagenForm(modelGoal: string, categories: Category[]) {
+  const tags = categories.map((category) => ({
+    name: category.name,
+    examples: category.examples.map((ex) => ex.text),
+    description: category.description,
   }));
   const numSentences = 10_000;
   return {
@@ -646,10 +646,20 @@ interface TrainTokenClassifierResponse {
   };
 }
 
+type Example = {
+  text: string;
+};
+
+type Category = {
+  name: string;
+  examples: Example[];
+  description: string;
+};
+
 export function trainTokenClassifier(
   modelName: string,
   modelGoal: string,
-  examples: TokenClassificationExample[]
+  categories: Category[]
 ): Promise<TrainTokenClassifierResponse> {
   // Retrieve the access token from local storage
   const accessToken = getAccessToken();
@@ -662,7 +672,7 @@ export function trainTokenClassifier(
     'datagen_options',
     JSON.stringify({
       task_prompt: modelGoal,
-      datagen_options: tokenClassifierDatagenForm(modelGoal, examples),
+      datagen_options: tokenClassifierDatagenForm(modelGoal, categories),
     })
   );
 
@@ -771,12 +781,12 @@ export interface TokenClassificationResult {
 export function useTokenClassificationEndpoints() {
   const accessToken = useAccessToken();
   const params = useParams();
-  console.log(params);
+  // console.log(params);
   const workflowId = params.deploymentId as string;
   const [workflowName, setWorkflowName] = useState<string>('');
   const [deploymentUrl, setDeploymentUrl] = useState<string | undefined>();
 
-  console.log('PARAMS', params);
+  // console.log('PARAMS', params);
 
   useEffect(() => {
     const init = async () => {

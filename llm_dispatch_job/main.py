@@ -39,11 +39,12 @@ async def generate(generate_args: GenerateArgs):
 
     Parameters:
         - query: str - The input query or prompt for text generation.
+        - task_prompt: Optional[str] - Additional prompt to guide the generation.
+        - references: List[Reference] - List of reference texts with optional sources and metadata.
         - key: Optional[str] - API key for the provider.
         - model: str - The model to use for text generation (default: "gpt-4o-mini").
         - provider: str - The AI provider to use (default: "openai"). Providers should be one of on-prem, openai, or cohere
         - workflow_id: Optional[str] - Workflow ID for tracking the request.
-        - original_query: Optional[str] - The original query to be cached, used for cache lookup.
         - cache_access_token: Optional[str] - Authorization token for caching responses.
 
     Returns:
@@ -53,10 +54,17 @@ async def generate(generate_args: GenerateArgs):
     ```
     {
         "query": "Explain the theory of relativity",
+        "task_prompt": "Provide a simple explanation suitable for a high school student.",
+        "references": [
+            {
+                "text": "E = mc^2 is the most famous equation in physics.",
+                "source": "Introduction to Physics, 2022",
+                "metadata": {"relevance": 0.9}
+            }
+        ],
         "model": "gpt-4o-mini",
         "provider": "openai",
         "workflow_id": "12345",
-        "original_query": "Explain relativity",
         "cache_access_token": "cache_token_abc"
     }
     ```
@@ -93,7 +101,7 @@ async def generate(generate_args: GenerateArgs):
             async for next_word in llm.stream(
                 key=key,
                 query=generate_args.query,
-                prompt=generate_args.prompt,
+                task_prompt=generate_args.task_prompt,
                 references=generate_args.references,
                 model=generate_args.model,
             ):

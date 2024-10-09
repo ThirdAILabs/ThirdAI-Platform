@@ -71,17 +71,20 @@ export default function ChooseProblem() {
 
   const workflowNames = workflows.map((workflow) => workflow.model_name);
 
-  const RETRIEVAL = 'Retrieval';
-  const NLP = 'Natural Language Processing';
-  const RAG = 'Retrieval Augmented Generation';
+  // Updated Use Case names
+  const ENTERPRISE_SEARCH = 'Enterprise Search';
+  const NLP_TEXT_ANALYSIS = 'NLP / Text Analytics';
+  const CHATBOT = 'Chatbot';
+
   // const DOC_CLASSIFICATION = "Document Classification";
   // const TABULAR_CLASSIFICATION = "Tabular Classification";
 
-  // const useCases = [RETRIEVAL, NLP, RAG, DOC_CLASSIFICATION, TABULAR_CLASSIFICATION];
-  const useCases = [{ name: RETRIEVAL }, { name: NLP }, { name: RAG }];
+  // Update the useCases array with new names
+  const useCases = [{ name: ENTERPRISE_SEARCH }, { name: CHATBOT }, { name: NLP_TEXT_ANALYSIS }];
   const handleSetModelType = (model: string) => {
     setModelType(model);
   };
+
   return (
     <>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -98,11 +101,13 @@ export default function ChooseProblem() {
         {modelType && (
           <div style={{ width: '100%', marginTop: '20px' }}>
             <Divider style={{ marginBottom: '20px' }} />
-            {modelType === RAG && (
+            {modelType === CHATBOT && (
               <RAGQuestions models={privateModels} workflowNames={workflowNames} />
             )}
-            {modelType === NLP && <NLPQuestions workflowNames={workflowNames} />}
-            {modelType === RETRIEVAL && <SemanticSearchQuestions workflowNames={workflowNames} />}
+            {modelType === NLP_TEXT_ANALYSIS && <NLPQuestions workflowNames={workflowNames} />}
+            {modelType === ENTERPRISE_SEARCH && (
+              <SemanticSearchQuestions models={privateModels} workflowNames={workflowNames} />
+            )}
             {/* {modelType === DOC_CLASSIFICATION && <DocumentClassificationQuestions workflowNames={workflowNames} />} */}
             {/* {modelType === TABULAR_CLASSIFICATION && <TabularClassificationQuestions workflowNames={workflowNames} />} */}
           </div>

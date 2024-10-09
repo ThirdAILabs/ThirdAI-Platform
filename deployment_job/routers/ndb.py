@@ -2,7 +2,7 @@ import io
 import traceback
 import uuid
 from pathlib import Path
-from typing import List
+from typing import AsyncGenerator, List
 
 import fitz
 import jwt
@@ -10,6 +10,7 @@ import thirdai
 from config import DeploymentConfig, NDBSubType
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
 from file_handler import download_local_files
 
 pass
@@ -459,13 +460,11 @@ class NDBRouter:
         else:
             session_id = input.session_id
 
-        chat_result = {"response": chat.chat(input.user_input, session_id)}
+        async def generate_response() -> AsyncGenerator[str, None]:
+            async for chunk in chat.stream_chat(input.user_input, session_id):
+                yield chunk
 
-        return response(
-            status_code=status.HTTP_200_OK,
-            message="Successful",
-            data=chat_result,
-        )
+        return StreamingResponse(generate_response(), media_type="text/plain")
 
     @propagate_error
     def get_sources(self, token=Depends(Permissions.verify_permission("read"))):

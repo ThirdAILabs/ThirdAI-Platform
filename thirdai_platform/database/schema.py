@@ -1,6 +1,7 @@
 import enum
 import re
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 
 from sqlalchemy import (
     ARRAY,
@@ -102,8 +103,6 @@ class User(SQLDeclarativeBase):
         "ModelPermission", back_populates="user", cascade="all, delete-orphan"
     )
 
-    reset_password_code = Column(Integer, nullable=True)
-
     @validates("username")
     def validate_username(self, key, username):
         # allow only alphanumeric characters, underscores, and hyphens
@@ -133,6 +132,28 @@ class User(SQLDeclarativeBase):
             user_team.role == Role.team_admin and user_team.team_id == team_id
             for user_team in self.teams
         )
+
+
+class PasswordReset(SQLDeclarativeBase):
+    __tablename__ = "password_resets"
+
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    reset_code_hash = Column(String, nullable=False)
+    expiration_time = Column(DateTime, nullable=False)
+
+    @staticmethod
+    def generate_expiration_time(minutes: int = 15):
+        return datetime.utcnow() + timedelta(minutes=minutes)
+
+    @staticmethod
+    def generate_reset_code(num: int = 6):
+        # Use secrets to generate a secure 6-digit code
+        return "".join([str(secrets.randbelow(10)) for _ in range(num)])
+
+    def is_valid(self):
+        return datetime.utcnow() < self.expiration_time
 
 
 class UserTeam(SQLDeclarativeBase):

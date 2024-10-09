@@ -146,6 +146,12 @@ function App() {
     null
   );
 
+  // Go to Chat page in case of ChatBot use case
+  useEffect(() => {
+    const isChatMode = searchParams.get('chatMode') === 'true';
+    setChatMode(isChatMode);
+  }, []);
+
   useEffect(() => {
     const receievedWorkflowId = searchParams.get('workflowId');
     const generationOn = searchParams.get('ifGenerationOn') === 'true';
@@ -285,6 +291,8 @@ function App() {
     isDifferent: boolean;
   } | null>(null);
 
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
+
   async function submit(query: string, genaiPrompt: string, bypassCache = false) {
     if (websocketRef.current) {
       websocketRef.current.close();
@@ -304,12 +312,19 @@ function App() {
       );
 
       if (results && ifGenerationOn) {
+        if (abortController) {
+          abortController.abort();
+        }
+
         console.log('processedQuery:', results.query);
         console.log('piiMap:', results.pii_entities);
         console.log('processedReferences:');
         results.references.forEach((reference) => {
           console.log(reference.content);
         });
+
+        const controller = new AbortController();
+        setAbortController(controller); // Store it in state
 
         modelService!.generateAnswer(
           results.query,
@@ -324,8 +339,14 @@ function App() {
             });
           },
           genAiProvider || undefined, // Convert null to undefined
-          workflowId || undefined
-        );
+          workflowId || undefined,
+          undefined,
+          controller.signal
+        )
+          .finally(() => {
+            // Cleanup after generation completes or is aborted
+            setAbortController(null);
+          });;
       }
     } else {
       setResults(null);
@@ -483,6 +504,9 @@ function App() {
                     setPrompt={setPrompt}
                     ifGenerationOn={ifGenerationOn}
                     cacheEnabled={cacheEnabled}
+                    abortController={abortController}
+                    setAbortController={setAbortController}
+                    setAnswer={setAnswer}
                   />
                   {failed && (
                     <Pad $top="100px">
@@ -504,6 +528,9 @@ function App() {
                             queryInfo={queryInfo}
                             cacheEnabled={cacheEnabled}
                             setCacheEnabled={setCacheEnabled}
+                            abortController={abortController} // Pass abortController here
+                            setAbortController={setAbortController} // Pass setAbortController
+                            setAnswer={setAnswer} // Pass setAnswer
                           />
                         </>
                       )}

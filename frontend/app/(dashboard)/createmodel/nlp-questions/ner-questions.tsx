@@ -6,7 +6,7 @@ import {
 } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
-import { Button, TextField } from '@mui/material';
+import { Button, TextField, IconButton } from '@mui/material';
 import {
   Table,
   TableBody,
@@ -16,10 +16,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { CardDescription } from '@/components/ui/card';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+
+type Example = {
+  text: string;
+};
 
 type Category = {
   name: string;
-  example: string;
+  examples: Example[];
   description: string;
 };
 
@@ -41,27 +47,59 @@ const NERQuestions = ({
   appName,
 }: NERQuestionsProps) => {
   const [modelName, setModelName] = useState(!appName ? '' : appName);
-  const [categories, setCategories] = useState([{ name: '', example: '', description: '' }]);
+  const [categories, setCategories] = useState<Category[]>([
+    { name: '', examples: [{ text: '' }], description: '' },
+  ]);
   const [isDataGenerating, setIsDataGenerating] = useState(false);
   const [generatedData, setGeneratedData] = useState([]);
   const [generateDataPrompt, setGenerateDataPrompt] = useState('');
 
   const router = useRouter();
 
-  const handleCategoryChange = (index: number, field: keyof Category, value: string) => {
+  const handleCategoryChange = (
+    index: number,
+    field: keyof Category,
+    value: string | Example[]
+  ) => {
     const updatedCategories = [...categories];
-    updatedCategories[index][field] = value;
+    if (field === 'examples') {
+      updatedCategories[index][field] = value as Example[];
+    } else {
+      updatedCategories[index][field] = value as string;
+    }
+    setCategories(updatedCategories);
+  };
+
+  const handleExampleChange = (categoryIndex: number, exampleIndex: number, value: string) => {
+    const updatedCategories = [...categories];
+    updatedCategories[categoryIndex].examples[exampleIndex].text = value;
+    setCategories(updatedCategories);
+  };
+
+  const handleAddExample = (categoryIndex: number) => {
+    const updatedCategories = [...categories];
+    updatedCategories[categoryIndex].examples.push({ text: '' });
+    setCategories(updatedCategories);
+  };
+
+  const handleRemoveExample = (categoryIndex: number, exampleIndex: number) => {
+    const updatedCategories = [...categories];
+    updatedCategories[categoryIndex].examples.splice(exampleIndex, 1);
     setCategories(updatedCategories);
   };
 
   const handleAddCategory = () => {
-    setCategories([...categories, { name: '', example: '', description: '' }]);
+    setCategories([...categories, { name: '', examples: [{ text: '' }], description: '' }]);
   };
 
   const validateCategories = () => {
-    // Check if any category has an empty name, example, or description
     return categories.every((category: Category) => {
-      return category.name && category.example && category.description;
+      return (
+        category.name &&
+        category.examples.length > 0 &&
+        category.examples.every((ex) => ex.text) &&
+        category.description
+      );
     });
   };
 
@@ -104,8 +142,13 @@ const NERQuestions = ({
   const generateData = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     for (const category of categories) {
-      if (category.name === '' || category.example === '' || category.description === '') {
-        alert('All tokens must have a name, example, and description.');
+      if (
+        category.name === '' ||
+        category.examples.length === 0 ||
+        category.examples[0].text === '' ||
+        category.description === ''
+      ) {
+        alert('All tokens must have a name, at least one example, and a description.');
         return;
       }
     }
@@ -280,64 +323,89 @@ const NERQuestions = ({
             Specify Tokens
           </span>
           <CardDescription>Define your own categories or select existing ones</CardDescription>
-          <form onSubmit={handleSubmit}>
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                marginTop: '10px',
-              }}
-            >
-              {categories.map((category, index) => (
+          <form onSubmit={(e) => e.preventDefault()}>
+            <div style={{ display: 'flex', flexDirection: 'column', marginTop: '10px' }}>
+              {categories.map((category, categoryIndex) => (
                 <div
-                  key={index}
+                  key={categoryIndex}
                   style={{
-                    display: 'flex',
-                    flexDirection: 'row',
-                    gap: '10px',
-                    justifyContent: 'space-between',
-                    marginBottom: '10px', // Adds gap between rows
+                    marginBottom: '20px',
+                    border: '1px solid #ccc',
+                    padding: '10px',
+                    borderRadius: '4px',
                   }}
                 >
-                  <div style={{ width: '100%' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '10px',
+                    }}
+                  >
                     <TextField
-                      style={{ width: '95%' }}
-                      className="text-sm w-fit"
+                      style={{ width: '45%' }}
+                      className="text-sm"
                       placeholder="Category Name"
                       value={category.name}
-                      onChange={(e) => handleCategoryChange(index, 'name', e.target.value)}
+                      onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value)}
                       InputProps={{
                         inputProps: {
-                          list: `category-options-${index}`, // Linking to the datalist
+                          list: `category-options-${categoryIndex}`,
                         },
                       }}
                     />
-                    <datalist id={`category-options-${index}`}>
+                    <datalist id={`category-options-${categoryIndex}`}>
                       {predefinedChoices.map((choice, i) => (
                         <option key={i} value={choice} />
                       ))}
                     </datalist>
+                    <TextField
+                      style={{ width: '45%' }}
+                      className="text-sm"
+                      placeholder="What this category is about."
+                      value={category.description}
+                      onChange={(e) =>
+                        handleCategoryChange(categoryIndex, 'description', e.target.value)
+                      }
+                    />
                   </div>
-                  <TextField
-                    style={{ width: '75%' }}
-                    className="text-sm w-fit"
-                    placeholder="Example"
-                    value={category.example}
-                    onChange={(e) => handleCategoryChange(index, 'example', e.target.value)}
-                  />
-                  <TextField
-                    style={{ width: '130%' }}
-                    className="text-sm w-fit"
-                    placeholder="What this category is about."
-                    value={category.description}
-                    onChange={(e) => handleCategoryChange(index, 'description', e.target.value)}
-                  />
+                  {category.examples.map((example, exampleIndex) => (
+                    <div
+                      key={exampleIndex}
+                      style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}
+                    >
+                      <TextField
+                        style={{ flex: 1 }}
+                        className="text-sm"
+                        placeholder={`Example ${exampleIndex + 1}`}
+                        value={example.text}
+                        onChange={(e) =>
+                          handleExampleChange(categoryIndex, exampleIndex, e.target.value)
+                        }
+                      />
+                      <IconButton
+                        onClick={() => handleRemoveExample(categoryIndex, exampleIndex)}
+                        disabled={category.examples.length === 1}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outlined"
+                    startIcon={<AddIcon />}
+                    onClick={() => handleAddExample(categoryIndex)}
+                    style={{ marginRight: '10px' }}
+                  >
+                    Add Example
+                  </Button>
                   <Button
                     variant="contained"
                     color="error"
-                    onClick={() => handleRemoveCategory(index)}
+                    onClick={() => handleRemoveCategory(categoryIndex)}
+                    disabled={categories.length === 1}
                   >
-                    Remove
+                    Remove Category
                   </Button>
                 </div>
               ))}
@@ -348,16 +416,14 @@ const NERQuestions = ({
               >
                 Add Category
               </Button>
-              {categories.length > 0 && (
-                <Button
-                  variant="contained"
-                  color={isDataGenerating ? 'success' : 'primary'}
-                  style={{ marginTop: '30px' }}
-                  onClick={generateData}
-                >
-                  {isDataGenerating ? 'Generating data...' : 'Generate data'}
-                </Button>
-              )}
+              <Button
+                variant="contained"
+                color={isDataGenerating ? 'success' : 'primary'}
+                style={{ marginTop: '30px' }}
+                onClick={generateData}
+              >
+                {isDataGenerating ? 'Generating data...' : 'Generate data'}
+              </Button>
             </div>
           </form>
         </>
@@ -389,7 +455,9 @@ const NERQuestions = ({
                     {category.name}
                   </TableCell>
                   <TableCell className="font-medium" align="left">
-                    {category.example}
+                    {category.examples.map((ex, i) => (
+                      <div key={i}>{ex.text}</div>
+                    ))}
                   </TableCell>
                   <TableCell className="font-medium" align="left">
                     {category.description}

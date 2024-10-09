@@ -171,7 +171,8 @@ class TokenClassificationModel(ClassificationModel):
         return self.config.model_options.udt_options
 
     def initialize_model(self):
-        target_labels = self.tkn_cls_vars.target_labels
+        # deduplicate the labels
+        target_labels = list(set(self.tkn_cls_vars.target_labels))
         default_tag = self.tkn_cls_vars.default_tag
         return bolt.UniversalDeepTransformer(
             data_types={

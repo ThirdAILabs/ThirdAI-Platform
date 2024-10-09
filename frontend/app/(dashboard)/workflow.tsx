@@ -46,7 +46,8 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
         // TODO don't use url params
         const genAiProvider = `${workflow.llm_provider}`;
         const ifGenerationOn = true;
-        const newUrl = `/semantic-search/${workflow.model_id}?workflowId=${workflow.model_id}&ifGenerationOn=${ifGenerationOn}&genAiProvider=${genAiProvider}`;
+        const chatMode = workflow.default_mode == "chat"
+        const newUrl = `/semantic-search/${workflow.model_id}?workflowId=${workflow.model_id}&ifGenerationOn=${ifGenerationOn}&genAiProvider=${genAiProvider}&chatMode=${chatMode}`;
         window.open(newUrl, '_blank');
         break;
       }
@@ -164,16 +165,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
 
   return (
     <TableRow>
-      <TableCell className="hidden sm:table-cell">
-        <Image
-          alt="workflow image"
-          className="aspect-square rounded-md object-cover"
-          height="64"
-          src={'/thirdai-small.png'}
-          width="64"
-        />
-      </TableCell>
-      <TableCell className="font-medium text-center">{workflow.model_name}</TableCell>
+      <TableCell className="font-bold text-center">{workflow.model_name}</TableCell>
       <TableCell className="text-center font-medium">
         <Badge variant="outline" className={`capitalize ${getBadgeColor(deployStatus)}`}>
           {deployStatus}
@@ -306,11 +298,11 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
                     </tr>
                   ))} */}
                   {/* {workflow.models.map((model, index) => ( */}
-                    <tr className="hover:bg-gray-100">
-                      <td className="border px-4 py-2">{workflow.model_name}</td>
-                      <td className="border px-4 py-2">{formatBytesToMB(workflow.size)}</td>
-                      <td className="border px-4 py-2">{formatBytesToMB(workflow.size_in_memory)}</td>
-                    </tr>
+                  <tr className="hover:bg-gray-100">
+                    <td className="border px-4 py-2">{workflow.model_name}</td>
+                    <td className="border px-4 py-2">{formatBytesToMB(workflow.size)}</td>
+                    <td className="border px-4 py-2">{formatBytesToMB(workflow.size_in_memory)}</td>
+                  </tr>
                   {/* ))} */}
                 </tbody>
               </table>

@@ -82,16 +82,12 @@ export function ModelsTable({ searchStr, offset }: { searchStr: string; offset: 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Apps</CardTitle>
-        <CardDescription>Manage your Apps and view their performance.</CardDescription>
+        <CardTitle>App Catalog</CardTitle>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="hidden w-[100px] sm:table-cell">
-                <span className="sr-only">Image</span>
-              </TableHead>
               <TableHead className="text-center">Name</TableHead>
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="hidden md:table-cell text-center">Type</TableHead>
