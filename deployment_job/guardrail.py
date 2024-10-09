@@ -1,10 +1,9 @@
 import re
 from collections import defaultdict
-from typing import List
+from typing import Dict, List
 from urllib.parse import urljoin
 
 import requests
-from typing import Dict
 from fastapi import HTTPException, status
 from pydantic_models.inputs import PiiEntity
 
