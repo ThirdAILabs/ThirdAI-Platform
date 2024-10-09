@@ -4,7 +4,8 @@ from typing import AsyncGenerator, List
 from urllib.parse import urljoin
 
 import aiohttp
-import requests
+
+pass
 from utils import Reference, make_prompt
 
 
@@ -127,6 +128,8 @@ class OnPremLLM(LLMBase):
             # sensitive to this. We set it to 1000 because throughput is important
             # and answers aren't super useful past 1000 tokens anyways.
             "n_predict": 1000,
+            # Passing in model is just for logging purposes. For some reason
+            # llama.cpp returns gpt-3.5-turbo for this value if not specified
             "model": model,
         }
         async with aiohttp.ClientSession() as session:
