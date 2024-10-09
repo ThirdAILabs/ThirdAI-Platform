@@ -4,8 +4,6 @@ from typing import AsyncGenerator, List
 from urllib.parse import urljoin
 
 import aiohttp
-
-pass
 from utils import Reference, make_prompt
 
 
