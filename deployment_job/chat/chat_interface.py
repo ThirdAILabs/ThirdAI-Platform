@@ -104,11 +104,10 @@ class ChatInterface(ABC):
         return chat_history_list
 
     def chat(self, user_input: str, session_id: str, **kwargs):
-        formatted_user_input = f"<|user|>{user_input}<|end|><|assistant|>"
         chat_history = SQLChatMessageHistory(
             session_id=session_id, connection_string=self.chat_history_sql_uri
         )
-        chat_history.add_user_message(formatted_user_input)
+        chat_history.add_user_message(user_input)
         response = self.conversational_retrieval_chain.invoke(
             {"messages": chat_history.messages}
         )
@@ -119,11 +118,10 @@ class ChatInterface(ABC):
     async def stream_chat(
         self, user_input: str, session_id: str, **kwargs
     ) -> AsyncGenerator[str, None]:
-        formatted_user_input = f"<|user|>{user_input}<|end|><|assistant|>"
         chat_history = SQLChatMessageHistory(
             session_id=session_id, connection_string=self.chat_history_sql_uri
         )
-        chat_history.add_user_message(formatted_user_input)
+        chat_history.add_user_message(user_input)
 
         response_chunks = []
         async for chunk in self.conversational_retrieval_chain.astream(
