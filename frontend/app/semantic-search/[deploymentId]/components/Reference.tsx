@@ -278,7 +278,7 @@ export default function Reference({
                       cursor: label && label.checked ? 'pointer' : 'auto',
                     }}
                   >
-                    {label && label.checked ? `${token_tag.token} (${token_tag.tag})` : `${token_tag.token} `}
+                    {label && label.checked ? `${token_tag.token} (${token_tag.tag}) ` : `${token_tag.token} `}
                   </span>
                 );
               })}
