@@ -19,12 +19,17 @@ export interface ReferenceInfo {
   metadata: any;
 }
 
+export interface PiiEntity {
+  token: string;
+  label: string;
+}
+
 export interface SearchResult {
   queryId: string;
   query: string;
   references: ReferenceInfo[];
 
-  pii_map: Map<string, Map<string, string>> | null;
+  pii_entities: PiiEntity[] | null;
 }
 
 export interface PdfInfo {
@@ -302,7 +307,7 @@ export class ModelService {
             content: ref.text,
             metadata: ref.metadata,
           })),
-          pii_map: data.pii_map,
+          pii_entities: data.pii_entities,
         };
         return searchResults;
       })

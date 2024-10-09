@@ -4,7 +4,7 @@ import { Spacer } from './Layout';
 import Reference from './Reference';
 import PillButton from './buttons/PillButton';
 import { fontSizes } from '../stylingConstants';
-import { ModelService, ReferenceInfo } from '../modelServices';
+import { ModelService, ReferenceInfo, PiiEntity } from '../modelServices';
 
 interface ReferenceListProps {
   query: string;
@@ -17,7 +17,7 @@ interface ReferenceListProps {
   checkedIds: Set<number>;
   onCheck: (ref: number) => void;
   modelService: ModelService;
-  piiMap: Map<string, Map<string, string>> | null;
+  piiEntities: PiiEntity[] | null;
 }
 
 const Container = styled.section`
@@ -50,7 +50,7 @@ export default function ReferenceList({
   checkedIds,
   onCheck,
   modelService,
-  piiMap,
+  piiEntities,
 }: ReferenceListProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   function handleMore() {
@@ -72,7 +72,7 @@ export default function ReferenceList({
             checked={checkedIds.has(ref.id)}
             onCheck={() => onCheck(ref.id)}
             modelService={modelService}
-            piiMap={piiMap}
+            piiMap={piiEntities ? new Map<string, string>(piiEntities!.map(entity => [entity.label, entity.token])) : null}
           />
           <Spacer $height="20px" />
         </Fragment>

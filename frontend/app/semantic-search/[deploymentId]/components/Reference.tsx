@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { ModelServiceContext } from '../Context';
-import { ModelService, ReferenceInfo, PIIDetectionResult } from '../modelServices';
+import { ModelService, ReferenceInfo, PiiEntity } from '../modelServices';
 
 const Stripe = styled.section`
   background: ${color.accent};
@@ -108,7 +108,7 @@ interface ReferenceProps {
   checked: boolean;
   onCheck: () => void;
   modelService: ModelService;
-  piiMap: Map<string, Map<string, string>> | null;
+  piiMap: Map<string, string> | null;
 }
 
 
@@ -117,27 +117,16 @@ interface TokenTag {
   tag: string
 }
 
-function getTokensAndTags(text: string, piiMap: object): TokenTag[] {
+function getTokensAndTags(text: string, piiMap: Map<string, string>): TokenTag[] {
   const tokens = text.replaceAll(/\[([A-Z]+) (#\d+)\]/gi, '$1<pii>$2').split(' ');
 
   var token_tags: TokenTag[] = [];
 
   for (const token of tokens) {
-    if (token.includes("<pii>")) {
-      const items = token.split("<pii>");
-      const tag = items[0]
-      const label = `[${tag} ${items[1]}]`
-
-      if (tag in piiMap) {
-        const candidates = piiMap[tag as keyof typeof piiMap]
-        if (label in candidates) {
-          token_tags.push({ token: candidates[label], tag: tag })
-        } else {
-          token_tags.push({ token: "[UNKNOWN]", tag: "" })
-        }
-      } else {
-        token_tags.push({ token: "[UNKNOWN]", tag: "" })
-      }
+    if (piiMap.has(token)) {
+      const items = token.split('#');
+      const tag = items[0].slice(1);
+      token_tags.push({ token: piiMap.get(token)!, tag: tag })
     } else {
       token_tags.push({ token: token, tag: "" })
     }

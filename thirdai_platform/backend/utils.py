@@ -120,7 +120,7 @@ def get_model_status(model: schema.Model, train_status: bool) -> schema.Status:
         schema.Status.stopped,
         schema.Status.failed,
     ]:
-        return status
+        return status, [f"Workflow {model.name} has status {status.value}."]
 
     statuses = defaultdict(list)
     for m in list_all_dependencies(model):

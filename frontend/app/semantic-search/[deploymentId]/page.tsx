@@ -14,7 +14,7 @@ import LogoImg from './assets/logos/logo.png';
 import { duration, fontSizes, padding } from './stylingConstants';
 import Teach from './components/Teach';
 import { ModelServiceContext } from './Context';
-import { ModelService, PdfInfo, ReferenceInfo, Source } from './modelServices';
+import { ModelService, PdfInfo, ReferenceInfo, Source, SearchResult, PiiEntity } from './modelServices';
 import InvalidModelMessage from './components/InvalidModelMessage';
 import PdfViewer from './components/pdf_viewer/PdfViewer';
 import { Chunk } from './components/pdf_viewer/interfaces';
@@ -93,14 +93,6 @@ const UpvoteModalWrapper = styled.section`
   padding: ${padding.card};
   box-sizing: border-box;
 `;
-
-interface SearchResult {
-  queryId: string;
-  query: string;
-  references: ReferenceInfo[];
-
-  pii_map: Map<string, Map<string, string>> | null;
-}
 
 const defaultPrompt =
   'Write an answer that is about 100 words ' +
@@ -299,7 +291,7 @@ function App() {
     }
     setAnswer('');
     setUpvoteQuery(query);
-    setResults({ queryId: '', query: '', references: [], pii_map: null });
+    setResults({ queryId: '', query: '', references: [], pii_entities: null });
     setCheckedIds(new Set<number>());
     setCanSearchMore(true);
     setNumReferences(c.numReferencesFirstLoad);
@@ -313,7 +305,7 @@ function App() {
 
       if (results && ifGenerationOn) {
         console.log('processedQuery:', results.query);
-        console.log('piiMap:', results.pii_map);
+        console.log('piiMap:', results.pii_entities);
         console.log('processedReferences:');
         results.references.forEach((reference) => {
           console.log(reference.content);
@@ -327,11 +319,6 @@ function App() {
             setAnswer((prev) => {
               // Concatenate previous answer and the new part
               const fullAnswer = prev + next;
-
-              // Replace placeholders in the concatenated string
-              if (results.pii_map) {
-                // return replacePlaceholdersWithOriginal(fullAnswer, results.pii_map);
-              }
               // Return the final processed answer to update the state
               return fullAnswer;
             });
@@ -538,7 +525,7 @@ function App() {
                         checkedIds={checkedIds}
                         onCheck={onCheck}
                         modelService={modelService}
-                        piiMap={results.pii_map}
+                        piiEntities={results.pii_entities}
                       />
                     </Pad>
                   </Pad>
