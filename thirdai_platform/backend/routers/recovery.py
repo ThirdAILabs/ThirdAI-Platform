@@ -39,9 +39,9 @@ def backup_to_s3():
     dump_file_path = os.path.join(local_dir, "db_backup.sql")
     dump_postgres_db_to_file(db_uri, dump_file_path)
 
-    s3_client_handler.upload_file_to_s3(dump_file_path, bucket_name, "db_backup.sql")
+    s3_client_handler.upload_file(dump_file_path, bucket_name, "db_backup.sql")
 
-    s3_client_handler.upload_folder_to_s3(bucket_name, local_dir)
+    s3_client_handler.upload_folder(bucket_name, local_dir)
 
     return response(
         status_code=status.HTTP_200_OK,

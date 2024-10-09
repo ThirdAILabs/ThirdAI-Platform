@@ -23,6 +23,7 @@ export default function Button(theme) {
     const largeSize = ownerState.size === 'large';
 
     const defaultStyle = {
+      textTransform: 'none',
       ...(inheritColor && {
         // CONTAINED
         ...(containedVariant && {

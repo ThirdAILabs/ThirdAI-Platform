@@ -136,6 +136,10 @@ interface SearchBarProps {
   setPrompt: (prompt: string) => void;
   ifGenerationOn: boolean;
   cacheEnabled: boolean;
+
+  abortController: AbortController | null;
+  setAbortController: (controller: AbortController | null) => void;
+  setAnswer: (answer: string) => void;
 }
 
 export default function SearchBar({
@@ -148,6 +152,10 @@ export default function SearchBar({
   setPrompt,
   ifGenerationOn,
   cacheEnabled,
+
+  abortController,
+  setAbortController,
+  setAnswer,
 }: SearchBarProps) {
   const modelService = useContext<ModelService | null>(ModelServiceContext);
   const [showSources, setShowSources] = useState(false);
@@ -277,7 +285,7 @@ export default function SearchBar({
             }}
           />
           <Spacer $width="15px" />
-          <PromptToggle onClick={() => setDialogOpen((dialogOpen) => !dialogOpen)} />
+          {/* <PromptToggle onClick={() => setDialogOpen((dialogOpen) => !dialogOpen)} /> */}
           <Spacer $width="7px" />
           <SaveButton onClick={handleSaveClick} />
         </SearchArea>

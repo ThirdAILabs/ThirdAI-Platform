@@ -114,8 +114,14 @@ class NDBModel(Model):
         Set up a chat instance for the given provider, if it hasn't been set already.
         """
         provider = kwargs.get("provider", "openai")
+        if provider in self.chat_instances and self.chat_instances[provider]:
+            # Chat instance for this provider already exists, do not recreate
+            print(f"Chat instance for provider '{provider}' is already set.")
+            return
         try:
-            sqlite_db_path = os.path.join(self.model_dir, "chat_history.db")
+            sqlite_db_path = os.path.join(self.model_dir, provider, "chat_history.db")
+
+            os.makedirs(os.path.dirname(sqlite_db_path), exist_ok=True)
 
             chat_history_sql_uri = f"sqlite:///{sqlite_db_path}"
 
@@ -346,7 +352,7 @@ class NDBV2Model(NDBModel):
     def chunk_to_pydantic_ref(self, chunk: Chunk, score: float) -> inputs.Reference:
         return inputs.Reference(
             id=chunk.chunk_id,
-            text=chunk.keywords + " " + chunk.text,
+            text=chunk.text,
             source=self.full_source_path(chunk.document),
             metadata=chunk.metadata,
             context="",

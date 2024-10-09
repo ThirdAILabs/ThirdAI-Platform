@@ -10,7 +10,9 @@ client = TestClient(app)
 pytestmark = [pytest.mark.unit]
 
 
-def test_generate_text_stream():
+@pytest.mark.parametrize("references", [[], ["Text from doc A", "Text from doc B"]])
+@pytest.mark.parametrize("prompt", [None, "This is a custom prompt"])
+def test_generate_text_stream(references, prompt):
     async def mock_stream(*args, **kwargs):
         yield "This "
         yield "is "
@@ -22,6 +24,8 @@ def test_generate_text_stream():
     with patch("main.model_classes", {"openai": lambda: mock_llm_instance}):
         request_data = {
             "query": "test query",
+            "prompt": prompt,
+            "references": [{"text": ref} for ref in references],
             "provider": "openai",
             "key": "dummy key",
         }

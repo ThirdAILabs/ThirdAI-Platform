@@ -126,6 +126,7 @@ function App() {
   const [selectedPdfChunk, setSelectedPdfChunk] = useState<Chunk | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
   const [chatMode, setChatMode] = useState(false);
+  const [chatEnabled, setChatEnabled] = useState(false);
   const [checkedIds, setCheckedIds] = useState(new Set<number>());
   const onCheck = (id: number) =>
     setCheckedIds((prev) => {
@@ -144,6 +145,18 @@ function App() {
   const [ifGuardRailOn, setIfGuardRailOn] = useState(false);
   const [genAiProvider, setGenAiProvider] = useState<string | null>(null);
   const [workflowId, setWorkflowId] = useState<string | null>(null);
+
+  const [sentimentClassifierExists, setSentimentClassifierExists] = useState(false);
+  const [tokenClassifierExists, setTokenClassifierExists] = useState(false);
+  const [sentimentClassifierWorkflowId, setSentimentClassifierWorkflowId] = useState<string | null>(
+    null
+  );
+
+  // Go to Chat page in case of ChatBot use case
+  useEffect(() => {
+    const isChatMode = searchParams.get('chatMode') === 'true';
+    setChatMode(isChatMode);
+  }, []);
 
   useEffect(() => {
     const receievedWorkflowId = searchParams.get('workflowId');
@@ -175,13 +188,35 @@ function App() {
           ? createTokenModelUrl(nlpModel.model_id)
           : createTokenModelUrl('');
 
+        // Filter and find the model with component "nlp-classifier"
+        const sentimentClassifier = details.data.models.find(
+          (model) => model.component === 'nlp-classifier'
+        );
+
         if (nlpModel) {
           setIfGuardRailOn(true);
         }
 
+        // Set whether token classifier exists
+        setTokenClassifierExists(!!nlpModel);
+
         if (!generationOn) {
           // if generation is off, turn off cache
           setCacheEnabled(false);
+        }
+
+        // Set whether sentiment classifier exists
+        setSentimentClassifierExists(!!sentimentClassifier);
+
+        // Set the sentiment classifier workflow ID if the model exists
+        if (sentimentClassifier) {
+          setSentimentClassifierWorkflowId(sentimentClassifier.model_id);
+        }
+
+        // Only enable the chat option if the workflow is of type RAG
+        const chatWorkflows = ['rag'];
+        if (chatWorkflows.includes(details.data.type)) {
+          setChatEnabled(true);
         }
 
         const newModelService = new ModelService(serviceUrl, tokenModelUrl, uuidv4());
@@ -268,6 +303,8 @@ function App() {
     userQuery: string;
     isDifferent: boolean;
   } | null>(null);
+
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   async function submit(query: string, genaiPrompt: string, bypassCache = false) {
     function replacePlaceholdersWithOriginal(
@@ -389,6 +426,11 @@ function App() {
       return processedSentences.join(' ');
     }
 
+    // If a generation is already in progress, abort it
+    if (abortController) {
+      abortController.abort();
+    }
+
     if (websocketRef.current) {
       websocketRef.current.close();
     }
@@ -426,25 +468,36 @@ function App() {
             console.log(reference.content);
           });
 
-          modelService!.generateAnswer(
-            processedQuery,
-            `${genaiPrompt}. [TAG #id] is sensitive information replaced as a placeholder, use them in your response for consistency.`,
-            processedReferences,
-            (next) => {
-              setAnswer((prev) => {
-                // Concatenate previous answer and the new part
-                const fullAnswer = prev + next;
+          // Create a new AbortController instance
+          const controller = new AbortController();
+          setAbortController(controller); // Store it in state
 
-                // Replace placeholders in the concatenated string
-                const replacedAnswer = replacePlaceholdersWithOriginal(fullAnswer, piiMap);
+          modelService!
+            .generateAnswer(
+              processedQuery,
+              `${genaiPrompt}. [TAG #id] is sensitive information replaced as a placeholder, use them in your response for consistency.`,
+              processedReferences,
+              (next) => {
+                setAnswer((prev) => {
+                  // Concatenate previous answer and the new part
+                  const fullAnswer = prev + next;
 
-                // Return the final processed answer to update the state
-                return replacedAnswer;
-              });
-            },
-            genAiProvider || undefined, // Convert null to undefined
-            workflowId || undefined
-          );
+                  // Replace placeholders in the concatenated string
+                  const replacedAnswer = replacePlaceholdersWithOriginal(fullAnswer, piiMap);
+
+                  // Return the final processed answer to update the state
+                  return replacedAnswer;
+                });
+              },
+              genAiProvider || undefined, // Convert null to undefined
+              workflowId || undefined,
+              undefined,
+              controller.signal // Pass the signal here
+            )
+            .finally(() => {
+              // Cleanup after generation completes or is aborted
+              setAbortController(null);
+            });
         }
       } else {
         // Case 2: Guardrail is OFF (Normal generation)
@@ -466,12 +519,30 @@ function App() {
                 console.log('cached query is', cachedResult.query);
                 console.log('cached generation is', cachedResult.llm_res);
 
+                // Set up an AbortController for cached generation
+                const cacheAbortController = new AbortController();
+                setAbortController(cacheAbortController);
+
                 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
                 setQueryInfo(null);
-                for (const token of cachedResult.llm_res.split(' ')) {
-                  setAnswer((prev) => prev + ' ' + token);
-                  await sleep(20);
+                // Initialize the stopping index
+                let currentStoppingIndex = 0;
+                const tokens = cachedResult.llm_res.split(' ');
+
+                for (let i = 0; i < tokens.length; i++) {
+                  if (cacheAbortController.signal.aborted) {
+                    console.log('Cached generation paused');
+                    // Set the answer up to the current stopping index
+                    setAnswer(tokens.slice(0, currentStoppingIndex).join(' '));
+                    break;
+                  }
+
+                  currentStoppingIndex = i + 1; // Update stopping index to current position
+                  setAnswer(tokens.slice(0, currentStoppingIndex).join(' '));
+                  await sleep(20); // Mimic streaming response with a delay
                 }
+
+                setAbortController(null);
 
                 // Set the query information including whether they differ
                 setQueryInfo({
@@ -491,14 +562,25 @@ function App() {
           // No cache hit or cache not used, proceed with generation
           setQueryInfo(null); // Indicates no cached data was used
 
-          modelService!.generateAnswer(
-            query,
-            genaiPrompt,
-            results.references,
-            (next) => setAnswer((prev) => prev + next),
-            genAiProvider || undefined, // Convert null to undefined
-            workflowId || undefined
-          );
+          // Create a new AbortController instance
+          const controller = new AbortController();
+          setAbortController(controller); // Store it in state
+
+          modelService!
+            .generateAnswer(
+              query,
+              genaiPrompt,
+              results.references,
+              (next) => setAnswer((prev) => prev + next),
+              genAiProvider || undefined, // Convert null to undefined
+              workflowId || undefined,
+              undefined,
+              controller.signal // Pass the signal here
+            )
+            .finally(() => {
+              // Cleanup after generation completes or is aborted
+              setAbortController(null);
+            });
         }
       }
     } else {
@@ -623,12 +705,22 @@ function App() {
               <Logo src={LogoImg.src} alt="Logo" />
             </a>
             <TopRightCorner>
-              <ChatToggle active={chatMode} onClick={() => setChatMode((chatMode) => !chatMode)} />
+              {chatEnabled && (
+                <ChatToggle
+                  active={chatMode}
+                  onClick={() => setChatMode((chatMode) => !chatMode)}
+                />
+              )}
               <Spacer $width="40px" />
               <Teach />
             </TopRightCorner>
             {chatMode ? (
-              <Chat provider={genAiProvider || 'openai'} />
+              <Chat
+                tokenClassifierExists={tokenClassifierExists}
+                sentimentClassifierExists={sentimentClassifierExists}
+                sentimentWorkflowId={sentimentClassifierWorkflowId} // Pass the workflow ID for sentiment classifier
+                provider={genAiProvider || 'openai'}
+              />
             ) : (
               <>
                 <SearchContainer $center={results === null}>
@@ -647,6 +739,9 @@ function App() {
                     setPrompt={setPrompt}
                     ifGenerationOn={ifGenerationOn}
                     cacheEnabled={cacheEnabled}
+                    abortController={abortController}
+                    setAbortController={setAbortController}
+                    setAnswer={setAnswer}
                   />
                   {failed && (
                     <Pad $top="100px">
@@ -668,6 +763,9 @@ function App() {
                             queryInfo={queryInfo}
                             cacheEnabled={cacheEnabled}
                             setCacheEnabled={setCacheEnabled}
+                            abortController={abortController} // Pass abortController here
+                            setAbortController={setAbortController} // Pass setAbortController
+                            setAnswer={setAnswer} // Pass setAnswer
                           />
                         </>
                       )}

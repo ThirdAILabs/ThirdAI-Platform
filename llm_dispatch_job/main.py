@@ -5,15 +5,16 @@ load_dotenv()
 import asyncio
 import logging
 import os
-from typing import Optional
+
+pass
 from urllib.parse import urljoin
 
 import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from llms import default_keys, model_classes
-from pydantic import BaseModel
+from llms import LLMBase, default_keys, model_classes
+from utils import GenerateArgs
 
 app = FastAPI()
 
@@ -30,18 +31,6 @@ logging.basicConfig(
 )
 
 
-class GenerateArgs(BaseModel):
-    query: str
-    key: Optional[str] = None
-    model: str = "gpt-4o-mini"
-    provider: str = "openai"
-    workflow_id: Optional[str] = None
-
-    # For caching we want just the query, not the entire prompt.
-    original_query: Optional[str] = None
-    cache_access_token: Optional[str] = None
-
-
 @app.post("/llm-dispatch/generate")
 async def generate(generate_args: GenerateArgs):
     """
@@ -50,11 +39,12 @@ async def generate(generate_args: GenerateArgs):
 
     Parameters:
         - query: str - The input query or prompt for text generation.
+        - task_prompt: Optional[str] - Additional prompt to guide the generation.
+        - references: List[Reference] - List of reference texts with optional sources and metadata.
         - key: Optional[str] - API key for the provider.
         - model: str - The model to use for text generation (default: "gpt-4o-mini").
         - provider: str - The AI provider to use (default: "openai"). Providers should be one of on-prem, openai, or cohere
         - workflow_id: Optional[str] - Workflow ID for tracking the request.
-        - original_query: Optional[str] - The original query to be cached, used for cache lookup.
         - cache_access_token: Optional[str] - Authorization token for caching responses.
 
     Returns:
@@ -64,10 +54,17 @@ async def generate(generate_args: GenerateArgs):
     ```
     {
         "query": "Explain the theory of relativity",
+        "task_prompt": "Provide a simple explanation suitable for a high school student.",
+        "references": [
+            {
+                "text": "E = mc^2 is the most famous equation in physics.",
+                "source": "Introduction to Physics, 2022",
+                "metadata": {"relevance": 0.9}
+            }
+        ],
         "model": "gpt-4o-mini",
         "provider": "openai",
         "workflow_id": "12345",
-        "original_query": "Explain relativity",
         "cache_access_token": "cache_token_abc"
     }
     ```
@@ -96,13 +93,17 @@ async def generate(generate_args: GenerateArgs):
         f"Starting generation with provider '{generate_args.provider.lower()}':",
     )
 
-    llm = llm_class()
+    llm: LLMBase = llm_class()
 
     async def generate_stream():
         generated_response = ""
         try:
             async for next_word in llm.stream(
-                key=key, query=generate_args.query, model=generate_args.model
+                key=key,
+                query=generate_args.query,
+                task_prompt=generate_args.task_prompt,
+                references=generate_args.references,
+                model=generate_args.model,
             ):
                 generated_response += next_word
                 yield next_word
@@ -116,12 +117,9 @@ async def generate(generate_args: GenerateArgs):
                 status_code=500, detail=f"Error while generating content: {e}"
             )
         else:
-            if (
-                generate_args.original_query is not None
-                and generate_args.cache_access_token is not None
-            ):
+            if generate_args.cache_access_token is not None:
                 await insert_into_cache(
-                    generate_args.original_query,
+                    generate_args.query,
                     generated_response,
                     generate_args.cache_access_token,
                 )

@@ -6,3 +6,4 @@ requests
 thirdai[neural_db_v2]>=0.9.12
 colorlog
 pydantic>=2.1.0
+pdftitle==0.11 # 0.12 has has a conflict with pdfplumber from thirdai
