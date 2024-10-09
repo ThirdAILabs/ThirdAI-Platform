@@ -111,10 +111,9 @@ interface ReferenceProps {
   piiMap: Map<string, string> | null;
 }
 
-
 interface TokenTag {
-  token: string
-  tag: string
+  token: string;
+  tag: string;
 }
 
 function getTokensAndTags(text: string, piiMap: Map<string, string>): TokenTag[] {
@@ -126,13 +125,13 @@ function getTokensAndTags(text: string, piiMap: Map<string, string>): TokenTag[]
     if (piiMap.has(token)) {
       const items = token.split('#');
       const tag = items[0].slice(1);
-      token_tags.push({ token: piiMap.get(token)!, tag: tag })
+      token_tags.push({ token: piiMap.get(token)!, tag: tag });
     } else {
-      token_tags.push({ token: token, tag: "" })
+      token_tags.push({ token: token, tag: '' });
     }
   }
-  console.log(text)
-  console.log(token_tags)
+  console.log(text);
+  console.log(token_tags);
 
   return token_tags;
 }
@@ -267,7 +266,9 @@ export default function Reference({
                       cursor: label && label.checked ? 'pointer' : 'auto',
                     }}
                   >
-                    {label && label.checked ? `${token_tag.token} (${token_tag.tag}) ` : `${token_tag.token} `}
+                    {label && label.checked
+                      ? `${token_tag.token} (${token_tag.tag}) `
+                      : `${token_tag.token} `}
                   </span>
                 );
               })}

@@ -72,7 +72,13 @@ export default function ReferenceList({
             checked={checkedIds.has(ref.id)}
             onCheck={() => onCheck(ref.id)}
             modelService={modelService}
-            piiMap={piiEntities ? new Map<string, string>(piiEntities!.map(entity => [entity.label, entity.token])) : null}
+            piiMap={
+              piiEntities
+                ? new Map<string, string>(
+                    piiEntities!.map((entity) => [entity.label, entity.token])
+                  )
+                : null
+            }
           />
           <Spacer $height="20px" />
         </Fragment>

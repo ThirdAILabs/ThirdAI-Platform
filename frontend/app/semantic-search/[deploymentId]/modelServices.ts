@@ -318,14 +318,14 @@ export class ModelService {
   }
 
   async unredact(text: string, pii_map: Map<string, Map<string, string>>): Promise<string> {
-    const url = new URL(this.ragUrl + "/unredact")
+    const url = new URL(this.ragUrl + '/unredact');
     return fetch(url, {
       method: 'POST',
       headers: {
         ...this.authHeader(),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ text: text, pii_map: pii_map })
+      body: JSON.stringify({ text: text, pii_map: pii_map }),
     })
       .then(this.handleInvalidAuth())
       .then((response) => {
@@ -334,11 +334,11 @@ export class ModelService {
         }
       })
       .then(({ data }) => {
-        return data["unredacted_text"]
+        return data['unredacted_text'];
       })
       .catch((e) => {
         console.log(e);
-        return ""
+        return '';
       });
   }
 

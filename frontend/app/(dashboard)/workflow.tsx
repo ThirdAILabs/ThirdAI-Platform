@@ -13,25 +13,20 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
-import {
-  Workflow,
-  start_workflow,
-  stop_workflow,
-  delete_workflow,
-} from '@/lib/backend';
+import { Workflow, start_workflow, stop_workflow, delete_workflow } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
 import { Modal } from '@/components/ui/Modal';
 import { InformationCircleIcon } from '@heroicons/react/solid';
 
 enum DeployStatus {
-  None = "",
-  TrainingFailed = "Training failed",
-  Training = "Training",
-  Inactive = "Inactive",
-  Starting = "Starting",
-  Active = "Active",
-  Failed = "Failed",
-};
+  None = '',
+  TrainingFailed = 'Training failed',
+  Training = 'Training',
+  Inactive = 'Inactive',
+  Starting = 'Starting',
+  Active = 'Active',
+  Failed = 'Failed',
+}
 
 export function WorkFlow({ workflow }: { workflow: Workflow }) {
   const router = useRouter();
@@ -46,7 +41,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
         // TODO don't use url params
         const genAiProvider = `${workflow.llm_provider}`;
         const ifGenerationOn = true;
-        const chatMode = workflow.default_mode == "chat"
+        const chatMode = workflow.default_mode == 'chat';
         const newUrl = `/semantic-search/${workflow.model_id}?workflowId=${workflow.model_id}&ifGenerationOn=${ifGenerationOn}&genAiProvider=${genAiProvider}&chatMode=${chatMode}`;
         window.open(newUrl, '_blank');
         break;
@@ -62,9 +57,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       }
       case 'udt': {
         const prefix =
-          workflow.sub_type === 'token'
-            ? '/token-classification'
-            : '/text-classification';
+          workflow.sub_type === 'token' ? '/token-classification' : '/text-classification';
         window.open(`${prefix}/${workflow.model_id}`, '_blank');
         break;
       }
@@ -77,19 +70,19 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
   function getButtonValue(status: DeployStatus): string {
     switch (status) {
       case DeployStatus.TrainingFailed:
-        return "Training failed";
+        return 'Training failed';
       case DeployStatus.Training:
-        return "Training...";
+        return 'Training...';
       case DeployStatus.Inactive:
-        return "Start";
+        return 'Start';
       case DeployStatus.Starting:
-        return "Starting...";
+        return 'Starting...';
       case DeployStatus.Active:
-        return "Endpoint";
+        return 'Endpoint';
       case DeployStatus.Failed:
-        return "Failed";
+        return 'Failed';
       default:
-        return "-"
+        return '-';
     }
   }
 
@@ -105,32 +98,32 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
   };
 
   useEffect(() => {
-    if (workflow.train_status === "failed") {
+    if (workflow.train_status === 'failed') {
       setDeployStatus(DeployStatus.TrainingFailed);
-    } else if (workflow.train_status !== "complete") {
+    } else if (workflow.train_status !== 'complete') {
       setDeployStatus(DeployStatus.Training);
-    } else if (workflow.deploy_status === "failed") {
+    } else if (workflow.deploy_status === 'failed') {
       setDeployStatus(DeployStatus.Failed);
-    } else if (workflow.deploy_status === "starting") {
+    } else if (workflow.deploy_status === 'starting') {
       setDeployStatus(DeployStatus.Starting);
-    } else if (workflow.deploy_status === "not_started" || workflow.deploy_status === 'stopped') {
+    } else if (workflow.deploy_status === 'not_started' || workflow.deploy_status === 'stopped') {
       setDeployStatus(DeployStatus.Inactive);
-    } else if (workflow.deploy_status === "complete") {
+    } else if (workflow.deploy_status === 'complete') {
       setDeployStatus(DeployStatus.Active);
     }
   }, [workflow.train_status, workflow.deploy_status, deployStatus]);
 
   useEffect(() => {
     if (workflow.type === 'ndb') {
-      if (workflow.default_mode && workflow.default_mode == "chat") {
-        setDeployType("Chatbot")
+      if (workflow.default_mode && workflow.default_mode == 'chat') {
+        setDeployType('Chatbot');
       } else {
-        setDeployType("Enterprise Search")
+        setDeployType('Enterprise Search');
       }
     } else if (workflow.type === 'udt') {
       setDeployType('Natural Language Processing');
     } else if (workflow.type === 'enterprise-search') {
-      setDeployType("Enterprise Search & Summarizer")
+      setDeployType('Enterprise Search & Summarizer');
     }
   }, [workflow.type]);
 
@@ -184,9 +177,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
           onClick={deployStatus === 'Active' ? goToEndpoint : handleDeploy}
           variant="contained"
           style={{ width: '100px' }}
-          disabled={
-            deployStatus != DeployStatus.Active && deployStatus != DeployStatus.Inactive
-          }
+          disabled={deployStatus != DeployStatus.Active && deployStatus != DeployStatus.Inactive}
         >
           {getButtonValue(deployStatus)}
         </Button>
@@ -225,7 +216,10 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
                       type="button"
                       onClick={async () => {
                         try {
-                          const response = await stop_workflow(workflow.username, workflow.model_name);
+                          const response = await stop_workflow(
+                            workflow.username,
+                            workflow.model_name
+                          );
                           console.log('Workflow undeployed successfully:', response);
                           // Optionally, update the UI state to reflect the undeployment
                           setDeployStatus(DeployStatus.Inactive);
@@ -248,7 +242,10 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
                   onClick={async () => {
                     if (window.confirm('Are you sure you want to delete this workflow?')) {
                       try {
-                        const response = await delete_workflow(workflow.username, workflow.model_name);
+                        const response = await delete_workflow(
+                          workflow.username,
+                          workflow.model_name
+                        );
                         console.log('Workflow deleted successfully:', response);
                       } catch (error) {
                         console.error('Error deleting workflow:', error);
@@ -262,7 +259,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
               </form>
             </DropdownMenuItem>
 
-            {workflow.type === "ndb" && (
+            {workflow.type === 'ndb' && (
               <Link
                 href={`/analytics?id=${encodeURIComponent(workflow.model_id)}&username=${encodeURIComponent(workflow.username)}&model_name=${encodeURIComponent(workflow.model_name)}&old_model_id=${encodeURIComponent(workflow.model_id)}`}
               >

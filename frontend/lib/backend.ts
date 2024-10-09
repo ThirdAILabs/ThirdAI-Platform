@@ -340,17 +340,13 @@ export function create_enterprise_search_workflow({
       })
       .catch((err) => {
         if (err.response && err.response.data) {
-          reject(
-            new Error(err.response.data.message || 'Failed to create workflow')
-          );
+          reject(new Error(err.response.data.message || 'Failed to create workflow'));
         } else {
           reject(new Error('Failed to create workflow'));
         }
       });
   });
 }
-
-
 
 export interface Workflow {
   model_id: string;
@@ -408,18 +404,21 @@ interface StartWorkflowResponse {
   };
 }
 
-export function start_workflow(username: string, model_name: string): Promise<StartWorkflowResponse> {
+export function start_workflow(
+  username: string,
+  model_name: string
+): Promise<StartWorkflowResponse> {
   const accessToken = getAccessToken();
 
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-  const params = new URLSearchParams({ model_identifier: createModelIdentifier(username, model_name) });
+  const params = new URLSearchParams({
+    model_identifier: createModelIdentifier(username, model_name),
+  });
 
   return new Promise((resolve, reject) => {
     axios
-      .post<StartWorkflowResponse>(
-        `${thirdaiPlatformBaseUrl}/api/deploy/run?${params.toString()}`
-      )
+      .post<StartWorkflowResponse>(`${thirdaiPlatformBaseUrl}/api/deploy/run?${params.toString()}`)
       .then((res) => {
         resolve(res.data);
       })
@@ -466,11 +465,16 @@ interface DeleteWorkflowResponse {
   message: string;
 }
 
-export async function delete_workflow(username: string, model_name: string): Promise<DeleteWorkflowResponse> {
+export async function delete_workflow(
+  username: string,
+  model_name: string
+): Promise<DeleteWorkflowResponse> {
   const accessToken = getAccessToken();
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-  const params = new URLSearchParams({ model_identifier: createModelIdentifier(username, model_name) });
+  const params = new URLSearchParams({
+    model_identifier: createModelIdentifier(username, model_name),
+  });
 
   return new Promise((resolve, reject) => {
     axios

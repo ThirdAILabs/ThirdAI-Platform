@@ -14,7 +14,14 @@ import LogoImg from './assets/logos/logo.png';
 import { duration, fontSizes, padding } from './stylingConstants';
 import Teach from './components/Teach';
 import { ModelServiceContext } from './Context';
-import { ModelService, PdfInfo, ReferenceInfo, Source, SearchResult, PiiEntity } from './modelServices';
+import {
+  ModelService,
+  PdfInfo,
+  ReferenceInfo,
+  Source,
+  SearchResult,
+  PiiEntity,
+} from './modelServices';
 import InvalidModelMessage from './components/InvalidModelMessage';
 import PdfViewer from './components/pdf_viewer/PdfViewer';
 import { Chunk } from './components/pdf_viewer/interfaces';
@@ -176,20 +183,26 @@ function App() {
         let ragUrl: string | undefined; // Initialize as undefined
         let chatEnabled = false;
 
-        if (data.type === "enterprise-search") {
+        if (data.type === 'enterprise-search') {
           // Enterprise-search logic
-          const ragDependency = data.dependencies.find(dep => dep.model_name.toLowerCase().includes('rag') || dep.model_name.toLowerCase().includes('retrieval'));
+          const ragDependency = data.dependencies.find(
+            (dep) =>
+              dep.model_name.toLowerCase().includes('rag') ||
+              dep.model_name.toLowerCase().includes('retrieval')
+          );
 
           serviceUrl = ragDependency
             ? createDeploymentUrl(ragDependency.model_id)
             : createDeploymentUrl('');
 
           // Only set ragUrl for enterprise-search case
-          ragUrl = data.model_id
-            ? createDeploymentUrl(data.model_id)
-            : undefined;
+          ragUrl = data.model_id ? createDeploymentUrl(data.model_id) : undefined;
 
-          const nerDependency = data.dependencies.find(dep => dep.model_name.toLowerCase().includes('pii') || dep.model_name.toLowerCase().includes('ner'));
+          const nerDependency = data.dependencies.find(
+            (dep) =>
+              dep.model_name.toLowerCase().includes('pii') ||
+              dep.model_name.toLowerCase().includes('ner')
+          );
 
           setIfGuardRailOn(!!nerDependency);
           setTokenClassifierExists(!!nerDependency);
@@ -200,9 +213,7 @@ function App() {
           setGenAiProvider(data.llm_provider || null);
         } else {
           // Non-enterprise-search logic
-          serviceUrl = data
-            ? createDeploymentUrl(data.model_id)
-            : createDeploymentUrl('');
+          serviceUrl = data ? createDeploymentUrl(data.model_id) : createDeploymentUrl('');
 
           const chatWorkflows = ['rag'];
           chatEnabled = chatWorkflows.includes(data.type);
@@ -214,7 +225,6 @@ function App() {
         const newModelService = new ModelService(serviceUrl, ragUrl, uuidv4());
         setModelService(newModelService);
         newModelService.sources().then((fetchedSources) => setSources(fetchedSources));
-
       } catch (error) {
         console.error('Failed to fetch model details:', error);
         // Optionally, handle the error (e.g., show a notification to the user)
@@ -267,7 +277,7 @@ function App() {
     return modelService!
       .predict(/* queryText= */ query, /* topK= */ topK, /* queryId= */ queryId)
       .then((searchResults) => {
-        console.log('searchResults', searchResults)
+        console.log('searchResults', searchResults);
         if (searchResults) {
           setResults(searchResults);
           if (searchResults.references.length < topK) {
@@ -326,27 +336,28 @@ function App() {
         const controller = new AbortController();
         setAbortController(controller); // Store it in state
 
-        modelService!.generateAnswer(
-          results.query,
-          `${genaiPrompt}. [TAG #id] is sensitive information replaced as a placeholder, use them in your response for consistency.`,
-          results.references,
-          (next) => {
-            setAnswer((prev) => {
-              // Concatenate previous answer and the new part
-              const fullAnswer = prev + next;
-              // Return the final processed answer to update the state
-              return fullAnswer;
-            });
-          },
-          genAiProvider || undefined, // Convert null to undefined
-          workflowId || undefined,
-          undefined,
-          controller.signal
-        )
+        modelService!
+          .generateAnswer(
+            results.query,
+            `${genaiPrompt}. [TAG #id] is sensitive information replaced as a placeholder, use them in your response for consistency.`,
+            results.references,
+            (next) => {
+              setAnswer((prev) => {
+                // Concatenate previous answer and the new part
+                const fullAnswer = prev + next;
+                // Return the final processed answer to update the state
+                return fullAnswer;
+              });
+            },
+            genAiProvider || undefined, // Convert null to undefined
+            workflowId || undefined,
+            undefined,
+            controller.signal
+          )
           .finally(() => {
             // Cleanup after generation completes or is aborted
             setAbortController(null);
-          });;
+          });
       }
     } else {
       setResults(null);

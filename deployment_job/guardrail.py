@@ -1,11 +1,11 @@
 import re
 from collections import defaultdict
-from typing import Dict, List
+from typing import List
 from urllib.parse import urljoin
-from pydantic_models.inputs import PiiEntity
 
 import requests
 from fastapi import HTTPException, status
+from pydantic_models.inputs import PiiEntity
 
 
 class LabelMap:

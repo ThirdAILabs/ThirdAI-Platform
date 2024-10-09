@@ -1,9 +1,6 @@
 // app/NERQuestions.js
 import React, { useEffect, useState } from 'react';
-import {
-  getUsername,
-  trainTokenClassifier
-} from '@/lib/backend';
+import { getUsername, trainTokenClassifier } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button, TextField, IconButton } from '@mui/material';
