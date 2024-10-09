@@ -922,6 +922,6 @@ def train_status(
         data={
             "model_identifier": model_identifier,
             "train_status": status,
-            "message": " ".join(reasons)
+            "message": " ".join(reasons),
         },
     )
