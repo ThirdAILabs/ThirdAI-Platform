@@ -1,4 +1,4 @@
-FROM tiangolo/uvicorn-gunicorn-fastapi:python3.9
+FROM tiangolo/uvicorn-gunicorn-fastapi:python3.11
 
 WORKDIR /app
 
@@ -6,7 +6,6 @@ WORKDIR /app
 # cached even when there are changes in the directory.
 COPY ./requirements.txt /app/requirements.txt
 RUN pip install -r /app/requirements.txt
-RUN python3 -m pip install pdftitle
 
 # Install thirdai package separately since this is the dependency that changes
 # the most often. This allows the other packages to stay cached.

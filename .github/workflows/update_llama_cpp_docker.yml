@@ -23,14 +23,14 @@ jobs:
         run: docker pull ghcr.io/ggerganov/llama.cpp:server
 
       - name: 'Tag Llama.cpp Image for ACR'
-        run: docker tag ghcr.io/ggerganov/llama.cpp:server ${{ secrets.REGISTRY_LOGIN_SERVER }}/llama.cpp:server
+        run: docker tag ghcr.io/ggerganov/llama.cpp:server thirdaiplatform.azurecr.io/llama.cpp:server
 
       - name: 'Azure Docker Login'
         uses: azure/docker-login@v1
         with:
-          login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          login-server: thirdaiplatform.azurecr.io
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: 'Push Image to ACR'
-        run: docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/llama.cpp:server
+        run: docker push thirdaiplatform.azurecr.io/llama.cpp:server

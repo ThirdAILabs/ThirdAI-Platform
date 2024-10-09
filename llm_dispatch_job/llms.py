@@ -4,20 +4,29 @@ from typing import AsyncGenerator, List
 from urllib.parse import urljoin
 
 import aiohttp
-import requests
 from utils import Reference, make_prompt
 
 
 class LLMBase:
     async def stream(
-        self, key: str, query: str, prompt: str, references: List[Reference], model: str
+        self,
+        key: str,
+        query: str,
+        task_prompt: str,
+        references: List[Reference],
+        model: str,
     ) -> AsyncGenerator[str, None]:
         raise NotImplementedError("Subclasses must implement this method")
 
 
 class OpenAILLM(LLMBase):
     async def stream(
-        self, key: str, query: str, prompt: str, references: List[Reference], model: str
+        self,
+        key: str,
+        query: str,
+        task_prompt: str,
+        references: List[Reference],
+        model: str,
     ) -> AsyncGenerator[str, None]:
         url = "https://api.openai.com/v1/chat/completions"
         headers = {
@@ -25,7 +34,7 @@ class OpenAILLM(LLMBase):
             "Authorization": f"Bearer {key}",
         }
 
-        system_prompt, user_prompt = make_prompt(query, prompt, references)
+        system_prompt, user_prompt = make_prompt(query, task_prompt, references)
 
         body = {
             "model": model,
@@ -60,7 +69,12 @@ class OpenAILLM(LLMBase):
 
 class CohereLLM(LLMBase):
     async def stream(
-        self, key: str, query: str, prompt: str, references: List[Reference], model: str
+        self,
+        key: str,
+        query: str,
+        task_prompt: str,
+        references: List[Reference],
+        model: str,
     ) -> AsyncGenerator[str, None]:
         url = "https://api.cohere.com/v1/chat"
         headers = {
@@ -68,7 +82,7 @@ class CohereLLM(LLMBase):
             "Authorization": f"Bearer {key}",
         }
 
-        system_prompt, user_prompt = make_prompt(query, prompt, references)
+        system_prompt, user_prompt = make_prompt(query, task_prompt, references)
 
         body = {
             "model": model,
@@ -107,9 +121,14 @@ class OnPremLLM(LLMBase):
             raise ValueError("Could not read MODEL_BAZAAR_ENDPOINT.")
 
     async def stream(
-        self, key: str, query: str, prompt: str, references: List[Reference], model: str
+        self,
+        key: str,
+        query: str,
+        task_prompt: str,
+        references: List[Reference],
+        model: str,
     ) -> AsyncGenerator[str, None]:
-        system_prompt, user_prompt = make_prompt(query, prompt, references)
+        system_prompt, user_prompt = make_prompt(query, task_prompt, references)
 
         url = urljoin(self.backend_endpoint, "/on-prem-llm/v1/chat/completions")
 
@@ -127,6 +146,8 @@ class OnPremLLM(LLMBase):
             # sensitive to this. We set it to 1000 because throughput is important
             # and answers aren't super useful past 1000 tokens anyways.
             "n_predict": 1000,
+            # Passing in model is just for logging purposes. For some reason
+            # llama.cpp returns gpt-3.5-turbo for this value if not specified
             "model": model,
         }
         async with aiohttp.ClientSession() as session:

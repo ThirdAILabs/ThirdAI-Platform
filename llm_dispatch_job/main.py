@@ -39,7 +39,7 @@ async def generate(generate_args: GenerateArgs):
 
     Parameters:
         - query: str - The input query or prompt for text generation.
-        - prompt: Optional[str] - Additional prompt to guide the generation.
+        - task_prompt: Optional[str] - Additional prompt to guide the generation.
         - references: List[Reference] - List of reference texts with optional sources and metadata.
         - key: Optional[str] - API key for the provider.
         - model: str - The model to use for text generation (default: "gpt-4o-mini").
@@ -54,7 +54,7 @@ async def generate(generate_args: GenerateArgs):
     ```
     {
         "query": "Explain the theory of relativity",
-        "prompt": "Provide a simple explanation suitable for a high school student.",
+        "task_prompt": "Provide a simple explanation suitable for a high school student.",
         "references": [
             {
                 "text": "E = mc^2 is the most famous equation in physics.",
@@ -101,7 +101,7 @@ async def generate(generate_args: GenerateArgs):
             async for next_word in llm.stream(
                 key=key,
                 query=generate_args.query,
-                prompt=generate_args.prompt,
+                task_prompt=generate_args.task_prompt,
                 references=generate_args.references,
                 model=generate_args.model,
             ):

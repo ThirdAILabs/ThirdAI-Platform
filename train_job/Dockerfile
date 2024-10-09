@@ -1,5 +1,5 @@
-# Use the official FastAPI image with Python 3.9
-FROM tiangolo/uvicorn-gunicorn-fastapi:python3.9
+# Use the official FastAPI image with Python 3.11
+FROM tiangolo/uvicorn-gunicorn-fastapi:python3.11
 
 # Set the working directory in the container to /app
 WORKDIR /app
@@ -9,7 +9,6 @@ COPY requirements.txt /app/
 
 # Install dependencies from requirements.txt
 RUN python3 -m pip install --no-cache-dir -r requirements.txt
-RUN python3 -m pip install pdftitle
 
 # Copy the current directory contents into the container at /app
 COPY . /app
