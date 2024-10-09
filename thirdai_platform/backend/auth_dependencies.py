@@ -185,6 +185,28 @@ def verify_model_read_access(
     )
 
 
+def verify_model_read_access_from_id(
+    model_id: str,
+    session: Session = Depends(get_session),
+    current_user: schema.User = Depends(get_current_user),
+) -> schema.Model:
+    model = session.query(schema.Model).get(model_id)
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model with id {model_id} not found",
+        )
+
+    permission = model.get_user_permission(current_user)
+    if permission in [schema.Permission.read, schema.Permission.write]:
+        return model
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You do not have read access to this model",
+    )
+
+
 def verify_model_write_access(
     model_identifier: str,
     session: Session = Depends(get_session),
