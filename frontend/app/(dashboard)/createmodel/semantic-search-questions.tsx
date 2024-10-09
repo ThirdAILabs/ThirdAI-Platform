@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { getUsername, train_ndb, create_workflow, add_models_to_workflow } from '@/lib/backend';
+import {
+  train_ndb,
+  create_workflow,
+  add_models_to_workflow,
+  set_gen_ai_provider,
+} from '@/lib/backend';
+import { SelectModel } from '@/lib/db';
 import { Button, TextField } from '@mui/material';
 import { CardDescription } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
+import DropdownMenu from '@/components/ui/dropDownMenu';
 
 interface SemanticSearchQuestionsProps {
   workflowNames: string[];
+  models: SelectModel[];
   onCreateModel?: (modelID: string) => void;
   stayOnPage?: boolean;
   appName?: string;
@@ -20,6 +28,7 @@ enum SourceType {
 
 const SemanticSearchQuestions = ({
   workflowNames,
+  models,
   onCreateModel,
   stayOnPage,
   appName,
@@ -27,6 +36,18 @@ const SemanticSearchQuestions = ({
   const [modelName, setModelName] = useState(!appName ? '' : appName);
   const [sources, setSources] = useState<Array<{ type: string; files: File[] }>>([]);
   const [fileCount, setFileCount] = useState<number[]>([]);
+  const [llmType, setLlmType] = useState<string | null>(null);
+
+  const [ifUseExistingSS, setUseExistingSS] = useState<string | null>(null);
+  const [existingSSmodels, setExistingSSmodels] = useState<SelectModel[]>([]);
+  const [ssIdentifier, setSsIdentifier] = useState<string | null>(null);
+  const [ssModelId, setSsModelId] = useState<string | null>(null);
+  const [createdSS, setCreatedSS] = useState<boolean>(false);
+
+  useEffect(() => {
+    setExistingSSmodels(models.filter((model) => model.type === 'ndb'));
+  }, [models]);
+
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -117,33 +138,37 @@ const SemanticSearchQuestions = ({
 
       console.log(`Submitting model '${modelName}'`);
 
-      const formData = makeFileFormData();
+      let modelId;
 
-      if (!formData) {
-        alert('Please upload at least one file before submitting.');
-        setIsLoading(false);
-        return;
-      }
+      if (ifUseExistingSS === 'Yes') {
+        if (!ssModelId) {
+          alert('Please select an existing retrieval app.');
+          setIsLoading(false);
+          return;
+        }
+        modelId = ssModelId;
+      } else {
+        const formData = makeFileFormData();
 
-      // Print out all the FormData entries
-      formData.forEach((value, key) => {
-        console.log(`${key}:`, value);
-      });
+        if (!formData) {
+          alert('Please upload at least one file before submitting.');
+          setIsLoading(false);
+          return;
+        }
 
-      console.log('modelName', modelName);
+        // Step 1: Create the model
+        const modelResponse = await train_ndb({ name: modelName, formData });
+        modelId = modelResponse.data.model_id;
 
-      // Step 1: Create the model
-      const modelResponse = await train_ndb({ name: modelName, formData });
-      const modelId = modelResponse.data.model_id;
-
-      // This is called from RAG
-      if (onCreateModel) {
-        onCreateModel(modelId);
+        // This is called from RAG
+        if (onCreateModel) {
+          onCreateModel(modelId);
+        }
       }
 
       // Step 2: Create the workflow
       const workflowName = modelName;
-      const workflowTypeName = 'semantic_search'; // You can change this as needed
+      const workflowTypeName = llmType ? 'rag' : 'semantic_search'; // If llmType is null, it's 'semantic_search'
       const workflowResponse = await create_workflow({
         name: workflowName,
         typeName: workflowTypeName,
@@ -158,6 +183,34 @@ const SemanticSearchQuestions = ({
       });
 
       console.log('addModelsResponse', addModelsResponse);
+
+      // Step 4: Set the generation AI provider if LLM is selected
+      if (llmType) {
+        // This will run only if llmType is not null
+        let provider = '';
+        switch (llmType) {
+          case 'OpenAI':
+            provider = 'openai';
+            break;
+          case 'On-prem':
+            provider = 'on-prem';
+            break;
+          case 'Self-host':
+            provider = 'self-host';
+            break;
+          default:
+            console.error('Invalid LLM type selected');
+            alert('Invalid LLM type selected');
+            setIsLoading(false);
+            return;
+        }
+
+        const setProviderResponse = await set_gen_ai_provider({
+          workflowId,
+          provider,
+        });
+        console.log('Generation AI provider set:', setProviderResponse);
+      }
 
       if (!stayOnPage) {
         router.push('/');
@@ -225,63 +278,171 @@ const SemanticSearchQuestions = ({
 
       {warningMessage && <span style={{ color: 'red', marginTop: '10px' }}>{warningMessage}</span>}
 
+      {/* Retrieval App Selection */}
       <span className="block text-lg font-semibold" style={{ marginTop: '20px' }}>
-        Sources
+        Retrieval App
       </span>
-      <CardDescription>Select files to search over.</CardDescription>
-
-      {sources.map(({ type }, index) => (
-        <div key={index}>
+      {!createdSS && (
+        <>
+          <CardDescription>Use an existing retrieval app?</CardDescription>
           <div
             style={{
               display: 'flex',
               flexDirection: 'row',
-              gap: '20px',
-              justifyContent: 'space-between',
+              gap: '10px',
               marginTop: '10px',
             }}
           >
-            {type === SourceType.S3 && (
-              <TextField
-                className="text-md w-full"
-                onChange={(e) => setS3SourceValue(index, e.target.value)}
-                placeholder="http://s3.amazonaws.com/bucketname/"
-              />
-            )}
-            {type === SourceType.LOCAL && (
-              <div>
-                <Input
-                  type="file"
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      setSourceValue(index, e.target.files);
-                    }
-                  }}
-                  multiple
-                />
+            <Button
+              variant={ifUseExistingSS === 'Yes' ? 'contained' : 'outlined'}
+              onClick={() => {
+                setUseExistingSS('Yes');
+                setCreatedSS(false);
+              }}
+            >
+              Yes
+            </Button>
+            <Button
+              variant={ifUseExistingSS === 'No' ? 'contained' : 'outlined'}
+              onClick={() => {
+                setUseExistingSS('No');
+                setCreatedSS(false);
+              }}
+            >
+              No, create a new one
+            </Button>
+          </div>
+        </>
+      )}
+
+      {ifUseExistingSS === 'Yes' && (
+        <div className="mb-4 mt-2">
+          <CardDescription>Choose from existing retrieval app(s)</CardDescription>
+          <div className="mt-2">
+            <DropdownMenu
+              title=" Please choose a model  "
+              handleSelectedTeam={(ssID: string) => {
+                setSsIdentifier(ssID);
+                const ssModel = existingSSmodels.find(
+                  (model) => `${model.username}/${model.model_name}` === ssID
+                );
+                if (ssModel) {
+                  setSsModelId(ssModel.model_id);
+                }
+              }}
+              teams={existingSSmodels.map((model) => ({
+                id: model.model_id,
+                name: `${model.username}/${model.model_name}`,
+              }))}
+            />
+          </div>
+        </div>
+      )}
+
+      {ifUseExistingSS === 'No' && (
+        <>
+          {createdSS ? (
+            <div>Retrieval app created.</div>
+          ) : (
+            <div>
+              <span className="block text-lg font-semibold" style={{ marginTop: '20px' }}>
+                Sources
+              </span>
+              <CardDescription>Select files to search over.</CardDescription>
+
+              {sources.map(({ type }, index) => (
+                <div key={index}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'row',
+                      gap: '20px',
+                      justifyContent: 'space-between',
+                      marginTop: '10px',
+                    }}
+                  >
+                    {type === SourceType.S3 && (
+                      <TextField
+                        className="text-md w-full"
+                        onChange={(e) => setS3SourceValue(index, e.target.value)}
+                        placeholder="http://s3.amazonaws.com/bucketname/"
+                      />
+                    )}
+                    {type === SourceType.LOCAL && (
+                      <div>
+                        <Input
+                          type="file"
+                          onChange={(e) => {
+                            if (e.target.files) {
+                              setSourceValue(index, e.target.files);
+                            }
+                          }}
+                          multiple
+                        />
+                      </div>
+                    )}
+                    {type === SourceType.NSF && ( // New input for NSF server path
+                      <TextField
+                        className="text-md w-full"
+                        onChange={(e) => setNSFSourceValue(index, e.target.value)}
+                        placeholder="Enter NSF server file path"
+                      />
+                    )}
+                    <Button variant="contained" color="error" onClick={() => deleteSource(index)}>
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <Button onClick={() => addSource(SourceType.LOCAL)} variant="contained">
+                  Add Local File
+                </Button>
+                <Button onClick={() => addSource(SourceType.S3)} variant="contained">
+                  Add S3 File
+                </Button>
               </div>
-            )}
-            {type === SourceType.NSF && ( // New input for NSF server path
-              <TextField
-                className="text-md w-full"
-                onChange={(e) => setNSFSourceValue(index, e.target.value)}
-                placeholder="Enter NSF server file path"
-              />
-            )}
-            <Button variant="contained" color="error" onClick={() => deleteSource(index)}>
-              Delete
+            </div>
+          )}
+        </>
+      )}
+
+      {/* LLM Selection */}
+      <div>
+        <span className="block text-lg font-semibold" style={{ marginTop: '20px' }}>
+          Summarizer (Optional)
+        </span>
+        <div>
+          <CardDescription>Choose an LLM option</CardDescription>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'row',
+              gap: '10px',
+              marginTop: '10px',
+            }}
+          >
+            <Button
+              variant={llmType === 'OpenAI' ? 'contained' : 'outlined'}
+              onClick={() => setLlmType(llmType === 'OpenAI' ? null : 'OpenAI')}
+            >
+              OpenAI
+            </Button>
+            <Button
+              variant={llmType === 'On-prem' ? 'contained' : 'outlined'}
+              onClick={() => setLlmType(llmType === 'On-prem' ? null : 'On-prem')}
+            >
+              On-prem
+            </Button>
+            <Button
+              variant={llmType === 'Self-host' ? 'contained' : 'outlined'}
+              onClick={() => setLlmType(llmType === 'Self-host' ? null : 'Self-host')}
+            >
+              Self-host
             </Button>
           </div>
         </div>
-      ))}
-
-      <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-        <Button onClick={() => addSource(SourceType.LOCAL)} variant="contained">
-          Add Local File
-        </Button>
-        <Button onClick={() => addSource(SourceType.S3)} variant="contained">
-          Add S3 File
-        </Button>
       </div>
 
       <div className="flex justify-start">

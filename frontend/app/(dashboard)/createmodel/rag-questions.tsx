@@ -75,7 +75,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
     setIsLoading(true);
 
     const workflowName = modelName;
-    const workflowTypeName = 'rag';
+    const workflowTypeName = 'chatbot';
 
     try {
       // Step 1: Create the workflow
@@ -162,7 +162,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
       setIsLoading(false);
     }
   };
-  //creting dropDownList for choosing model....
+  // Creating drop-down list for choosing model....
   const modelDropDownList = existingSSmodels.map((model) => {
     return {
       id: model.user_id,
@@ -304,6 +304,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
               ) : (
                 <div>
                   <SemanticSearchQuestions
+                    models={models}
                     workflowNames={workflowNames}
                     onCreateModel={(modelID) => {
                       setSsModelId(modelID);
@@ -320,15 +321,16 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
       ),
     },
     {
-      title: 'LLM Guardrail',
+      title: 'LLM',
       content: (
         <div>
-          <span className="block text-lg font-semibold" style={{ marginTop: '20px' }}>
-            LLM Guardrail
-          </span>
-          {!createdGR && (
-            <>
-              <CardDescription>Would you like to add LLM guardrail?</CardDescription>
+          {/* LLM selection */}
+          <div>
+            <span className="block text-lg font-semibold" style={{ marginTop: '20px' }}>
+              LLM
+            </span>
+            <div>
+              <CardDescription>Choose an LLM option</CardDescription>
               <div
                 style={{
                   display: 'flex',
@@ -338,220 +340,220 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
                 }}
               >
                 <Button
-                  variant={ifUseLGR === 'Yes' ? 'contained' : 'outlined'}
-                  onClick={() => {
-                    setIfUseLGR('Yes');
-                    setCreatedGR(false);
-                  }}
+                  variant={llmType === 'OpenAI' ? 'contained' : 'outlined'}
+                  onClick={() => setLlmType('OpenAI')}
                 >
-                  Yes
+                  OpenAI
                 </Button>
                 <Button
-                  variant={ifUseLGR === 'No' ? 'contained' : 'outlined'}
-                  onClick={() => {
-                    setGrIdentifier(null);
-                    setIfUseLGR('No');
-                    setCreatedGR(false);
-                  }}
+                  variant={llmType === 'On-prem' ? 'contained' : 'outlined'}
+                  onClick={() => setLlmType('On-prem')}
                 >
-                  No
+                  On-prem
+                </Button>
+                <Button
+                  variant={llmType === 'Self-host' ? 'contained' : 'outlined'}
+                  onClick={() => setLlmType('Self-host')}
+                >
+                  Self-host
                 </Button>
               </div>
+            </div>
+          </div>
 
-              {ifUseLGR === 'Yes' && (
-                <>
-                  <div style={{ marginTop: '20px' }}>
-                    <CardDescription>Use an existing NER model for LLM guardrail?</CardDescription>
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'row',
-                        gap: '10px',
-                        marginTop: '10px',
-                      }}
-                    >
-                      <Button
-                        variant={ifUseExistingLGR === 'Yes' ? 'contained' : 'outlined'}
-                        onClick={() => {
-                          setIfUseExistingLGR('Yes');
-                          setCreatedGR(false);
-                        }}
-                      >
-                        Yes
-                      </Button>
-                      <Button
-                        variant={ifUseExistingLGR === 'No' ? 'contained' : 'outlined'}
-                        onClick={() => {
-                          setIfUseExistingLGR('No');
-                          setCreatedGR(false);
-                        }}
-                      >
-                        No
-                      </Button>
-                    </div>
-                  </div>
+          {/* LLM Guardrail (Optional) */}
+          <div>
+            <span className="block text-lg font-semibold" style={{ marginTop: '20px' }}>
+              LLM Guardrail (Optional)
+            </span>
+            {!createdGR && (
+              <>
+                <CardDescription>
+                  Would you like to reduce PII (Personally identifiable information) from your
+                  reference?
+                </CardDescription>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    gap: '10px',
+                    marginTop: '10px',
+                  }}
+                >
+                  <Button
+                    variant={ifUseLGR === 'Yes' ? 'contained' : 'outlined'}
+                    onClick={() => {
+                      setIfUseLGR('Yes');
+                      setCreatedGR(false);
+                    }}
+                  >
+                    Yes
+                  </Button>
+                  <Button
+                    variant={ifUseLGR === 'No' ? 'contained' : 'outlined'}
+                    onClick={() => {
+                      setGrIdentifier(null);
+                      setIfUseLGR('No');
+                      setCreatedGR(false);
+                    }}
+                  >
+                    No
+                  </Button>
+                </div>
 
-                  {ifUseExistingLGR === 'Yes' && (
+                {ifUseLGR === 'Yes' && (
+                  <>
                     <div style={{ marginTop: '20px' }}>
-                      <div className="mb-4 mt-2">
-                        <CardDescription>Choose from existing NLP App(s)</CardDescription>
-                        <div className="mt-2">
-                          <DropdownMenu
-                            title=" Please choose a model  "
-                            handleSelectedTeam={handleGrIdentifier}
-                            teams={grDropDownList}
-                          />
-                        </div>
+                      <CardDescription>
+                        Use an existing NER model to reduce PII from your reference?
+                      </CardDescription>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'row',
+                          gap: '10px',
+                          marginTop: '10px',
+                        }}
+                      >
+                        <Button
+                          variant={ifUseExistingLGR === 'Yes' ? 'contained' : 'outlined'}
+                          onClick={() => {
+                            setIfUseExistingLGR('Yes');
+                            setCreatedGR(false);
+                          }}
+                        >
+                          Yes
+                        </Button>
+                        <Button
+                          variant={ifUseExistingLGR === 'No' ? 'contained' : 'outlined'}
+                          onClick={() => {
+                            setIfUseExistingLGR('No');
+                            setCreatedGR(false);
+                          }}
+                        >
+                          No
+                        </Button>
                       </div>
                     </div>
-                  )}
 
-                  {ifUseExistingLGR === 'No' && (
-                    <>
-                      {createdGR ? (
-                        <div>Guardrail model created.</div>
-                      ) : (
-                        <div>
-                          <NERQuestions
-                            workflowNames={workflowNames}
-                            modelGoal="Model to detect sensitive PII"
-                            onCreateModel={(modelID) => {
-                              setGrModelId(modelID);
-                              setCreatedGR(true);
-                            }}
-                            stayOnPage={true}
-                            appName={`${modelName}-NER`}
-                          />
+                    {ifUseExistingLGR === 'Yes' && (
+                      <div style={{ marginTop: '20px' }}>
+                        <div className="mb-4 mt-2">
+                          <CardDescription>Choose from existing NLP App(s)</CardDescription>
+                          <div className="mt-2">
+                            <DropdownMenu
+                              title=" Please choose a model  "
+                              handleSelectedTeam={handleGrIdentifier}
+                              teams={grDropDownList}
+                            />
+                          </div>
                         </div>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </div>
-      ),
-    },
-    {
-      title: 'NLP Classifier',
-      content: (
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', marginTop: '20px' }}>
-            <span className="block text-lg font-semibold">NLP Classifier</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span style={{ marginLeft: '8px', cursor: 'pointer' }}>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="w-5 h-5"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="8" />
-                    <line x1="12" y1="12" x2="12" y2="16" />
-                  </svg>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="right" style={{ maxWidth: '250px' }}>
-                A classification model, such as a sentiment analyzer, can categorize the user&apos;s
-                query into different labels, providing deeper insights into the intent or tone of
-                the input.
-              </TooltipContent>
-            </Tooltip>
+                      </div>
+                    )}
+
+                    {ifUseExistingLGR === 'No' && (
+                      <>
+                        {createdGR ? (
+                          <div>Guardrail model created.</div>
+                        ) : (
+                          <div>
+                            <NERQuestions
+                              workflowNames={workflowNames}
+                              modelGoal="Model to detect sensitive PII"
+                              onCreateModel={(modelID) => {
+                                setGrModelId(modelID);
+                                setCreatedGR(true);
+                              }}
+                              stayOnPage={true}
+                              appName={`${modelName}-NER`}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </>
+            )}
           </div>
 
-          <CardDescription>Would you like to add NLP Classifier?</CardDescription>
-          <div style={{ display: 'flex', flexDirection: 'row', gap: '10px', marginTop: '10px' }}>
-            <Button
-              variant={ifUseNLPClassifier === 'Yes' ? 'contained' : 'outlined'}
-              color={ifUseNLPClassifier === 'Yes' ? 'secondary' : 'primary'}
-              onClick={() => setIfUseNLPClassifier('Yes')}
-            >
-              Yes
-            </Button>
-            <Button
-              variant={ifUseNLPClassifier === 'No' ? 'contained' : 'outlined'}
-              color={ifUseNLPClassifier === 'No' ? 'secondary' : 'primary'}
-              onClick={() => {
-                setNlpClassifierIdentifier(null);
-                setIfUseNLPClassifier('No');
-              }}
-            >
-              No
-            </Button>
-          </div>
+          {/* Sentiment Analysis (Optional) */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', marginTop: '20px' }}>
+              <span className="block text-lg font-semibold">Sentiment Analysis (Optional)</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span style={{ marginLeft: '8px', cursor: 'pointer' }}>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="w-5 h-5"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="8" />
+                      <line x1="12" y1="12" x2="12" y2="16" />
+                    </svg>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="right" style={{ maxWidth: '250px' }}>
+                  A sentiment analysis model can determine the emotional tone behind a user&apos;s
+                  query, providing insights into their attitude and emotional state.
+                </TooltipContent>
+              </Tooltip>
+            </div>
 
-          {ifUseNLPClassifier === 'Yes' && (
-            <div style={{ marginTop: '20px' }}>
-              <CardDescription>Choose from existing NLP classifier models</CardDescription>
-              <select
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                value={nlpClassifierIdentifier || ''}
-                onChange={(e) => {
-                  const classifierID = e.target.value;
-                  setNlpClassifierIdentifier(classifierID);
-                  const classifierModel = existingNLPClassifierModels.find(
-                    (model) => `${model.username}/${model.model_name}` === classifierID
-                  );
-                  if (classifierModel) {
-                    setNlpClassifierModelId(classifierModel.model_id);
-                  }
+            <CardDescription>Would you like to detect sentiment of user query?</CardDescription>
+            <div style={{ display: 'flex', flexDirection: 'row', gap: '10px', marginTop: '10px' }}>
+              <Button
+                variant={ifUseNLPClassifier === 'Yes' ? 'contained' : 'outlined'}
+                color={ifUseNLPClassifier === 'Yes' ? 'secondary' : 'primary'}
+                onClick={() => setIfUseNLPClassifier('Yes')}
+              >
+                Yes
+              </Button>
+              <Button
+                variant={ifUseNLPClassifier === 'No' ? 'contained' : 'outlined'}
+                color={ifUseNLPClassifier === 'No' ? 'secondary' : 'primary'}
+                onClick={() => {
+                  setNlpClassifierIdentifier(null);
+                  setIfUseNLPClassifier('No');
                 }}
               >
-                <option value="">-- Please choose a model --</option>
-                {existingNLPClassifierModels.map((model) => (
-                  <option key={model.id} value={`${model.username}/${model.model_name}`}>
-                    {`${model.username}/${model.model_name}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
-      title: 'Chat',
-      content: (
-        <div>
-          <span className="block text-lg font-semibold" style={{ marginTop: '20px' }}>
-            Chat
-          </span>
-          <div>
-            <CardDescription>Choose an LLM option</CardDescription>
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'row',
-                gap: '10px',
-                marginTop: '10px',
-              }}
-            >
-              <Button
-                variant={llmType === 'OpenAI' ? 'contained' : 'outlined'}
-                onClick={() => setLlmType('OpenAI')}
-              >
-                OpenAI
-              </Button>
-              <Button
-                variant={llmType === 'On-prem' ? 'contained' : 'outlined'}
-                onClick={() => setLlmType('On-prem')}
-              >
-                On-prem
-              </Button>
-              <Button
-                variant={llmType === 'Self-host' ? 'contained' : 'outlined'}
-                onClick={() => setLlmType('Self-host')}
-              >
-                Self-host
+                No
               </Button>
             </div>
+
+            {ifUseNLPClassifier === 'Yes' && (
+              <div style={{ marginTop: '20px' }}>
+                <CardDescription>Choose from existing sentiment analysis models</CardDescription>
+                <select
+                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                  value={nlpClassifierIdentifier || ''}
+                  onChange={(e) => {
+                    const classifierID = e.target.value;
+                    setNlpClassifierIdentifier(classifierID);
+                    const classifierModel = existingNLPClassifierModels.find(
+                      (model) => `${model.username}/${model.model_name}` === classifierID
+                    );
+                    if (classifierModel) {
+                      setNlpClassifierModelId(classifierModel.model_id);
+                    }
+                  }}
+                >
+                  <option value="">-- Please choose a model --</option>
+                  {existingNLPClassifierModels.map((model) => (
+                    <option key={model.id} value={`${model.username}/${model.model_name}`}>
+                      {`${model.username}/${model.model_name}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
       ),
@@ -563,11 +565,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
 
   if (!modelName) missingRequirements.push('App Name is not specified (Step 1)');
   if (!ssModelId) missingRequirements.push('Retrieval app is not specified (Step 2)');
-  if (!(ifUseLGR === 'No' || grModelId))
-    missingRequirements.push('LLM Guardrail is not specified (Step 3)');
-  if (!(ifUseNLPClassifier === 'No' || nlpClassifierModelId))
-    missingRequirements.push('NLP Classifier is not specified (Step 4)');
-  if (!llmType) missingRequirements.push('LLM Type is not specified (Step 5)');
+  if (!llmType) missingRequirements.push('LLM Type is not specified (Step 3)');
 
   const errorMessage = missingRequirements.length > 0 && (
     <div>
@@ -634,10 +632,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
           <Button onClick={() => setCurrentStep(currentStep + 1)}>Next</Button>
         ) : (
           <>
-            {ssModelId &&
-            (ifUseLGR === 'No' || grModelId) &&
-            modelName &&
-            (ifUseNLPClassifier === 'No' || nlpClassifierModelId) ? (
+            {ssModelId && modelName && llmType ? (
               <div>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -645,16 +640,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
                       <Button
                         onClick={handleSubmit}
                         style={{ width: '100%' }}
-                        disabled={
-                          isLoading ||
-                          !(
-                            ssModelId &&
-                            (ifUseLGR === 'No' || grModelId) &&
-                            llmType &&
-                            modelName &&
-                            (ifUseNLPClassifier === 'No' || nlpClassifierModelId)
-                          )
-                        }
+                        disabled={isLoading || !(ssModelId && modelName && llmType)}
                       >
                         {isLoading ? (
                           <div className="flex items-center justify-center">
@@ -667,13 +653,9 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
                       </Button>
                     </div>
                   </TooltipTrigger>
-                  {!(
-                    ssModelId &&
-                    (ifUseLGR === 'No' || grModelId) &&
-                    llmType &&
-                    modelName &&
-                    (ifUseNLPClassifier === 'No' || nlpClassifierModelId)
-                  ) && <TooltipContent side="bottom">Requirements not met</TooltipContent>}
+                  {!(ssModelId && modelName && llmType) && (
+                    <TooltipContent side="bottom">Requirements not met</TooltipContent>
+                  )}
                 </Tooltip>
               </div>
             ) : (

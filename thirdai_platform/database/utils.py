@@ -30,6 +30,24 @@ default_workflow_types = [
             ],
         ],
     },
+    {
+        "name": "chatbot",
+        "description": "Chatbot workflow",
+        "model_requirements": [
+            [
+                {"component": "search", "type": "ndb"},
+                {"component": "guardrail", "type": "udt", "subtype": "token"},
+            ],
+            [
+                {"component": "search", "type": "ndb"},
+            ],
+            [
+                {"component": "search", "type": "ndb"},
+                {"component": "guardrail", "type": "udt", "subtype": "token"},
+                {"component": "sentiment", "type": "udt", "subtype": "text"},
+            ],
+        ],
+    },
 ]
 
 

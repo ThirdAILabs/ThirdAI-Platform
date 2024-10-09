@@ -568,7 +568,8 @@ export class ModelService {
     onNextWord: (str: string) => void,
     genAiProvider?: string,
     workflowId?: string,
-    onComplete?: (finalAnswer: string) => void
+    onComplete?: (finalAnswer: string) => void,
+    signal?: AbortSignal // <-- Add this parameter
   ) {
     let finalAnswer = ''; // Variable to accumulate the response
 
@@ -599,6 +600,7 @@ export class ModelService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(args),
+        signal: signal,
       });
 
       if (!response.ok) {
@@ -623,10 +625,20 @@ export class ModelService {
       if (onComplete) {
         onComplete(finalAnswer);
       }
-    } catch (error) {
-      console.error('Generation Error:', error);
-      alert('Generation Error:' + error);
-      onNextWord('An error occurred during generation.');
+    } catch (error: unknown) {
+      if (isAbortError(error)) {
+        console.log('Fetch aborted');
+        onNextWord(finalAnswer);
+      } else {
+        console.error('Generation Error:', error);
+        alert('Generation Error:' + (error instanceof Error ? error.message : String(error)));
+        // onNextWord('An error occurred during generation.');
+      }
+    }
+
+    // Type guard to check if the error is an AbortError
+    function isAbortError(error: any): error is { name: string } {
+      return error && typeof error === 'object' && 'name' in error && error.name === 'AbortError';
     }
   }
 
@@ -660,35 +672,65 @@ export class ModelService {
       });
   }
 
-  chat(textInput: string, provider: string): Promise<ChatResponse> {
-    return fetch(this.url + '/chat', {
-      method: 'POST',
-      body: JSON.stringify({
-        session_id: this.sessionId,
-        user_input: textInput,
-        provider: provider,
-      }),
-      headers: {
-        'Content-type': 'application/json; charset=UTF-8',
-        ...this.authHeader(),
-      },
-    })
-      .then(this.handleInvalidAuth())
-      .then((res) => {
-        if (res.ok) {
-          return res.json();
-        } else {
-          return res.json().then((err) => {
-            throw new Error(err.detail || 'Failed to fetch chat response');
-          });
-        }
-      })
-      .then((response) => response['data'] as ChatResponse)
-      .catch((e) => {
-        console.error('Error in chat:', e);
-        alert('Error in chat: ' + e);
-        throw e;
+  async chat(
+    textInput: string,
+    provider: string,
+    onNextWord: (str: string) => void,
+    onComplete?: (finalResponse: string) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    try {
+      const response = await fetch(this.url + '/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          session_id: this.sessionId,
+          user_input: textInput,
+          provider: provider,
+        }),
+        headers: {
+          'Content-type': 'application/json; charset=UTF-8',
+          ...this.authHeader(),
+        },
+        signal,
       });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let finalResponse = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+
+        const newData = decoder.decode(value, { stream: true });
+        finalResponse += newData;
+
+        onNextWord(newData);
+      }
+
+      if (onComplete) {
+        onComplete(finalResponse);
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          console.log('Chat was aborted');
+        } else {
+          console.error('Error in chat:', error);
+          alert('Error in chat: ' + error);
+        }
+      } else {
+        console.error('An unknown error occurred:', error);
+        alert('An unknown error occurred');
+      }
+      throw error;
+    }
   }
 
   setChat(provider: string): Promise<any> {

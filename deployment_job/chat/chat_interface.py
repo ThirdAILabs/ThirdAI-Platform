@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Union
+from typing import AsyncGenerator, List, Union
 
 from chat.ndbv2_vectorstore import NeuralDBV2VectorStore
 from langchain.chains.combine_documents import create_stuff_documents_chain
@@ -114,3 +114,22 @@ class ChatInterface(ABC):
         chat_history.add_ai_message(response["answer"])
 
         return response["answer"]
+
+    async def stream_chat(
+        self, user_input: str, session_id: str, **kwargs
+    ) -> AsyncGenerator[str, None]:
+        chat_history = SQLChatMessageHistory(
+            session_id=session_id, connection_string=self.chat_history_sql_uri
+        )
+        chat_history.add_user_message(user_input)
+
+        response_chunks = []
+        async for chunk in self.conversational_retrieval_chain.astream(
+            {"messages": chat_history.messages}
+        ):
+            if "answer" in chunk:
+                response_chunks.append(chunk["answer"])
+                yield chunk["answer"]
+
+        full_response = "".join(response_chunks)
+        chat_history.add_ai_message(full_response)
