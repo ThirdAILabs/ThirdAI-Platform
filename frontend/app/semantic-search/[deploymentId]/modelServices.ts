@@ -151,7 +151,6 @@ export class ModelService {
         }
       })
       .then(({ data }) => {
-        console.log(data);
         return data;
       })
       .catch((e) => {
@@ -314,7 +313,7 @@ export class ModelService {
   }
 
   async unredact(text: string, pii_map: Map<string, Map<string, string>>): Promise<string> {
-    const url = new URL(this.url + "/unredact")
+    const url = new URL(this.ragUrl + "/unredact")
     return fetch(url, {
       method: 'POST',
       headers: {

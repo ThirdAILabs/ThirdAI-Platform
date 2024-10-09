@@ -108,7 +108,44 @@ interface ReferenceProps {
   checked: boolean;
   onCheck: () => void;
   modelService: ModelService;
-  ifGuardRailOn: boolean;
+  piiMap: Map<string, Map<string, string>> | null;
+}
+
+
+interface TokenTag {
+  token: string
+  tag: string
+}
+
+function getTokensAndTags(text: string, piiMap: object): TokenTag[] {
+  const tokens = text.replaceAll(/\[([A-Z]+) (#\d+)\]/gi, '$1<pii>$2').split(' ');
+
+  var token_tags: TokenTag[] = [];
+
+  for (const token of tokens) {
+    if (token.includes("<pii>")) {
+      const items = token.split("<pii>");
+      const tag = items[0]
+      const label = `[${tag} ${items[1]}]`
+
+      if (tag in piiMap) {
+        const candidates = piiMap[tag as keyof typeof piiMap]
+        if (label in candidates) {
+          token_tags.push({ token: candidates[label], tag: tag })
+        } else {
+          token_tags.push({ token: "[UNKNOWN]", tag: "" })
+        }
+      } else {
+        token_tags.push({ token: "[UNKNOWN]", tag: "" })
+      }
+    } else {
+      token_tags.push({ token: token, tag: "" })
+    }
+  }
+  console.log(text)
+  console.log(token_tags)
+
+  return token_tags;
 }
 
 export default function Reference({
@@ -120,7 +157,7 @@ export default function Reference({
   checked,
   onCheck,
   modelService,
-  ifGuardRailOn,
+  piiMap,
 }: ReferenceProps) {
   const [opacity, setOpacity] = useState('0');
   useEffect(() => setOpacity('100%'), []);
@@ -176,69 +213,6 @@ export default function Reference({
     },
   ];
 
-  const [prediction, setPrediction] = useState<PIIDetectionResult>({
-    tokens: [],
-    predicted_tags: [],
-  });
-  const [transformedPrediction, setTransformedPrediction] = useState<string[][]>([]);
-
-  useEffect(() => {
-    // if (ifGuardRailOn) {
-    //   // console.log('info.content', info.content)
-
-    //   // Call piiDetect and handle the promise with .then
-    //   modelService
-    //     .piiDetect(info.content)
-    //     .then((result) => {
-    //       // console.log('result', result);
-    //       setPrediction(result);
-    //     })
-    //     .catch((error) => {
-    //       console.error('Error detecting PII:', error);
-    //       alert('Error detecting PII:' + error);
-    //     });
-    // }
-  }, [info, ifGuardRailOn]);
-
-  useEffect(() => {
-    const { tokens, predicted_tags } = prediction;
-    let result = [];
-    let currentSentence = '';
-    let currentTag = '';
-
-    for (let i = 0; i < tokens.length; i++) {
-      const word = tokens[i];
-      if (!(predicted_tags && predicted_tags[i])) {
-        continue;
-      }
-      const tag = predicted_tags[i][0]; // Extract the tag from the tuple
-
-      if (tag === currentTag) {
-        // If the tag is the same as the current tag, append the word to the current sentence
-        currentSentence += ` ${word}`;
-      } else {
-        // If the tag is different, push the current sentence and tag to the result
-        if (currentSentence) {
-          result.push([currentSentence.trim(), currentTag]);
-        }
-        // Start a new sentence with the current word and tag
-        currentSentence = word;
-        currentTag = tag;
-      }
-    }
-
-    // Push the last sentence and tag to the result
-    if (currentSentence) {
-      result.push([currentSentence.trim(), currentTag]);
-    }
-
-    // console.log('trans result', result)
-
-    // console.log('newtransformedPrediction', result);
-    // setTransformedPrediction(result);
-    setTransformedPrediction(result);
-  }, [prediction]);
-
   return (
     <Card
       style={{
@@ -285,30 +259,29 @@ export default function Reference({
           )}
         </Header>
         <Content>
-          {ifGuardRailOn ? (
+          {piiMap ? (
             <div className="ner-block">
-              {transformedPrediction &&
-                transformedPrediction.map(([sentence, tag], sentenceIndex) => {
-                  const label = labels.find((label) => label.name === tag);
-                  return (
-                    <span
-                      key={sentenceIndex}
-                      // data-paragraph-index={paragraphIndex}
-                      // data-sentence-index={sentenceIndex}
-                      // onClick={() => {
-                      //     if (label && label.checked) {
-                      //         handleSpanClick(paragraphIndex, sentenceIndex);
-                      //     }
-                      // }}
-                      style={{
-                        color: label && label.checked ? label.color : 'inherit',
-                        cursor: label && label.checked ? 'pointer' : 'auto',
-                      }}
-                    >
-                      {label && label.checked ? `${sentence} (${tag})` : `${sentence} `}
-                    </span>
-                  );
-                })}
+              {getTokensAndTags(info.content, piiMap).map((token_tag, sentenceIndex) => {
+                const label = labels.find((label) => label.name === token_tag.tag);
+                return (
+                  <span
+                    key={sentenceIndex}
+                    // data-paragraph-index={paragraphIndex}
+                    // data-sentence-index={sentenceIndex}
+                    // onClick={() => {
+                    //     if (label && label.checked) {
+                    //         handleSpanClick(paragraphIndex, sentenceIndex);
+                    //     }
+                    // }}
+                    style={{
+                      color: label && label.checked ? label.color : 'inherit',
+                      cursor: label && label.checked ? 'pointer' : 'auto',
+                    }}
+                  >
+                    {label && label.checked ? `${token_tag.token} (${token_tag.tag}) ` : `${token_tag.token} `}
+                  </span>
+                );
+              })}
             </div>
           ) : (
             <Content> {info.content} </Content>

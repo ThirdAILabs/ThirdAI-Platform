@@ -25,8 +25,6 @@ from backend.startup_jobs import (
 )
 from backend.status_sync import sync_job_statuses
 from backend.utils import get_platform
-
-pass
 from fastapi.middleware.cors import CORSMiddleware
 
 app = fastapi.FastAPI()

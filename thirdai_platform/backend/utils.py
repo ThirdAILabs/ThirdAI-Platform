@@ -122,10 +122,15 @@ def get_model_status(model: schema.Model, train_status: bool) -> schema.Status:
     ]:
         return status
 
-    statuses = defaultdict(int)
+    statuses = defaultdict(list)
     for m in list_all_dependencies(model):
         status = m.train_status if train_status else m.deploy_status
-        statuses[status] += 1
+        if m.id == model.id:
+            statuses[status].append(f"Workflow {model.name} has status {status.value}.")
+        else:
+            statuses[status].append(
+                f"The workflow depends on workflow {model.name} which has status {status.value}."
+            )
 
     status_priority_order = [
         schema.Status.failed,
@@ -137,8 +142,9 @@ def get_model_status(model: schema.Model, train_status: bool) -> schema.Status:
     ]
 
     for status_type in status_priority_order:
-        if statuses[status_type] > 0:
-            return status_type
+        reasons = statuses[status_type]
+        if len(reasons) > 0:
+            return status_type, reasons
 
 
 def get_high_level_model_info(result: schema.Model):
@@ -159,8 +165,8 @@ def get_high_level_model_info(result: schema.Model):
         "access_level": result.access_level,
         "domain": result.domain,
         "type": result.type,
-        "train_status": get_model_status(result, train_status=True),
-        "deploy_status": get_model_status(result, train_status=False),
+        "train_status": get_model_status(result, train_status=True)[0],
+        "deploy_status": get_model_status(result, train_status=False)[0],
         "team_id": str(result.team_id),
         "model_id": str(result.id),
         "sub_type": result.sub_type,

@@ -51,23 +51,42 @@ def create_enterprise_search_workflow(
 
     workflow_id = uuid.uuid4()
 
-    search_model = session.query(schema.Model).get(options.retrieval_id)
-    if not search_model or search_model.type != ModelType.NDB:
+    search_model: schema.Model = session.query(schema.Model).get(options.retrieval_id)
+    if not search_model:
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"Search component must be an existing retrieval model. Search model {options.retrieval_id} either does not exist or is not a retrieval model.",
+            message=f"Search component must be an existing retrieval model. Search model {options.retrieval_id} does not exist.",
+        )
+    if search_model.type != ModelType.NDB:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"Search component must be an existing retrieval model. Search model {options.retrieval_id} is not a retrieval model.",
+        )
+    if search_model.get_user_permission(user) is None:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"User {user.username} does not have permission to access search model {search_model.name}.",
         )
 
     if options.guardrail_id:
         guardrail_model = session.query(schema.Model).get(options.guardrail_id)
+        if not guardrail_model:
+            return response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message=f"Guardrail component must be an existing nlp model. Guardrail {options.retrieval_id} does not exist.",
+            )
         if (
-            not guardrail_model
-            or guardrail_model.type != ModelType.UDT
+            guardrail_model.type != ModelType.UDT
             or guardrail_model.sub_type != UDTSubType.token
         ):
             return response(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                message=f"Guardrail component must be an existing nlp model. Guardrail {options.retrieval_id} either does not exist or is not a nlp model.",
+                message=f"Guardrail component must be an existing nlp model. Guardrail {options.retrieval_id} is not a nlp model.",
+            )
+        if guardrail_model.get_user_permission(user) is None:
+            return response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message=f"User {user.username} does not have permission to access guardrail model {guardrail_model.name}.",
             )
 
     try:
