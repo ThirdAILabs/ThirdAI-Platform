@@ -11,7 +11,7 @@ class Reference(BaseModel):
 
 class GenerateArgs(BaseModel):
     query: str
-    prompt: Optional[str] = None
+    task_prompt: Optional[str] = None
     references: List[Reference] = []
 
     key: Optional[str] = None
@@ -45,7 +45,7 @@ def reference_content(reference: Reference) -> str:
 
 def make_prompt(
     query: str,
-    prompt: Optional[str],
+    task_prompt: Optional[str],
     references: List[Reference],
     reverse_ref_order: bool = False,
     token_limit: int = 2000,
@@ -62,6 +62,6 @@ def make_prompt(
         context = " ".join(context.split(" ")[:token_limit])
 
     system_prompt = DEFAULT_SYSTEM_PROMPT
-    user_prompt = f"{context}\n\n {prompt or DEFAULT_PROMPT} {query}"
+    user_prompt = f"{context}\n\n {task_prompt or DEFAULT_PROMPT} {query}"
 
     return system_prompt, user_prompt
