@@ -1209,7 +1209,7 @@
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
-        "regex": "",
+        "regex": "/.*:4646$/",
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
