@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import List, Literal, Union
 
+from platform_common.file_handler import FileInfo
 from pydantic import BaseModel, Field
 
 
@@ -37,3 +38,11 @@ class FeedbackLog(BaseModel):
     event: Union[UpvoteLog, AssociateLog, ImplicitUpvoteLog] = Field(
         ..., discriminator="action"
     )
+
+
+class InsertLog(BaseModel):
+    documents: List[FileInfo]
+
+
+class DeleteLog(BaseModel):
+    doc_ids: List[str]

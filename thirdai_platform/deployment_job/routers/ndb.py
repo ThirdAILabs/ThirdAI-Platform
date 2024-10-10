@@ -14,21 +14,21 @@ from fastapi.responses import StreamingResponse
 from models.ndb_models import NDBModel, NDBV1Model, NDBV2Model
 from permissions import Permissions
 from platform_common.file_handler import download_local_files
+from platform_common.pydantic_models.feedback_logs import (
+    AssociateLog,
+    DeleteLog,
+    FeedbackLog,
+    ImplicitUpvoteLog,
+    InsertLog,
+    UpvoteLog,
+)
 from platform_common.requests import response
 from prometheus_client import Counter, Summary
 from pydantic import ValidationError
 from pydantic_models import inputs
 from pydantic_models.inputs import NDBSearchParams
 from reporter import Reporter
-from update_logger import (
-    AssociateLog,
-    DeleteLog,
-    FeedbackLog,
-    ImplicitUpvoteLog,
-    InsertLog,
-    UpdateLogger,
-    UpvoteLog,
-)
+from update_logger import UpdateLogger
 from utils import propagate_error, validate_name
 
 ndb_query_metric = Summary("ndb_query", "NDB Queries")
