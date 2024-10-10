@@ -48,6 +48,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Create and activate virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+
       - name: install dependencies
         run: |
           pip3 install -r thirdai_platform/requirements.txt
@@ -81,6 +86,11 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Create and activate virtual environment
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+
     - name: install dependencies
       run: |
         pip3 install -r train_job/requirements.txt
@@ -96,6 +106,11 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Create and activate virtual environment
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+
     - name: install dependencies
       run: |
         pip3 install -r llm_dispatch_job/requirements.txt
@@ -110,6 +125,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+
+    - name: Create and activate virtual environment
+      run: |
+        python -m venv venv
+        source venv/bin/activate
 
     - name: install dependencies
       run: |
