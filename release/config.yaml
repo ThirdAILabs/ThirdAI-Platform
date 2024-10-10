@@ -30,7 +30,7 @@ azure:
       push_credentials:
         password: wE/QRZQEq2Ie0HqIlbMbq/dYQcNGnwsjHXaM9zT1V4+ACRCSDWKD
         username: thirdaiplatform-push-move-jobs-test
-      version: 0.0.1
+      version: 0.0.5
     mshift:
       pull_credentials:
         password: uGpzj1Ylkgc+PBbQ5e3r1nEFC+BtiQK2cNeFdRW1NP+ACRCsrcq2

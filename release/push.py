@@ -101,7 +101,7 @@ def build_image(
         dockerfile_path = get_root_absolute_path() / dockerfile_path
 
     full_name = provider.get_full_image_name(name, branch, tag)
-    image_id = provider.build_image(dockerfile_path, full_name, nocache, buildargs)
+    image_id = provider.build_image(str(dockerfile_path), full_name, nocache, buildargs)
     return {name: image_id}
 
 
@@ -144,11 +144,27 @@ def build_images(
     for image in images_to_build:
         if image.name == "thirdai_platform":
             image_ids.update(
-                build_image(provider, image.name, branch, tag, buildargs, nocache, image.dockerfile_path)
+                build_image(
+                    provider,
+                    image.name,
+                    branch,
+                    tag,
+                    buildargs,
+                    nocache,
+                    image.dockerfile_path,
+                )
             )
         else:
             image_ids.update(
-                build_image(provider, image.name, branch, tag, {}, nocache, image.dockerfile_path)
+                build_image(
+                    provider,
+                    image.name,
+                    branch,
+                    tag,
+                    {},
+                    nocache,
+                    image.dockerfile_path,
+                )
             )
 
     return image_ids
