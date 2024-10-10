@@ -42,9 +42,9 @@ if __name__ == "__main__":
     tag = "v" + args.version
     config = load_config(args.config)
     provider = AzureProvider(config["azure"]["registry"])
-    for image in image_base_names.to_list():
+    for image in image_base_names:
         provider.delete_image(
-            image_name_for_branch(image, args.branch),
+            image_name_for_branch(image.name, args.branch),
             tag,
             tenant_id=args.tenant_id,
             client_id=args.client_id,

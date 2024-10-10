@@ -82,6 +82,7 @@ def build_image(
     tag: str,
     buildargs: Dict[str, str],
     nocache: bool,
+    dockerfile_path: str,
 ) -> Dict[str, str]:
     """
     Build a Docker image.
@@ -92,11 +93,15 @@ def build_image(
     :param tag: Version tag
     :param buildargs: Build arguments for Docker
     :param nocache: Whether to use cache during build
+    :param dockerfile_path: Path to the Dockerfile
     :return: Dictionary with image name and image ID
     """
-    path = get_root_absolute_path() / name
+    dockerfile_path = Path(dockerfile_path)
+    if not dockerfile_path.is_absolute():
+        dockerfile_path = get_root_absolute_path() / dockerfile_path
+
     full_name = provider.get_full_image_name(name, branch, tag)
-    image_id = provider.build_image(str(path), full_name, nocache, buildargs)
+    image_id = provider.build_image(dockerfile_path, full_name, nocache, buildargs)
     return {name: image_id}
 
 
@@ -121,7 +126,6 @@ def build_images(
     """
     image_ids = {}
 
-    # Build ThirdAI platform image with specific buildargs
     buildargs = {
         "tag": tag,
         "docker_registry": provider.get_registry_name(),
@@ -137,20 +141,15 @@ def build_images(
         ),
     }
 
-    image_ids.update(
-        build_image(
-            provider,
-            image_base_names.THIRDAI_PLATFORM_IMAGE_NAME,
-            branch,
-            tag,
-            buildargs,
-            nocache,
-        )
-    )
-
-    # Build peripheral images without buildargs
     for image in images_to_build:
-        image_ids.update(build_image(provider, image.name, branch, tag, {}, nocache))
+        if image.name == "thirdai_platform":
+            image_ids.update(
+                build_image(provider, image.name, branch, tag, buildargs, nocache)
+            )
+        else:
+            image_ids.update(
+                build_image(provider, image.name, branch, tag, {}, nocache)
+            )
 
     return image_ids
 
@@ -257,8 +256,8 @@ def main() -> None:
             new_push_credentials = provider.create_credentials(
                 name=f"thirdaiplatform-push-{sanitized_branch}",
                 image_names=[
-                    image_name_for_branch(name, args.branch)
-                    for name in image_base_names.to_list()
+                    image_name_for_branch(image.name, args.branch)
+                    for image in images_to_build
                 ]
                 + images_to_pull_from_private,
                 push_access=True,
@@ -275,8 +274,8 @@ def main() -> None:
                 provider.update_credentials(
                     name=f"thirdaiplatform-push-{sanitized_branch}",
                     image_names=[
-                        image_name_for_branch(name, args.branch)
-                        for name in image_base_names.to_list()
+                        image_name_for_branch(image.name, args.branch)
+                        for image in images_to_build
                     ]
                     + images_to_pull_from_private,
                     push_access=True,
@@ -286,8 +285,8 @@ def main() -> None:
             new_pull_credentials = provider.create_credentials(
                 name=f"thirdaiplatform-pull-{sanitized_branch}",
                 image_names=[
-                    image_name_for_branch(name, args.branch)
-                    for name in image_base_names.to_list()
+                    image_name_for_branch(image.name, args.branch)
+                    for image in images_to_build
                 ]
                 + images_to_pull_from_private,
                 push_access=False,
@@ -304,8 +303,8 @@ def main() -> None:
                 provider.update_credentials(
                     name=f"thirdaiplatform-pull-{sanitized_branch}",
                     image_names=[
-                        image_name_for_branch(name, args.branch)
-                        for name in image_base_names.to_list()
+                        image_name_for_branch(image.name, args.branch)
+                        for image in images_to_build
                     ]
                     + images_to_pull_from_private,
                     push_access=False,
