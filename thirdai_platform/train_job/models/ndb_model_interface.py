@@ -15,7 +15,9 @@ from utils import (
     get_directory_size,
 )
 
-from utils.file_handler import expand_s3_buckets_and_directories
+from thirdai_platform.platform_common.file_handler import (
+    expand_s3_buckets_and_directories,
+)
 
 
 @apply_exception_handler

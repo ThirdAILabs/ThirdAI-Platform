@@ -9,7 +9,7 @@ from config import FileInfo, FileLocation
 from fastapi import Response
 from thirdai import neural_db as ndb
 
-from utils.file_handler import create_s3_client
+from thirdai_platform.platform_common.file_handler import create_s3_client
 
 GB_1 = 1024 * 1024 * 1024  # Define 1 GB in bytes
 

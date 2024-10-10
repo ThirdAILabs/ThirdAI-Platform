@@ -26,7 +26,10 @@ from thirdai import neural_db_v2 as ndbv2
 from thirdai.neural_db_v2.core.types import Chunk
 from utils import highlighted_pdf_bytes, new_pdf_chunks, old_pdf_chunks
 
-from utils.file_handler import FileInfo, expand_s3_buckets_and_directories
+from thirdai_platform.platform_common.file_handler import (
+    FileInfo,
+    expand_s3_buckets_and_directories,
+)
 
 
 class NDBModel(Model):

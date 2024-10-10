@@ -3,7 +3,7 @@ from pathlib import Path
 
 from config import DeploymentConfig
 
-from utils.logging import LoggerConfig
+from thirdai_platform.platform_common.logging import LoggerConfig
 
 
 class Model(ABC):

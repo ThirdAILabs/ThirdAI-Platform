@@ -1,7 +1,7 @@
 import functools
 import sys
 
-from utils.logging import get_default_logger
+from thirdai_platform.platform_common.logging import get_default_logger
 
 
 def exception_handler(report_method, logger):
