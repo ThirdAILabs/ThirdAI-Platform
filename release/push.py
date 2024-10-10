@@ -5,7 +5,7 @@ from typing import Dict
 import yaml
 from azure_provider import AzureProvider
 from cloud_provider_interface import CloudProviderInterface
-from docker_constants import image_base_names, images_to_pull_from_private
+from docker_constants import images_to_build, images_to_pull_from_private
 from utils import Credentials, image_name_for_branch, load_config
 
 
@@ -130,12 +130,13 @@ def build_images(
         "export_image_names_command": (
             " ".join(
                 [
-                    f"export {key}={image_name_for_branch(base_name, branch)}"
-                    for key, base_name in image_base_names.peripherals_as_dict().items()
+                    f"export {image.key}={image_name_for_branch(image.name, branch)}"
+                    for image in images_to_build
                 ]
             )
         ),
     }
+
     image_ids.update(
         build_image(
             provider,
@@ -148,8 +149,8 @@ def build_images(
     )
 
     # Build peripheral images without buildargs
-    for base_name in image_base_names.peripherals_as_dict().values():
-        image_ids.update(build_image(provider, base_name, branch, tag, {}, nocache))
+    for image in images_to_build:
+        image_ids.update(build_image(provider, image.name, branch, tag, {}, nocache))
 
     return image_ids
 
