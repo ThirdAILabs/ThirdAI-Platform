@@ -1,16 +1,18 @@
+import logging
 import os
+from abc import ABC, abstractmethod
 from enum import Enum
+from functools import wraps
 from typing import Any, Dict, List, Optional
 
 import boto3
+from azure.storage.blob import BlobServiceClient
 from botocore import UNSIGNED
 from botocore.client import Config
-
-pass
-from abc import ABC, abstractmethod
-from typing import List
-
+from botocore.exceptions import ClientError
 from fastapi import HTTPException, UploadFile, status
+from google.cloud import storage
+from google.oauth2 import service_account
 from pydantic import BaseModel
 
 
@@ -155,6 +157,27 @@ def create_s3_client() -> boto3.client:
     return s3_client
 
 
+def handle_exceptions(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            class_name = args[0].__class__.__name__ if args else "UnknownClass"
+            method_name = func.__name__
+            logging.error(
+                f"Error in class '{class_name}', method '{method_name}' "
+                f"with arguments {args[1:]}, and keyword arguments {kwargs}. "
+                f"Error: {str(e)}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"An error occurred: {str(e)}",
+            )
+
+    return wrapper
+
+
 class CloudStorageHandler(ABC):
     """
     Interface for Cloud Storage Handlers.
@@ -206,10 +229,6 @@ class S3StorageHandler(CloudStorageHandler):
 
     @handle_exceptions
     def create_s3_client(self, aws_access_key=None, aws_secret_access_key=None):
-        import boto3
-        from botocore import UNSIGNED
-        from botocore.client import Config
-
         if not aws_access_key or not aws_secret_access_key:
             config = Config(
                 signature_version=UNSIGNED,
@@ -234,8 +253,6 @@ class S3StorageHandler(CloudStorageHandler):
 
     @handle_exceptions
     def create_bucket_if_not_exists(self, bucket_name: str):
-        from botocore.exceptions import ClientError
-
         try:
             self.s3_client.head_bucket(Bucket=bucket_name)
             print(f"Bucket {bucket_name} already exists.")
@@ -340,13 +357,7 @@ class S3StorageHandler(CloudStorageHandler):
 
 
 class AzureStorageHandler(CloudStorageHandler):
-    """
-    Azure storage handler implementation.
-    """
-
     def __init__(self, account_name, account_key):
-        from azure.storage.blob import BlobServiceClient
-
         connection_string = f"DefaultEndpointsProtocol=https;AccountName={account_name};AccountKey={account_key};EndpointSuffix=core.windows.net"
 
         self._blob_service_client = BlobServiceClient.from_connection_string(
@@ -434,14 +445,7 @@ class AzureStorageHandler(CloudStorageHandler):
 
 
 class GCPStorageHandler(CloudStorageHandler):
-    """
-    GCP storage handler implementation.
-    """
-
     def __init__(self, credentials_file_path: str):
-        from google.cloud import storage
-        from google.oauth2 import service_account
-
         try:
             credentials = service_account.Credentials.from_service_account_file(
                 credentials_file_path
@@ -508,12 +512,10 @@ class GCPStorageHandler(CloudStorageHandler):
     def delete_bucket(self, bucket_name: str):
         bucket = self._client.bucket(bucket_name)
 
-        # List and delete all objects in the bucket
         blobs = list(bucket.list_blobs())
         for blob in blobs:
             blob.delete()
 
-        # Delete the bucket
         bucket.delete()
 
     @handle_exceptions

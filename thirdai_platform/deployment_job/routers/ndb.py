@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 from file_handler import download_local_files
 from models.ndb_models import NDBModel, NDBV1Model, NDBV2Model
 from permissions import Permissions
+from platform_common.file_handler import download_local_files
 from prometheus_client import Counter, Summary
 from pydantic import ValidationError
 from pydantic_models import inputs
@@ -29,8 +30,6 @@ from update_logger import (
     UpvoteLog,
 )
 from utils import propagate_error, response, validate_name
-
-from platform_common.file_handler import download_local_files
 
 ndb_query_metric = Summary("ndb_query", "NDB Queries")
 ndb_upvote_metric = Summary("ndb_upvote", "NDB upvotes")

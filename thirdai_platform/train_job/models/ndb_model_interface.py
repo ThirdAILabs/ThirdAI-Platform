@@ -6,6 +6,7 @@ import thirdai
 from config import FileInfo, NDBv1Options, TrainConfig
 from exceptional_handler import apply_exception_handler
 from models.model import Model
+from platform_common.file_handler import expand_s3_buckets_and_directories
 from reporter import Reporter
 from thirdai import neural_db as ndb
 from utils import (
@@ -13,10 +14,6 @@ from utils import (
     check_local_nfs_only,
     convert_supervised_to_ndb_file,
     get_directory_size,
-)
-
-from platform_common.file_handler import (
-    expand_s3_buckets_and_directories,
 )
 
 

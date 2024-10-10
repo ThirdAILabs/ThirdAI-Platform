@@ -12,12 +12,9 @@ from config import (
 )
 from exceptional_handler import apply_exception_handler
 from models.model import Model
+from platform_common.file_handler import expand_s3_buckets_and_directories
 from thirdai import bolt
 from utils import check_csv_only, check_local_nfs_only
-
-from platform_common.file_handler import (
-    expand_s3_buckets_and_directories,
-)
 
 
 @apply_exception_handler

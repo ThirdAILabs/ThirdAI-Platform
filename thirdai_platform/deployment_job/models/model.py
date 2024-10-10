@@ -2,7 +2,6 @@ from abc import ABC
 from pathlib import Path
 
 from config import DeploymentConfig
-
 from platform_common.logging import LoggerConfig
 
 

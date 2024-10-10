@@ -20,16 +20,12 @@ import thirdai.neural_db_v2.chunk_stores.constraints as ndbv2_constraints
 from chat import llm_providers
 from config import DeploymentConfig
 from models.model import Model
+from platform_common.file_handler import FileInfo, expand_s3_buckets_and_directories
 from pydantic_models import inputs
 from thirdai import neural_db as ndb
 from thirdai import neural_db_v2 as ndbv2
 from thirdai.neural_db_v2.core.types import Chunk
 from utils import highlighted_pdf_bytes, new_pdf_chunks, old_pdf_chunks
-
-from platform_common.file_handler import (
-    FileInfo,
-    expand_s3_buckets_and_directories,
-)
 
 
 class NDBModel(Model):

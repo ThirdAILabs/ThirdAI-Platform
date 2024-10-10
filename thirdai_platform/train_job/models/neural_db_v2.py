@@ -12,14 +12,13 @@ from config import FileInfo, NDBv2Options, TrainConfig
 from fastapi import Response
 from feedback_logs import ActionType, FeedbackLog
 from models.model import Model
-from reporter import Reporter
-from thirdai import neural_db_v2 as ndbv2
-from utils import check_disk, get_directory_size
-
 from platform_common.file_handler import (
     create_s3_client,
     expand_s3_buckets_and_directories,
 )
+from reporter import Reporter
+from thirdai import neural_db_v2 as ndbv2
+from utils import check_disk, get_directory_size
 
 
 def convert_to_ndb_doc(
