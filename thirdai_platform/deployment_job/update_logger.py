@@ -5,7 +5,7 @@ from typing import List, Literal, Union
 
 from pydantic import BaseModel, Field
 
-from thirdai_platform.platform_common.file_handler import FileInfo
+from platform_common.file_handler import FileInfo
 
 
 class ActionType(str, Enum):

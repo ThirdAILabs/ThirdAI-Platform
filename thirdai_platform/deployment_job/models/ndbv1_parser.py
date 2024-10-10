@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 from fastapi import Response
 from thirdai import neural_db as ndb
 
-from thirdai_platform.platform_common.file_handler import (
+from platform_common.file_handler import (
     FileInfo,
     FileLocation,
     create_s3_client,

@@ -6,7 +6,7 @@ from config import TrainConfig
 from exceptional_handler import apply_exception_handler
 from reporter import Reporter
 
-from thirdai_platform.platform_common.logging import LoggerConfig
+from platform_common.logging import LoggerConfig
 
 
 @apply_exception_handler

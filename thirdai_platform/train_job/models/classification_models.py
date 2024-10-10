@@ -15,7 +15,7 @@ from models.model import Model
 from thirdai import bolt
 from utils import check_csv_only, check_local_nfs_only
 
-from thirdai_platform.platform_common.file_handler import (
+from platform_common.file_handler import (
     expand_s3_buckets_and_directories,
 )
 

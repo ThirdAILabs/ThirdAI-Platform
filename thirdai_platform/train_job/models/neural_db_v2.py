@@ -16,7 +16,7 @@ from reporter import Reporter
 from thirdai import neural_db_v2 as ndbv2
 from utils import check_disk, get_directory_size
 
-from thirdai_platform.platform_common.file_handler import (
+from platform_common.file_handler import (
     create_s3_client,
     expand_s3_buckets_and_directories,
 )

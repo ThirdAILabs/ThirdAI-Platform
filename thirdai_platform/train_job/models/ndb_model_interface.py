@@ -15,7 +15,7 @@ from utils import (
     get_directory_size,
 )
 
-from thirdai_platform.platform_common.file_handler import (
+from platform_common.file_handler import (
     expand_s3_buckets_and_directories,
 )
 
