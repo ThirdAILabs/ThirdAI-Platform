@@ -143,7 +143,7 @@ def build_images(
                     )
                 ),
             }
-            
+
         image_ids.update(
             build_image(
                 provider,
