@@ -126,46 +126,35 @@ def build_images(
     """
     image_ids = {}
 
-    buildargs = {
-        "tag": tag,
-        "docker_registry": provider.get_registry_name(),
-        "docker_username": username,
-        "docker_password": password,
-        "export_image_names_command": (
-            " ".join(
-                [
-                    f"export {image.key}={image_name_for_branch(image.name, branch)}"
-                    for image in images_to_build
-                ]
-            )
-        ),
-    }
-
     for image in images_to_build:
+        buildargs = {}
         if image.name == "thirdai_platform":
-            image_ids.update(
-                build_image(
-                    provider,
-                    image.name,
-                    branch,
-                    tag,
-                    buildargs,
-                    nocache,
-                    image.dockerfile_path,
-                )
+            buildargs = {
+                "tag": tag,
+                "docker_registry": provider.get_registry_name(),
+                "docker_username": username,
+                "docker_password": password,
+                "export_image_names_command": (
+                    " ".join(
+                        [
+                            f"export {image.key}={image_name_for_branch(image.name, branch)}"
+                            for image in images_to_build
+                        ]
+                    )
+                ),
+            }
+            
+        image_ids.update(
+            build_image(
+                provider,
+                image.name,
+                branch,
+                tag,
+                buildargs,
+                nocache,
+                image.dockerfile_path,
             )
-        else:
-            image_ids.update(
-                build_image(
-                    provider,
-                    image.name,
-                    branch,
-                    tag,
-                    {},
-                    nocache,
-                    image.dockerfile_path,
-                )
-            )
+        )
 
     return image_ids
 
