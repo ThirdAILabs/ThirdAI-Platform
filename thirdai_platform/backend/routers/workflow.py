@@ -22,11 +22,11 @@ from backend.utils import (
     delete_nomad_job,
     get_platform,
     get_python_path,
-    thirdai_platform_dir,
     get_workflow,
     list_workflow_models,
     response,
     submit_nomad_job,
+    thirdai_platform_dir,
 )
 from database import schema
 from database.session import get_session

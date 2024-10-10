@@ -23,11 +23,11 @@ from backend.utils import (
     get_model_from_identifier,
     get_platform,
     get_python_path,
-    thirdai_platform_dir,
     logger,
     model_accessible,
     response,
     submit_nomad_job,
+    thirdai_platform_dir,
     validate_license_info,
 )
 from database import schema

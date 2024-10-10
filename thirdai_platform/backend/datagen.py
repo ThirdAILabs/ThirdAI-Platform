@@ -13,11 +13,11 @@ from backend.train_config import (
 from backend.utils import (
     get_platform,
     get_python_path,
-    thirdai_platform_dir,
     model_bazaar_path,
     response,
     save_dict,
     submit_nomad_job,
+    thirdai_platform_dir,
 )
 from database import schema
 from database.session import get_session
