@@ -187,6 +187,11 @@ jobs:
         run: |
           aws s3 cp thirdai-platform-package-${{ env.branch_name }}-${{ env.latest_tag }}.tar.gz s3://thirdai-corp-public/ThirdAI-Platform-latest-release/
 
+      - name: Delete platform package artifact
+        uses: geekyeggo/delete-artifact@v2
+        with:
+          name: thirdai-platform-package-${{ env.branch_name }}-${{ env.latest_tag }}
+
       - name: Upload Docker images artifact
         uses: actions/upload-artifact@v3
         with:
@@ -196,3 +201,8 @@ jobs:
       - name: Upload Docker images package to S3
         run: |
           aws s3 cp thirdai-platform-package-offline-${{ env.branch_name }}-${{ env.latest_tag }}.tar.gz s3://thirdai-corp-public/ThirdAI-Platform-latest-release/
+
+      - name: Delete Docker images artifact
+        uses: geekyeggo/delete-artifact@v2
+        with:
+          name: thirdai-platform-package-offline-${{ env.branch_name }}-${{ env.latest_tag }}
