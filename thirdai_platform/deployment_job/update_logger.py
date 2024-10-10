@@ -5,7 +5,7 @@ from typing import List, Literal, Union
 
 from pydantic import BaseModel, Field
 
-from platform_common.file_handler import FileInfo
+from utils.file_handler import FileInfo
 
 
 class ActionType(str, Enum):

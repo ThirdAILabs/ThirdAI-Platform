@@ -3,7 +3,7 @@ from pathlib import Path
 
 from config import DeploymentConfig
 
-from platform_common.logging import LoggerConfig
+from utils.logging import LoggerConfig
 
 
 class Model(ABC):

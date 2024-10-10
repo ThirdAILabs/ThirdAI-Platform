@@ -30,7 +30,7 @@ from update_logger import (
 )
 from utils import propagate_error, response, validate_name
 
-from platform_common.file_handler import download_local_files
+from utils.file_handler import download_local_files
 
 ndb_query_metric = Summary("ndb_query", "NDB Queries")
 ndb_upvote_metric = Summary("ndb_upvote", "NDB upvotes")

@@ -1,7 +1,7 @@
 import functools
 import sys
 
-from platform_common.logging import get_default_logger
+from utils.logging import get_default_logger
 
 
 def exception_handler(report_method, logger):
