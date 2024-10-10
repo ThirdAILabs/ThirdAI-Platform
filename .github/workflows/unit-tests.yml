@@ -51,10 +51,10 @@ jobs:
       - name: Create and activate virtual environment
         run: |
           python -m venv venv
-          source venv/bin/activate
 
       - name: install dependencies
         run: |
+          source venv/bin/activate
           pip3 install -r thirdai_platform/requirements.txt
           pip3 install pytest
           pip3 install pyopenssl --upgrade
@@ -89,10 +89,10 @@ jobs:
     - name: Create and activate virtual environment
       run: |
         python -m venv venv
-        source venv/bin/activate
 
     - name: install dependencies
       run: |
+        source venv/bin/activate
         pip3 install -r train_job/requirements.txt
         pip3 install pytest
         pip3 install pyopenssl --upgrade
@@ -109,10 +109,10 @@ jobs:
     - name: Create and activate virtual environment
       run: |
         python -m venv venv
-        source venv/bin/activate
 
     - name: install dependencies
       run: |
+        source venv/bin/activate
         pip3 install -r llm_dispatch_job/requirements.txt
         pip3 install httpx
         pip3 install pytest
@@ -129,10 +129,10 @@ jobs:
     - name: Create and activate virtual environment
       run: |
         python -m venv venv
-        source venv/bin/activate
 
     - name: install dependencies
       run: |
+        source venv/bin/activate
         pip3 install -r deployment_job/requirements.txt
         pip3 install pyopenssl --upgrade
         pip3 install pytest
