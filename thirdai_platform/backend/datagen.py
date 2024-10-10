@@ -14,14 +14,14 @@ from backend.utils import (
     get_platform,
     get_python_path,
     model_bazaar_path,
-    response,
-    save_dict,
     submit_nomad_job,
     thirdai_platform_dir,
 )
 from database import schema
 from database.session import get_session
 from fastapi import Depends, status
+from platform_common.requests import response
+from platform_common.utils import save_dict
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 

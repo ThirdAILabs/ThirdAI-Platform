@@ -5,7 +5,7 @@ from typing import Optional
 
 import cohere
 from openai import OpenAI
-from utils import save_dict
+from platform_common.utils import save_dict
 
 
 class LLMBase(ABC):

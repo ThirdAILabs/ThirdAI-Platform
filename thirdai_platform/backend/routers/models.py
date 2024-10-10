@@ -17,7 +17,6 @@ from backend.utils import (
     get_model,
     get_model_from_identifier,
     model_bazaar_path,
-    response,
     validate_name,
 )
 from database import schema
@@ -34,6 +33,7 @@ from fastapi import (
 )
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, StreamingResponse
+from platform_common.requests import response
 from pydantic import BaseModel
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload

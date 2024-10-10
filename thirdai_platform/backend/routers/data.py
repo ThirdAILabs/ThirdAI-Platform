@@ -6,10 +6,11 @@ from typing import Dict, List
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.datagen import generate_text_data, generate_token_data
 from backend.train_config import JobOptions
-from backend.utils import response, validate_license_info
+from backend.utils import validate_license_info
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, Form, status
+from platform_common.requests import response
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 

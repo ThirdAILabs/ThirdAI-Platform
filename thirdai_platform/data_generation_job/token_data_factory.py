@@ -6,19 +6,14 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 from data_factory_interface import DataFactory
 from faker import Faker
+from platform_common.utils import save_dict
 from prompt_resources.token_prompts import (
     dataset_generation_prompt,
     dataset_generation_prompt_with_sample,
     tag_value_prompt,
 )
 from tqdm import tqdm
-from utils import (
-    remove_duplicates,
-    save_dict,
-    shuffle_and_filter,
-    train_test_split,
-    write_to_csv,
-)
+from utils import remove_duplicates, shuffle_and_filter, train_test_split, write_to_csv
 from variables import Entity, NERSample
 
 

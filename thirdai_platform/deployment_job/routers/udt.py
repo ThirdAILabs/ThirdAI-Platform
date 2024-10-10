@@ -9,6 +9,7 @@ from models.classification_models import (
     TokenClassificationModel,
 )
 from permissions import Permissions
+from platform_common.requests import response
 from prometheus_client import Summary
 from pydantic_models.inputs import (
     SearchResultsTokenClassification,
@@ -16,7 +17,7 @@ from pydantic_models.inputs import (
 )
 from reporter import Reporter
 from throughput import Throughput
-from utils import propagate_error, response
+from utils import propagate_error
 
 udt_predict_metric = Summary("udt_predict", "UDT predictions")
 

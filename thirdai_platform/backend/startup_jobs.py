@@ -12,12 +12,12 @@ from backend.utils import (
     get_root_absolute_path,
     model_bazaar_path,
     nomad_job_exists,
-    response,
     submit_nomad_job,
     thirdai_platform_dir,
 )
 from fastapi import status
 from licensing.verify.verify_license import valid_job_allocation, verify_license
+from platform_common.requests import response
 
 GENERATE_JOB_ID = "llm-generation"
 THIRDAI_PLATFORM_FRONTEND_ID = "thirdai-platform-frontend"

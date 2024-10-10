@@ -34,7 +34,6 @@ from backend.utils import (
     get_python_path,
     logger,
     model_bazaar_path,
-    response,
     submit_nomad_job,
     thirdai_platform_dir,
     update_json,
@@ -45,6 +44,7 @@ from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
 from platform_common.file_handler import download_local_files
+from platform_common.requests import response
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 

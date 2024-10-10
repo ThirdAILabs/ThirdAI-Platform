@@ -2,9 +2,9 @@ import os
 import subprocess
 
 from auth.jwt import verify_access_token
-from backend.utils import response
 from fastapi import APIRouter, Depends, HTTPException, status
 from platform_common.file_handler import S3StorageHandler
+from platform_common.requests import response
 
 recovery_router = APIRouter()
 

@@ -25,7 +25,6 @@ from backend.utils import (
     get_python_path,
     logger,
     model_accessible,
-    response,
     submit_nomad_job,
     thirdai_platform_dir,
     validate_license_info,
@@ -34,6 +33,7 @@ from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
+from platform_common.requests import response
 from sqlalchemy.orm import Session
 
 deploy_router = APIRouter()
