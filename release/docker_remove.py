@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 
 from azure_provider import AzureProvider
-from docker_constants import image_base_names
+from docker_constants import images_to_build
 from utils import image_name_for_branch, load_config
 
 if __name__ == "__main__":
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     tag = "v" + args.version
     config = load_config(args.config)
     provider = AzureProvider(config["azure"]["registry"])
-    for image in image_base_names:
+    for image in images_to_build:
         provider.delete_image(
             image_name_for_branch(image.name, args.branch),
             tag,
