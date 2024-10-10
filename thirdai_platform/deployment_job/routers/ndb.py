@@ -11,7 +11,6 @@ from config import DeploymentConfig, NDBSubType
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
-from file_handler import download_local_files
 from models.ndb_models import NDBModel, NDBV1Model, NDBV2Model
 from permissions import Permissions
 from platform_common.file_handler import download_local_files

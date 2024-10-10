@@ -9,7 +9,6 @@ from typing import Dict, List, Optional
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
 from backend.datagen import generate_data_for_train_job
-from backend.file_handler import download_local_files
 from backend.train_config import (
     DatagenOptions,
     FileInfo,
@@ -45,6 +44,7 @@ from backend.utils import (
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
+from platform_common.file_handler import download_local_files
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
