@@ -48,7 +48,7 @@ job "llm-dispatch" {
           }
         {% elif platform == "local" %}
           command = "/bin/sh"
-          args    = ["-c", "cd /home/david/ThirdAI-Platform && {{ python_path }} -m uvicorn main:app --app-dir {{ generate_app_dir }} --reload --host 0.0.0.0 --port ${NOMAD_PORT_llm_dispatch_http}"]
+          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} -m uvicorn main:app --app-dir {{ app_dir }} --host 0.0.0.0 --port ${NOMAD_PORT_llm_dispatch_http}"]
         {% endif %}
       }
 

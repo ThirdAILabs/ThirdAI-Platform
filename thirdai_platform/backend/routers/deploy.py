@@ -23,11 +23,11 @@ from backend.utils import (
     get_model_from_identifier,
     get_platform,
     get_python_path,
-    get_root_absolute_path,
     logger,
     model_accessible,
     response,
     submit_nomad_job,
+    thirdai_platform_dir,
     validate_license_info,
 )
 from database import schema
@@ -258,7 +258,6 @@ def deploy_model(
             docker_username=os.getenv("DOCKER_USERNAME"),
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("DEPLOY_IMAGE_NAME"),
-            deployment_app_dir=str(get_root_absolute_path() / "deployment_job"),
             model_id=str(model.id),
             share_dir=os.getenv("SHARE_DIR", None),
             config_path=config.save_deployment_config(),
@@ -266,6 +265,8 @@ def deploy_model(
             autoscaler_max_count=str(autoscaler_max_count),
             memory=memory,
             python_path=get_python_path(),
+            thirdai_platform_dir=thirdai_platform_dir(),
+            app_dir="deployment_job",
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
         )

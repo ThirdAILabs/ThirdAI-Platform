@@ -14,6 +14,7 @@ from backend.utils import (
     nomad_job_exists,
     response,
     submit_nomad_job,
+    thirdai_platform_dir,
 )
 from fastapi import status
 from licensing.verify.verify_license import valid_job_allocation, verify_license
@@ -47,7 +48,8 @@ async def restart_generate_job():
         image_name=os.getenv("GENERATION_IMAGE_NAME"),
         model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
         python_path=get_python_path(),
-        generate_app_dir=str(get_root_absolute_path() / "llm_dispatch_job"),
+        thirdai_platform_dir=thirdai_platform_dir(),
+        app_dir="llm_dispatch_job",
     )
 
 
@@ -157,7 +159,8 @@ async def restart_llm_cache_job():
         model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
         share_dir=os.getenv("SHARE_DIR"),
         python_path=get_python_path(),
-        llm_cache_app_dir=str(get_root_absolute_path() / "llm_cache_job"),
+        thirdai_platform_dir=thirdai_platform_dir(),
+        app_dir="llm_cache_job",
         license_key=license_info["boltLicenseKey"],
     )
 

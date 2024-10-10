@@ -405,6 +405,10 @@ def get_root_absolute_path():
     return Path(__file__).parent.parent.parent.absolute()
 
 
+def thirdai_platform_dir():
+    return str(get_root_absolute_path() / "thirdai_platform")
+
+
 def update_json(current_json, new_dict):
     """
     Update a JSON object with a new dictionary.
