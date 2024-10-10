@@ -13,7 +13,6 @@ from backend.train_config import (
 from backend.utils import (
     get_platform,
     get_python_path,
-    get_root_absolute_path,
     thirdai_platform_dir,
     model_bazaar_path,
     response,

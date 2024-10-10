@@ -23,7 +23,6 @@ from backend.utils import (
     get_model_from_identifier,
     get_platform,
     get_python_path,
-    get_root_absolute_path,
     thirdai_platform_dir,
     logger,
     model_accessible,
