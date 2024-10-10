@@ -52,13 +52,13 @@ job "telemetry" {
             password = "{{ docker_password }}"
             server_address = "{{ registry }}"
           }
-        group_add = ["4646"]
+        
         ports = ["vicky-http"]
         args = [
           "--storageDataPath={{ nomad_monitoring_dir }}/victoriametric",
           "--retentionPeriod=1d",
           "--httpListenAddr=:${NOMAD_PORT_vicky_http}",
-          "--promscrape.config={{ promfile }}"
+          "--promscrape.config={{ nomad_monitoring_dir }}/node_discovery/prometheus.yaml"
         ]
         {% if platform == "local" -%}
         extra_hosts = ["host.docker.internal:host-gateway"]
@@ -179,12 +179,12 @@ EOF
       driver = "docker"
 
       env {
-        GF_AUTH_ANONYMOUS_ENABLED = "true"
-        GF_AUTH_BASIC_ENABLED = "false"
         GF_LOG_LEVEL          = "DEBUG"
         GF_LOG_MODE           = "console"
-        GF_AUTH_ANONYMOUS_ORG_ROLE = "Admin"
-        GF_AUTH_DISABLE_LOGIN_FORM = "true"
+        GF_SECURITY_ADMIN_USER = "{{ admin_username }}"
+        GF_SECURITY_ADMIN_EMAIL = "{{ admin_mail }}"
+        GF_SECURITY_ADMIN_PASSWORD = "{{ admin_password }}"
+        GF_DATABASE_URL = "{{ grafana_db_url }}"
         GF_SERVER_ROOT_URL = "%(protocol)s://%(domain)s:%(http_port)s/grafana/"
         GF_SERVER_SERVE_FROM_SUB_PATH = "true"
         GF_SERVER_HTTP_PORT   = "${NOMAD_PORT_http}"
