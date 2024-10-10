@@ -30,13 +30,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Create and activate virtual environment
-        run: |
-          python -m venv venv
-
       - name: Prepare autoflake, Black, and isort
         run: |
-          source venv/bin/activate
           pip3 install autoflake black isort
 
       # Check for unused imports without modifying files
