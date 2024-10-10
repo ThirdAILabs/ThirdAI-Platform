@@ -1,3 +1,7 @@
+from common.file_handler import func
+
+func()
+
 from dotenv import load_dotenv
 
 load_dotenv()
