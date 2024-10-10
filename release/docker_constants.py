@@ -20,7 +20,8 @@ images_to_build = [
         "thirdai_platform/deployment_job/Dockerfile",
     ),
     Image(
-        "DATA_GENERATION_IMAGE_NAME" "data_generation_job",
+        "DATA_GENERATION_IMAGE_NAME", 
+        "data_generation_job",
         "thirdai_platform/data_generation_job/Dockerfile",
     ),
     Image(

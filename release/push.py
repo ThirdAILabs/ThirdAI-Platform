@@ -144,11 +144,11 @@ def build_images(
     for image in images_to_build:
         if image.name == "thirdai_platform":
             image_ids.update(
-                build_image(provider, image.name, branch, tag, buildargs, nocache)
+                build_image(provider, image.name, branch, tag, buildargs, nocache, image.dockerfile_path)
             )
         else:
             image_ids.update(
-                build_image(provider, image.name, branch, tag, {}, nocache)
+                build_image(provider, image.name, branch, tag, {}, nocache, image.dockerfile_path)
             )
 
     return image_ids
