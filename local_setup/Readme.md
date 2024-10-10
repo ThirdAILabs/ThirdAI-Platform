@@ -20,10 +20,11 @@ Without this process, it is cumbersome to test out platform changes. We would ha
        - Since Nomad will run jobs locally, the Python environment that is currently running in the terminal sesssion must have all dependencies for all jobs:
        ```
        pip3 install -r headless/requirements.txt
-       pip3 install -r train_job/requirements.txt
-       pip3 install -r deployment_job/requirements.txt
        pip3 install -r thirdai_platform/requirements.txt
-       pip3 install -r llm_dispatch_job/requirements.txt
+       pip3 install -r thirdai_platform/train_job/requirements.txt
+       pip3 install -r thirdai_platform/deployment_job/requirements.txt
+       pip3 install -r thirdai_platform/llm_dispatch_job/requirements.txt
+       pip3 install -r thirdai_platform/llm_cache_job/requirements.txt
        ```
    - Open a terminal session and run:
      ```

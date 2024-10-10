@@ -23,6 +23,14 @@ azure:
       push_credentials:
         password: rt/BPKK778qUWXa3YZjHUTNsVc9MkwU53kydXmSscF+ACRAfiMQq
         username: thirdaiplatform-push-local-registry
+    move-jobs-test:
+      pull_credentials:
+        password: f8Q2nTtHjM/V8pPf+TrGBw6S2j1qcr7lvd6R3P2Ryl+ACRDOJMvA
+        username: thirdaiplatform-pull-move-jobs-test
+      push_credentials:
+        password: wE/QRZQEq2Ie0HqIlbMbq/dYQcNGnwsjHXaM9zT1V4+ACRCSDWKD
+        username: thirdaiplatform-push-move-jobs-test
+      version: 0.0.5
     mshift:
       pull_credentials:
         password: uGpzj1Ylkgc+PBbQ5e3r1nEFC+BtiQK2cNeFdRW1NP+ACRCsrcq2
