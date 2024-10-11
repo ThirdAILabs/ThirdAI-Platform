@@ -4,9 +4,9 @@ WORKDIR /app
 
 # Install dependencies before copying the directory so python dependencies are 
 # cached even when there are changes in the directory.
-COPY llm_dispatch_job/requirements.txt /app/llm_dispatch_job/
-RUN python3 -m pip install -r llm_dispatch_job/requirements.txt
+COPY ./requirements.txt /app/requirements.txt
+RUN pip install -r /app/requirements.txt
 
-COPY llm_dispatch_job/ /app/llm_dispatch_job/
+COPY ./. /app/
 
-CMD ["python3", "-m", "uvicorn","main:app","--app-dir", "llm_dispatch_job", "--host","0.0.0.0","--port","80"]
+CMD ["uvicorn","main:app","--host","0.0.0.0","--port","80"]
