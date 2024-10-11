@@ -387,3 +387,9 @@ Workflow:
     dependencies: [stop_workflow]
     params:
       workflow_id: create_workflow
+
+Recovery_Backup:
+  config: dummy
+  recovery_snapshot:
+    dependencies: []
+    params: {}

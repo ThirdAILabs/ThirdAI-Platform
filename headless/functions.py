@@ -185,6 +185,14 @@ class CommonFunctions:
         flow.bazaar_client.cleanup_cache()
         logging.info(f"Bazaar cache is cleaned")
 
+    @staticmethod
+    def recovery_snapshot(inputs: Dict[str, Any]):
+        logging.info(f"Recovery snapshot with inputs: {inputs}")
+        config = {
+            "cloud_provider": None,
+        }
+        flow.bazaar_client.recovery_snapshot(config=config)
+
 
 class NDBFunctions:
     @staticmethod
