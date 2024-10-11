@@ -24,7 +24,6 @@ from backend.utils import (
     get_python_path,
     get_workflow,
     list_workflow_models,
-    response,
     submit_nomad_job,
     thirdai_platform_dir,
 )
@@ -33,6 +32,7 @@ from database.session import get_session
 from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
 from licensing.verify.verify_license import verify_license
+from platform_common.requests import response
 from pydantic import BaseModel, validator
 from sqlalchemy.orm import Session, selectinload
 

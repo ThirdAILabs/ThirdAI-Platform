@@ -5,11 +5,12 @@ from backend.auth_dependencies import (
     is_model_owner,
     team_admin_or_global_admin,
 )
-from backend.utils import get_model_from_identifier, response
+from backend.utils import get_model_from_identifier
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
+from platform_common.requests import response
 from sqlalchemy.orm import Session, selectinload
 
 team_router = APIRouter()
