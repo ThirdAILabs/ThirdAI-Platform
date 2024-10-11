@@ -18,7 +18,7 @@ from backend.utils import (
 )
 from fastapi import status
 from licensing.verify.verify_license import valid_job_allocation, verify_license
-from platform_common.requests import response
+from platform_common.utils import response
 
 GENERATE_JOB_ID = "llm-generation"
 THIRDAI_PLATFORM_FRONTEND_ID = "thirdai-platform-frontend"

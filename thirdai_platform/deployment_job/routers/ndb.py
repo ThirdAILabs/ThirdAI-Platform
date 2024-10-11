@@ -22,7 +22,7 @@ from platform_common.pydantic_models.feedback_logs import (
     UpvoteLog,
 )
 from platform_common.pydantic_models.training import DeploymentConfig, NDBSubType
-from platform_common.requests import response
+from platform_common.utils import response
 from prometheus_client import Counter, Summary
 from pydantic import ValidationError
 from pydantic_models import inputs

@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
-from platform_common.requests import response
+from platform_common.utils import response
 from pydantic import BaseModel
 from sqlalchemy import exists
 from sqlalchemy.orm import Session, selectinload

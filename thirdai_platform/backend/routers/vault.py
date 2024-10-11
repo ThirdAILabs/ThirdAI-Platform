@@ -2,7 +2,7 @@ import hvac  # type: ignore
 from auth.jwt import verify_access_token
 from backend.auth_dependencies import get_vault_client, global_admin_only
 from fastapi import APIRouter, Depends, HTTPException, status
-from platform_common.requests import response
+from platform_common.utils import response
 from pydantic import BaseModel
 
 vault_router = APIRouter()

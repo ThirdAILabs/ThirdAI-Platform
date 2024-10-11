@@ -9,7 +9,7 @@ from models.classification_models import (
 )
 from permissions import Permissions
 from platform_common.pydantic_models.training import DeploymentConfig, UDTSubType
-from platform_common.requests import response
+from platform_common.utils import response
 from prometheus_client import Summary
 from pydantic_models.inputs import (
     SearchResultsTokenClassification,

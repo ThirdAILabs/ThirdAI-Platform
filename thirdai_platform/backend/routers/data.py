@@ -9,7 +9,7 @@ from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, Form, status
 from platform_common.pydantic_models.training import JobOptions, LLMProvider
-from platform_common.requests import response
+from platform_common.utils import response
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 

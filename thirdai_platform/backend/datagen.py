@@ -20,7 +20,7 @@ from platform_common.pydantic_models.training import (
     LLMProvider,
     UDTSubType,
 )
-from platform_common.requests import response
+from platform_common.utils import response
 from platform_common.utils import save_dict
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session

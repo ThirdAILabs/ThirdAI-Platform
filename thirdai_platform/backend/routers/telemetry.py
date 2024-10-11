@@ -4,7 +4,7 @@ from backend.utils import get_platform, get_service_info, list_services, logger
 from fastapi import APIRouter, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from platform_common.requests import response
+from platform_common.utils import response
 
 telemetry_router = APIRouter()
 

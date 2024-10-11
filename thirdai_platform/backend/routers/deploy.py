@@ -33,7 +33,7 @@ from platform_common.pydantic_models.training import (
     NDBDeploymentOptions,
     UDTDeploymentOptions,
 )
-from platform_common.requests import response
+from platform_common.utils import response
 from sqlalchemy.orm import Session
 
 deploy_router = APIRouter()

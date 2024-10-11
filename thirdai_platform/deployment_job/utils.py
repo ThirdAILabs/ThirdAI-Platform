@@ -9,7 +9,7 @@ from typing import Tuple
 import fitz
 import requests
 from fastapi import status
-from platform_common.requests import response
+from platform_common.utils import response
 from thirdai import neural_db as ndb
 
 

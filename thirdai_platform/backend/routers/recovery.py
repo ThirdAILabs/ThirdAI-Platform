@@ -15,7 +15,7 @@ from backend.utils import (
     thirdai_platform_dir,
 )
 from fastapi import APIRouter, Depends, HTTPException, status
-from platform_common.requests import response
+from platform_common.utils import response
 from pydantic import BaseModel, Field, root_validator
 
 recovery_router = APIRouter()

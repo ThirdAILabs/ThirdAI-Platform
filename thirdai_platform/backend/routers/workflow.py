@@ -32,7 +32,7 @@ from platform_common.pydantic_models.training import (
     NDBDeploymentOptions,
     UDTDeploymentOptions,
 )
-from platform_common.requests import response
+from platform_common.utils import response
 from pydantic import BaseModel, validator
 from sqlalchemy.orm import Session, selectinload
 

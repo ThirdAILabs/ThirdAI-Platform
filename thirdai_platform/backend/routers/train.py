@@ -44,7 +44,7 @@ from platform_common.pydantic_models.training import (
     UDTOptions,
     UDTSubType,
 )
-from platform_common.requests import response
+from platform_common.utils import response
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
