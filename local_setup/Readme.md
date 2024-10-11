@@ -64,6 +64,10 @@ Without this process, it is cumbersome to test out platform changes. We would ha
       ```
       CREATE EXTENSION IF NOT EXISTS pgcrypto;
       ```
+   - Create the grafana db:
+      ```
+      create database grafana;
+      ```
 
 ### Step 3: Build and Deploy NeuralDB
 

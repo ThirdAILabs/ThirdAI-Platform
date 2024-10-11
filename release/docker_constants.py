@@ -39,6 +39,7 @@ image_base_names = ImageNames(
     GENERATION_IMAGE_NAME="llm_dispatch_job",
     FRONTEND_IMAGE_NAME="frontend",
     LLM_CACHE_IMAGE_NAME="llm_cache_job",
+    RECOVERY_SNAPSHOT_IMAGE_NAME="recovery_snapshot_job",
 )
 
 images_to_pull_from_private = ["victoria-metrics", "grafana", "loki", "llama.cpp"]
