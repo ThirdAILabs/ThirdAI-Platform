@@ -83,6 +83,7 @@ def build_image(
     buildargs: Dict[str, str],
     nocache: bool,
     dockerfile_path: str,
+    context_path: str,
 ) -> Dict[str, str]:
     """
     Build a Docker image.
@@ -97,11 +98,16 @@ def build_image(
     :return: Dictionary with image name and image ID
     """
     dockerfile_path = Path(dockerfile_path)
+    context_path = Path(context_path)
     if not dockerfile_path.is_absolute():
         dockerfile_path = get_root_absolute_path() / dockerfile_path
+    if not context_path.is_absolute():
+        context_path = get_root_absolute_path() / context_path
 
     full_name = provider.get_full_image_name(name, branch, tag)
-    image_id = provider.build_image(str(dockerfile_path), full_name, nocache, buildargs)
+    image_id = provider.build_image(
+        str(dockerfile_path), str(context_path), full_name, nocache, buildargs
+    )
     return {name: image_id}
 
 
@@ -153,6 +159,7 @@ def build_images(
                 buildargs,
                 nocache,
                 image.dockerfile_path,
+                image.context_path,
             )
         )
 

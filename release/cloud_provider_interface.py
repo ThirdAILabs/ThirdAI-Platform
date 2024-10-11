@@ -9,7 +9,12 @@ class CloudProviderInterface:
         self.credentials = credentials
 
     def build_image(
-        self, path: str, tag: str, nocache: bool, buildargs: Dict[str, str]
+        self,
+        dockerfile_path: str,
+        context_path: str,
+        tag: str,
+        nocache: bool,
+        buildargs: Dict[str, str],
     ) -> str:
         raise NotImplementedError
 
