@@ -85,7 +85,7 @@ async def start_on_prem_generate_job(
     # TODO(david) support configuration for multiple models
     job_memory_mb = model_size * 2  # give some leeway
     if os.cpu_count() < 16:
-        raise ValueError("Can't run LLM job on less than 8 cores")
+        raise ValueError("Can't run LLM job on less than 16 cores")
     if cores_per_allocation is None:
         cores_per_allocation = min(16, os.cpu_count() - 8)
     return submit_nomad_job(
