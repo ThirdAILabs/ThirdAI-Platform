@@ -1,6 +1,5 @@
 import time
 
-from config import DeploymentConfig, UDTSubType
 from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
 from models.classification_models import (
@@ -9,6 +8,7 @@ from models.classification_models import (
     TokenClassificationModel,
 )
 from permissions import Permissions
+from platform_common.pydantic_models.training import DeploymentConfig, UDTSubType
 from platform_common.requests import response
 from prometheus_client import Summary
 from pydantic_models.inputs import (

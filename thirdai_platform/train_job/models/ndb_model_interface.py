@@ -3,10 +3,10 @@ from pathlib import Path
 from typing import List
 
 import thirdai
-from config import FileInfo, NDBv1Options, TrainConfig
 from exceptional_handler import apply_exception_handler
 from models.model import Model
 from platform_common.file_handler import expand_s3_buckets_and_directories
+from platform_common.pydantic_models.training import FileInfo, NDBv1Options, TrainConfig
 from reporter import Reporter
 from thirdai import neural_db as ndb
 from utils import (

@@ -2,9 +2,9 @@ from abc import ABC, abstractmethod
 from logging import Logger
 from pathlib import Path
 
-from config import TrainConfig
 from exceptional_handler import apply_exception_handler
 from platform_common.logging import LoggerConfig
+from platform_common.pydantic_models.training import TrainConfig
 from reporter import Reporter
 
 

@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pdftitle
 import thirdai
-from config import FileInfo, NDBv2Options, TrainConfig
 from fastapi import Response
 from models.model import Model
 from platform_common.file_handler import (
@@ -16,6 +15,7 @@ from platform_common.file_handler import (
     expand_s3_buckets_and_directories,
 )
 from platform_common.pydantic_models.feedback_logs import ActionType, FeedbackLog
+from platform_common.pydantic_models.training import FileInfo, NDBv2Options, TrainConfig
 from reporter import Reporter
 from thirdai import neural_db_v2 as ndbv2
 from utils import check_disk, get_directory_size

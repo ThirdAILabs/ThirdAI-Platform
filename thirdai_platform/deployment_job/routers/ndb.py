@@ -7,7 +7,6 @@ from typing import AsyncGenerator, List
 import fitz
 import jwt
 import thirdai
-from config import DeploymentConfig, NDBSubType
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
@@ -22,6 +21,7 @@ from platform_common.pydantic_models.feedback_logs import (
     InsertLog,
     UpvoteLog,
 )
+from platform_common.pydantic_models.training import DeploymentConfig, NDBSubType
 from platform_common.requests import response
 from prometheus_client import Counter, Summary
 from pydantic import ValidationError

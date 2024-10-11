@@ -1,8 +1,8 @@
 from abc import ABC
 from pathlib import Path
 
-from config import DeploymentConfig
 from platform_common.logging import LoggerConfig
+from platform_common.pydantic_models.training import DeploymentConfig
 
 
 class Model(ABC):

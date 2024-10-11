@@ -1,8 +1,8 @@
 from abc import abstractmethod
 from typing import Optional
 
-from config import DeploymentConfig
 from models.model import Model
+from platform_common.pydantic_models.training import DeploymentConfig
 from pydantic_models import inputs
 from thirdai import bolt
 

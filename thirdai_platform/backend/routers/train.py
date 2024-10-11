@@ -9,24 +9,6 @@ from typing import Dict, List, Optional
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
 from backend.datagen import generate_data_for_train_job
-from backend.train_config import (
-    DatagenOptions,
-    FileInfo,
-    FileLocation,
-    JobOptions,
-    ModelType,
-    NDBData,
-    NDBOptions,
-    NDBSubType,
-    NDBv2Options,
-    TextClassificationOptions,
-    TokenClassificationOptions,
-    TrainConfig,
-    UDTData,
-    UDTGeneratedData,
-    UDTOptions,
-    UDTSubType,
-)
 from backend.utils import (
     get_model,
     get_model_from_identifier,
@@ -44,6 +26,24 @@ from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
 from platform_common.file_handler import download_local_files
+from platform_common.pydantic_models.training import (
+    DatagenOptions,
+    FileInfo,
+    FileLocation,
+    JobOptions,
+    ModelType,
+    NDBData,
+    NDBOptions,
+    NDBSubType,
+    NDBv2Options,
+    TextClassificationOptions,
+    TokenClassificationOptions,
+    TrainConfig,
+    UDTData,
+    UDTGeneratedData,
+    UDTOptions,
+    UDTSubType,
+)
 from platform_common.requests import response
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session

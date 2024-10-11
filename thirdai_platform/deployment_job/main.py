@@ -5,11 +5,11 @@ from functools import wraps
 from typing import Any
 
 import uvicorn
-from config import DeploymentConfig, ModelType
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from permissions import Permissions
+from platform_common.pydantic_models.training import DeploymentConfig, ModelType
 from prometheus_client import make_asgi_app
 from reporter import Reporter
 from routers.ndb import NDBRouter

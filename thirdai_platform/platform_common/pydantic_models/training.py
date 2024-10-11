@@ -1,5 +1,6 @@
+import os
 from enum import Enum
-from typing import List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -13,6 +14,20 @@ class ModelDataType(str, Enum):
     NDB = "ndb"
     UDT = "udt"
     UDT_DATAGEN = "udt_datagen"
+
+
+class FileLocation(str, Enum):
+    local = "local"
+    nfs = "nfs"
+    s3 = "s3"
+
+
+class FileInfo(BaseModel):
+    path: str
+    location: FileLocation
+    doc_id: Optional[str] = None
+    options: Dict[str, Any] = {}
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class MachOptions(BaseModel):
@@ -73,6 +88,9 @@ class NDBOptions(BaseModel):
         NDBv2Options(), discriminator="ndb_sub_type"
     )
 
+    class Config:
+        protected_namespaces = ()
+
 
 class NDBData(BaseModel):
     model_data_type: Literal[ModelDataType.NDB] = ModelDataType.NDB
@@ -82,6 +100,9 @@ class NDBData(BaseModel):
     test_files: List[FileInfo] = []
 
     deletions: List[str] = []
+
+    class Config:
+        protected_namespaces = ()
 
     @model_validator(mode="after")
     def check_nonempty(self):
@@ -134,12 +155,18 @@ class UDTOptions(BaseModel):
 
     train_options: UDTTrainOptions = UDTTrainOptions()
 
+    class Config:
+        protected_namespaces = ()
+
 
 class UDTData(BaseModel):
     model_data_type: Literal[ModelDataType.UDT] = ModelDataType.UDT
 
     supervised_files: List[FileInfo]
     test_files: List[FileInfo] = []
+
+    class Config:
+        protected_namespaces = ()
 
     @model_validator(mode="after")
     def check_nonempty(self):
@@ -178,6 +205,20 @@ class TokenClassificationDatagenOptions(BaseModel):
     tags: List[Entity]
     num_sentences_to_generate: int
     num_samples_per_tag: Optional[int] = None
+
+    @model_validator(mode="after")
+    def deduplicate_tags(cls, values):
+        tag_map = {}
+        for tag in values.tags:
+            key = tag.name
+            if key in tag_map:
+                tag_map[key].examples = list(
+                    set(tag_map[key].examples) | set(tag.examples)
+                )
+            else:
+                tag_map[key] = tag
+        values.tags = list(tag_map.values())
+        return values
 
 
 class DatagenOptions(BaseModel):
@@ -218,8 +259,75 @@ class TrainConfig(BaseModel):
         ..., discriminator="model_data_type"
     )
 
+    class Config:
+        protected_namespaces = ()
+
     @model_validator(mode="after")
     def check_model_data_match(self):
         if self.model_options.model_type.value not in self.data.model_data_type.value:
             raise ValueError("Model and data fields don't match")
         return self
+
+    def save_train_config(self):
+        config_path = os.path.join(
+            self.model_bazaar_dir, "models", str(self.model_id), "train_config.json"
+        )
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        with open(config_path, "w") as file:
+            file.write(self.model_dump_json(indent=4))
+
+        return config_path
+
+
+class NDBDeploymentOptions(BaseModel):
+    model_type: Literal[ModelType.NDB] = ModelType.NDB
+
+    ndb_sub_type: NDBSubType = NDBSubType.v2
+
+    llm_provider: str = "openai"
+    genai_key: Optional[str] = None
+
+
+class UDTDeploymentOptions(BaseModel):
+    model_type: Literal[ModelType.UDT] = ModelType.UDT
+
+    udt_sub_type: UDTSubType
+
+
+class DeploymentConfig(BaseModel):
+    model_id: str
+    model_bazaar_endpoint: str
+    model_bazaar_dir: str
+    license_key: str
+
+    autoscaling_enabled: bool = False
+
+    model_options: Union[NDBDeploymentOptions, UDTDeploymentOptions] = Field(
+        ..., discriminator="model_type"
+    )
+
+    def get_nomad_endpoint(self) -> str:
+        # Parse the model_bazaar_endpoint to extract scheme and host
+        from urllib.parse import urlparse, urlunparse
+
+        parsed_url = urlparse(self.model_bazaar_endpoint)
+
+        # Reconstruct the URL with port 4646
+        nomad_netloc = f"{parsed_url.hostname}:4646"
+
+        # Rebuild the URL while keeping the original scheme and hostname
+        return urlunparse((parsed_url.scheme, nomad_netloc, "", "", "", ""))
+
+    def save_deployment_config(self):
+        config_path = os.path.join(
+            self.model_bazaar_dir,
+            "models",
+            str(self.model_id),
+            "deployments",
+            "deployment_config.json",
+        )
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        with open(config_path, "w") as file:
+            file.write(self.model_dump_json(indent=4))
+
+        return config_path

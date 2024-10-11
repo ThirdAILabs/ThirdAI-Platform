@@ -5,9 +5,9 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from config import FileInfo, FileLocation
 from fastapi import Response
 from platform_common.file_handler import create_s3_client
+from platform_common.pydantic_models.training import FileInfo, FileLocation
 from thirdai import neural_db as ndb
 
 GB_1 = 1024 * 1024 * 1024  # Define 1 GB in bytes

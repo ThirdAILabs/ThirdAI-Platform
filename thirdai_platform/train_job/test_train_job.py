@@ -3,7 +3,13 @@ import shutil
 from typing import Dict
 
 import pytest
-from config import (
+from platform_common.pydantic_models.feedback_logs import (
+    AssociateLog,
+    FeedbackLog,
+    ImplicitUpvoteLog,
+    UpvoteLog,
+)
+from platform_common.pydantic_models.training import (
     FileInfo,
     JobOptions,
     NDBData,
@@ -15,12 +21,6 @@ from config import (
     TrainConfig,
     UDTData,
     UDTOptions,
-)
-from platform_common.pydantic_models.feedback_logs import (
-    AssociateLog,
-    FeedbackLog,
-    ImplicitUpvoteLog,
-    UpvoteLog,
 )
 from reporter import Reporter
 from run import get_model

@@ -3,13 +3,6 @@ import traceback
 from pathlib import Path
 from typing import List, Optional
 
-from backend.train_config import (
-    DatagenOptions,
-    Entity,
-    JobOptions,
-    LLMProvider,
-    UDTSubType,
-)
 from backend.utils import (
     get_platform,
     get_python_path,
@@ -20,6 +13,13 @@ from backend.utils import (
 from database import schema
 from database.session import get_session
 from fastapi import Depends, status
+from platform_common.pydantic_models.training import (
+    DatagenOptions,
+    Entity,
+    JobOptions,
+    LLMProvider,
+    UDTSubType,
+)
 from platform_common.requests import response
 from platform_common.utils import save_dict
 from pydantic import BaseModel, ValidationError

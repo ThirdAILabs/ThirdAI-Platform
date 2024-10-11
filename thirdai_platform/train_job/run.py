@@ -7,7 +7,6 @@ import argparse
 import os
 
 import thirdai
-from config import ModelType, NDBSubType, RetrieverType, TrainConfig, UDTSubType
 from models.classification_models import (
     TextClassificationModel,
     TokenClassificationModel,
@@ -15,6 +14,13 @@ from models.classification_models import (
 from models.finetunable_retriever import FinetunableRetriever
 from models.neural_db_v2 import NeuralDBV2
 from models.single_mach import SingleMach
+from platform_common.pydantic_models.training import (
+    ModelType,
+    NDBSubType,
+    RetrieverType,
+    TrainConfig,
+    UDTSubType,
+)
 from reporter import HttpReporter, Reporter
 
 

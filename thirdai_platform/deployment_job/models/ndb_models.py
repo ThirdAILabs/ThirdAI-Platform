@@ -18,9 +18,9 @@ import models.ndbv1_parser as ndbv1_parser
 import models.ndbv2_parser as ndbv2_parser
 import thirdai.neural_db_v2.chunk_stores.constraints as ndbv2_constraints
 from chat import llm_providers
-from config import DeploymentConfig
 from models.model import Model
 from platform_common.file_handler import FileInfo, expand_s3_buckets_and_directories
+from platform_common.pydantic_models.training import DeploymentConfig
 from pydantic_models import inputs
 from thirdai import neural_db as ndb
 from thirdai import neural_db_v2 as ndbv2
