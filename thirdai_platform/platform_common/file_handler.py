@@ -1,9 +1,8 @@
 import logging
 import os
 from abc import ABC, abstractmethod
-from enum import Enum
 from functools import wraps
-from typing import Any, Dict, List, Optional
+from typing import List
 
 import boto3
 from azure.storage.blob import BlobServiceClient
@@ -13,25 +12,7 @@ from botocore.exceptions import ClientError
 from fastapi import HTTPException, UploadFile, status
 from google.cloud import storage
 from google.oauth2 import service_account
-from pydantic import BaseModel
-
-
-class FileLocation(str, Enum):
-    local = "local"
-    nfs = "nfs"
-    s3 = "s3"
-
-
-class FileInfo(BaseModel):
-    path: str
-    location: FileLocation
-    doc_id: Optional[str] = None
-    options: Dict[str, Any] = {}
-    metadata: Optional[Dict[str, Any]] = None
-
-    def ext(self) -> str:
-        _, ext = os.path.splitext(self.path)
-        return ext
+from .pydantic_models.training import FileInfo, FileLocation
 
 
 def download_local_file(file_info: FileInfo, upload_file: UploadFile, dest_dir: str):

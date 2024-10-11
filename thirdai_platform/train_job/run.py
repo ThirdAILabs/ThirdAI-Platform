@@ -1,10 +1,15 @@
+import sys
+import os
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(current_dir)
+
 import nltk
 
 nltk.download("punkt_tab")
 print("Downloading punkttab")
 
 import argparse
-import os
 
 import thirdai
 from models.classification_models import (

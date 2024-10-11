@@ -5,7 +5,7 @@ Defines input models for Pydantic validation and utility functions for conversio
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
-from platfrom_common.file_handler import FileInfo
+from platform_common.pydantic_models.training import FileInfo
 from pydantic import BaseModel, Field
 from pydantic_models.constraints import Constraints
 

@@ -36,7 +36,7 @@ job "{{ train_job_name }}" {
           args    = ["run.py", "--config", "{{ config_path }}"]
         {% elif platform == "local" %}
           command = "/bin/sh"
-          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} {{ train_script }} --config {{ config_path }}"]
+          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} -m train_job.run --config {{ config_path }}"]
         {% endif %}
       }
 
