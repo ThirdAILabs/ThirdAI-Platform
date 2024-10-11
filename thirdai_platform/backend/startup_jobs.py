@@ -80,6 +80,7 @@ async def start_on_prem_generate_job(
     if not os.path.exists(model_path):
         raise ValueError(f"Cannot find model at location: {model_path}.")
     model_size = int(os.path.getsize(model_path) / 1e6)
+    # TODO(david) support configuration for multiple models
     job_memory_mb = model_size * 2  # give some leeway
     if os.cpu_count() < 8:
         raise ValueError("Can't run LLM job on less than 8 cores")
