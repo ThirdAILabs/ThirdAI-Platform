@@ -1,0 +1,8 @@
+boto3
+azure-storage-blob
+fastapi
+google-cloud-storage
+pydantic
+colorlog
+botocore
+google-auth
