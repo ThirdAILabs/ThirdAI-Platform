@@ -17,7 +17,7 @@ LICENSE_KEY = "236C00-47457C-4641C5-52E3BB-3D1F34-V3"
 def doc_dir():
     return os.path.join(
         os.path.dirname(os.path.dirname(__file__)),
-        "thirdai_platform/train_job/sample_docs",
+        "train_job/sample_docs",
     )
 
 
