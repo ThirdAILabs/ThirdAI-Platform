@@ -1,0 +1,52 @@
+job "recovery-snapshot" {
+
+  datacenters = ["dc1"]
+
+  type = "batch"
+
+  group "snapshot" {
+    count = 1
+
+    task "backup-task" {
+
+      {% if platform == "docker" %}
+        driver = "docker"
+      {% elif platform == "local" %}
+        driver = "raw_exec"
+      {% endif %}
+
+      env {
+        CONFIG_PATH = "{{ config_path }}"
+        {% if platform == "docker" %}
+        MODEL_BAZAAR_DIR = "/model_bazaar"
+        {% elif platform == "local" %}
+        MODEL_BAZAAR_DIR = "{{ share_dir }}"
+        {% endif %}
+        DB_URI = "{{ db_uri }}"
+      }
+
+      config {
+        {% if platform == "docker" %}
+          image = "{{ registry }}/{{ image_name }}:{{ tag }}"
+          image_pull_timeout = "15m"
+          auth {
+            username = "{{ docker_username }}"
+            password = "{{ docker_password }}"
+            server_address = "{{ registry }}"
+          }
+          volumes = [
+            "{{ share_dir }}:/model_bazaar"
+          ]
+        {% elif platform == "local" %}
+          command = "/bin/sh"
+          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} {{ recovery_snapshot_script }}"]
+        {% endif %}
+      }
+
+      resources {
+        cpu = 2400
+        memory = 5000
+      }
+    }
+  }
+}

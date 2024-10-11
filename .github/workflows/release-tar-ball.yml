@@ -177,21 +177,9 @@ jobs:
         run: |
           tar -czvf thirdai-platform-package-offline-${{ env.branch_name }}-${{ env.latest_tag }}.tar.gz ./platform ./docker_images-${{ env.latest_tag }} ./driver.sh ./config.yml ./README.md ./gen-ai-models
 
-      - name: Upload platform package artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: thirdai-platform-package-${{ env.branch_name }}-${{ env.latest_tag }}
-          path: thirdai-platform-package-${{ env.branch_name }}-${{ env.latest_tag }}.tar.gz
-
       - name: Upload platform package to S3
         run: |
           aws s3 cp thirdai-platform-package-${{ env.branch_name }}-${{ env.latest_tag }}.tar.gz s3://thirdai-corp-public/ThirdAI-Platform-latest-release/
-
-      - name: Upload Docker images artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: thirdai-platform-package-offline-${{ env.branch_name }}-${{ env.latest_tag }}
-          path: thirdai-platform-package-offline-${{ env.branch_name }}-${{ env.latest_tag }}.tar.gz
 
       - name: Upload Docker images package to S3
         run: |

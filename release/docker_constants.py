@@ -32,6 +32,11 @@ images_to_build = [
         "llm_cache_job",
         "thirdai_platform/llm_cache_job",
     ),
+    Image(
+        "RECOVERY_SNAPSHOT_IMAGE_NAME",
+        "recovery_snapshot_job",
+        "thirdai_platform/recovery_snapshot_job",
+    ),
 ]
 
 
