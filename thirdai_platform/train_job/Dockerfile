@@ -10,4 +10,4 @@ COPY train_job/ /app/train_job/
 
 COPY platform_common/ /app/platform_common/
 
-CMD ["python3", "run.py"]
+CMD ["python3", "train_job/run.py"]
