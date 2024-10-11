@@ -462,12 +462,14 @@ async def start_on_prem_job(
     model_name: str = "Llama-3.2-3B-Instruct-f16.gguf",
     restart_if_exists: bool = True,
     autoscaling_enabled: bool = True,
+    cores_per_allocation: Optional[int] = None,
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
     await start_on_prem_generate_job(
         model_name=model_name,
         restart_if_exists=restart_if_exists,
         autoscaling_enabled=autoscaling_enabled,
+        cores_per_allocation=cores_per_allocation,
     )
 
     return response(

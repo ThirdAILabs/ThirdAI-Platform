@@ -516,7 +516,10 @@ class ModelBazaar:
         return response_data
 
     def start_on_prem(
-        self, restart_if_exists: bool = True, autoscaling_enabled: bool = True
+        self,
+        restart_if_exists: bool = True,
+        autoscaling_enabled: bool = True,
+        cores_per_allocation: Optional[int] = None,
     ):
         url = urljoin(self._base_url, "deploy/start-on-prem")
 
@@ -526,6 +529,7 @@ class ModelBazaar:
             params={
                 "restart_if_exists": restart_if_exists,
                 "autoscaling_enabled": autoscaling_enabled,
+                "cores_per_allocation": cores_per_allocation,
             },
         )
 

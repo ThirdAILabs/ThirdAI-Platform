@@ -1,6 +1,7 @@
 import os
 import shutil
 from pathlib import Path
+from typing import Optional
 from urllib.parse import urlparse
 
 import requests
@@ -56,9 +57,10 @@ ON_PREM_GENERATE_JOB_ID = "on-prem-llm-generation"
 
 
 async def start_on_prem_generate_job(
-    model_name="Llama-3.2-3B-Instruct-f16.gguf",
-    restart_if_exists=True,
-    autoscaling_enabled=True,
+    model_name: str = "Llama-3.2-3B-Instruct-f16.gguf",
+    restart_if_exists: bool = True,
+    autoscaling_enabled: bool = True,
+    cores_per_allocation: Optional[int] = None,
 ):
     """
     Restart the LLM generation job.
@@ -82,9 +84,10 @@ async def start_on_prem_generate_job(
     model_size = int(os.path.getsize(model_path) / 1e6)
     # TODO(david) support configuration for multiple models
     job_memory_mb = model_size * 2  # give some leeway
-    if os.cpu_count() < 8:
+    if os.cpu_count() < 16:
         raise ValueError("Can't run LLM job on less than 8 cores")
-    cores_per_allocation = min(16, os.cpu_count() - 6)
+    if cores_per_allocation is None:
+        cores_per_allocation = min(16, os.cpu_count() - 8)
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "on_prem_generation_job.hcl.j2"),
