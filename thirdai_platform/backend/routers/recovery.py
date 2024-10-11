@@ -150,7 +150,7 @@ def backup(config: BackupConfig):
             model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
             python_path=get_python_path(),
             thirdai_platform_dir=thirdai_platform_dir(),
-            generate_script="recovery_snapshot_job/run.py",
+            recovery_snapshot_script="recovery_snapshot_job/run.py",
             config_path=config_file_path,
             share_dir=local_dir,
             db_uri=db_uri,
