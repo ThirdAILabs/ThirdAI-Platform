@@ -465,12 +465,18 @@ async def start_on_prem_job(
     cores_per_allocation: Optional[int] = None,
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
-    await start_on_prem_generate_job(
-        model_name=model_name,
-        restart_if_exists=restart_if_exists,
-        autoscaling_enabled=autoscaling_enabled,
-        cores_per_allocation=cores_per_allocation,
-    )
+    try:
+        await start_on_prem_generate_job(
+            model_name=model_name,
+            restart_if_exists=restart_if_exists,
+            autoscaling_enabled=autoscaling_enabled,
+            cores_per_allocation=cores_per_allocation,
+        )
+    except Exception as e:
+        return HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start on prem LLM job with error: {str(e)}",
+        )
 
     return response(
         status_code=status.HTTP_200_OK, message="On-prem job started successfully"
