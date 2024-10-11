@@ -14,7 +14,7 @@ Before running the script, ensure the following are installed on your machine:
 
 - `driver.sh`: The main script to automate the deployment.
 - `config.yml`: The configuration file required for Ansible to deploy the platform.
-- `models/Llama-3.2-3B-Instruct-fp16.gguf`: The generation model used by the platform.
+- `models/Llama-3.2-3B-Instruct-f16.gguf`: The generation model used by the platform.
 - `platform`: This contains Ansible playbooks and other necessary files.
 
 ## How to Run `driver.sh`
@@ -34,7 +34,7 @@ Before running the script, ensure the following are installed on your machine:
    - `driver.sh`
    - `config.yml`
    - `platform/`
-   - `models/Llama-3.2-3B-Instruct-fp16.gguf`
+   - `models/Llama-3.2-3B-Instruct-f16.gguf`
 
 2. **Make the `driver.sh` Script Executable**:
    

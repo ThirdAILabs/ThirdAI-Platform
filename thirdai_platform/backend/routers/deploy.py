@@ -459,7 +459,7 @@ def get_deployment_info(
 
 @deploy_router.post("/start-on-prem")
 async def start_on_prem_job(
-    model_name: str = "Llama-3.2-3B-Instruct-fp16.gguf",
+    model_name: str = "Llama-3.2-3B-Instruct-f16.gguf",
     restart_if_exists: bool = True,
     autoscaling_enabled: bool = True,
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
