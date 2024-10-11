@@ -26,6 +26,7 @@ from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
 from platform_common.file_handler import download_local_files
+from platform_common.pydantic_models.feedback_logs import DeleteLog, InsertLog
 from platform_common.pydantic_models.training import (
     DatagenOptions,
     FileInfo,
@@ -217,14 +218,6 @@ def train_ndb(
             "user_id": str(user.id),
         },
     )
-
-
-class InsertLog(BaseModel):
-    documents: List[FileInfo]
-
-
-class DeleteLog(BaseModel):
-    doc_ids: List[str]
 
 
 def list_insertions(deployment_dir: str) -> List[FileInfo]:
