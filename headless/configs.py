@@ -79,6 +79,8 @@ class Config(ABC):
     n_classes: Optional[int] = None
     target_labels: list[str] = None
 
+    on_prem_cores: int = 8
+
 
 class Scifact(Config):
     """

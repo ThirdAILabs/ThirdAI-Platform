@@ -299,9 +299,11 @@ class NDBFunctions:
                 logging.info(f"OpenAI Chat history {chat_history}")
 
             if on_prem:
-                flow.bazaar_client.start_on_prem(autoscaling_enabled=False)
+                flow.bazaar_client.start_on_prem(
+                    autoscaling_enabled=False, cores_per_allocation=config.on_prem_cores
+                )
                 # waiting for our on-prem to start and trafeik to discover the service
-                time.sleep(45)
+                time.sleep(90)
                 generated_answer = llm_client.generate(
                     query=best_answer["text"],
                     api_key="no key",
