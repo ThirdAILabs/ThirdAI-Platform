@@ -77,14 +77,14 @@ def test_llm_cache(temp_share):
     os.environ["MODEL_BAZAAR_DIR"] = temp_share
     os.environ["LICENSE_KEY"] = "236C00-47457C-4641C5-52E3BB-3D1F34-V3"
 
-    from permissions import Permissions
+    from llm_cache_job.permissions import Permissions
 
     Permissions.verify_read_permission = dummy_verify
     Permissions.verify_write_permission = dummy_verify
 
-    import main
+    import llm_cache_job.main
 
-    client = TestClient(main.app)
+    client = TestClient(llm_cache_job.main.app)
 
     assert len(suggestions(client, "abc", "wht is the capital of fran")) == 0
 

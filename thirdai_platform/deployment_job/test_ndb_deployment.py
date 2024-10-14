@@ -4,8 +4,8 @@ import shutil
 
 import pytest
 import thirdai
+from deployment_job.permissions import Permissions
 from fastapi.testclient import TestClient
-from permissions import Permissions
 from platform_common.pydantic_models.training import (
     DeploymentConfig,
     NDBDeploymentOptions,
@@ -182,7 +182,7 @@ def check_deletion_dev_mode(client: TestClient):
 @pytest.mark.unit
 @pytest.mark.parametrize("sub_type", ["v1", "v2"])
 def test_deploy_ndb_dev_mode(tmp_dir, sub_type):
-    from routers.ndb import NDBRouter
+    from deployment_job.routers.ndb import NDBRouter
 
     config = create_config(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=False)
 
@@ -288,7 +288,7 @@ def check_log_lines(logdir, expected_lines):
 @pytest.mark.unit
 @pytest.mark.parametrize("sub_type", ["v1", "v2"])
 def test_deploy_ndb_prod_mode(tmp_dir, sub_type):
-    from routers.ndb import NDBRouter
+    from deployment_job.routers.ndb import NDBRouter
 
     config = create_config(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=True)
 

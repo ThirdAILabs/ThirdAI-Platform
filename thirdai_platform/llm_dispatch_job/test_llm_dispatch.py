@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from main import app
+from llm_dispatch_job.main import app
 
 client = TestClient(app)
 
@@ -21,7 +21,9 @@ def test_generate_text_stream(references, prompt):
     mock_llm_instance = AsyncMock()
     mock_llm_instance.stream = mock_stream
 
-    with patch("main.model_classes", {"openai": lambda: mock_llm_instance}):
+    with patch(
+        "llm_dispatch_job.main.model_classes", {"openai": lambda: mock_llm_instance}
+    ):
         request_data = {
             "query": "test query",
             "prompt": prompt,

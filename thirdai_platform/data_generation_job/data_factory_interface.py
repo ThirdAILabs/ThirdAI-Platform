@@ -4,12 +4,12 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from llms import llm_classes
+from data_generation_job.llms import llm_classes
+from data_generation_job.utils import count_csv_lines
+from data_generation_job.variables import Entity, GeneralVariables
 from prompt_resources.common_prompts import extended_description_prompt
 from prompt_resources.util_data import random_prompts, vocab
 from tqdm import tqdm
-from utils import count_csv_lines
-from variables import Entity, GeneralVariables
 
 
 class DataFactory(ABC):

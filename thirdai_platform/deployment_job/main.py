@@ -5,17 +5,17 @@ from functools import wraps
 from typing import Any
 
 import uvicorn
+from deployment_job.permissions import Permissions
+from deployment_job.reporter import Reporter
+from deployment_job.routers.ndb import NDBRouter
+from deployment_job.routers.udt import UDTRouter
+from deployment_job.utils import delete_deployment_job
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from permissions import Permissions
 from platform_common.pydantic_models.training import DeploymentConfig, ModelType
 from prometheus_client import make_asgi_app
-from reporter import Reporter
-from routers.ndb import NDBRouter
-from routers.udt import UDTRouter
 from thirdai import licensing
-from utils import delete_deployment_job
 
 
 def load_config():

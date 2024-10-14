@@ -7,11 +7,16 @@ from typing import AsyncGenerator, List
 import fitz
 import jwt
 import thirdai
+from deployment_job.models.ndb_models import NDBModel, NDBV1Model, NDBV2Model
+from deployment_job.permissions import Permissions
+from deployment_job.pydantic_models import inputs
+from deployment_job.pydantic_models.inputs import NDBSearchParams
+from deployment_job.reporter import Reporter
+from deployment_job.update_logger import UpdateLogger
+from deployment_job.utils import propagate_error, validate_name
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
-from models.ndb_models import NDBModel, NDBV1Model, NDBV2Model
-from permissions import Permissions
 from platform_common.file_handler import download_local_files
 from platform_common.pydantic_models.feedback_logs import (
     AssociateLog,
@@ -25,11 +30,6 @@ from platform_common.pydantic_models.training import DeploymentConfig, NDBSubTyp
 from platform_common.utils import response
 from prometheus_client import Counter, Summary
 from pydantic import ValidationError
-from pydantic_models import inputs
-from pydantic_models.inputs import NDBSearchParams
-from reporter import Reporter
-from update_logger import UpdateLogger
-from utils import propagate_error, validate_name
 
 ndb_query_metric = Summary("ndb_query", "NDB Queries")
 ndb_upvote_metric = Summary("ndb_upvote", "NDB upvotes")

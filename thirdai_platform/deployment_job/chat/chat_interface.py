@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator, List, Union
 
-from chat.ndbv2_vectorstore import NeuralDBV2VectorStore
+from deployment_job.chat.ndbv2_vectorstore import NeuralDBV2VectorStore
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.docstore.document import Document
 from langchain.vectorstores import NeuralDBVectorStore

@@ -1,6 +1,4 @@
 import csv
-
-pass
 import os
 import random
 import re

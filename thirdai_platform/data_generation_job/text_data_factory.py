@@ -1,12 +1,12 @@
 import random
 from typing import Dict, List, Optional
 
-from data_factory_interface import DataFactory
+from data_generation_job.data_factory_interface import DataFactory
+from data_generation_job.prompt_resources.text_prompts import datagen_prompt
+from data_generation_job.utils import shuffle_and_filter, train_test_split, write_to_csv
+from data_generation_job.variables import Entity
 from platform_common.utils import save_dict
-from prompt_resources.text_prompts import datagen_prompt
 from tqdm import tqdm
-from utils import shuffle_and_filter, train_test_split, write_to_csv
-from variables import Entity
 
 
 class TextDataFactory(DataFactory):
