@@ -1,13 +1,13 @@
-job "{{ train_job_name }}" {
+job "recovery-snapshot" {
 
   datacenters = ["dc1"]
 
   type = "batch"
 
-  group "train-job" {
+  group "snapshot" {
     count = 1
 
-    task "server" {
+    task "backup-task" {
 
       {% if platform == "docker" %}
         driver = "docker"
@@ -16,8 +16,13 @@ job "{{ train_job_name }}" {
       {% endif %}
 
       env {
-        AWS_ACCESS_KEY = "{{ aws_access_key }}"
-        AWS_ACCESS_SECRET = "{{ aws_access_secret }}"
+        CONFIG_PATH = "{{ config_path }}"
+        {% if platform == "docker" %}
+        MODEL_BAZAAR_DIR = "/model_bazaar"
+        {% elif platform == "local" %}
+        MODEL_BAZAAR_DIR = "{{ share_dir }}"
+        {% endif %}
+        DB_URI = "{{ db_uri }}"
       }
 
       config {
@@ -32,18 +37,15 @@ job "{{ train_job_name }}" {
           volumes = [
             "{{ share_dir }}:/model_bazaar"
           ]
-          command = "python3"
-          args    = ["run.py", "--config", "{{ config_path }}"]
         {% elif platform == "local" %}
           command = "/bin/sh"
-          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} {{ train_script }} --config {{ config_path }}"]
+          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} {{ recovery_snapshot_script }}"]
         {% endif %}
       }
 
       resources {
-        cpu = {{ allocation_cores * 2400 }}
-        memory = {{ allocation_memory }}
-        memory_max = {{ allocation_memory_max }}
+        cpu = 2400
+        memory = 5000
       }
     }
   }

@@ -58,16 +58,16 @@ async def startup_event():
     except Exception as error:
         print(f"Failed to start the Generation Job : {error}", file=sys.stderr)
 
+    try:
+        print("Starting telemetry Job...")
+        await restart_telemetry_jobs()
+        print("Successfully started telemetry Job!")
+    except Exception as error:
+        traceback.print_exc()
+        print(f"Failed to start the telemetry Job : {error}", file=sys.stderr)
+
     platform = get_platform()
     if platform == "docker":
-        try:
-            print("Starting telemetry Job...")
-            await restart_telemetry_jobs()
-            print("Successfully started telemetry Job!")
-        except Exception as error:
-            traceback.print_exc()
-            print(f"Failed to start the telemetry Job : {error}", file=sys.stderr)
-
         try:
             print("Launching frontend...")
             await restart_thirdai_platform_frontend()

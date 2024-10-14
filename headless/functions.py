@@ -185,6 +185,14 @@ class CommonFunctions:
         flow.bazaar_client.cleanup_cache()
         logging.info(f"Bazaar cache is cleaned")
 
+    @staticmethod
+    def recovery_snapshot(inputs: Dict[str, Any]):
+        logging.info(f"Recovery snapshot with inputs: {inputs}")
+        config = {
+            "cloud_provider": None,
+        }
+        flow.bazaar_client.recovery_snapshot(config=config)
+
 
 class NDBFunctions:
     @staticmethod
@@ -291,9 +299,11 @@ class NDBFunctions:
                 logging.info(f"OpenAI Chat history {chat_history}")
 
             if on_prem:
-                flow.bazaar_client.start_on_prem(autoscaling_enabled=False)
+                flow.bazaar_client.start_on_prem(
+                    autoscaling_enabled=False, cores_per_allocation=config.on_prem_cores
+                )
                 # waiting for our on-prem to start and trafeik to discover the service
-                time.sleep(45)
+                time.sleep(90)
                 generated_answer = llm_client.generate(
                     query=best_answer["text"],
                     api_key="no key",

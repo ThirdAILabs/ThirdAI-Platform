@@ -1,6 +1,8 @@
 import os
 import shutil
 from pathlib import Path
+from typing import Optional
+from urllib.parse import urlparse
 
 import requests
 import yaml
@@ -14,6 +16,7 @@ from backend.utils import (
     nomad_job_exists,
     response,
     submit_nomad_job,
+    thirdai_platform_dir,
 )
 from fastapi import status
 from licensing.verify.verify_license import valid_job_allocation, verify_license
@@ -47,7 +50,8 @@ async def restart_generate_job():
         image_name=os.getenv("GENERATION_IMAGE_NAME"),
         model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
         python_path=get_python_path(),
-        generate_app_dir=str(get_root_absolute_path() / "llm_dispatch_job"),
+        thirdai_platform_dir=thirdai_platform_dir(),
+        app_dir="llm_dispatch_job",
     )
 
 
@@ -55,9 +59,10 @@ ON_PREM_GENERATE_JOB_ID = "on-prem-llm-generation"
 
 
 async def start_on_prem_generate_job(
-    model_name="qwen2-0_5b-instruct-fp16.gguf",
-    restart_if_exists=True,
-    autoscaling_enabled=True,
+    model_name: str = "Llama-3.2-3B-Instruct-f16.gguf",
+    restart_if_exists: bool = True,
+    autoscaling_enabled: bool = True,
+    cores_per_allocation: Optional[int] = None,
 ):
     """
     Restart the LLM generation job.
@@ -79,7 +84,12 @@ async def start_on_prem_generate_job(
     if not os.path.exists(model_path):
         raise ValueError(f"Cannot find model at location: {model_path}.")
     model_size = int(os.path.getsize(model_path) / 1e6)
+    # TODO(david) support configuration for multiple models
     job_memory_mb = model_size * 2  # give some leeway
+    if os.cpu_count() < 16:
+        raise ValueError("Can't run LLM job on less than 16 cores")
+    if cores_per_allocation is None:
+        cores_per_allocation = min(16, os.cpu_count() - 8)
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "on_prem_generation_job.hcl.j2"),
@@ -87,7 +97,7 @@ async def start_on_prem_generate_job(
         initial_allocations=1,
         min_allocations=1,
         max_allocations=5,
-        cores_per_allocation=7,
+        cores_per_allocation=cores_per_allocation,
         memory_per_allocation=job_memory_mb,
         model_name=model_name,
         registry=os.getenv("DOCKER_REGISTRY"),
@@ -158,7 +168,8 @@ async def restart_llm_cache_job():
         model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
         share_dir=os.getenv("SHARE_DIR"),
         python_path=get_python_path(),
-        llm_cache_app_dir=str(get_root_absolute_path() / "llm_cache_job"),
+        thirdai_platform_dir=thirdai_platform_dir(),
+        app_dir="llm_cache_job",
         license_key=license_info["boltLicenseKey"],
     )
 
@@ -221,6 +232,25 @@ def create_promfile(promfile_path: str):
     return targets
 
 
+def get_grafana_db_uri():
+    parsed_result = urlparse(os.getenv("DATABASE_URI"))
+    db_type, username, password, hostname, port = (
+        parsed_result.scheme,
+        parsed_result.username,
+        parsed_result.password,
+        parsed_result.hostname,
+        parsed_result.port,
+    )
+
+    platform = get_platform()
+    if db_type == "postgresql":
+        db_type = "postgres"  # Either mysql, postgres or sqlite3
+    if platform == "local":
+        hostname = "host.docker.internal"
+
+    return f"{db_type}://{username}:{password}@{hostname}:{port}/grafana"
+
+
 async def restart_telemetry_jobs():
     """
     Restart the telemetry jobs.
@@ -255,9 +285,12 @@ async def restart_telemetry_jobs():
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "telemetry.hcl.j2"),
         platform=platform,
-        promfile="/model_bazaar/nomad-monitoring/node_discovery/prometheus.yaml",  # Promfile_path could be different based on whether it is being run on `local-docker` or `docker`. But victoriametric should always find this file somewhere in the mounted volume. That's why it is being hardcoded here
         share_dir=share_dir,
         target_count=str(len(targets)),
+        grafana_db_url=get_grafana_db_uri(),
+        admin_username=os.getenv("ADMIN_USERNAME"),
+        admin_password=os.getenv("ADMIN_PASSWORD"),
+        admin_mail=os.getenv("ADMIN_MAIL"),
         registry=os.getenv("DOCKER_REGISTRY"),
         docker_username=os.getenv("DOCKER_USERNAME"),
         docker_password=os.getenv("DOCKER_PASSWORD"),

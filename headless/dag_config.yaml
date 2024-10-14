@@ -319,4 +319,8 @@ TeamAdmin:
     params:
       team_id: test_create_team
 
-
+Recovery_Backup:
+  config: dummy
+  recovery_snapshot:
+    dependencies: []
+    params: {}

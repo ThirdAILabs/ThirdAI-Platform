@@ -13,11 +13,11 @@ from backend.train_config import (
 from backend.utils import (
     get_platform,
     get_python_path,
-    get_root_absolute_path,
     model_bazaar_path,
     response,
     save_dict,
     submit_nomad_job,
+    thirdai_platform_dir,
 )
 from database import schema
 from database.session import get_session
@@ -140,7 +140,8 @@ def generate_text_data(
             docker_username=os.getenv("DOCKER_USERNAME"),
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("DATA_GENERATION_IMAGE_NAME"),
-            train_script=str(get_root_absolute_path() / "data_generation_job/run.py"),
+            thirdai_platform_dir=thirdai_platform_dir(),
+            generate_script="data_generation_job/run.py",
             task_prompt=task_prompt,
             data_id=data_id,
             storage_dir=storage_dir,
@@ -207,7 +208,8 @@ def generate_token_data(
             docker_username=os.getenv("DOCKER_USERNAME"),
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("DATA_GENERATION_IMAGE_NAME"),
-            train_script=str(get_root_absolute_path() / "data_generation_job/run.py"),
+            thirdai_platform_dir=thirdai_platform_dir(),
+            generate_script="data_generation_job/run.py",
             task_prompt=task_prompt,
             data_id=str(data_id),
             storage_dir=storage_dir,

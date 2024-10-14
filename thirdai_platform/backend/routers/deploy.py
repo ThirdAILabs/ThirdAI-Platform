@@ -25,12 +25,12 @@ from backend.utils import (
     get_model_status,
     get_platform,
     get_python_path,
-    get_root_absolute_path,
     list_all_dependencies,
     logger,
     model_accessible,
     response,
     submit_nomad_job,
+    thirdai_platform_dir,
     validate_license_info,
 )
 from database import schema
@@ -243,7 +243,6 @@ def deploy_single_model(
             docker_username=os.getenv("DOCKER_USERNAME"),
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("DEPLOY_IMAGE_NAME"),
-            deployment_app_dir=str(get_root_absolute_path() / "deployment_job"),
             model_id=str(model.id),
             share_dir=os.getenv("SHARE_DIR", None),
             config_path=config.save_deployment_config(),
@@ -251,6 +250,8 @@ def deploy_single_model(
             autoscaler_max_count=str(autoscaler_max_count),
             memory=memory,
             python_path=get_python_path(),
+            thirdai_platform_dir=thirdai_platform_dir(),
+            app_dir="deployment_job",
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
         )
@@ -514,16 +515,24 @@ def active_deployment_count(model_id: str, session: Session = Depends(get_sessio
 
 @deploy_router.post("/start-on-prem")
 async def start_on_prem_job(
-    model_name: str = "qwen2-0_5b-instruct-fp16.gguf",
+    model_name: str = "Llama-3.2-3B-Instruct-f16.gguf",
     restart_if_exists: bool = True,
     autoscaling_enabled: bool = True,
+    cores_per_allocation: Optional[int] = None,
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
-    await start_on_prem_generate_job(
-        model_name=model_name,
-        restart_if_exists=restart_if_exists,
-        autoscaling_enabled=autoscaling_enabled,
-    )
+    try:
+        await start_on_prem_generate_job(
+            model_name=model_name,
+            restart_if_exists=restart_if_exists,
+            autoscaling_enabled=autoscaling_enabled,
+            cores_per_allocation=cores_per_allocation,
+        )
+    except Exception as e:
+        return HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start on prem LLM job with error: {str(e)}",
+        )
 
     return response(
         status_code=status.HTTP_200_OK, message="On-prem job started successfully"

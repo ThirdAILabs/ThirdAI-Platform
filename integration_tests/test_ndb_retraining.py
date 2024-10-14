@@ -10,6 +10,13 @@ from client.bazaar import ModelBazaar
 from client.utils import auth_header
 
 
+def doc_dir():
+    return os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "thirdai_platform/train_job/sample_docs/",
+    )
+
+
 @pytest.mark.unit
 def test_ndb_retraining_log_feedback_from_read_only_users():
     base_url = "http://127.0.0.1:80/api/"

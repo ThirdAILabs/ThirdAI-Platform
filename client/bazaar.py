@@ -12,7 +12,6 @@ from client.clients import BaseClient, Login, Model, NeuralDBClient, UDTClient
 from client.utils import (
     auth_header,
     create_model_identifier,
-    download_files_from_s3,
     http_delete_with_error,
     http_get_with_error,
     http_post_with_error,
@@ -517,7 +516,10 @@ class ModelBazaar:
         return response_data
 
     def start_on_prem(
-        self, restart_if_exists: bool = True, autoscaling_enabled: bool = True
+        self,
+        restart_if_exists: bool = True,
+        autoscaling_enabled: bool = True,
+        cores_per_allocation: Optional[int] = None,
     ):
         url = urljoin(self._base_url, "deploy/start-on-prem")
 
@@ -527,6 +529,7 @@ class ModelBazaar:
             params={
                 "restart_if_exists": restart_if_exists,
                 "autoscaling_enabled": autoscaling_enabled,
+                "cores_per_allocation": cores_per_allocation,
             },
         )
 
@@ -717,16 +720,12 @@ class ModelBazaar:
         )
         return res.json()["data"]
 
-    # TODO(pratik): add a unit tests for this function
-    @staticmethod
-    def full_backup_restore(bucket_name, local_dir, database_uri):
-
-        os.environ["DATABASE_URI"] = database_uri
-        os.environ["SHARE_DIR"] = local_dir
-
-        download_files_from_s3(bucket_name, local_dir)
-
-        print("Backup and restore operations completed successfully.")
+    def recovery_snapshot(self, config: dict):
+        response = http_post_with_error(
+            urljoin(self._base_url, "recovery/backup"),
+            headers=auth_header(self._access_token),
+            json=config,
+        )
 
     def delete(self, model_identifier: str):
         response = http_post_with_error(

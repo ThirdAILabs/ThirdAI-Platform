@@ -41,8 +41,8 @@ job "GenerateData-{{ data_id }}" {
           "{{ share_dir }}:/model_bazaar"
         ]
         {% elif platform == "local" %}
-        command = "{{ python_path }}"
-        args    = ["{{ train_script }}"]
+          command = "/bin/sh"
+          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} {{ generate_script }}"]
         {% endif %}
       }
 
