@@ -22,19 +22,24 @@ def max_overlap(a: str, b: str) -> int:
 
 
 def merge_tags(tokens: List[str], tags: List[List[str]]):
+    if len(tags) < 1:
+        return tokens, tags
     merged_tokens = []
     merged_tags = []
 
-    index = 0
-    while index < len(tokens):
-        start = index
-        curr_tag = tags[index][0]
+    curr_span = []
+    curr_tag = tags[0][0]
 
-        while index < len(tokens) and tags[index][0] == curr_tag:
-            index += 1
-
-        merged_tokens.append(" ".join(tokens[start:index]))
-        merged_tags.append(curr_tag)
+    for token, tag in zip(tokens, tags):
+        if tag[0] == curr_tag:
+            curr_span.append(token)
+        else:
+            merged_tokens.append(" ".join(curr_span))
+            merged_tags.append(curr_tag)
+            curr_span = [token]
+            curr_tag = tag[0]
+    merged_tokens.append(" ".join(curr_span))
+    merged_tags.append(curr_tag)
 
     return merged_tokens, merged_tags
 
