@@ -1,9 +1,3 @@
-import os
-import sys
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(current_dir)
-
 import nltk
 
 nltk.download("punkt_tab")
@@ -12,13 +6,6 @@ print("Downloading punkttab")
 import argparse
 
 import thirdai
-from models.classification_models import (
-    TextClassificationModel,
-    TokenClassificationModel,
-)
-from models.finetunable_retriever import FinetunableRetriever
-from models.neural_db_v2 import NeuralDBV2
-from models.single_mach import SingleMach
 from platform_common.pydantic_models.training import (
     ModelType,
     NDBSubType,
@@ -26,7 +13,14 @@ from platform_common.pydantic_models.training import (
     TrainConfig,
     UDTSubType,
 )
-from reporter import HttpReporter, Reporter
+from train_job.models.classification_models import (
+    TextClassificationModel,
+    TokenClassificationModel,
+)
+from train_job.models.finetunable_retriever import FinetunableRetriever
+from train_job.models.neural_db_v2 import NeuralDBV2
+from train_job.models.single_mach import SingleMach
+from train_job.reporter import HttpReporter, Reporter
 
 
 def get_model(config: TrainConfig, reporter: Reporter):

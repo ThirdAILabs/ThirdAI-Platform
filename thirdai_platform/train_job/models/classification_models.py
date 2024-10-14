@@ -4,8 +4,6 @@ from pathlib import Path
 from typing import List
 
 import thirdai
-from exceptional_handler import apply_exception_handler
-from models.model import Model
 from platform_common.file_handler import expand_s3_buckets_and_directories
 from platform_common.pydantic_models.training import (
     FileInfo,
@@ -14,7 +12,9 @@ from platform_common.pydantic_models.training import (
     UDTTrainOptions,
 )
 from thirdai import bolt
-from utils import check_csv_only, check_local_nfs_only
+from train_job.exceptional_handler import apply_exception_handler
+from train_job.models.model import Model
+from train_job.utils import check_csv_only, check_local_nfs_only
 
 
 @apply_exception_handler
