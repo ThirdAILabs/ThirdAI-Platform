@@ -71,7 +71,6 @@ def get_root_absolute_path() -> Path:
     while current_path.name != "ThirdAI-Platform":
         current_path = current_path.parent
 
-    print(current_path)
     return current_path
 
 
@@ -99,10 +98,13 @@ def build_image(
     """
     dockerfile_path = Path(dockerfile_path)
     context_path = Path(context_path)
-    if not dockerfile_path.is_absolute():
-        dockerfile_path = get_root_absolute_path() / dockerfile_path
     if not context_path.is_absolute():
         context_path = get_root_absolute_path() / context_path
+    if not dockerfile_path.is_absolute():
+        dockerfile_path = context_path / Path(dockerfile_path)
+
+    print(f"Dockerfile path: {dockerfile_path}")
+    print(f"Context path: {context_path}")
 
     full_name = provider.get_full_image_name(name, branch, tag)
     image_id = provider.build_image(
