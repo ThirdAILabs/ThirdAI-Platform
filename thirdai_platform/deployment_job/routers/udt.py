@@ -1,11 +1,6 @@
 import os
 import time
 
-from common.thirdai_storage.data_types import (
-    LabelCollection,
-    LabelStatus,
-    TokenClassificationData,
-)
 from config import DeploymentConfig, UDTSubType
 from fastapi import APIRouter, Depends, UploadFile, status
 from fastapi.encoders import jsonable_encoder
@@ -25,6 +20,12 @@ from reporter import Reporter
 from thirdai import neural_db as ndb
 from throughput import Throughput
 from utils import propagate_error, response
+
+from thirdai_platform.common.thirdai_storage.data_types import (
+    LabelCollection,
+    LabelStatus,
+    TokenClassificationData,
+)
 
 udt_predict_metric = Summary("udt_predict", "UDT predictions")
 

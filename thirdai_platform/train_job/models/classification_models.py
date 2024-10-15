@@ -7,16 +7,6 @@ from typing import List
 
 import pandas as pd
 import thirdai
-from common.thirdai_storage.data_types import (
-    DataSample,
-    LabelEntity,
-    LabelStatus,
-    Metadata,
-    MetadataStatus,
-    SampleStatus,
-    TagMetadata,
-)
-from common.thirdai_storage.storage import DataStorage, SQLiteConnector
 from config import (
     FileInfo,
     TextClassificationOptions,
@@ -33,6 +23,17 @@ from utils import (
     check_local_nfs_only,
     expand_s3_buckets_and_directories,
 )
+
+from thirdai_platform.common.thirdai_storage.data_types import (
+    DataSample,
+    LabelEntity,
+    LabelStatus,
+    Metadata,
+    MetadataStatus,
+    SampleStatus,
+    TagMetadata,
+)
+from thirdai_platform.common.thirdai_storage.storage import DataStorage, SQLiteConnector
 
 
 @apply_exception_handler
