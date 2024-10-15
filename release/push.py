@@ -134,20 +134,12 @@ def build_images(
 
     for image in images_to_build:
         buildargs = {}
-        if image.name == "thirdai_platform":
+        if image.name == "thirdai_platform_base":
             buildargs = {
                 "tag": tag,
                 "docker_registry": provider.get_registry_name(),
                 "docker_username": username,
                 "docker_password": password,
-                "export_image_names_command": (
-                    " ".join(
-                        [
-                            f"export {image.key}={image_name_for_branch(image.name, branch)}"
-                            for image in images_to_build
-                        ]
-                    )
-                ),
             }
 
         image_ids.update(

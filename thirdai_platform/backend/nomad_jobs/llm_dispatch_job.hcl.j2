@@ -38,7 +38,7 @@ job "llm-dispatch" {
       }
       config {
         {% if platform == "docker" %}  
-          image = "{{ registry }}/{{ image_name }}:{{ tag }}"
+          image = "{{ registry }}/thirdai_platform_base:{{ tag }}"
           image_pull_timeout = "15m"
           ports = ["llm-dispatch-http"]
           auth {

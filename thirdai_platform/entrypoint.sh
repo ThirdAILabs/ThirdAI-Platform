@@ -1,7 +1,5 @@
 #!/bin/bash
 
-$EXPORT_IMAGE_NAMES_COMMAND
-
 # Check if alembic version exists
 alembic current | grep -q "[a-f0-9]\{12\}"; 
 if [ $? -ne 0 ]; then

@@ -46,7 +46,6 @@ async def restart_generate_job():
         registry=os.getenv("DOCKER_REGISTRY"),
         docker_username=os.getenv("DOCKER_USERNAME"),
         docker_password=os.getenv("DOCKER_PASSWORD"),
-        image_name=os.getenv("GENERATION_IMAGE_NAME"),
         model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
         python_path=get_python_path(),
         thirdai_platform_dir=thirdai_platform_dir(),
@@ -125,7 +124,6 @@ async def restart_thirdai_platform_frontend():
         registry=os.getenv("DOCKER_REGISTRY"),
         docker_username=os.getenv("DOCKER_USERNAME"),
         docker_password=os.getenv("DOCKER_PASSWORD"),
-        image_name=os.getenv("FRONTEND_IMAGE_NAME"),
         # Model bazaar dockerfile does not include neuraldb_frontend code,
         # but app_dir is only used if platform == local.
         app_dir=str(get_root_absolute_path() / "frontend"),
@@ -162,7 +160,6 @@ async def restart_llm_cache_job():
         registry=os.getenv("DOCKER_REGISTRY"),
         docker_username=os.getenv("DOCKER_USERNAME"),
         docker_password=os.getenv("DOCKER_PASSWORD"),
-        image_name=os.getenv("LLM_CACHE_IMAGE_NAME"),
         model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
         share_dir=os.getenv("SHARE_DIR"),
         python_path=get_python_path(),
