@@ -1,10 +1,10 @@
 // /lib/backend.js
 
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { access } from 'fs';
 import _ from 'lodash';
 import { useParams } from 'next/navigation';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 
 export const thirdaiPlatformBaseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 export const deploymentBaseUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -303,46 +303,6 @@ export function retrain_ndb({
       });
   });
 }
-
-interface RetrainNERParams {
-  model_name: string;
-  base_model_identifier?: string;
-}
-
-export function retrainNER({ model_name, base_model_identifier }: RetrainNERParams): Promise<any> {
-  const accessToken = getAccessToken();
-  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-
-  const params = new URLSearchParams({
-    model_name,
-    llm_provider: 'openai',
-  });
-
-  if (base_model_identifier) {
-    params.append('base_model_identifier', base_model_identifier);
-  }
-
-  return new Promise((resolve, reject) => {
-    axios
-      .post(`${thirdaiPlatformBaseUrl}/api/train/retrain-udt?${params.toString()}`)
-      .then((res) => {
-        resolve(res.data);
-      })
-      .catch((err) => {
-        if (axios.isAxiosError(err)) {
-          const axiosError = err as AxiosError;
-          if (axiosError.response && axiosError.response.data) {
-            reject(new Error((axiosError.response.data as any).detail || 'Failed to retrain UDT model'));
-          } else {
-            reject(new Error('Failed to retrain UDT model'));
-          }
-        } else {
-          reject(new Error('Failed to retrain UDT model'));
-        }
-      });
-  });
-}
-
 
 export interface EnterpriseSearchOptions {
   retrieval_id: string;
@@ -671,10 +631,13 @@ function tokenClassifierDatagenForm(modelGoal: string, categories: Category[]) {
     examples: category.examples.map((ex) => ex.text),
     description: category.description,
   }));
+  const numSentences = 10_000;
   return {
     sub_type: 'token',
     task_prompt: modelGoal,
     tags: tags,
+    num_sentences_to_generate: numSentences,
+    num_samples_per_tag: Math.max(Math.ceil(numSentences / tags.length), 50),
   };
 }
 
@@ -813,107 +776,6 @@ function useAccessToken() {
   return accessToken;
 }
 
-interface UseLabelsOptions {
-  deploymentUrl: string;
-  pollingInterval?: number;
-  maxRecentLabels?: number;
-}
-
-interface UseLabelsResult {
-  allLabels: Set<string>;
-  recentLabels: string[];
-  error: Error | null;
-}
-
-export function useLabels({ deploymentUrl, pollingInterval = 5000, maxRecentLabels = 5 }: UseLabelsOptions): UseLabelsResult {
-  const [allLabels, setAllLabels] = useState<Set<string>>(new Set());
-  const [recentLabels, setRecentLabels] = useState<string[]>([]);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchLabels = useCallback(async () => {
-    try {
-      const accessToken = getAccessToken();
-      axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-
-      const response = await axios.get<{ data: string[] }>(`${deploymentUrl}/get_labels`);
-      const labels = response.data.data;
-
-      setAllLabels(prevLabels => {
-        const newLabels = new Set(prevLabels);
-        labels.forEach((label: string) => {
-          if (!prevLabels.has(label)) {
-            newLabels.add(label);
-            setRecentLabels(prev => [label, ...prev].slice(0, maxRecentLabels));
-          }
-        });
-        return newLabels;
-      });
-
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching labels:', err);
-      setError(err instanceof Error ? err : new Error('An unknown error occurred'));
-    }
-  }, [deploymentUrl, maxRecentLabels]);
-
-  useEffect(() => {
-    fetchLabels(); // Fetch labels immediately on mount
-
-    const intervalId = setInterval(fetchLabels, pollingInterval);
-
-    return () => clearInterval(intervalId); // Clean up on unmount
-  }, [fetchLabels, pollingInterval]);
-
-  return { allLabels, recentLabels, error };
-}
-
-interface Sample {
-  tokens: string[];
-  tags: string[];
-}
-
-interface UseRecentSamplesOptions {
-  deploymentUrl: string;
-  pollingInterval?: number;
-  maxRecentSamples?: number;
-}
-
-interface UseRecentSamplesResult {
-  recentSamples: Sample[];
-  error: Error | null;
-}
-
-export function useRecentSamples({ 
-  deploymentUrl, 
-  pollingInterval = 5000, 
-  maxRecentSamples = 5 
-}: UseRecentSamplesOptions): UseRecentSamplesResult {
-  const [recentSamples, setRecentSamples] = useState<Sample[]>([]);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchRecentSamples = useCallback(async () => {
-    try {
-      const accessToken = getAccessToken();
-      axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-
-      const response = await axios.get<{ data: Sample[] }>(`${deploymentUrl}/get_recent_samples`);
-      setRecentSamples(response.data.data.slice(0, maxRecentSamples));
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching recent samples:', err);
-      setError(err instanceof Error ? err : new Error('An unknown error occurred'));
-    }
-  }, [deploymentUrl, maxRecentSamples]);
-
-  useEffect(() => {
-    fetchRecentSamples();
-    const intervalId = setInterval(fetchRecentSamples, pollingInterval);
-    return () => clearInterval(intervalId);
-  }, [fetchRecentSamples, pollingInterval]);
-
-  return { recentSamples, error };
-}
-
 export interface TokenClassificationResult {
   query_text: string;
   tokens: string[];
@@ -923,9 +785,12 @@ export interface TokenClassificationResult {
 export function useTokenClassificationEndpoints() {
   const accessToken = useAccessToken();
   const params = useParams();
+  // console.log(params);
   const workflowId = params.deploymentId as string;
   const [workflowName, setWorkflowName] = useState<string>('');
   const [deploymentUrl, setDeploymentUrl] = useState<string | undefined>();
+
+  // console.log('PARAMS', params);
 
   useEffect(() => {
     const init = async () => {
@@ -965,59 +830,6 @@ export function useTokenClassificationEndpoints() {
       console.error('Error predicting tokens:', error);
       alert('Error predicting tokens:' + error);
       throw new Error('Failed to predict tokens');
-    }
-  };
-
-  const insertSample = async (sample: { tokens: string[], tags: string[] }): Promise<void> => {
-    axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-    try {
-      await axios.post(`${deploymentUrl}/insert_sample`, sample);
-    } catch (error) {
-      console.error('Error inserting sample:', error);
-      alert('Error inserting sample:' + error);
-      throw new Error('Failed to insert sample');
-    }
-  };
-
-  const addLabel = async (labels: { tags: { name: string, description: string }[] }): Promise<void> => {
-    axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-    try {
-      await axios.post(`${deploymentUrl}/add_labels`, labels);
-    } catch (error) {
-      console.error('Error adding label:', error);
-      alert('Error adding label:' + error);
-      throw new Error('Failed to add label');
-    }
-  };
-
-  const getLabels = async (): Promise<string[]> => {
-    axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-    try {
-      const response = await axios.get(`${deploymentUrl}/get_labels`);
-      return response.data.data;
-    } catch (error) {
-      console.error('Error fetching labels:', error);
-      alert('Error fetching labels:' + error);
-      throw new Error('Failed to fetch labels');
-    }
-  };
-
-  const getTextFromFile = async (file: File): Promise<string[]> => {
-    axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const response = await axios.post(`${deploymentUrl}/get-text`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      return response.data.data;
-    } catch (error) {
-      console.error('Error parsing file:', error);
-      alert('Error parsing file:' + error);
-      throw new Error('Failed to parse file');
     }
   };
 
@@ -1102,11 +914,7 @@ export function useTokenClassificationEndpoints() {
   return {
     workflowName,
     predict,
-    insertSample,
-    addLabel,
-    getLabels,
     getStats,
-    getTextFromFile,
   };
 }
 

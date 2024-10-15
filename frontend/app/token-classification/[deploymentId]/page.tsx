@@ -11,21 +11,29 @@ export default function Page() {
   const { workflowName } = useTokenClassificationEndpoints();
 
   return (
-  <div className="bg-muted min-h-screen">
-    <header className="w-full p-4 bg-muted">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-muted-foreground text-sm">
-          Token Classification
+    <div
+      className="bg-muted"
+      style={{
+        width: '100%',
+        display: 'flex',
+        justifyContent: 'center',
+        height: '100vh',
+      }}
+    >
+      <Tabs defaultValue="interact" style={{ width: '100%' }}>
+        <div style={{ position: 'fixed', top: '20px', left: '20px' }}>
+          <div className="text-muted-foreground" style={{ fontSize: '16px' }}>
+            Token Classification
+          </div>
+          <div style={{ fontWeight: 'bold', fontSize: '24px' }}>{workflowName}</div>
         </div>
-        <div className="font-bold text-xl truncate" title={workflowName}>
-          {workflowName}
-        </div>
-      </div>
-    </header>
-
-    <main className="pt-24"> {/* Adjust padding-top to account for fixed header */}
-      <Tabs defaultValue="interact" className="w-full">
-        <div className="flex justify-center mb-4">
+        <div
+          style={{
+            marginTop: '20px',
+            display: 'flex',
+            justifyContent: 'center',
+          }}
+        >
           <TabsList style={{ backgroundColor: 'rgba(0,0,0,0.05)' }}>
             <TabsTrigger value="interact">Interact</TabsTrigger>
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
@@ -38,7 +46,6 @@ export default function Page() {
           <Dashboard />
         </TabsContent>
       </Tabs>
-    </main>
-  </div>
+    </div>
   );
 }

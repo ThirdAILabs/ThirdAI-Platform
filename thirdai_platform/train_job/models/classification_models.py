@@ -1,33 +1,18 @@
-import os
 import time
-import typing
 from abc import abstractmethod
 from pathlib import Path
 from typing import List
 
-import pandas as pd
 import thirdai
 from config import (
     FileInfo,
     TextClassificationOptions,
     TokenClassificationOptions,
-    TrainConfig,
     UDTTrainOptions,
 )
 from exceptional_handler import apply_exception_handler
 from models.model import Model
-from reporter import Reporter
 from thirdai import bolt
-from thirdai_storage.data_types import (
-    DataSample,
-    LabelEntity,
-    LabelStatus,
-    Metadata,
-    MetadataStatus,
-    SampleStatus,
-    TagMetadata,
-)
-from thirdai_storage.storage import DataStorage, SQLiteConnector
 from utils import (
     check_csv_only,
     check_local_nfs_only,
@@ -92,21 +77,14 @@ class ClassificationModel(Model):
         return Path(self.config.model_bazaar_dir) / "models" / model_id / "model.udt"
 
     def load_model(self, model_id):
-        return bolt.UniversalDeepTransformer.load(str(self.get_udt_path(model_id)))
+        return bolt.UniversalDeepTransformer.load(self.get_udt_path(model_id))
 
     def save_model(self, model):
         model.save(str(self.model_save_path))
 
     def get_model(self):
-        # if a model with the same id has already been initialized, return the model
-        if os.path.exists(self.model_save_path):
-            return bolt.UniversalDeepTransformer.load(str(self.model_save_path))
-
-        # if model with the id not found but has a base model, return the base model
         if self.config.base_model_id:
             return self.load_model(self.config.base_model_id)
-
-        # initialize the model from scratch if the model does not exist or if there is not base model
         return self.initialize_model()
 
     def evaluate(self, model, test_files: List[FileInfo]):
@@ -188,62 +166,22 @@ class TextClassificationModel(ClassificationModel):
 
 @apply_exception_handler
 class TokenClassificationModel(ClassificationModel):
-    def __init__(self, config: TrainConfig, reporter: Reporter):
-        super().__init__(config, reporter)
-        self.load_storage()
-
     @property
     def tkn_cls_vars(self) -> TokenClassificationOptions:
         return self.config.model_options.udt_options
 
     def initialize_model(self):
-        # remove duplicates from target_labels
+        # deduplicate the labels
         target_labels = list(set(self.tkn_cls_vars.target_labels))
-
-        # insert the tags into the storage to keep track of their training status
-        tag_status = {
-            self.tkn_cls_vars.default_tag: LabelEntity(
-                name=self.tkn_cls_vars.default_tag, status=LabelStatus.untrained
-            )
-        }
-
-        new_tags = self.config.datagen_options.datagen_options.tags
-        for tag in new_tags:
-            tag.status = LabelStatus.untrained
-            tag_status[tag.name] = tag
-
-        self.update_tag_metadata(
-            tag_metadata=TagMetadata(tag_status=tag_status),
-            status=MetadataStatus.unchanged,
-        )
-
         default_tag = self.tkn_cls_vars.default_tag
         return bolt.UniversalDeepTransformer(
             data_types={
                 self.tkn_cls_vars.source_column: bolt.types.text(),
                 self.tkn_cls_vars.target_column: bolt.types.token_tags(
-                    tags=target_labels,
-                    default_tag=default_tag,
+                    tags=target_labels, default_tag=default_tag
                 ),
             },
             target=self.tkn_cls_vars.target_column,
-        )
-
-    def load_storage(self):
-        data_storage_path = self.data_dir / "data_storage.db"
-        # connector will instantiate an sqlite db at the specified path if it doesn't exist
-        self.data_storage = DataStorage(
-            connector=SQLiteConnector(db_path=data_storage_path)
-        )
-
-    @property
-    def tag_metadata(self) -> TagMetadata:
-        # load tags and their status from the storage
-        return self.data_storage.get_metadata("tags_and_status").data
-
-    def update_tag_metadata(self, tag_metadata, status: MetadataStatus):
-        self.data_storage.insert_metadata(
-            metadata=Metadata(name="tags_and_status", data=tag_metadata, status=status)
         )
 
     def train(self, **kwargs):
@@ -252,24 +190,6 @@ class TokenClassificationModel(ClassificationModel):
         model = self.get_model()
 
         start_time = time.time()
-
-        supervised_files = self.supervised_files()
-        # insert samples into data storage for later use
-        self.insert_samples_in_storage(supervised_files)
-
-        tags = self.tag_metadata
-
-        # new labels to add to the model
-        new_labels = []
-        for name in tags.tag_status.keys():
-            label = tags.tag_status[name]
-            if label.status == LabelStatus.uninserted:
-                new_labels.append(name)
-                label.status = LabelStatus.trained
-
-        if new_labels:
-            model.add_ner_entities(new_labels)
-
         for train_file in self.supervised_files():
             model.train(
                 train_file.path,
@@ -281,15 +201,6 @@ class TokenClassificationModel(ClassificationModel):
         training_time = time.time() - start_time
 
         self.save_model(model)
-
-        # converts the status of all tags to trained and update in the storage
-        for tag in tags.tag_status:
-            tags.tag_status[tag].status = LabelStatus.trained
-
-        # once training is complete, update the status of the metadata to unchanged
-        # and the status of the samples to trained
-        self.update_tag_metadata(tags, MetadataStatus.unchanged)
-        self.data_storage.update_sample_status("ner", SampleStatus.trained)
 
         self.evaluate(model, self.test_files())
 
@@ -309,39 +220,6 @@ class TokenClassificationModel(ClassificationModel):
                 "latency": str(latency),
             },
         )
-
-    def insert_samples_in_storage(
-        self, supervised_files: typing.List[FileInfo], buffer_size=50_000
-    ):
-        # these samples will be used as balancing samples for the training of the model
-        # this sampling is not uniform but we assume that there won't be many samples
-        # TODO(Shubh) : make this sampling uniform using reservoir sampling
-        df = pd.DataFrame()
-        for supervised_file in supervised_files:
-            new_df = pd.read_csv(supervised_file.path)
-            new_df = new_df[
-                [self.tkn_cls_vars.source_column, self.tkn_cls_vars.target_column]
-            ]
-
-            df = pd.concat([df, new_df])
-            df = df.sample(n=min(len(df), buffer_size))
-
-        samples = []
-
-        for index in df.index:
-            row = df.loc[index]
-            tokens = row[self.tkn_cls_vars.source_column].split()
-            tags = row[self.tkn_cls_vars.target_column].split()
-            assert len(tokens) == len(tags)
-
-            sample = DataSample(
-                name="ner",
-                data={"tokens": tokens, "tags": tags},
-                status=SampleStatus.untrained,
-            )
-            samples.append(sample)
-
-        self.data_storage.insert_samples(samples=samples)
 
     def get_latency(self, model) -> float:
         self.logger.info("Measuring latency of the UDT instance.")
