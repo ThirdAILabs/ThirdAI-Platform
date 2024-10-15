@@ -1,6 +1,8 @@
 import io
 import traceback
 import uuid
+from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 from typing import AsyncGenerator, List
 
@@ -28,7 +30,7 @@ from update_logger import (
     UpdateLogger,
     UpvoteLog,
 )
-from utils import propagate_error, response, validate_name
+from utils import load_json, propagate_error, response, validate_name
 
 ndb_query_metric = Summary("ndb_query", "NDB Queries")
 ndb_upvote_metric = Summary("ndb_upvote", "NDB upvotes")
@@ -76,6 +78,9 @@ class NDBRouter:
         )
         self.router.add_api_route("/pdf-blob", self.pdf_blob, methods=["GET"])
         self.router.add_api_route("/pdf-chunks", self.pdf_chunks, methods=["GET"])
+        self.router.add_api_route(
+            "/feedback-stats", self.feedback_stats, methods=["GET"]
+        )
 
     @staticmethod
     def get_model(config: DeploymentConfig) -> NDBModel:
@@ -286,17 +291,18 @@ class NDBRouter:
             token=token, permission_type="write"
         )
 
-        if not write_permission or self.config.autoscaling_enabled:
-            self.feedback_logger.log(
-                FeedbackLog(
-                    event=UpvoteLog(
-                        chunk_ids=[
-                            sample.reference_id for sample in input.text_id_pairs
-                        ],
-                        queries=[sample.query_text for sample in input.text_id_pairs],
-                    )
+        self.feedback_logger.log(
+            FeedbackLog(
+                event=UpvoteLog(
+                    chunk_ids=[sample.reference_id for sample in input.text_id_pairs],
+                    queries=[sample.query_text for sample in input.text_id_pairs],
                 )
-            )
+            ),
+            update_stat_immediately=write_permission
+            and not self.config.autoscaling_enabled,
+        )
+
+        if not write_permission or self.config.autoscaling_enabled:
             return response(
                 status_code=status.HTTP_202_ACCEPTED,
                 message="Upvote logged successfully.",
@@ -340,15 +346,18 @@ class NDBRouter:
             token=token, permission_type="write"
         )
 
-        if not write_permission or self.config.autoscaling_enabled:
-            self.feedback_logger.log(
-                FeedbackLog(
-                    event=AssociateLog(
-                        sources=[sample.source for sample in input.text_pairs],
-                        targets=[sample.target for sample in input.text_pairs],
-                    )
+        self.feedback_logger.log(
+            FeedbackLog(
+                event=AssociateLog(
+                    sources=[sample.source for sample in input.text_pairs],
+                    targets=[sample.target for sample in input.text_pairs],
                 )
-            )
+            ),
+            update_stat_immediately=write_permission
+            and not self.config.autoscaling_enabled,
+        )
+
+        if not write_permission or self.config.autoscaling_enabled:
             return response(
                 status_code=status.HTTP_202_ACCEPTED,
                 message="Associate logged successfully.",
@@ -360,6 +369,42 @@ class NDBRouter:
                 status_code=status.HTTP_200_OK,
                 message="Associate applied successfully.",
             )
+
+    @propagate_error
+    def feedback_stats(
+        self,
+        token: str = Depends(Permissions.verify_permission("read")),
+    ):
+        """
+        Respond with the feedback stat of the deployed model
+
+        Parameters:
+        - token: str - Authorization token.
+
+        Returns:
+        - JSONResponse: Feedback stats of the deployed model
+        """
+
+        feedback_dir = self.model.data_dir / "feedback"
+        accumlated_stats = defaultdict(list)
+        for dir in feedback_dir.iterdir():
+            stat_file = dir / "last_stats.json"
+            if stat_file.exists():
+                stat = load_json(stat_file)
+                for event_type, entries in stat.items():
+                    accumlated_stats[event_type].extend(entries)
+
+        # sort event's entries based on timestamp
+        for key in accumlated_stats:
+            accumlated_stats[key].sort(
+                key=lambda x: datetime.strptime(x["timestamp"], "%Y-%m-%d %H-%M-%S")
+            )
+
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successfully retrieved the feedback stats",
+            data=accumlated_stats,
+        )
 
     @propagate_error
     @ndb_implicit_feedback_metric.time()

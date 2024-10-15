@@ -1,6 +1,7 @@
 import ast
 import datetime
 import enum
+import json
 import re
 import traceback
 from functools import wraps
@@ -204,3 +205,13 @@ def old_pdf_chunks(db: ndb.NeuralDB, reference: ndb.Reference):
         "text": [text for text, _ in text_and_highlights],
         "boxes": boxes,
     }
+
+
+def save_json(path: str, obj: Dict):
+    with open(path, "w") as fp:
+        json.dump(obj, fp, indent=4)
+
+
+def load_json(path: str):
+    with open(path, "r") as fp:
+        return json.load(fp)
