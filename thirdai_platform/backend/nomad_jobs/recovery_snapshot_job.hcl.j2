@@ -37,6 +37,8 @@ job "recovery-snapshot" {
           volumes = [
             "{{ share_dir }}:/model_bazaar"
           ]
+          command = "python3"
+          args    = ["-m", "{{ recovery_snapshot_script }}"]
         {% elif platform == "local" %}
           command = "/bin/sh"
           args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} -m {{ recovery_snapshot_script }}"]

@@ -40,6 +40,8 @@ job "GenerateData-{{ data_id }}" {
         volumes = [
           "{{ share_dir }}:/model_bazaar"
         ]
+        command = "python3"
+        args    = ["-m", "{{ generate_script }}"]
         {% elif platform == "local" %}
           command = "/bin/sh"
           args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} -m {{ generate_script }}"]
