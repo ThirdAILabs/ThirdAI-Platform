@@ -242,7 +242,7 @@ export class ModelService {
         stride: 40,
         emphasize_first_words: 0,
         ignore_header_footer: true,
-        ignore_nonstandard_orientation: true
+        ignore_nonstandard_orientation: true,
       });
     }
 
@@ -259,7 +259,7 @@ export class ModelService {
         stride: 40,
         emphasize_first_words: 0,
         ignore_header_footer: true,
-        ignore_nonstandard_orientation: true
+        ignore_nonstandard_orientation: true,
       });
     }
 
