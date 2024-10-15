@@ -1,8 +1,6 @@
 import io
 import traceback
 import uuid
-from collections import defaultdict
-from datetime import datetime
 from pathlib import Path
 from typing import AsyncGenerator, List
 
@@ -30,7 +28,7 @@ from update_logger import (
     UpdateLogger,
     UpvoteLog,
 )
-from utils import load_json, propagate_error, response, validate_name
+from utils import propagate_error, response, validate_name
 
 ndb_query_metric = Summary("ndb_query", "NDB Queries")
 ndb_upvote_metric = Summary("ndb_upvote", "NDB upvotes")
@@ -78,9 +76,6 @@ class NDBRouter:
         )
         self.router.add_api_route("/pdf-blob", self.pdf_blob, methods=["GET"])
         self.router.add_api_route("/pdf-chunks", self.pdf_chunks, methods=["GET"])
-        self.router.add_api_route(
-            "/feedback-stats", self.feedback_stats, methods=["GET"]
-        )
 
     @staticmethod
     def get_model(config: DeploymentConfig) -> NDBModel:
