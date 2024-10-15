@@ -3,10 +3,11 @@ import traceback
 from pathlib import Path
 from typing import List, Optional
 
+from backend.thirdai_storage.data_types import TokenClassificationData
 from backend.train_config import (
     DatagenOptions,
-    Entity,
     JobOptions,
+    LabelEntity,
     LLMProvider,
     UDTSubType,
 )
@@ -92,7 +93,7 @@ def generate_data_for_train_job(
 
 class TextClassificationGenerateArgs(BaseModel):
     samples_per_label: int
-    target_labels: List[Entity]
+    target_labels: List[LabelEntity]
     user_vocab: Optional[List[str]] = None
     user_prompts: Optional[List[str]] = None
     vocab_per_sentence: int = 4
@@ -160,11 +161,15 @@ def generate_text_data(
 
 
 class TokenClassificationGenerateArgs(BaseModel):
-    tags: List[Entity]
+    tags: List[LabelEntity]
     num_sentences_to_generate: int
     num_samples_per_tag: Optional[int] = None
     allocation_cores: Optional[int] = None
     allocation_memory: Optional[int] = None
+
+    # example NER samples
+    samples: Optional[List[TokenClassificationData]] = None
+    templates_per_sample: int = 10
 
 
 def generate_token_data(

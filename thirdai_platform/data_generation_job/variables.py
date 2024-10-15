@@ -6,7 +6,7 @@ from dataclasses import MISSING, dataclass, fields
 from enum import Enum
 from typing import Dict, List, Optional, Type, TypeVar, Union, get_args, get_origin
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 T = TypeVar("T", bound="EnvLoader")
 
@@ -105,13 +105,20 @@ class GeneralVariables(EnvLoader):
     test_size: float = 0.05
 
 
+class EntityStatus(str, Enum):
+    trained = "trained"  # if the model has already been trained on the label
+    uninserted = "uninserted"  # if label is scheduled to be added to the model
+
+    untrained = "untrained"  # if the label is present in the model but not trained
+
+
 class Entity(BaseModel):
     name: str
-    examples: List[str]
-    description: str
-    status: str = "untrained"
+    examples: List[str] = Field(default_factory=list)
+    description: str = Field(default="NA")
+    status: EntityStatus = EntityStatus.untrained
 
-    @field_validator("name", mode="before")
+    @field_validator("name", mode="after")
     def uppercase_name(cls, v):
         return v.upper()
 
@@ -176,7 +183,7 @@ class TokenGenerationVariables(BaseModel):
     num_sentences_to_generate: int
     num_samples_per_tag: Optional[int] = None
     # example NER samples
-    samples: List[NERSample] = None
+    samples: Optional[List[NERSample]] = None
     templates_per_sample: int = 10
 
     def to_dict(self):

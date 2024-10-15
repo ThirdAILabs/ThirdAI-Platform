@@ -2,6 +2,7 @@ import os
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
 
+from backend.thirdai_storage.data_types import LabelEntity, TokenClassificationData
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -185,16 +186,10 @@ class LLMProvider(str, Enum):
     cohere = "cohere"
 
 
-class Entity(BaseModel):
-    name: str
-    examples: List[str]
-    description: str
-
-
 class TextClassificationDatagenOptions(BaseModel):
     sub_type: Literal[UDTSubType.text] = UDTSubType.text
     samples_per_label: int
-    target_labels: List[Entity]
+    target_labels: List[LabelEntity]
     user_vocab: Optional[List[str]] = None
     user_prompts: Optional[List[str]] = None
     vocab_per_sentence: int = 4
@@ -202,9 +197,13 @@ class TextClassificationDatagenOptions(BaseModel):
 
 class TokenClassificationDatagenOptions(BaseModel):
     sub_type: Literal[UDTSubType.token] = UDTSubType.token
-    tags: List[Entity]
-    num_sentences_to_generate: int
+    tags: List[LabelEntity]
+    num_sentences_to_generate: int = 10_00
     num_samples_per_tag: Optional[int] = None
+
+    # example NER samples
+    samples: Optional[List[TokenClassificationData]] = None
+    templates_per_sample: int = 10
 
     @model_validator(mode="after")
     def deduplicate_tags(cls, values):

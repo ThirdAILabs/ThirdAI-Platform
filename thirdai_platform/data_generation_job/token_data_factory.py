@@ -19,7 +19,7 @@ from utils import (
     train_test_split,
     write_to_csv,
 )
-from variables import Entity, NERSample
+from variables import Entity, EntityStatus, NERSample
 
 
 class TokenDataFactory(DataFactory):
@@ -200,7 +200,11 @@ class TokenDataFactory(DataFactory):
 
         sampling_weights = np.array(
             [
-                untrained_tag_weight_multiplier if tag.status == "untrained" else 1
+                (
+                    untrained_tag_weight_multiplier
+                    if tag.status != EntityStatus.trained
+                    else 1
+                )
                 for tag in tags
             ]
         )

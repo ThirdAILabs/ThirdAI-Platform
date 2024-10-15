@@ -4,6 +4,7 @@ from typing import Dict
 
 import pytest
 from config import (
+    DatagenOptions,
     FileInfo,
     JobOptions,
     NDBData,
@@ -11,6 +12,7 @@ from config import (
     NDBv1Options,
     NDBv2Options,
     TextClassificationOptions,
+    TokenClassificationDatagenOptions,
     TokenClassificationOptions,
     TrainConfig,
     UDTData,
@@ -221,6 +223,25 @@ def test_udt_token_train():
             ],
         ),
         job_options=JobOptions(),
+        datagen_options=DatagenOptions(
+            task_prompt="token classification",
+            llm_provider="openai",
+            datagen_options=TokenClassificationDatagenOptions(
+                sub_type="token",
+                tags=[
+                    {
+                        "name": "NAME",
+                        "examples": ["shubh"],
+                        "description": "name of person",
+                        "status": "uninserted",
+                    }
+                ],
+                num_sentences_to_generate=1000,
+                num_samples_per_tag=None,
+                samples=None,
+                templates_per_sample=10,
+            ),
+        ),
     )
 
     model = get_model(config, DummyReporter())
