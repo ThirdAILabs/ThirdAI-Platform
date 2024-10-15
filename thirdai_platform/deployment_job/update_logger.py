@@ -70,8 +70,9 @@ class UpdateLogger:
     def log(self, update: BaseModel, update_stat_immediately: bool = True):
         self.stream.write(update.model_dump_json() + "\n")
         self.stream.flush()
-        self.num_lines += 1
-        self._update_track(update, update_stat_immediately)
+        if isinstance(update, FeedbackLog):
+            self.num_lines += 1
+            self._update_track(update, update_stat_immediately)
 
     def _update_track(self, update: BaseModel, update_stat_immediately: bool = True):
         action = update.event.action
