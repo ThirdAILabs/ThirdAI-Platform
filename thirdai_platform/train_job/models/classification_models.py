@@ -18,7 +18,7 @@ from exceptional_handler import apply_exception_handler
 from models.model import Model
 from reporter import Reporter
 from thirdai import bolt
-from thirdai_storage.data_types import (
+from common.thirdai_storage.data_types import (
     DataSample,
     LabelEntity,
     LabelStatus,
@@ -27,7 +27,7 @@ from thirdai_storage.data_types import (
     SampleStatus,
     TagMetadata,
 )
-from thirdai_storage.storage import DataStorage, SQLiteConnector
+from common.thirdai_storage.storage import DataStorage, SQLiteConnector
 from utils import (
     check_csv_only,
     check_local_nfs_only,

@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, model_validator
-from thirdai_storage.data_types import LabelEntity, TokenClassificationData
+from common.thirdai_storage.data_types import LabelEntity, TokenClassificationData
 
 
 class ModelType(str, Enum):

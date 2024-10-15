@@ -17,7 +17,7 @@ from pydantic_models.inputs import (
     TextAnalysisPredictParams,
 )
 from reporter import Reporter
-from thirdai_storage.data_types import (
+from common.thirdai_storage.data_types import (
     LabelCollection,
     LabelStatus,
     TokenClassificationData,

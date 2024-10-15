@@ -6,7 +6,7 @@ from config import DeploymentConfig
 from models.model import Model
 from pydantic_models import inputs
 from thirdai import bolt
-from thirdai_storage.data_types import (
+from common.thirdai_storage.data_types import (
     DataSample,
     LabelCollection,
     Metadata,
@@ -15,7 +15,7 @@ from thirdai_storage.data_types import (
     TagMetadata,
     TokenClassificationData,
 )
-from thirdai_storage.storage import DataStorage, SQLiteConnector
+from common.thirdai_storage.storage import DataStorage, SQLiteConnector
 
 
 class ClassificationModel(Model):
