@@ -53,8 +53,8 @@ def find_dataset(
 def dump_generation_args(path: str, args: BaseModel):
     os.makedirs(path, exist_ok=True)
     save_dict(
-        args.model_dump(),
         os.path.join(path, "generation_args.json"),
+        **args.model_dump(),
     )
 
 
