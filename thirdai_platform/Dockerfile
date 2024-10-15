@@ -12,14 +12,14 @@ RUN apt-get update && \
 
 COPY **/requirements.txt /app/
 
+RUN pip install -r /app/recovery_snapshot_job/requirements.txt
+RUN pip install -r /app/data_generation_job/requirements.txt
+RUN pip install -r /app/llm_cache_job/requirements.txt
+RUN pip install -r /app/llm_dispatch_job/requirements.txt
+RUN pip install -r /app/train_job/requirements.txt
+RUN pip install -r /app/deployment_job/requirements.txt
 RUN pip install -r /app/requirements.txt
 RUN pip install -r /app/platform_common/requirements.txt
-RUN pip install -r /app/data_generation_job/requirements.txt
-RUN pip install -r /app/llm_dispatch_job/requirements.txt
-RUN pip install -r /app/recovery_snapshot_job/requirements.txt
-RUN pip install -r /app/train_job/requirements.txt
-RUN pip install -r /app/llm_cache_job/requirements.txt
-RUN pip install -r /app/deployment_job/requirements.txt
 
 # Install thirdai package separately since this is the dependency that changes
 # the most often. This allows the other packages to stay cached.
