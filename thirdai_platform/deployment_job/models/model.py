@@ -2,7 +2,7 @@ from abc import ABC
 from pathlib import Path
 
 from platform_common.logging import LoggerConfig
-from platform_common.pydantic_models.training import DeploymentConfig
+from platform_common.pydantic_models.deployment import DeploymentConfig
 
 
 class Model(ABC):

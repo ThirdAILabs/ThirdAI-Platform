@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 from platform_common.file_handler import download_local_files
+from platform_common.pydantic_models.deployment import DeploymentConfig, NDBSubType
 from platform_common.pydantic_models.feedback_logs import (
     AssociateLog,
     DeleteLog,
@@ -26,7 +27,6 @@ from platform_common.pydantic_models.feedback_logs import (
     InsertLog,
     UpvoteLog,
 )
-from platform_common.pydantic_models.training import DeploymentConfig, NDBSubType
 from platform_common.utils import response
 from prometheus_client import Counter, Summary
 from pydantic import ValidationError

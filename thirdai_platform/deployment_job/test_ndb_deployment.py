@@ -6,11 +6,11 @@ import pytest
 import thirdai
 from deployment_job.permissions import Permissions
 from fastapi.testclient import TestClient
-from platform_common.pydantic_models.training import (
+from platform_common.pydantic_models.deployment import (
     DeploymentConfig,
     NDBDeploymentOptions,
-    NDBSubType,
 )
+from platform_common.pydantic_models.training import NDBSubType
 from thirdai import neural_db as ndbv1
 from thirdai import neural_db_v2 as ndbv2
 

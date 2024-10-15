@@ -13,7 +13,8 @@ from deployment_job.utils import delete_deployment_job
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from platform_common.pydantic_models.training import DeploymentConfig, ModelType
+from platform_common.pydantic_models.deployment import DeploymentConfig
+from platform_common.pydantic_models.training import ModelType
 from prometheus_client import make_asgi_app
 from thirdai import licensing
 

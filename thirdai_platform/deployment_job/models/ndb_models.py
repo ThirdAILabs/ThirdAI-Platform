@@ -22,7 +22,7 @@ from deployment_job.models.model import Model
 from deployment_job.pydantic_models import inputs
 from deployment_job.utils import highlighted_pdf_bytes, new_pdf_chunks, old_pdf_chunks
 from platform_common.file_handler import FileInfo, expand_s3_buckets_and_directories
-from platform_common.pydantic_models.training import DeploymentConfig
+from platform_common.pydantic_models.deployment import DeploymentConfig
 from thirdai import neural_db as ndb
 from thirdai import neural_db_v2 as ndbv2
 from thirdai.neural_db_v2.core.types import Chunk

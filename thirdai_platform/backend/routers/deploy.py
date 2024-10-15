@@ -27,12 +27,12 @@ from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
-from platform_common.pydantic_models.training import (
+from platform_common.pydantic_models.deployment import (
     DeploymentConfig,
-    ModelType,
     NDBDeploymentOptions,
     UDTDeploymentOptions,
 )
+from platform_common.pydantic_models.training import ModelType
 from platform_common.utils import response
 from sqlalchemy.orm import Session
 

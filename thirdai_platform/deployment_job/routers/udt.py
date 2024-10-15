@@ -14,7 +14,7 @@ from deployment_job.reporter import Reporter
 from deployment_job.utils import propagate_error
 from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
-from platform_common.pydantic_models.training import DeploymentConfig, UDTSubType
+from platform_common.pydantic_models.deployment import DeploymentConfig, UDTSubType
 from platform_common.utils import response
 from prometheus_client import Summary
 from throughput import Throughput

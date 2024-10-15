@@ -26,12 +26,12 @@ from database.session import get_session
 from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
 from licensing.verify.verify_license import verify_license
-from platform_common.pydantic_models.training import (
+from platform_common.pydantic_models.deployment import (
     DeploymentConfig,
-    ModelType,
     NDBDeploymentOptions,
     UDTDeploymentOptions,
 )
+from platform_common.pydantic_models.training import ModelType
 from platform_common.utils import response
 from pydantic import BaseModel, validator
 from sqlalchemy.orm import Session, selectinload
