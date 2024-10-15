@@ -103,9 +103,6 @@ def build_image(
     if not dockerfile_path.is_absolute():
         dockerfile_path = context_path / Path(dockerfile_path)
 
-    print(f"Dockerfile path: {dockerfile_path}")
-    print(f"Context path: {context_path}")
-
     full_name = provider.get_full_image_name(name, branch, tag)
     image_id = provider.build_image(
         str(dockerfile_path), str(context_path), full_name, nocache, buildargs
