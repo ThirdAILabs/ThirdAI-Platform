@@ -1,17 +1,17 @@
-# Use the official FastAPI image with Python 3.11
 FROM tiangolo/uvicorn-gunicorn-fastapi:python3.11
 
-# Set the working directory in the container to /app
 WORKDIR /app
 
-# Copy the requirements.txt file into the container
-COPY requirements.txt /app/
+# Install dependencies before copying the directory so python dependencies are 
+# cached even when there are changes in the directory.
+COPY train_job/requirements.txt /app/train_job/
+RUN python3 -m pip install -r train_job/requirements.txt
 
-# Install dependencies from requirements.txt
-RUN python3 -m pip install --no-cache-dir -r requirements.txt
+COPY platform_common/requirements.txt /app/platform_common/
+RUN python3 -m pip install -r platform_common/requirements.txt
 
-# Copy the current directory contents into the container at /app
-COPY . /app
+COPY train_job/ /app/train_job/
 
-# Set the default command to run the FastAPI application
-CMD ["python3", "run.py"]
+COPY platform_common/ /app/platform_common/
+
+CMD ["python3", "train_job/run.py"]

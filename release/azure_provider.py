@@ -30,7 +30,8 @@ class AzureProvider(CloudProviderInterface):
         """
         Build a Docker image from the specified path with the given tag.
 
-        :param path: Path to the Dockerfile
+        :param dockerfile_path: Path to the actual Dockerfile
+        :param context_path: Path to the context used to build
         :param tag: Tag for the built image
         :param nocache: Whether to use cache during build
         :param buildargs: Build arguments for the Docker build

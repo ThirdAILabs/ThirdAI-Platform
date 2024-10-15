@@ -15,6 +15,11 @@ RUN apt-get update && \
 COPY recovery_snapshot_job/requirements.txt /app/recovery_snapshot_job/requirements.txt
 RUN pip install -r recovery_snapshot_job/requirements.txt
 
+COPY platform_common/requirements.txt /app/platform_common/
+RUN python3 -m pip install -r platform_common/requirements.txt
+
 COPY recovery_snapshot_job/ /app/recovery_snapshot_job/
+
+COPY platform_common/ /app/platform_common/
 
 CMD ["python3", "-m", "recovery_snapshot_job.run"]

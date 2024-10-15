@@ -93,7 +93,8 @@ def build_image(
     :param tag: Version tag
     :param buildargs: Build arguments for Docker
     :param nocache: Whether to use cache during build
-    :param dockerfile_path: Path to the Dockerfile
+    :param dockerfile_path: Path to the actual Dockerfile
+    :param context_path: Path to the context used to build
     :return: Dictionary with image name and image ID
     """
     dockerfile_path = Path(dockerfile_path)
