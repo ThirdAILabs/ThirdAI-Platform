@@ -139,12 +139,11 @@ def get_model_permissions(
 
 
 # TODO(Any): move args like llm_provider to model attributes.
-def deploy_single_model(
+async def deploy_single_model(
     model_id: str,
     memory: Optional[int],
     autoscaling_enabled: bool,
     autoscaler_max_count: int,
-    llm_provider: Optional[str],
     genai_key: Optional[str],
     session: Session,
     user: schema.User,
@@ -202,12 +201,17 @@ def deploy_single_model(
     work_dir = os.getcwd()
     platform = get_platform()
 
+    requires_on_prem_llm = False
     if model.type == ModelType.NDB:
         model_options = NDBDeploymentOptions(
             ndb_sub_type=model.sub_type,
-            llm_provider=(llm_provider or os.getenv("LLM_PROVIDER", "openai")),
+            llm_provider=(
+                model.get_attributes().get("llm_provider")
+                or os.getenv("LLM_PROVIDER", "openai")
+            ),
             genai_key=(genai_key or os.getenv("GENAI_KEY", "")),
         )
+        requires_on_prem_llm = model_options.llm_provider == "on-prem"
     elif model.type == ModelType.UDT:
         model_options = UDTDeploymentOptions(udt_sub_type=model.sub_type)
     elif model.type == ModelType.ENTERPRISE_SEARCH:
@@ -216,6 +220,7 @@ def deploy_single_model(
             retrieval_id=attributes["retrieval_id"],
             guardrail_id=attributes.get("guardrail_id", None),
         )
+        requires_on_prem_llm = attributes.get("llm_provider") == "on-prem"
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -267,14 +272,16 @@ def deploy_single_model(
             detail=str(err),
         )
 
+    if requires_on_prem_llm:
+        await start_on_prem_generate_job(restart_if_exists=False)
+
 
 @deploy_router.post("/run", dependencies=[Depends(is_model_owner)])
-def deploy_model(
+async def deploy_model(
     model_identifier: str,
     memory: Optional[int] = None,
     autoscaling_enabled: bool = False,
     autoscaler_max_count: int = 1,
-    llm_provider: Optional[str] = None,
     genai_key: Optional[str] = None,
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
@@ -315,12 +322,11 @@ def deploy_model(
 
     for dependency in list_all_dependencies(model=model):
         try:
-            deploy_single_model(
+            await deploy_single_model(
                 model_id=dependency.id,
                 memory=memory,
                 autoscaling_enabled=autoscaling_enabled,
                 autoscaler_max_count=autoscaler_max_count,
-                llm_provider=llm_provider,
                 genai_key=genai_key,
                 session=session,
                 user=user,

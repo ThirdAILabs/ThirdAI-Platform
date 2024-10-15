@@ -91,6 +91,8 @@ class NDBOptions(BaseModel):
     class Config:
         protected_namespaces = ()
 
+    llm_provider: Optional[str] = None
+
 
 class NDBData(BaseModel):
     model_data_type: Literal[ModelDataType.NDB] = ModelDataType.NDB
