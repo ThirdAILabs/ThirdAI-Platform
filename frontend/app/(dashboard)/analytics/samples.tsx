@@ -88,7 +88,7 @@ const Highlight: React.FC<HighlightProps> = ({
   onMouseOver,
   onMouseDown,
   selecting,
-  selected
+  selected,
 }) => {
   const [hover, setHover] = useState<boolean>(false);
 
@@ -138,7 +138,9 @@ const HighlightedSample: React.FC<HighlightedSampleProps> = ({ tokens, tags, tag
       <Highlight
         key={index}
         currentToken={{ text: token, tag: tags[index] }}
-        nextToken={index < tokens.length - 1 ? { text: tokens[index + 1], tag: tags[index + 1] } : null}
+        nextToken={
+          index < tokens.length - 1 ? { text: tokens[index + 1], tag: tags[index + 1] } : null
+        }
         tagColors={tagColors}
         onMouseOver={() => {}}
         onMouseDown={() => {}}
@@ -194,7 +196,7 @@ export default function RecentSamples({ deploymentUrl }: RecentSamplesProps) {
 
   useEffect(() => {
     const updateTagColors = () => {
-      const allTags = recentSamples.flatMap(sample => sample.tags);
+      const allTags = recentSamples.flatMap((sample) => sample.tags);
       const uniqueTags = Array.from(new Set(allTags)).filter((tag) => tag !== 'O');
       const newColors: Record<string, HighlightColor> = {};
 
@@ -219,8 +221,8 @@ export default function RecentSamples({ deploymentUrl }: RecentSamplesProps) {
     updateTagColors();
   }, [recentSamples]);
 
-    // Create a set of unique labels and convert it back to an array
-    const uniqueLabels = Array.from(new Set(recentLabels));
+  // Create a set of unique labels and convert it back to an array
+  const uniqueLabels = Array.from(new Set(recentLabels));
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -230,7 +232,9 @@ export default function RecentSamples({ deploymentUrl }: RecentSamplesProps) {
           <CardDescription>The latest added labels</CardDescription>
         </CardHeader>
         <CardContent className="overflow-y-auto h-[calc(100%-5rem)]">
-          {labelError && <div className="text-red-500">Error fetching labels: {labelError.message}</div>}
+          {labelError && (
+            <div className="text-red-500">Error fetching labels: {labelError.message}</div>
+          )}
           {uniqueLabels.map((label, idx) => (
             <div key={idx} className="mb-2 p-2 bg-gray-100 rounded-md">
               <span className="font-medium">{label}</span>
@@ -244,9 +248,16 @@ export default function RecentSamples({ deploymentUrl }: RecentSamplesProps) {
           <CardDescription>The latest inserted samples</CardDescription>
         </CardHeader>
         <CardContent className="overflow-y-auto h-[calc(100%-5rem)]">
-          {sampleError && <div className="text-red-500">Error fetching samples: {sampleError.message}</div>}
+          {sampleError && (
+            <div className="text-red-500">Error fetching samples: {sampleError.message}</div>
+          )}
           {recentSamples.map((sample, idx) => (
-            <HighlightedSample key={idx} tokens={sample.tokens} tags={sample.tags} tagColors={tagColors} />
+            <HighlightedSample
+              key={idx}
+              tokens={sample.tokens}
+              tags={sample.tags}
+              tagColors={tagColors}
+            />
           ))}
         </CardContent>
       </Card>

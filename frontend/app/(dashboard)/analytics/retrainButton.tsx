@@ -30,7 +30,9 @@ export default function RetrainButton({ modelName, username }: RetrainButtonProp
       console.log('New model created successfully');
       setNewModelName(''); // Clear the input after successful creation
     } catch (error) {
-      setRetrainError(error instanceof Error ? error.message : 'An error occurred while creating the new model');
+      setRetrainError(
+        error instanceof Error ? error.message : 'An error occurred while creating the new model'
+      );
     } finally {
       setIsRetraining(false);
     }

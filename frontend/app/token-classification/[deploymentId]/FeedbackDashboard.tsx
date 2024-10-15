@@ -2,91 +2,91 @@ import React, { MouseEventHandler, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 interface HighlightColor {
-    text: string;
-    tag: string;
-  }
-  
+  text: string;
+  tag: string;
+}
+
 interface HighlightProps {
-currentToken: Token;
-nextToken?: Token | null;
-tagColors: Record<string, HighlightColor>;
-onMouseOver: MouseEventHandler;
-onMouseDown: MouseEventHandler;
-selecting: boolean;
-selected: boolean;
+  currentToken: Token;
+  nextToken?: Token | null;
+  tagColors: Record<string, HighlightColor>;
+  onMouseOver: MouseEventHandler;
+  onMouseDown: MouseEventHandler;
+  selecting: boolean;
+  selected: boolean;
 }
 
 const SELECTING_COLOR = '#EFEFEF';
 const SELECTED_COLOR = '#DFDFDF';
 
 function Highlight({
-currentToken,
-nextToken,
-tagColors,
-onMouseOver,
-onMouseDown,
-selecting,
-selected,
+  currentToken,
+  nextToken,
+  tagColors,
+  onMouseOver,
+  onMouseDown,
+  selecting,
+  selected,
 }: HighlightProps) {
-const [hover, setHover] = useState<boolean>(false);
+  const [hover, setHover] = useState<boolean>(false);
 
-return (
+  return (
     <>
-    <span
+      <span
         style={{
-        backgroundColor:
+          backgroundColor:
             hover || selecting
-            ? SELECTING_COLOR
-            : selected
-            ? SELECTED_COLOR
-            : tagColors[currentToken.tag]?.text || 'transparent',
-        padding: '2px',
-        borderRadius: '2px',
-        cursor: hover ? 'pointer' : 'default',
-        userSelect: 'none',
+              ? SELECTING_COLOR
+              : selected
+                ? SELECTED_COLOR
+                : tagColors[currentToken.tag]?.text || 'transparent',
+          padding: '2px',
+          borderRadius: '2px',
+          cursor: hover ? 'pointer' : 'default',
+          userSelect: 'none',
         }}
         onMouseOver={(e) => {
-        setHover(true);
-        onMouseOver(e);
+          setHover(true);
+          onMouseOver(e);
         }}
         onMouseLeave={(e) => {
-        setHover(false);
+          setHover(false);
         }}
         onMouseDown={onMouseDown}
-    >
+      >
         {currentToken.text}
         {tagColors[currentToken.tag] && nextToken?.tag !== currentToken.tag && (
-        <span
+          <span
             style={{
-            backgroundColor: tagColors[currentToken.tag].tag,
-            color: 'white',
-            fontSize: '11px',
-            fontWeight: 'bold',
-            borderRadius: '2px',
-            marginLeft: '4px',
-            padding: '5px 3px 1px 3px',
-            marginBottom: '1px',
+              backgroundColor: tagColors[currentToken.tag].tag,
+              color: 'white',
+              fontSize: '11px',
+              fontWeight: 'bold',
+              borderRadius: '2px',
+              marginLeft: '4px',
+              padding: '5px 3px 1px 3px',
+              marginBottom: '1px',
             }}
-        >
+          >
             {currentToken.tag}
-        </span>
+          </span>
         )}
-    </span>
-    <span
+      </span>
+      <span
         style={{ cursor: hover ? 'pointer' : 'default', userSelect: 'none' }}
         onMouseOver={(e) => {
-        setHover(true);
-        onMouseOver(e);
+          setHover(true);
+          onMouseOver(e);
         }}
         onMouseLeave={(e) => {
-        setHover(false);
+          setHover(false);
         }}
         onMouseDown={onMouseDown}
-    >
+      >
         {' '}
-    </span>
+      </span>
     </>
-);
+  );
 }
 
 interface Token {
@@ -116,7 +116,7 @@ interface FeedbackDashboardProps {
   deleteFeedbackExample: (sentence: string) => void;
   submitFeedback: () => void;
 }
-  
+
 const FeedbackDashboard: React.FC<FeedbackDashboardProps> = ({
   cachedTags,
   tagColors,

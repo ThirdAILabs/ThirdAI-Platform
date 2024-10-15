@@ -18,7 +18,9 @@ export default function UpdateButton({ modelName }: UpdateButtonProps) {
       await retrainNER({ model_name: modelName });
       console.log('Model updated successfully');
     } catch (error) {
-      setUpdateError(error instanceof Error ? error.message : 'An error occurred while updating the model');
+      setUpdateError(
+        error instanceof Error ? error.message : 'An error occurred while updating the model'
+      );
     } finally {
       setIsUpdating(false);
     }
