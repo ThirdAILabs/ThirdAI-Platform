@@ -7,6 +7,16 @@ from typing import List
 
 import pandas as pd
 import thirdai
+from common.thirdai_storage.data_types import (
+    DataSample,
+    LabelEntity,
+    LabelStatus,
+    Metadata,
+    MetadataStatus,
+    SampleStatus,
+    TagMetadata,
+)
+from common.thirdai_storage.storage import DataStorage, SQLiteConnector
 from config import (
     FileInfo,
     TextClassificationOptions,
@@ -18,16 +28,6 @@ from exceptional_handler import apply_exception_handler
 from models.model import Model
 from reporter import Reporter
 from thirdai import bolt
-from common.thirdai_storage.data_types import (
-    DataSample,
-    LabelEntity,
-    LabelStatus,
-    Metadata,
-    MetadataStatus,
-    SampleStatus,
-    TagMetadata,
-)
-from common.thirdai_storage.storage import DataStorage, SQLiteConnector
 from utils import (
     check_csv_only,
     check_local_nfs_only,

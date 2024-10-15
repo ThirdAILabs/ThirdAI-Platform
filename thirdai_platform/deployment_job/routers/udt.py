@@ -1,15 +1,20 @@
 import os
 import time
 
+from common.thirdai_storage.data_types import (
+    LabelCollection,
+    LabelStatus,
+    TokenClassificationData,
+)
 from config import DeploymentConfig, UDTSubType
 from fastapi import APIRouter, Depends, UploadFile, status
 from fastapi.encoders import jsonable_encoder
-from models.ndbv1_parser import convert_to_ndb_file
 from models.classification_models import (
     ClassificationModel,
     TextClassificationModel,
     TokenClassificationModel,
 )
+from models.ndbv1_parser import convert_to_ndb_file
 from permissions import Permissions
 from prometheus_client import Summary
 from pydantic_models.inputs import (
@@ -17,14 +22,9 @@ from pydantic_models.inputs import (
     TextAnalysisPredictParams,
 )
 from reporter import Reporter
-from common.thirdai_storage.data_types import (
-    LabelCollection,
-    LabelStatus,
-    TokenClassificationData,
-)
+from thirdai import neural_db as ndb
 from throughput import Throughput
 from utils import propagate_error, response
-from thirdai import neural_db as ndb
 
 udt_predict_metric = Summary("udt_predict", "UDT predictions")
 
@@ -75,19 +75,20 @@ class UDTRouter:
         destination_path = self.model.data_dir / file.filename
         with open(destination_path, "wb") as f:
             f.write(file.file.read())
-            
-        doc: ndb.Document = convert_to_ndb_file(destination_path, metadata=None, options=None)
-        
-        display_list = doc.table.df['display'].tolist()
-        
+
+        doc: ndb.Document = convert_to_ndb_file(
+            destination_path, metadata=None, options=None
+        )
+
+        display_list = doc.table.df["display"].tolist()
+
         os.remove(destination_path)
-        
+
         return response(
             status_code=status.HTTP_200_OK,
             message="Successful",
             data=jsonable_encoder(display_list),
         )
-        
 
     @propagate_error
     @udt_predict_metric.time()
