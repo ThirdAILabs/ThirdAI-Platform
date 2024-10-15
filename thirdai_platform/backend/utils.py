@@ -531,6 +531,11 @@ def save_dict(obj: dict, path: str):
         json.dump(obj, fp, indent=4)
 
 
+def load_json(path: str):
+    with open(path, "r") as fp:
+        return json.load(fp)
+
+
 def validate_license_info():
     try:
         license_info = verify_license(

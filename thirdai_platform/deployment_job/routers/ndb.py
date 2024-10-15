@@ -371,42 +371,6 @@ class NDBRouter:
             )
 
     @propagate_error
-    def feedback_stats(
-        self,
-        token: str = Depends(Permissions.verify_permission("read")),
-    ):
-        """
-        Respond with the feedback stat of the deployed model
-
-        Parameters:
-        - token: str - Authorization token.
-
-        Returns:
-        - JSONResponse: Feedback stats of the deployed model
-        """
-
-        feedback_dir = self.model.data_dir / "feedback"
-        accumlated_stats = defaultdict(list)
-        for dir in feedback_dir.iterdir():
-            stat_file = dir / "last_stats.json"
-            if stat_file.exists():
-                stat = load_json(stat_file)
-                for event_type, entries in stat.items():
-                    accumlated_stats[event_type].extend(entries)
-
-        # sort event's entries based on timestamp
-        for key in accumlated_stats:
-            accumlated_stats[key].sort(
-                key=lambda x: datetime.strptime(x["timestamp"], "%Y-%m-%d %H-%M-%S")
-            )
-
-        return response(
-            status_code=status.HTTP_200_OK,
-            message="Successfully retrieved the feedback stats",
-            data=accumlated_stats,
-        )
-
-    @propagate_error
     @ndb_implicit_feedback_metric.time()
     def implicit_feedback(
         self,

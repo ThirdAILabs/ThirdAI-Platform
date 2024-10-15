@@ -2,6 +2,7 @@ import json
 import os
 import traceback
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -24,6 +25,7 @@ from backend.utils import (
     get_python_path,
     get_workflow,
     list_workflow_models,
+    load_json,
     response,
     submit_nomad_job,
     thirdai_platform_dir,
@@ -788,6 +790,107 @@ async def start_workflow(
         status_code=status.HTTP_202_ACCEPTED,
         message="Workflow started successfully.",
         data={"models": jsonable_encoder(list_workflow_models(workflow))},
+    )
+
+
+@workflow_router.post("/feedbacks", dependencies=[Depends(is_workflow_owner)])
+def workflow_feedbacks(
+    workflow_id: str,
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
+    """
+    Fetches all the feedback collected on the deploed models in the workflow
+
+    - **Parameters**:
+      - `workflow_id` (str): ID of the workflow to start.
+    - **Returns**:
+      - `status_code` (int): HTTP status code.
+      - `message` (str): Response message.
+      - `data` (dict): Dict of feedbacks
+
+    **Example Request**:
+    ```json
+    {
+        "workflow_id": "f84b8f1d-76e1-4d9b-bb1a-8f8d5d6f1a3c"
+    }
+    ```
+
+    **Example Response**:
+    ```json
+    {
+        "status_code": 200,
+        "message": "Retrieved model feedbacks.",
+        "data": {
+            "upvotes": [
+                {"chunk_id": 17, "query": "query to one of the model"}
+                {"chunk_id": 188, "query": "query to one of the model"}
+                ..
+            ],
+            "associates": [
+                {"source": "This is the source1", "target": "This is the target1"}
+                {"source": "This is the source2", "target": "This is the target2"}
+                ..
+            ]
+        }
+    }
+    ```
+    """
+
+    workflow: schema.Workflow = session.query(schema.Workflow).get(workflow_id)
+
+    if not workflow:
+        return response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Workflow not found.",
+        )
+
+    workflow_models: List[schema.WorkflowModel] = list(
+        filter(
+            lambda model: model.deploy_status == schema.Status.complete,
+            workflow.workflow_models,
+        )
+    )
+
+    if not workflow_models:
+        return response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="No deployed models found in the workflow.",
+        )
+    platform = get_platform()
+    model_bazaar_dir = (
+        os.getenv("SHARE_DIR", None) if platform == "local" else "/model_bazaar"
+    )
+
+    accumlated_stats = defaultdict(list)
+
+    for workflow_model in workflow_models:
+        model: schema.Model = workflow_model.model
+
+        deployment_dir = os.path.join(
+            model_bazaar_dir, "models", str(model.id), "deployment", "data", "feedback"
+        )
+        if not os.path.exists(deployment_dir):
+            continue
+
+        for alloc_dir_entry in os.scandir(deployment_dir):
+            stats_file_path = os.path.join(alloc_dir_entry.path, "last_stats.json")
+            if os.path.join(stats_file_path):
+                stats = load_json(stats_file_path)
+
+                for event_type, entries in stats.items():
+                    accumlated_stats[event_type].extend(entries)
+
+    # sort event's entries based on timestamp
+    for key in accumlated_stats:
+        accumlated_stats[key].sort(
+            key=lambda x: datetime.strptime(x["timestamp"], "%Y-%m-%d %H-%M-%S")
+        )
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Successfully retrieved the feedback stats",
+        data=accumlated_stats,
     )
 
 
