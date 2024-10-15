@@ -40,3 +40,5 @@ ENV DOCKER_PASSWORD $docker_password
 ENV PLATFORM docker
 
 RUN chmod +x ./entrypoint.sh
+
+CMD ["./entrypoint.sh"]
