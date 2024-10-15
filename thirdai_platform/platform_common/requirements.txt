@@ -6,3 +6,4 @@ pydantic
 colorlog
 botocore
 google-auth
+pdftitle

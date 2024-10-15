@@ -13,9 +13,9 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import deployment_job.models.ndbv1_parser as ndbv1_parser
-import deployment_job.models.ndbv2_parser as ndbv2_parser
 import fitz
+import platform_common.ndb.ndbv1_parser as ndbv1_parser
+import platform_common.ndb.ndbv2_parser as ndbv2_parser
 import thirdai.neural_db_v2.chunk_stores.constraints as ndbv2_constraints
 from deployment_job.chat import llm_providers
 from deployment_job.models.model import Model

@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from fastapi import Response
-from platform_common.file_handler import FileInfo, FileLocation, create_s3_client
+from platform_common.file_handler import FileInfo, FileLocation, S3StorageHandler
 from thirdai import neural_db as ndb
 
 
@@ -52,11 +52,13 @@ def parse_doc(doc: FileInfo, tmp_dir: str) -> ndb.Document:
     """
     if doc.location == FileLocation.s3:
         s3 = True
-        s3_client = create_s3_client()
+        s3_client = S3StorageHandler(
+            aws_access_key=os.getenv("AWS_ACCESS_KEY"),
+            aws_secret_access_key=os.getenv("AWS_ACCESS_SECRET"),
+        )
         bucket_name, prefix = doc.path.replace("s3://", "").split("/", 1)
         local_file_path = os.path.join(tmp_dir, os.path.basename(prefix))
 
-        # Download the file from S3
         try:
             s3_client.download_file(bucket_name, prefix, local_file_path)
         except Exception as error:
@@ -68,14 +70,12 @@ def parse_doc(doc: FileInfo, tmp_dir: str) -> ndb.Document:
         local_file_path = doc.path
         s3 = False
 
-    # Convert to NDB file
     ndb_file = convert_to_ndb_file(
         local_file_path, metadata=doc.metadata, options=doc.options
     )
 
     if s3:
         ndb_file.path = Path(f"/{bucket_name}.s3.amazonaws.com/{prefix}")
-        # Remove the local file
         os.remove(local_file_path)
 
     return ndb_file

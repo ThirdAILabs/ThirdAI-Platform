@@ -3,11 +3,12 @@ import shutil
 import time
 from typing import List
 
+from platform_common.ndb.ndbv1_parser import parse_doc
 from platform_common.pydantic_models.training import FileInfo, MachOptions
 from thirdai import neural_db as ndb
 from train_job.exceptional_handler import apply_exception_handler
 from train_job.models.ndb_model_interface import NDBModel
-from train_job.utils import check_disk, process_file
+from train_job.utils import check_disk
 
 
 @apply_exception_handler
@@ -27,7 +28,7 @@ class SingleMach(NDBModel):
         """
         self.logger.info("Starting unsupervised training.")
         unsupervised_docs = [
-            process_file(file, self.data_dir / "unsupervised") for file in files
+            parse_doc(file, self.data_dir / "unsupervised") for file in files
         ]
         self.logger.info(f"Processed {len(unsupervised_docs)} unsupervised documents.")
 

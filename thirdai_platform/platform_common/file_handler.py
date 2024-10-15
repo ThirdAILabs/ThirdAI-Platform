@@ -5,13 +5,10 @@ from functools import wraps
 from typing import List
 
 import boto3
-from azure.storage.blob import BlobServiceClient
 from botocore import UNSIGNED
 from botocore.client import Config
 from botocore.exceptions import ClientError
 from fastapi import HTTPException, UploadFile, status
-from google.cloud import storage
-from google.oauth2 import service_account
 
 from .pydantic_models.training import FileInfo, FileLocation
 
@@ -110,33 +107,6 @@ def expand_s3_buckets_and_directories(file_infos: List[FileInfo]) -> List[FileIn
                 expand_file_info(paths=directory_files, file_info=file_info)
             )
     return expanded_files
-
-
-def create_s3_client() -> boto3.client:
-    """
-    Create and return an S3 client using environment variables.
-    """
-    aws_access_key = os.getenv("AWS_ACCESS_KEY")
-    aws_secret_access_key = os.getenv("AWS_ACCESS_SECRET")
-
-    config_params = {
-        "retries": {"max_attempts": 10, "mode": "standard"},
-        "connect_timeout": 5,
-        "read_timeout": 60,
-    }
-
-    if not aws_access_key or not aws_secret_access_key:
-        config_params["signature_version"] = UNSIGNED
-        s3_client = boto3.client("s3", config=Config(**config_params))
-    else:
-        s3_client = boto3.client(
-            "s3",
-            aws_access_key_id=aws_access_key,
-            aws_secret_access_key=aws_secret_access_key,
-            config=Config(**config_params),
-        )
-
-    return s3_client
 
 
 def handle_exceptions(func):
@@ -340,6 +310,8 @@ class S3StorageHandler(CloudStorageHandler):
 
 class AzureStorageHandler(CloudStorageHandler):
     def __init__(self, account_name, account_key):
+        from azure.storage.blob import BlobServiceClient
+
         connection_string = f"DefaultEndpointsProtocol=https;AccountName={account_name};AccountKey={account_key};EndpointSuffix=core.windows.net"
 
         self._blob_service_client = BlobServiceClient.from_connection_string(
@@ -428,6 +400,9 @@ class AzureStorageHandler(CloudStorageHandler):
 
 class GCPStorageHandler(CloudStorageHandler):
     def __init__(self, credentials_file_path: str):
+        from google.cloud import storage
+        from google.oauth2 import service_account
+
         try:
             credentials = service_account.Credentials.from_service_account_file(
                 credentials_file_path
