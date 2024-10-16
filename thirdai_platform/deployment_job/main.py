@@ -7,9 +7,9 @@ from typing import Any
 import uvicorn
 from deployment_job.permissions import Permissions
 from deployment_job.reporter import Reporter
+from deployment_job.routers.enterprise_search import EnterpriseSearchRouter
 from deployment_job.routers.ndb import NDBRouter
 from deployment_job.routers.udt import UDTRouter
-from deployment_job.routers.enterprise_search import EnterpriseSearchRouter
 from deployment_job.utils import delete_deployment_job
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware

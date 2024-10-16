@@ -3,10 +3,10 @@ import logging
 import math
 import os
 import re
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import List
 from urllib.parse import urljoin
-from collections import deque, defaultdict
 
 import bcrypt
 import requests

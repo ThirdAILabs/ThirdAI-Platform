@@ -12,6 +12,7 @@ from backend.datagen import generate_data_for_train_job
 from backend.utils import (
     get_model,
     get_model_from_identifier,
+    get_model_status,
     get_platform,
     get_python_path,
     logger,
@@ -21,7 +22,6 @@ from backend.utils import (
     update_json,
     validate_license_info,
     validate_name,
-    get_model_status,
 )
 from database import schema
 from database.session import get_session

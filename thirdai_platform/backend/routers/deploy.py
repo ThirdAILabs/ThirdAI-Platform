@@ -28,12 +28,13 @@ from backend.utils import (
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.encoders import jsonable_encoder
+
+pass
 from platform_common.pydantic_models.deployment import (
     DeploymentConfig,
+    EnterpriseSearchOptions,
     NDBDeploymentOptions,
     UDTDeploymentOptions,
-    EnterpriseSearchOptions,
 )
 from platform_common.pydantic_models.training import ModelType
 from platform_common.utils import response

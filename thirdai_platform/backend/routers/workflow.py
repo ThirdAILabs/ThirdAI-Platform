@@ -2,16 +2,17 @@ import uuid
 from typing import List, Optional
 
 from backend.auth_dependencies import get_current_user
-from thirdai_platform.platform_common.pydantic_models.training import (
-    ModelType,
-    UDTSubType,
-)
 from backend.utils import get_model, response, validate_name
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
+from thirdai_platform.platform_common.pydantic_models.training import (
+    ModelType,
+    UDTSubType,
+)
 
 workflow_router = APIRouter()
 
