@@ -14,18 +14,18 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import fitz
-import models.ndbv1_parser as ndbv1_parser
-import models.ndbv2_parser as ndbv2_parser
+import platform_common.ndb.ndbv1_parser as ndbv1_parser
+import platform_common.ndb.ndbv2_parser as ndbv2_parser
 import thirdai.neural_db_v2.chunk_stores.constraints as ndbv2_constraints
-from chat import llm_providers
-from config import DeploymentConfig
-from file_handler import FileInfo, expand_s3_buckets_and_directories
-from models.model import Model
-from pydantic_models import inputs
+from deployment_job.chat import llm_providers
+from deployment_job.models.model import Model
+from deployment_job.pydantic_models import inputs
+from deployment_job.utils import highlighted_pdf_bytes, new_pdf_chunks, old_pdf_chunks
+from platform_common.file_handler import FileInfo, expand_s3_buckets_and_directories
+from platform_common.pydantic_models.deployment import DeploymentConfig
 from thirdai import neural_db as ndb
 from thirdai import neural_db_v2 as ndbv2
 from thirdai.neural_db_v2.core.types import Chunk
-from utils import highlighted_pdf_bytes, new_pdf_chunks, old_pdf_chunks
 
 
 class NDBModel(Model):

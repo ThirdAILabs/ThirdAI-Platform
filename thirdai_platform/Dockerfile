@@ -6,6 +6,8 @@ WORKDIR /app
 # cached even when there are changes in the directory.
 COPY requirements.txt /app
 RUN pip install -r /app/requirements.txt
+COPY platform_common/requirements.txt /app/platform_common/requirements.txt
+RUN pip install -r /app/platform_common/requirements.txt
 
 COPY . /app
 

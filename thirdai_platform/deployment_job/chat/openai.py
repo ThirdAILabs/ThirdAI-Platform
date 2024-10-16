@@ -1,6 +1,6 @@
 from urllib.parse import urljoin
 
-from chat.chat_interface import ChatInterface
+from deployment_job.chat.chat_interface import ChatInterface
 from langchain_openai import ChatOpenAI  # type: ignore
 from thirdai import neural_db as ndb
 

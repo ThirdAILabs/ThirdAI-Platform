@@ -11,11 +11,11 @@ from backend.utils import (
     get_python_path,
     model_bazaar_path,
     nomad_job_exists,
-    response,
     submit_nomad_job,
     thirdai_platform_dir,
 )
 from fastapi import APIRouter, Depends, HTTPException, status
+from platform_common.utils import response
 from pydantic import BaseModel, Field, root_validator
 
 recovery_router = APIRouter()
@@ -150,7 +150,7 @@ def backup(config: BackupConfig):
             model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
             python_path=get_python_path(),
             thirdai_platform_dir=thirdai_platform_dir(),
-            recovery_snapshot_script="recovery_snapshot_job/run.py",
+            recovery_snapshot_script="recovery_snapshot_job.run",
             config_path=config_file_path,
             share_dir=local_dir,
             db_uri=db_uri,

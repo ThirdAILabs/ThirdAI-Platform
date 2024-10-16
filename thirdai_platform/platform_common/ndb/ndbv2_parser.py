@@ -3,8 +3,9 @@ import shutil
 import uuid
 from typing import Any, Dict, Optional, Tuple
 
+import pdftitle
 from fastapi import Response
-from file_handler import FileInfo, FileLocation, create_s3_client
+from platform_common.file_handler import FileInfo, FileLocation, S3StorageHandler
 from thirdai import neural_db_v2 as ndbv2
 
 
@@ -18,12 +19,26 @@ def convert_to_ndb_doc(
     filename, ext = os.path.splitext(resource_path)
 
     if ext == ".pdf":
+        doc_keywords = ""
+        if options.get("title_as_keywords", False):
+            try:
+                pdf_title = pdftitle.get_title_from_file(resource_path)
+                filename_as_keywords = (
+                    resource_path.strip(".pdf").replace("-", " ").replace("_", " ")
+                )
+                keyword_weight = options.get("keyword_weight", 10)
+                doc_keywords = (
+                    (pdf_title + " " + filename_as_keywords + " ") * keyword_weight,
+                )
+            except Exception as e:
+                print(f"Could not parse pdftitle for pdf: {resource_path}. Error: {e}")
+
         return ndbv2.PDF(
             resource_path,
             doc_metadata=metadata,
             display_path=display_path,
             doc_id=doc_id,
-            version="v1",
+            doc_keywords=doc_keywords,
         )
     elif ext == ".docx":
         return ndbv2.DOCX(
@@ -84,7 +99,10 @@ def parse_doc(
     """
     if doc.location == FileLocation.s3:
         try:
-            s3_client = create_s3_client()
+            s3_client = S3StorageHandler(
+                aws_access_key=os.getenv("AWS_ACCESS_KEY"),
+                aws_secret_access_key=os.getenv("AWS_ACCESS_SECRET"),
+            )
             bucket_name, prefix = doc.path.replace("s3://", "").split("/", 1)
             local_file_path = os.path.join(tmp_dir, os.path.basename(prefix))
 

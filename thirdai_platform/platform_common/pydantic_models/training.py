@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, model_validator
 class ModelType(str, Enum):
     NDB = "ndb"
     UDT = "udt"
+    ENTERPRISE_SEARCH = "enterprise-search"
 
 
 class ModelDataType(str, Enum):
@@ -28,6 +29,10 @@ class FileInfo(BaseModel):
     doc_id: Optional[str] = None
     options: Dict[str, Any] = {}
     metadata: Optional[Dict[str, Any]] = None
+
+    def ext(self) -> str:
+        _, ext = os.path.splitext(self.path)
+        return ext
 
 
 class MachOptions(BaseModel):

@@ -9,8 +9,26 @@ from typing import Dict, List, Optional
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
 from backend.datagen import generate_data_for_train_job
-from backend.file_handler import download_local_files
-from backend.train_config import (
+from backend.utils import (
+    get_model,
+    get_model_from_identifier,
+    get_platform,
+    get_python_path,
+    logger,
+    model_bazaar_path,
+    submit_nomad_job,
+    thirdai_platform_dir,
+    update_json,
+    validate_license_info,
+    validate_name,
+    get_model_status,
+)
+from database import schema
+from database.session import get_session
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
+from platform_common.file_handler import download_local_files
+from platform_common.pydantic_models.feedback_logs import DeleteLog, InsertLog
+from platform_common.pydantic_models.training import (
     DatagenOptions,
     FileInfo,
     FileLocation,
@@ -28,24 +46,7 @@ from backend.train_config import (
     UDTOptions,
     UDTSubType,
 )
-from backend.utils import (
-    get_model,
-    get_model_from_identifier,
-    get_model_status,
-    get_platform,
-    get_python_path,
-    logger,
-    model_bazaar_path,
-    response,
-    submit_nomad_job,
-    thirdai_platform_dir,
-    update_json,
-    validate_license_info,
-    validate_name,
-)
-from database import schema
-from database.session import get_session
-from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
+from platform_common.utils import response
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
@@ -189,7 +190,7 @@ def train_ndb(
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("TRAIN_IMAGE_NAME"),
             thirdai_platform_dir=thirdai_platform_dir(),
-            train_script="train_job/run.py",
+            train_script="train_job.run",
             model_id=str(model_id),
             share_dir=os.getenv("SHARE_DIR", None),
             python_path=get_python_path(),
@@ -223,14 +224,6 @@ def train_ndb(
             "user_id": str(user.id),
         },
     )
-
-
-class InsertLog(BaseModel):
-    documents: List[FileInfo]
-
-
-class DeleteLog(BaseModel):
-    doc_ids: List[str]
 
 
 def list_insertions(deployment_dir: str) -> List[FileInfo]:
@@ -365,7 +358,7 @@ def retrain_ndb(
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("TRAIN_IMAGE_NAME"),
             thirdai_platform_dir=thirdai_platform_dir(),
-            train_script="train_job/run.py",
+            train_script="train_job.run",
             model_id=str(model_id),
             share_dir=os.getenv("SHARE_DIR", None),
             python_path=get_python_path(),
@@ -607,7 +600,7 @@ def datagen_callback(
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("TRAIN_IMAGE_NAME"),
             thirdai_platform_dir=thirdai_platform_dir(),
-            train_script="train_job/run.py",
+            train_script="train_job.run",
             model_id=str(model_id),
             share_dir=os.getenv("SHARE_DIR", None),
             python_path=get_python_path(),
@@ -764,7 +757,7 @@ def train_udt(
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("TRAIN_IMAGE_NAME"),
             thirdai_platform_dir=thirdai_platform_dir(),
-            train_script="train_job/run.py",
+            train_script="train_job.run",
             model_id=str(model_id),
             share_dir=os.getenv("SHARE_DIR", None),
             python_path=get_python_path(),

@@ -7,15 +7,21 @@ import argparse
 import os
 
 import thirdai
-from config import ModelType, NDBSubType, RetrieverType, TrainConfig, UDTSubType
-from models.classification_models import (
+from platform_common.pydantic_models.training import (
+    ModelType,
+    NDBSubType,
+    RetrieverType,
+    TrainConfig,
+    UDTSubType,
+)
+from train_job.models.classification_models import (
     TextClassificationModel,
     TokenClassificationModel,
 )
-from models.finetunable_retriever import FinetunableRetriever
-from models.neural_db_v2 import NeuralDBV2
-from models.single_mach import SingleMach
-from reporter import HttpReporter, Reporter
+from train_job.models.finetunable_retriever import FinetunableRetriever
+from train_job.models.neural_db_v2 import NeuralDBV2
+from train_job.models.single_mach import SingleMach
+from train_job.reporter import HttpReporter, Reporter
 
 
 def get_model(config: TrainConfig, reporter: Reporter):

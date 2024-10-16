@@ -8,7 +8,7 @@ import zipfile
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from file_handler import (
+from platform_common.file_handler import (
     AzureStorageHandler,
     CloudStorageHandler,
     GCPStorageHandler,

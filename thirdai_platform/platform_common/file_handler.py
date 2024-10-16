@@ -1,10 +1,16 @@
+import logging
 import os
 from abc import ABC, abstractmethod
+from functools import wraps
 from typing import List
 
-from backend.train_config import FileInfo, FileLocation
-from backend.utils import handle_exceptions
+import boto3
+from botocore import UNSIGNED
+from botocore.client import Config
+from botocore.exceptions import ClientError
 from fastapi import HTTPException, UploadFile, status
+
+from .pydantic_models.training import FileInfo, FileLocation
 
 
 def download_local_file(file_info: FileInfo, upload_file: UploadFile, dest_dir: str):
@@ -50,6 +56,78 @@ def download_local_files(
             all_files.append(file_info)
 
     return all_files
+
+
+def expand_file_info(paths: List[str], file_info: FileInfo):
+    return [
+        FileInfo(
+            path=path,
+            location=file_info.location,
+            doc_id=file_info.doc_id if len(paths) == 1 else None,
+            options=file_info.options,
+            metadata=file_info.metadata,
+        )
+        for path in paths
+    ]
+
+
+def list_files_in_nfs_dir(path: str):
+    if os.path.isdir(path):
+        return [
+            os.path.join(root, file)
+            for root, _, files_in_dir in os.walk(path)
+            for file in files_in_dir
+        ]
+    return [path]
+
+
+def expand_s3_buckets_and_directories(file_infos: List[FileInfo]) -> List[FileInfo]:
+    """
+    This function takes in a list of file infos and expands it so that each file info
+    represents a single file that can be passed to NDB or UDT. This is because we allow
+    users to specify s3 buckets or nfs directories in train, that could contain multiple
+    files, however UDT only accepts single files, and we need the individual docs themselves
+    so that we can parallelize doc parsing in NDB. If one of the input file infos
+    is an s3 bucket with N documents in it, then this will replace it with N file infos,
+    one per document in the bucket.
+    """
+    s3_client = S3StorageHandler()
+    expanded_files = []
+    for file_info in file_infos:
+        if file_info.location == FileLocation.local:
+            expanded_files.append(file_info)
+        elif file_info.location == FileLocation.s3:
+            s3_objects = s3_client.list_s3_files(file_info.path)
+            expanded_files.extend(
+                expand_file_info(paths=s3_objects, file_info=file_info)
+            )
+        elif file_info.location == FileLocation.nfs:
+            directory_files = list_files_in_nfs_dir(file_info.path)
+            expanded_files.extend(
+                expand_file_info(paths=directory_files, file_info=file_info)
+            )
+    return expanded_files
+
+
+def handle_exceptions(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            class_name = args[0].__class__.__name__ if args else "UnknownClass"
+            method_name = func.__name__
+            logging.error(
+                f"Error in class '{class_name}', method '{method_name}' "
+                f"with arguments {args[1:]}, and keyword arguments {kwargs}. "
+                f"Error: {str(e)}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"An error occurred: {str(e)}",
+            )
+
+    return wrapper
 
 
 class CloudStorageHandler(ABC):
@@ -103,10 +181,6 @@ class S3StorageHandler(CloudStorageHandler):
 
     @handle_exceptions
     def create_s3_client(self, aws_access_key=None, aws_secret_access_key=None):
-        import boto3
-        from botocore import UNSIGNED
-        from botocore.client import Config
-
         if not aws_access_key or not aws_secret_access_key:
             config = Config(
                 signature_version=UNSIGNED,
@@ -131,8 +205,6 @@ class S3StorageHandler(CloudStorageHandler):
 
     @handle_exceptions
     def create_bucket_if_not_exists(self, bucket_name: str):
-        from botocore.exceptions import ClientError
-
         try:
             self.s3_client.head_bucket(Bucket=bucket_name)
             print(f"Bucket {bucket_name} already exists.")
@@ -237,10 +309,6 @@ class S3StorageHandler(CloudStorageHandler):
 
 
 class AzureStorageHandler(CloudStorageHandler):
-    """
-    Azure storage handler implementation.
-    """
-
     def __init__(self, account_name, account_key):
         from azure.storage.blob import BlobServiceClient
 
@@ -331,10 +399,6 @@ class AzureStorageHandler(CloudStorageHandler):
 
 
 class GCPStorageHandler(CloudStorageHandler):
-    """
-    GCP storage handler implementation.
-    """
-
     def __init__(self, credentials_file_path: str):
         from google.cloud import storage
         from google.oauth2 import service_account
@@ -405,12 +469,10 @@ class GCPStorageHandler(CloudStorageHandler):
     def delete_bucket(self, bucket_name: str):
         bucket = self._client.bucket(bucket_name)
 
-        # List and delete all objects in the bucket
         blobs = list(bucket.list_blobs())
         for blob in blobs:
             blob.delete()
 
-        # Delete the bucket
         bucket.delete()
 
     @handle_exceptions

@@ -8,18 +8,17 @@ import requests
 import yaml
 from backend.utils import (
     delete_nomad_job,
-    get_empty_port,
     get_platform,
     get_python_path,
     get_root_absolute_path,
     model_bazaar_path,
     nomad_job_exists,
-    response,
     submit_nomad_job,
     thirdai_platform_dir,
 )
 from fastapi import status
 from licensing.verify.verify_license import valid_job_allocation, verify_license
+from platform_common.utils import response
 
 GENERATE_JOB_ID = "llm-generation"
 THIRDAI_PLATFORM_FRONTEND_ID = "thirdai-platform-frontend"
@@ -159,7 +158,6 @@ async def restart_llm_cache_job():
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "llm_cache_job.hcl.j2"),
         platform=platform,
-        port=None if platform == "docker" else get_empty_port(),
         tag=os.getenv("TAG"),
         registry=os.getenv("DOCKER_REGISTRY"),
         docker_username=os.getenv("DOCKER_USERNAME"),

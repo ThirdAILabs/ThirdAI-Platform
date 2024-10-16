@@ -3,18 +3,15 @@ import logging
 import math
 import os
 import re
-import socket
-from collections import defaultdict, deque
-from functools import wraps
 from pathlib import Path
 from typing import List
 from urllib.parse import urljoin
+from collections import deque, defaultdict
 
 import bcrypt
 import requests
 from database import schema
 from fastapi import HTTPException, status
-from fastapi.responses import JSONResponse
 from jinja2 import Template
 from licensing.verify.verify_license import valid_job_allocation, verify_license
 from sqlalchemy.orm import Session
@@ -50,29 +47,6 @@ setup_logger()
 
 def model_bazaar_path():
     return "/model_bazaar" if os.path.exists("/.dockerenv") else os.getenv("SHARE_DIR")
-
-
-def response(status_code: int, message: str, data={}, success: bool = None):
-    """
-    Create a JSON response.
-
-    Parameters:
-    - status_code: HTTP status code for the response.
-    - message: Message to include in the response.
-    - data: Optional data to include in the response (default is an empty dictionary).
-    - success: Optional boolean indicating success or failure (default is None).
-
-    Returns:
-    - JSONResponse: FastAPI JSONResponse object.
-    """
-    if success is not None:
-        status = "success" if success else "failed"
-    else:
-        status = "success" if status_code < 400 else "failed"
-    return JSONResponse(
-        status_code=status_code,
-        content={"status": status, "message": message, "data": data},
-    )
 
 
 def hash_password(password: str):
@@ -553,20 +527,6 @@ def model_accessible(model: schema.Model, user: schema.User) -> bool:
     return True
 
 
-def get_empty_port():
-    """
-    Get an empty port.
-
-    Returns:
-    - int: The empty port number.
-    """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(("", 0))  # Bind to an empty
-    port = sock.getsockname()[1]
-    sock.close()
-    return port
-
-
 def get_expiry_min(size: int):
     """
     This is a helper function to calculate the expiry time for the signed
@@ -574,11 +534,6 @@ def get_expiry_min(size: int):
     Taking an average speed of 300 to 400 KB/s we give an extra 60 min for every 1.5GB.
     """
     return 60 * (1 + math.floor(size / 1500))
-
-
-def save_dict(obj: dict, path: str):
-    with open(path, "w") as fp:
-        json.dump(obj, fp, indent=4)
 
 
 def validate_license_info():
@@ -599,24 +554,3 @@ def validate_license_info():
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"License is not valid. {str(e)}",
         )
-
-
-def handle_exceptions(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            class_name = args[0].__class__.__name__ if args else "UnknownClass"
-            method_name = func.__name__
-            logging.error(
-                f"Error in class '{class_name}', method '{method_name}' "
-                f"with arguments {args[1:]}, and keyword arguments {kwargs}. "
-                f"Error: {str(e)}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"An error occurred: {str(e)}",
-            )
-
-    return wrapper

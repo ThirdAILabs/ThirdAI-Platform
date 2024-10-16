@@ -1,24 +1,8 @@
 import os
-from enum import Enum
 from typing import Literal, Optional, Union
 
+from platform_common.pydantic_models.training import ModelType, NDBSubType, UDTSubType
 from pydantic import BaseModel, Field
-
-
-class ModelType(str, Enum):
-    NDB = "ndb"
-    UDT = "udt"
-    ENTERPRISE_SEARCH = "enterprise-search"
-
-
-class NDBSubType(str, Enum):
-    v1 = "v1"
-    v2 = "v2"
-
-
-class UDTSubType(str, Enum):
-    text = "text"
-    token = "token"
 
 
 class NDBDeploymentOptions(BaseModel):

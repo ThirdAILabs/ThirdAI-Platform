@@ -3,109 +3,13 @@ import shutil
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List
 
-import boto3
-from botocore import UNSIGNED
-from botocore.client import Config
-from config import FileInfo, FileLocation
-from fastapi import Response
+from platform_common.ndb.ndbv1_parser import parse_doc
+from platform_common.pydantic_models.training import FileInfo, FileLocation
 from thirdai import neural_db as ndb
 
 GB_1 = 1024 * 1024 * 1024  # Define 1 GB in bytes
-
-
-def create_s3_client() -> boto3.client:
-    """
-    Create and return an S3 client using environment variables.
-    """
-    aws_access_key = os.getenv("AWS_ACCESS_KEY")
-    aws_secret_access_key = os.getenv("AWS_ACCESS_SECRET")
-
-    config_params = {
-        "retries": {"max_attempts": 10, "mode": "standard"},
-        "connect_timeout": 5,
-        "read_timeout": 60,
-    }
-
-    if not aws_access_key or not aws_secret_access_key:
-        config_params["signature_version"] = UNSIGNED
-        s3_client = boto3.client("s3", config=Config(**config_params))
-    else:
-        s3_client = boto3.client(
-            "s3",
-            aws_access_key_id=aws_access_key,
-            aws_secret_access_key=aws_secret_access_key,
-            config=Config(**config_params),
-        )
-
-    return s3_client
-
-
-def list_s3_files(path: str):
-    s3_client = create_s3_client()
-
-    bucket_name, prefix = path.replace("s3://", "").split("/", 1)
-    paginator = s3_client.get_paginator("list_objects_v2")
-    pages = paginator.paginate(Bucket=bucket_name, Prefix=prefix)
-
-    file_keys = []
-    for page in pages:
-        if "Contents" in page:
-            for obj in page["Contents"]:
-                file_keys.append(f"s3://{bucket_name}/{obj['Key']}")
-
-    return file_keys
-
-
-def expand_file_info(paths: List[str], file_info: FileInfo):
-    return [
-        FileInfo(
-            path=path,
-            location=file_info.location,
-            doc_id=file_info.doc_id if len(paths) == 1 else None,
-            options=file_info.options,
-            metadata=file_info.metadata,
-        )
-        for path in paths
-    ]
-
-
-def list_files_in_nfs_dir(path: str):
-    if os.path.isdir(path):
-        return [
-            os.path.join(root, file)
-            for root, _, files_in_dir in os.walk(path)
-            for file in files_in_dir
-        ]
-    return [path]
-
-
-def expand_s3_buckets_and_directories(file_infos: List[FileInfo]) -> List[FileInfo]:
-    """
-    This function takes in a list of file infos and expands it so that each file info
-    represents a single file that can be passed to NDB or UDT. This is because we allow
-    users to specify s3 buckets or nfs directories in train, that could contain multiple
-    files, however UDT only accepts single files, and we need the individual docs themselves
-    so that we can parallelize doc parsing in NDB. If one of the input file infos
-    is an s3 bucket with N documents in it, then this will replace it with N file infos,
-    one per document in the bucket.
-    """
-    expanded_files = []
-    for file_info in file_infos:
-        if file_info.location == FileLocation.local:
-            expanded_files.append(file_info)
-        elif file_info.location == FileLocation.s3:
-            s3_objects = list_s3_files(file_info.path)
-            expanded_files.extend(
-                expand_file_info(paths=s3_objects, file_info=file_info)
-            )
-        elif file_info.location == FileLocation.nfs:
-            directory_files = list_files_in_nfs_dir(file_info.path)
-            expanded_files.extend(
-                expand_file_info(paths=directory_files, file_info=file_info)
-            )
-    return expanded_files
 
 
 def check_csv_only(all_files: List[FileInfo]):
@@ -124,80 +28,6 @@ def check_local_nfs_only(files: List[FileInfo]):
             )
 
 
-def convert_to_ndb_file(
-    file: str, metadata: Optional[Dict[str, Any]], options: Dict[str, Any]
-) -> ndb.Document:
-    """
-    Convert a file to an NDB file type based on its extension.
-    """
-    filename, ext = os.path.splitext(file)
-
-    if ext == ".pdf":
-        return ndb.PDF(file, metadata=metadata, save_extra_info=False, version="v1")
-    elif ext == ".docx":
-        return ndb.DOCX(file, metadata=metadata)
-    elif ext == ".html":
-        base_filename = os.path.basename(filename)
-
-        with open(file, "r", encoding="utf-8") as f:
-            html_content = f.read()
-
-        dummy_response = Response()
-        dummy_response.status_code = 200
-        dummy_response._content = html_content.encode("utf-8")
-
-        return ndb.URL(
-            base_filename, dummy_response, metadata=metadata, save_extra_info=False
-        )
-    elif ext == ".csv":
-        return ndb.CSV(
-            file,
-            id_column=options.get("csv_id_column", None),
-            strong_columns=options.get("csv_strong_columns", None),
-            weak_columns=options.get("csv_weak_columns", None),
-            reference_columns=options.get("csv_reference_columns", None),
-            metadata=metadata,
-            save_extra_info=False,
-        )
-    else:
-        raise TypeError(f"{ext} Document type isn't supported yet.")
-
-
-def process_file(doc: FileInfo, tmp_dir: str) -> ndb.Document:
-    """
-    Process a file, downloading it from S3 if necessary, and convert it to an NDB file.
-    """
-    if doc.path.startswith("s3://"):
-        s3 = True
-        s3_client = create_s3_client()
-        bucket_name, prefix = doc.path.replace("s3://", "").split("/", 1)
-        local_file_path = os.path.join(tmp_dir, os.path.basename(prefix))
-
-        # Download the file from S3
-        try:
-            s3_client.download_file(bucket_name, prefix, local_file_path)
-        except Exception as error:
-            print(
-                f"There was an error downloading the file from s3 : {error}. {doc.path}"
-            )
-            return f"There was an error downloading the file from s3 : {error}"
-    else:
-        local_file_path = doc.path
-        s3 = False
-
-    # Convert to NDB file
-    ndb_file = convert_to_ndb_file(
-        local_file_path, metadata=doc.metadata, options=doc.options
-    )
-
-    if s3:
-        ndb_file.path = Path(f"/{bucket_name}.s3.amazonaws.com/{prefix}")
-        # Remove the local file
-        os.remove(local_file_path)
-
-    return ndb_file
-
-
 def producer(files: List[FileInfo], buffer, tmp_dir: str):
     """
     Process files in parallel and add the resulting NDB files to a buffer.
@@ -206,7 +36,7 @@ def producer(files: List[FileInfo], buffer, tmp_dir: str):
     num_workers = max(1, max_cores - 6)
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         future_to_file = {
-            executor.submit(process_file, file, tmp_dir): file for file in files
+            executor.submit(parse_doc, file, tmp_dir): file for file in files
         }
 
         for future in as_completed(future_to_file):

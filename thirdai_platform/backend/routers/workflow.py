@@ -2,7 +2,10 @@ import uuid
 from typing import List, Optional
 
 from backend.auth_dependencies import get_current_user
-from backend.deployment_config import ModelType, UDTSubType
+from thirdai_platform.platform_common.pydantic_models.training import (
+    ModelType,
+    UDTSubType,
+)
 from backend.utils import get_model, response, validate_name
 from database import schema
 from database.session import get_session

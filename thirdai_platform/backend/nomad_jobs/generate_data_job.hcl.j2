@@ -42,7 +42,7 @@ job "GenerateData-{{ data_id }}" {
         ]
         {% elif platform == "local" %}
           command = "/bin/sh"
-          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} {{ generate_script }}"]
+          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} -m {{ generate_script }}"]
         {% endif %}
       }
 

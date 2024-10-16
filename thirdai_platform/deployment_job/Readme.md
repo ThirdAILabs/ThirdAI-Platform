@@ -20,7 +20,7 @@ To add a new router to the project, follow these steps:
 
    ```python
    from fastapi import FastAPI
-   from routers import your_new_router
+   from deployment_job.routers import your_new_router
 
    app = FastAPI()
 

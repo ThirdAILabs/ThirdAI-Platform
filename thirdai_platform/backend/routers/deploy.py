@@ -11,13 +11,6 @@ from auth.jwt import (
     verify_access_token_no_throw,
 )
 from backend.auth_dependencies import is_model_owner
-from backend.deployment_config import (
-    DeploymentConfig,
-    EnterpriseSearchOptions,
-    ModelType,
-    NDBDeploymentOptions,
-    UDTDeploymentOptions,
-)
 from backend.startup_jobs import start_on_prem_generate_job
 from backend.utils import (
     delete_nomad_job,
@@ -28,7 +21,6 @@ from backend.utils import (
     list_all_dependencies,
     logger,
     model_accessible,
-    response,
     submit_nomad_job,
     thirdai_platform_dir,
     validate_license_info,
@@ -36,6 +28,15 @@ from backend.utils import (
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.encoders import jsonable_encoder
+from platform_common.pydantic_models.deployment import (
+    DeploymentConfig,
+    NDBDeploymentOptions,
+    UDTDeploymentOptions,
+    EnterpriseSearchOptions,
+)
+from platform_common.pydantic_models.training import ModelType
+from platform_common.utils import response
 from sqlalchemy.orm import Session
 
 deploy_router = APIRouter()

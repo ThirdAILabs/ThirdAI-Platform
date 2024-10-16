@@ -4,7 +4,7 @@ from typing import AsyncGenerator, List
 from urllib.parse import urljoin
 
 import aiohttp
-from utils import Reference, make_prompt
+from llm_dispatch_job.utils import Reference, make_prompt
 
 
 class LLMBase:

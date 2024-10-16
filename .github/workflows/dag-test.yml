@@ -72,6 +72,7 @@ jobs:
         pip install -r thirdai_platform/train_job/requirements.txt
         pip install -r thirdai_platform/data_generation_job/requirements.txt
         pip install -r thirdai_platform/recovery_snapshot_job/requirements.txt
+        pip install -r thirdai_platform/platform_common/requirements.txt
     
     - name: Update openssl
       run: |

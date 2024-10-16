@@ -20,21 +20,28 @@ class AzureProvider(CloudProviderInterface):
         self.registry_name = registry.split(".")[0]
 
     def build_image(
-        self, path: str, tag: str, nocache: bool, buildargs: Dict[str, str]
+        self,
+        dockerfile_path: str,
+        context_path: str,
+        tag: str,
+        nocache: bool,
+        buildargs: Dict[str, str],
     ) -> str:
         """
         Build a Docker image from the specified path with the given tag.
 
-        :param path: Path to the Dockerfile
+        :param dockerfile_path: Path to the actual Dockerfile
+        :param context_path: Path to the context used to build
         :param tag: Tag for the built image
         :param nocache: Whether to use cache during build
         :param buildargs: Build arguments for the Docker build
         :return: ID of the built image
         """
-        print(f"Building image at path: {path} with tag: {tag}")
+        print(f"Building image at path: {context_path} with tag: {tag}")
         docker_client = docker.APIClient(base_url="unix://var/run/docker.sock")
         generator = docker_client.build(
-            path=path,
+            path=context_path,
+            dockerfile=dockerfile_path,
             tag=tag,
             rm=True,
             platform="linux/x86_64",
@@ -56,7 +63,7 @@ class AzureProvider(CloudProviderInterface):
                 if "errorDetail" in json_chunk:
                     raise RuntimeError(json_chunk["errorDetail"]["message"])
         if not image_id:
-            raise RuntimeError(f"Did not successfully build {tag} from {path}")
+            raise RuntimeError(f"Did not successfully build {tag} from {context_path}")
 
         print(f"\nLocal: Built {image_id}\n")
         print("\n===============================================================\n")

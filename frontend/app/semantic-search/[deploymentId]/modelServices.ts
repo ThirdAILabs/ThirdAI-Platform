@@ -200,31 +200,44 @@ export class ModelService {
 
   async addSources(files: File[], s3Urls: string[]): Promise<any> {
     const formData = new FormData();
-    const documentData: object[] = [];
+    const documents: object[] = [];
 
-    // Append local files to formData and documentData
+    // Process local files
     for (let i = 0; i < files.length; i++) {
       formData.append('files', files[i]);
       const extension = files[i].name.split('.').pop();
-      documentData.push({
+      documents.push({
         document_type: extension!.toUpperCase(),
         path: files[i].name,
         location: 'local',
+        metadata: {},
+        chunk_size: 100,
+        stride: 40,
+        emphasize_first_words: 0,
+        ignore_header_footer: true,
+        ignore_nonstandard_orientation: true,
       });
     }
 
-    // Append S3 URLs to documentData
+    // Process S3 URLs
     for (let i = 0; i < s3Urls.length; i++) {
       const url = s3Urls[i];
       const extension = url.split('.').pop();
-      documentData.push({
+      documents.push({
         document_type: extension ? extension.toUpperCase() : 'URL',
         path: url,
         location: 's3',
+        metadata: {},
+        chunk_size: 100,
+        stride: 40,
+        emphasize_first_words: 0,
+        ignore_header_footer: true,
+        ignore_nonstandard_orientation: true,
       });
     }
 
-    formData.append('documents', JSON.stringify(documentData));
+    // Wrap the documents array in an object with a 'documents' key
+    formData.append('documents', JSON.stringify({ documents }));
     const url = new URL(this.url + '/insert');
 
     return fetch(url, {
@@ -235,17 +248,19 @@ export class ModelService {
       },
     })
       .then(this.handleInvalidAuth())
-      .then((response) => {
+      .then(async (response) => {
         if (response.ok) {
           return response.json();
         }
+        const errorBody = await response.json();
+        throw new Error(JSON.stringify(errorBody));
       })
       .then(({ data }) => {
         return data;
       })
       .catch((e) => {
-        console.log(e);
-        return [];
+        console.error('Error in addSources:', e);
+        throw e;
       });
   }
 

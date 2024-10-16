@@ -74,7 +74,8 @@ jobs:
 
       - name: run unit tests
         run: |
-          python3 -m pytest ./thirdai_platform/tests -v
+          cd thirdai_platform
+          python3 -m pytest tests -v
 
       - name: Stop Services
         if: always()
@@ -94,12 +95,14 @@ jobs:
     - name: install dependencies
       run: |
         pip3 install -r thirdai_platform/train_job/requirements.txt
+        pip3 install -r thirdai_platform/platform_common/requirements.txt
         pip3 install pytest
         pip3 install pyopenssl --upgrade
 
     - name: run unit tests
       run: |
-        python3 -m pytest ./thirdai_platform/train_job -v
+        cd thirdai_platform
+        python3 -m pytest train_job -v
   
   llm-gen-unit-tests:
     runs-on: ubuntu-latest
@@ -119,7 +122,8 @@ jobs:
 
     - name: run unit tests
       run: |
-        python3 -m pytest ./thirdai_platform/llm_dispatch_job -v
+        cd thirdai_platform
+        python3 -m pytest llm_dispatch_job -v
 
   deployment-job-unit-tests:
     runs-on: ubuntu-latest
@@ -134,6 +138,7 @@ jobs:
     - name: install dependencies
       run: |
         pip3 install -r thirdai_platform/deployment_job/requirements.txt
+        pip3 install -r thirdai_platform/platform_common/requirements.txt
         pip3 install pyopenssl --upgrade
         pip3 install pytest
         pip3 install thirdai[neural_db_v2]

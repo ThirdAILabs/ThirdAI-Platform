@@ -1,22 +1,23 @@
 import time
 
-from config import DeploymentConfig, UDTSubType
-from fastapi import APIRouter, Depends, status
-from fastapi.encoders import jsonable_encoder
-from models.classification_models import (
+from deployment_job.models.classification_models import (
     ClassificationModel,
     TextClassificationModel,
     TokenClassificationModel,
 )
-from permissions import Permissions
-from prometheus_client import Summary
-from pydantic_models.inputs import (
+from deployment_job.permissions import Permissions
+from deployment_job.pydantic_models.inputs import (
     SearchResultsTokenClassification,
     TextAnalysisPredictParams,
 )
-from reporter import Reporter
+from deployment_job.reporter import Reporter
+from deployment_job.utils import propagate_error
+from fastapi import APIRouter, Depends, status
+from fastapi.encoders import jsonable_encoder
+from platform_common.pydantic_models.deployment import DeploymentConfig, UDTSubType
+from platform_common.utils import response
+from prometheus_client import Summary
 from throughput import Throughput
-from utils import propagate_error, response
 
 udt_predict_metric = Summary("udt_predict", "UDT predictions")
 

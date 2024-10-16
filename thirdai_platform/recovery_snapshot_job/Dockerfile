@@ -12,9 +12,14 @@ RUN apt-get update && \
 
 # Install dependencies before copying the directory so python dependencies are 
 # cached even when there are changes in the directory.
-COPY ./requirements.txt /app/requirements.txt
-RUN pip install -r /app/requirements.txt
+COPY recovery_snapshot_job/requirements.txt /app/recovery_snapshot_job/requirements.txt
+RUN pip install -r recovery_snapshot_job/requirements.txt
 
-COPY ./. /app
+COPY platform_common/requirements.txt /app/platform_common/
+RUN python3 -m pip install -r platform_common/requirements.txt
 
-CMD ["python3", "run.py"]
+COPY recovery_snapshot_job/ /app/recovery_snapshot_job/
+
+COPY platform_common/ /app/platform_common/
+
+CMD ["python3", "-m", "recovery_snapshot_job.run"]

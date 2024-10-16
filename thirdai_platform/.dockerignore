@@ -1,0 +1,17 @@
+# Ignore env file, which might contain sensitive information from local testing
+.env
+
+# Ignore Python cache files and directories
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignore the tests directory, which includes a permanent license
+/tests/
+ndb_enterprise_license.json
+
+# Ignore any file or directory that contains "test" in its name
+*test*
+
+# Ignore the licensing/generate directory, which stores our private key for generating licenses
+/licensing/generate/

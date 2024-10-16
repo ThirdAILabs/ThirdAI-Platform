@@ -5,9 +5,13 @@ from unittest.mock import patch
 
 import pytest
 import thirdai
-from config import DeploymentConfig, NDBDeploymentOptions, NDBSubType
+from deployment_job.permissions import Permissions
 from fastapi.testclient import TestClient
-from permissions import Permissions
+from platform_common.pydantic_models.deployment import (
+    DeploymentConfig,
+    NDBDeploymentOptions,
+)
+from platform_common.pydantic_models.training import NDBSubType
 from thirdai import neural_db as ndbv1
 from thirdai import neural_db_v2 as ndbv2
 
@@ -177,7 +181,7 @@ def check_deletion_dev_mode(client: TestClient):
 @patch.object(Permissions, "verify_permission", mock_verify_permission)
 @patch.object(Permissions, "check_permission", mock_check_permission)
 def test_deploy_ndb_dev_mode(tmp_dir, sub_type):
-    from routers.ndb import NDBRouter
+    from deployment_job.routers.ndb import NDBRouter
 
     config = create_config(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=False)
 
@@ -285,7 +289,7 @@ def check_log_lines(logdir, expected_lines):
 @patch.object(Permissions, "verify_permission", mock_verify_permission)
 @patch.object(Permissions, "check_permission", mock_check_permission)
 def test_deploy_ndb_prod_mode(tmp_dir, sub_type):
-    from routers.ndb import NDBRouter
+    from deployment_job.routers.ndb import NDBRouter
 
     config = create_config(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=True)
 
