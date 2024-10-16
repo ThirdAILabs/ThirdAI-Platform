@@ -1,8 +1,0 @@
-boto3
-apscheduler
-azure-storage-blob
-azure-mgmt-containerservice
-azure-identity
-google-cloud-build
-google-auth
-google-cloud-storage
