@@ -102,11 +102,12 @@ export default function ChooseProblem() {
           <div style={{ width: '100%', marginTop: '20px' }}>
             <Divider style={{ marginBottom: '20px' }} />
             {modelType === CHATBOT && (
-              <RAGQuestions models={privateModels} workflowNames={workflowNames} />
+              <RAGQuestions models={privateModels} workflowNames={workflowNames} isChatbot={true} />
             )}
             {modelType === NLP_TEXT_ANALYSIS && <NLPQuestions workflowNames={workflowNames} />}
             {modelType === ENTERPRISE_SEARCH && (
-              <SemanticSearchQuestions models={privateModels} workflowNames={workflowNames} />
+              <RAGQuestions models={privateModels} workflowNames={workflowNames} isChatbot={false} />
+              // <SemanticSearchQuestions models={privateModels} workflowNames={workflowNames} />
             )}
             {/* {modelType === DOC_CLASSIFICATION && <DocumentClassificationQuestions workflowNames={workflowNames} />} */}
             {/* {modelType === TABULAR_CLASSIFICATION && <TabularClassificationQuestions workflowNames={workflowNames} />} */}

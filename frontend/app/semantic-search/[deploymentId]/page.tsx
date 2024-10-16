@@ -143,12 +143,10 @@ function App() {
   const searchParams = useSearchParams();
   const [ifGenerationOn, setIfGenerationOn] = useState(false);
   const [cacheEnabled, setCacheEnabled] = useState(true); // default generation cache is on
-  const [ifGuardRailOn, setIfGuardRailOn] = useState(false);
   const [genAiProvider, setGenAiProvider] = useState<string | null>(null);
   const [workflowId, setWorkflowId] = useState<string | null>(null);
 
-  const [sentimentClassifierExists, setSentimentClassifierExists] = useState(false);
-  const [tokenClassifierExists, setTokenClassifierExists] = useState(false);
+  const [piiDetectionWorkflowId, setPiiDetectionWorkflowId] = useState<string | null>(null);
   const [sentimentClassifierWorkflowId, setSentimentClassifierWorkflowId] = useState<string | null>(
     null
   );
@@ -191,15 +189,18 @@ function App() {
 
           ragUrl = createDeploymentUrl(data.model_id);
 
-          const nerDependency = data.attributes.guardrail_id;
-
-          setIfGuardRailOn(!!nerDependency);
-          setTokenClassifierExists(!!nerDependency);
+          if (data.attributes.guardrail_id) {
+            setPiiDetectionWorkflowId(data.attributes.guardrail_id);
+          }
 
           chatEnabled = true;
 
           setIfGenerationOn(!!data.attributes.llm_provider);
           setGenAiProvider(data.attributes.llm_provider || null);
+
+          if (data.attributes.nlp_classifier_id) {
+            setSentimentClassifierWorkflowId(data.attributes.nlp_classifier_id);
+          }
         } else {
           // Non-enterprise-search logic
           serviceUrl = data ? createDeploymentUrl(data.model_id) : createDeploymentUrl('');
@@ -481,8 +482,7 @@ function App() {
             </TopRightCorner>
             {chatMode ? (
               <Chat
-                tokenClassifierExists={tokenClassifierExists}
-                sentimentClassifierExists={sentimentClassifierExists}
+                piiWorkflowId={piiDetectionWorkflowId}
                 sentimentWorkflowId={sentimentClassifierWorkflowId} // Pass the workflow ID for sentiment classifier
                 provider={genAiProvider || 'openai'}
               />

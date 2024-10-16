@@ -5,7 +5,7 @@ import { borderRadius, color, duration, fontSizes, padding } from '../../styling
 import { ModelServiceContext } from '../../Context';
 import { ChatMessage, ModelService } from '../../modelServices';
 import TypingAnimation from '../TypingAnimation';
-import { useTextClassificationEndpoints, useSentimentClassification } from '@/lib/backend'; // Import for sentiment classification
+import { piiDetect, useSentimentClassification } from '@/lib/backend'; // Import for sentiment classification
 // Import FontAwesomeIcon and faPause
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faStop } from '@fortawesome/free-solid-svg-icons';
@@ -180,8 +180,6 @@ function ChatBox({
     }
   };
 
-  console.log('sentiment', sentiment);
-
   return (
     <ChatBoxContainer>
       <ChatBoxSender>{message.sender === 'human' ? '👋 You' : '🤖 AI'}</ChatBoxSender>
@@ -232,13 +230,11 @@ function AILoadingChatBox() {
 }
 
 export default function Chat({
-  tokenClassifierExists,
-  sentimentClassifierExists, // Indicates if sentiment classification model exists
+  piiWorkflowId,   // Workflow ID for pii detection
   sentimentWorkflowId, // Workflow ID for sentiment classification
   provider,
 }: {
-  tokenClassifierExists: boolean;
-  sentimentClassifierExists: boolean;
+  piiWorkflowId: string | null;
   sentimentWorkflowId: string | null;
   provider: string;
 }) {
@@ -267,12 +263,11 @@ export default function Chat({
   }, [modelService, provider]);
 
   const performPIIDetection = (messageContent: string): Promise<string[][]> => {
-    if (!modelService) {
+    if (!piiWorkflowId) {
       return Promise.resolve([]);
     }
 
-    return modelService
-      .piiDetect(messageContent)
+    return piiDetect(messageContent, piiWorkflowId)
       .then((result) => {
         const { tokens, predicted_tags } = result;
         let transformed: string[][] = [];
@@ -310,7 +305,7 @@ export default function Chat({
 
   // Function to classify sentiment and store the highest sentiment score
   const classifySentiment = async (messageContent: string, messageIndex: number) => {
-    if (!sentimentClassifierExists || !sentimentWorkflowId) {
+    if (!sentimentWorkflowId) {
       return;
     }
 
@@ -367,12 +362,12 @@ export default function Chat({
       setTextInput('');
 
       // Trigger sentiment classification if classifier exists
-      if (sentimentClassifierExists) {
+      if (sentimentWorkflowId) {
         classifySentiment(lastTextInput, currentIndex);
       }
 
       // Perform PII detection on the human's message
-      if (tokenClassifierExists) {
+      if (piiWorkflowId) {
         const humanTransformed = await performPIIDetection(lastTextInput);
         setTransformedMessages((prev) => ({
           ...prev,
@@ -400,7 +395,7 @@ export default function Chat({
             });
           },
           async (finalResponse: string) => {
-            if (tokenClassifierExists) {
+            if (piiWorkflowId) {
               const aiTransformed = await performPIIDetection(finalResponse);
               setTransformedMessages((prev) => ({
                 ...prev,
@@ -446,7 +441,7 @@ export default function Chat({
               <ChatBox
                 key={i}
                 message={message}
-                transformedMessage={tokenClassifierExists ? transformedMessages[i] : undefined} // Pass PII-transformed message for human and AI
+                transformedMessage={piiWorkflowId ? transformedMessages[i] : undefined} // Pass PII-transformed message for human and AI
                 sentiment={sentiments[i]} // Pass sentiment for human message
               />
             ))}

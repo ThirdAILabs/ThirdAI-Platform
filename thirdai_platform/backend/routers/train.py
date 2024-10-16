@@ -166,11 +166,6 @@ def train_ndb(
         )
 
         session.add(new_model)
-        session.add(
-            schema.ModelAttribute(
-                model_id=model_id, key="llm_provider", value=model_options.llm_provider
-            )
-        )
         session.commit()
         session.refresh(new_model)
     except Exception as err:
