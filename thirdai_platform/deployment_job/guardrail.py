@@ -4,8 +4,8 @@ from typing import Dict, List
 from urllib.parse import urljoin
 
 import requests
+from deployment_job.pydantic_models.inputs import PiiEntity
 from fastapi import HTTPException, status
-from pydantic_models.inputs import PiiEntity
 
 
 def max_overlap(a: str, b: str) -> int:
