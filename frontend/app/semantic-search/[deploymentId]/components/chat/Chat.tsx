@@ -230,7 +230,7 @@ function AILoadingChatBox() {
 }
 
 export default function Chat({
-  piiWorkflowId,   // Workflow ID for pii detection
+  piiWorkflowId, // Workflow ID for pii detection
   sentimentWorkflowId, // Workflow ID for sentiment classification
   provider,
 }: {

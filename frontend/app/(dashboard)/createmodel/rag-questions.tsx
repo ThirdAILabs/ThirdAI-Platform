@@ -90,7 +90,7 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
         guardrail_id: grModelId || '',
         nlp_classifier_id: nlpClassifierModelId || '',
         llm_provider: '',
-        default_mode: isChatbot ? "chat" : "search",
+        default_mode: isChatbot ? 'chat' : 'search',
       };
 
       // Set llm_provider based on llmType
@@ -479,7 +479,9 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
               </div>
 
               <CardDescription>Would you like to detect sentiment of user query?</CardDescription>
-              <div style={{ display: 'flex', flexDirection: 'row', gap: '10px', marginTop: '10px' }}>
+              <div
+                style={{ display: 'flex', flexDirection: 'row', gap: '10px', marginTop: '10px' }}
+              >
                 <Button
                   variant={ifUseNLPClassifier === 'Yes' ? 'contained' : 'outlined'}
                   color={ifUseNLPClassifier === 'Yes' ? 'secondary' : 'primary'}

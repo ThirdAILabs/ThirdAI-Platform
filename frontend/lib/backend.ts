@@ -993,10 +993,16 @@ export function useSentimentClassification(workflowId: string | null) {
   };
 }
 
-export async function piiDetect(query: string, workflowId: string): Promise<TokenClassificationResult> {
+export async function piiDetect(
+  query: string,
+  workflowId: string
+): Promise<TokenClassificationResult> {
   try {
     // Corrected the key from 'query' to 'text'
-    const response = await axios.post(`${deploymentBaseUrl}/${workflowId}/predict`, { text: query, top_k: 1 });
+    const response = await axios.post(`${deploymentBaseUrl}/${workflowId}/predict`, {
+      text: query,
+      top_k: 1,
+    });
     return response.data.data;
   } catch (error) {
     console.error('Error performing pii detection:', error);
