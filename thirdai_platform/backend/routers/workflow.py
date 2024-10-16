@@ -6,13 +6,9 @@ from backend.utils import get_model, response, validate_name
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, status
+from platform_common.pydantic_models.training import ModelType, UDTSubType
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-
-from platform_common.pydantic_models.training import (
-    ModelType,
-    UDTSubType,
-)
 
 workflow_router = APIRouter()
 
