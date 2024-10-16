@@ -907,19 +907,15 @@ export function useTextClassificationEndpoints() {
       const accessToken = getAccessToken();
       axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-      const params = new URLSearchParams({ workflow_id: workflowId });
+      const params = new URLSearchParams({ model_id: workflowId });
 
       axios
         .get<WorkflowDetailsResponse>(
-          `${thirdaiPlatformBaseUrl}/api/workflow/details?${params.toString()}`
+          `${thirdaiPlatformBaseUrl}/api/model/details?${params.toString()}`
         )
         .then((res) => {
           setWorkflowName(res.data.data.model_name);
-          // for (const model of res.data.data.models) {
-          //   if (model.component === 'nlp') {
-          //     setDeploymentUrl(`${deploymentBaseUrl}/${model.model_id}`);
-          //   }
-          // }
+          setDeploymentUrl(`${deploymentBaseUrl}/${res.data.data.model_id}`);
         })
         .catch((err) => {
           console.error('Error fetching workflow details:', err);
