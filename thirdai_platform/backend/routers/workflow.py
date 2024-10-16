@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from thirdai_platform.platform_common.pydantic_models.training import (
+from platform_common.pydantic_models.training import (
     ModelType,
     UDTSubType,
 )

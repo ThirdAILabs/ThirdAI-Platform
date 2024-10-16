@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from guardrail import Guardrail, LabelMap
+from .guardrail import Guardrail, LabelMap
 
 
 def fake_ner_output(self, text, access_token):
