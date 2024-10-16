@@ -10,6 +10,8 @@ RUN apt-get update && \
     apt-get update && \
     apt-get install -y postgresql-client-17
 
+# Install dependencies before copying the directory so python dependencies are 
+# cached even when there are changes in the directory.
 COPY requirements.txt /app/requirements.txt
 RUN pip install -r /app/requirements.txt
 
