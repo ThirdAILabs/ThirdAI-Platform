@@ -308,7 +308,8 @@ export interface EnterpriseSearchOptions {
   retrieval_id: string;
   guardrail_id?: string;
   nlp_classifier_id?: string;
-  llm_provider: string;
+  llm_provider?: string;
+  default_mode?: string;
 }
 
 interface CreateWorkflowParams {
@@ -353,6 +354,7 @@ export interface Attributes {
   default_mode?: string;
   retrieval_id?: string;
   guardrail_id?: string;
+  nlp_classifier_id?: string;
 }
 
 interface Dependency {
@@ -989,6 +991,18 @@ export function useSentimentClassification(workflowId: string | null) {
   return {
     predictSentiment,
   };
+}
+
+export async function piiDetect(query: string, workflowId: string): Promise<TokenClassificationResult> {
+  try {
+    // Corrected the key from 'query' to 'text'
+    const response = await axios.post(`${deploymentBaseUrl}/${workflowId}/predict`, { text: query, top_k: 1 });
+    return response.data.data;
+  } catch (error) {
+    console.error('Error performing pii detection:', error);
+    alert('Error performing pii detection: ' + error);
+    throw new Error('Failed to perform pii detection');
+  }
 }
 
 export interface DeploymentStatsTable {

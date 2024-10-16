@@ -18,12 +18,12 @@ class EnterpriseSearchOptions(BaseModel):
     retrieval_id: str
     guardrail_id: Optional[str] = None
     llm_provider: Optional[str] = None
+    nlp_classifier_id: Optional[str] = None
     default_mode: Optional[str] = None
 
     def dependencies(self) -> List[str]:
-        if self.guardrail_id:
-            return [self.retrieval_id, self.guardrail_id]
-        return [self.retrieval_id]
+        deps = [self.retrieval_id, self.guardrail_id, self.nlp_classifier_id]
+        return list(filter(lambda x: x is not None, deps))
 
 
 @workflow_router.post("/enterprise-search")
