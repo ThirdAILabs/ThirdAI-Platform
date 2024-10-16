@@ -296,6 +296,8 @@ export class ModelService {
     const requestUrl = this.ragUrl || this.url;
     const url = new URL(requestUrl + '/search');
 
+    console.log('REQUST URL: ', url);
+
     return fetch(url, {
       method: 'POST',
       headers: {

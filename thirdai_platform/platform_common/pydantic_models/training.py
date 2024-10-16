@@ -186,6 +186,9 @@ class UDTGeneratedData(BaseModel):
     model_data_type: Literal[ModelDataType.UDT_DATAGEN] = ModelDataType.UDT_DATAGEN
     secret_token: str
 
+    class Config:
+        protected_namespaces = ()
+
 
 class LLMProvider(str, Enum):
     openai = "openai"

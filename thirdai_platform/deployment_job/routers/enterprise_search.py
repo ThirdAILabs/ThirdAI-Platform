@@ -1,10 +1,10 @@
 from urllib.parse import urljoin
 
 import requests
+from deployment_job.permissions import Permissions
 from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
 from guardrail import Guardrail, LabelMap
-from permissions import Permissions
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from prometheus_client import Summary
 from pydantic_models import inputs

@@ -21,6 +21,12 @@ enum SourceType {
   NSF = 'nsf',
 }
 
+enum LlmProvider {
+  OpenAI = 'openai',
+  OnPrem = 'on-prem',
+  SelfHosted = 'self-hosted',
+}
+
 const SemanticSearchQuestions = ({
   workflowNames,
   models,
@@ -31,7 +37,7 @@ const SemanticSearchQuestions = ({
   const [modelName, setModelName] = useState(!appName ? '' : appName);
   const [sources, setSources] = useState<Array<{ type: string; files: File[] }>>([]);
   const [fileCount, setFileCount] = useState<number[]>([]);
-  const [llmType, setLlmType] = useState<string | null>(null);
+  const [llmType, setLlmType] = useState<LlmProvider | null>(null);
 
   const [ifUseExistingSS, setUseExistingSS] = useState<string | null>(null);
   const [existingSSmodels, setExistingSSmodels] = useState<SelectModel[]>([]);
@@ -376,20 +382,22 @@ const SemanticSearchQuestions = ({
             }}
           >
             <Button
-              variant={llmType === 'OpenAI' ? 'contained' : 'outlined'}
-              onClick={() => setLlmType(llmType === 'OpenAI' ? null : 'OpenAI')}
+              variant={llmType === LlmProvider.OpenAI ? 'contained' : 'outlined'}
+              onClick={() => setLlmType(llmType === LlmProvider.OpenAI ? null : LlmProvider.OpenAI)}
             >
               OpenAI
             </Button>
             <Button
-              variant={llmType === 'On-prem' ? 'contained' : 'outlined'}
-              onClick={() => setLlmType(llmType === 'On-prem' ? null : 'On-prem')}
+              variant={llmType === LlmProvider.OnPrem ? 'contained' : 'outlined'}
+              onClick={() => setLlmType(llmType === LlmProvider.OnPrem ? null : LlmProvider.OnPrem)}
             >
               On-prem
             </Button>
             <Button
-              variant={llmType === 'Self-host' ? 'contained' : 'outlined'}
-              onClick={() => setLlmType(llmType === 'Self-host' ? null : 'Self-host')}
+              variant={llmType === LlmProvider.SelfHosted ? 'contained' : 'outlined'}
+              onClick={() =>
+                setLlmType(llmType === LlmProvider.SelfHosted ? null : LlmProvider.SelfHosted)
+              }
             >
               Self-host
             </Button>

@@ -39,19 +39,21 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
         // enterprise-search is rag with generation
 
         // TODO don't use url params
-        const genAiProvider = `${workflow.llm_provider}`;
+        const llmProvider = `${workflow.attributes.llm_provider}`;
         const ifGenerationOn = true;
-        const chatMode = workflow.default_mode == 'chat';
-        const newUrl = `/semantic-search/${workflow.model_id}?workflowId=${workflow.model_id}&ifGenerationOn=${ifGenerationOn}&genAiProvider=${genAiProvider}&chatMode=${chatMode}`;
+        const chatMode = workflow.attributes.default_mode == 'chat';
+        const newUrl = `/semantic-search/${workflow.model_id}?workflowId=${workflow.model_id}&ifGenerationOn=${ifGenerationOn}&genAiProvider=${llmProvider}&chatMode=${chatMode}`;
         window.open(newUrl, '_blank');
         break;
       }
       case 'ndb': {
         // ndb is is rag without generation
-
+        const llmProvider = workflow.attributes.llm_provider
+          ? workflow.attributes.llm_provider
+          : null;
         // TODO don't use url params
-        const ifGenerationOn = false;
-        const newUrl = `/semantic-search/${workflow.model_id}?workflowId=${workflow.model_id}&ifGenerationOn=${ifGenerationOn}`;
+        const ifGenerationOn = llmProvider != null;
+        const newUrl = `/semantic-search/${workflow.model_id}?workflowId=${workflow.model_id}&ifGenerationOn=${ifGenerationOn}&genAiProvider=${llmProvider}`;
         window.open(newUrl, '_blank');
         break;
       }
@@ -115,7 +117,7 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
 
   useEffect(() => {
     if (workflow.type === 'ndb') {
-      if (workflow.default_mode && workflow.default_mode == 'chat') {
+      if (workflow.attributes.default_mode && workflow.attributes.default_mode == 'chat') {
         setDeployType('Chatbot');
       } else {
         setDeployType('Enterprise Search');

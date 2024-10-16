@@ -73,6 +73,6 @@ class HttpReporter(Reporter):
         content = self._request(
             "post",
             "api/train/update-status",
-            params={"model_id": model_id, "status": status, "message": message},
+            params={"model_id": model_id, "new_status": status, "message": message},
         )
         print(content)

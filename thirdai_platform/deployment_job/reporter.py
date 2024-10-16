@@ -140,7 +140,7 @@ class Reporter:
             "api/deploy/update-status",
             params={
                 "model_id": model_id,
-                "status": status,
+                "new_status": status,
             },
         )
         print(content)

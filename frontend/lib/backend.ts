@@ -348,6 +348,21 @@ export function create_enterprise_search_workflow({
   });
 }
 
+export interface Attributes {
+  llm_provider?: string;
+  default_mode?: string;
+  retrieval_id?: string;
+  guardrail_id?: string;
+}
+
+interface Dependency {
+  model_id: string;
+  model_name: string;
+  type: string;
+  sub_type: string;
+  username: string;
+}
+
 export interface Workflow {
   model_id: string;
   model_name: string;
@@ -357,8 +372,8 @@ export interface Workflow {
   deploy_status: string;
   publish_date: string;
   username: string;
-  llm_provider?: string;
-  default_mode?: string;
+  attributes: Attributes;
+  dependencies: Dependency[];
   size: string;
   size_in_memory: string;
 }
@@ -492,57 +507,10 @@ export async function delete_workflow(
   });
 }
 
-interface WorkflowModel {
-  access_level: string;
-  component: string;
-  deploy_status: string;
-  domain: string;
-  latency: string;
-  model_id: string;
-  model_name: string;
-  num_params: string;
-  publish_date: string;
-  size: string;
-  size_in_memory: string;
-  sub_type: string;
-  team_id: string | null;
-  thirdai_version: string;
-  training_time: string;
-  type: string;
-  train_status: string;
-  user_email: string;
-  username: string;
-}
-
-interface Dependency {
-  model_id: string;
-  model_name: string;
-  username: string;
-}
-
 interface WorkflowDetailsResponse {
   status_code: number;
   message: string;
-  data: {
-    model_id: string;
-    model_name: string;
-    type: string;
-    train_status: string;
-    deploy_status: string;
-    llm_provider?: string;
-    guardrail_id?: string;
-    retrieval_id?: string;
-    dependencies: Dependency[];
-    username: string;
-    user_email: string;
-    publish_date: string;
-    access_level: string;
-    domain: string;
-    sub_type: string;
-    team_id: string;
-    used_by: string[];
-    default_mode: string | null;
-  };
+  data: Workflow;
 }
 
 export async function getWorkflowDetails(workflow_id: string): Promise<WorkflowDetailsResponse> {

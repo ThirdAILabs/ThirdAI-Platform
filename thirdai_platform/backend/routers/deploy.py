@@ -393,7 +393,7 @@ def deployment_status(
 @deploy_router.post("/update-status")
 def update_deployment_status(
     model_id: str,
-    status: schema.Status,
+    new_status: schema.Status,
     session: Session = Depends(get_session),
 ):
     """
@@ -422,7 +422,7 @@ def update_deployment_status(
             message=f"No model with id {model_id}.",
         )
 
-    model.deploy_status = status
+    model.deploy_status = new_status
 
     session.commit()
 

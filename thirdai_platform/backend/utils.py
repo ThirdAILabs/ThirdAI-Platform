@@ -146,13 +146,14 @@ def get_high_level_model_info(result: schema.Model):
         "sub_type": result.sub_type,
     }
 
-    attributes = result.get_attributes()
-    info.update(attributes)
+    info["attributes"] = result.get_attributes()
 
     info["dependencies"] = [
         {
             "model_id": m.dependency_id,
             "model_name": m.dependency.name,
+            "type": m.dependency.type,
+            "sub_type": m.dependency.sub_type,
             "username": m.dependency.user.username,
         }
         for m in result.dependencies

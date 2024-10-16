@@ -185,32 +185,21 @@ function App() {
 
         if (data.type === 'enterprise-search') {
           // Enterprise-search logic
-          const ragDependency = data.dependencies.find(
-            (dep) =>
-              dep.model_name.toLowerCase().includes('rag') ||
-              dep.model_name.toLowerCase().includes('retrieval')
-          );
-
-          serviceUrl = ragDependency
-            ? createDeploymentUrl(ragDependency.model_id)
+          serviceUrl = data.attributes.retrieval_id
+            ? createDeploymentUrl(data.attributes.retrieval_id)
             : createDeploymentUrl('');
 
-          // Only set ragUrl for enterprise-search case
-          ragUrl = data.model_id ? createDeploymentUrl(data.model_id) : undefined;
+          ragUrl = createDeploymentUrl(data.model_id);
 
-          const nerDependency = data.dependencies.find(
-            (dep) =>
-              dep.model_name.toLowerCase().includes('pii') ||
-              dep.model_name.toLowerCase().includes('ner')
-          );
+          const nerDependency = data.attributes.guardrail_id;
 
           setIfGuardRailOn(!!nerDependency);
           setTokenClassifierExists(!!nerDependency);
 
           chatEnabled = true;
 
-          setIfGenerationOn(!!data.llm_provider);
-          setGenAiProvider(data.llm_provider || null);
+          setIfGenerationOn(!!data.attributes.llm_provider);
+          setGenAiProvider(data.attributes.llm_provider || null);
         } else {
           // Non-enterprise-search logic
           serviceUrl = data ? createDeploymentUrl(data.model_id) : createDeploymentUrl('');
