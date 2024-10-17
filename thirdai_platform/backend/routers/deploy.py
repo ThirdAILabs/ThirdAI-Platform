@@ -369,7 +369,7 @@ def get_feedback(
     Example Usage:
     ```json
     {
-        "model_identifier": "model_123",
+        "model_identifier": "user/model_123",
     }
     ```
 
