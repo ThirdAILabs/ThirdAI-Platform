@@ -381,7 +381,7 @@ def get_feedback(
                 "query": "This is the query",
                 "reference_text": "This is the result upvoted",
                 "reference_id": 15
-                "timestamp": "2024-10-17 16-13-11"
+                "timestamp": "17 October 2024 17:54:11",
             },
             ..
         ],
@@ -389,7 +389,7 @@ def get_feedback(
             {
                 "source": "This is the source text",
                 "target": "This is the target text",
-                "timestamp": "2024-10-17 16-13-13"
+                "timestamp": "18 October 2024 17:49:43",
             },
             ..
         ]
@@ -433,7 +433,6 @@ def get_feedback(
         accumlated_feedbacks[key].sort(
             key=lambda x: datetime.strptime(x["timestamp"], "%d %B %Y %H:%M:%S")
         )
-
 
     return response(
         status_code=status.HTTP_200_OK,

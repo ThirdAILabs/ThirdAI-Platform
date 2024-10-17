@@ -33,16 +33,16 @@ class FeedbackCollector:
                         "reference_id": text_id_pair.reference_id,
                         "reference_text": text_id_pair.reference_text,
                     }
-                )  
+                )
         else:
             for text_pair in input.text_pairs:
                 self._queue[event].append(
                     {
                         "timestamp": current_time,
                         "source": text_pair.source,
-                        "target": text_pair.target
+                        "target": text_pair.target,
                     }
-                )  
+                )
 
         self.update_counter += 1
 
