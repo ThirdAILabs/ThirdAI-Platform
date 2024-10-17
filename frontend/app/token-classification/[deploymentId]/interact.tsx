@@ -553,6 +553,7 @@ export default function Interact() {
         let paragraphs: string[];
         let rowIndices: number[] | null = null;
         let isCSV = false;
+        let isDirectQuery = false;
   
         if (parsedData.type === 'pdf' && parsedData.pdfParagraphs) {
           paragraphs = parsedData.pdfParagraphs;
@@ -562,13 +563,17 @@ export default function Interact() {
           rowIndices = csvData.rowIndices;
           isCSV = true;
         } else {
-          return updatedCachedTags;
+          // This is a direct query
+          isDirectQuery = true;
+          paragraphs = [parsedData.content]; // Treat the entire content as a single paragraph
         }
 
         console.log('selectedRange', selectedRange)
 
         let relevantParagraphIndex: number;
-        if (isCSV && rowIndices) {
+        if (isDirectQuery) {
+          relevantParagraphIndex = 0; // For direct queries, we only have one paragraph
+        } else if (isCSV && rowIndices) {
           relevantParagraphIndex = findCSVRowIndex(selectedRange, rowIndices);
         } else {
           relevantParagraphIndex = findParagraphIndex(selectedRange, paragraphs);
@@ -580,21 +585,25 @@ export default function Interact() {
           const relevantParagraph = paragraphs[relevantParagraphIndex];
   
           // Use paragraph index as key
-          const feedbackKey = isCSV ? `row-${relevantParagraphIndex}` : `paragraph-${relevantParagraphIndex}`;
+          const feedbackKey = isDirectQuery ? 'direct-query' : 
+          isCSV ? `row-${relevantParagraphIndex}` : 
+          `paragraph-${relevantParagraphIndex}`;
 
           // Tokenize the paragraph
           const paragraphTokens = tokenizeParagraph(relevantParagraph);
 
           // Find the start index of this paragraph in the overall annotations
           let paragraphStartIndex = 0;
-          if (isCSV && rowIndices) {
+          if (isDirectQuery) {
+            paragraphStartIndex = 0;
+          } else if (isCSV && rowIndices) {
             paragraphStartIndex = rowIndices[relevantParagraphIndex];
           } else {
           let tokenCount = 0;
-          for (let i = 0; i < relevantParagraphIndex; i++) {
-            tokenCount += tokenizeParagraph(paragraphs[i]).length;
-          }
-          paragraphStartIndex = tokenCount;
+            for (let i = 0; i < relevantParagraphIndex; i++) {
+              tokenCount += tokenizeParagraph(paragraphs[i]).length;
+            }
+            paragraphStartIndex = tokenCount;
           }
 
           console.log('rowIndices', rowIndices)
@@ -619,7 +628,9 @@ export default function Interact() {
             }
           } else {
             updatedCachedTags[feedbackKey] = {
-              columnName: isCSV ? `Row ${relevantParagraphIndex + 1}` : `Paragraph ${relevantParagraphIndex + 1}`,
+              columnName: isDirectQuery ? 'Direct Query' : 
+                          isCSV ? `Row ${relevantParagraphIndex + 1}` : 
+                          `Paragraph ${relevantParagraphIndex + 1}`,
               content: newContent,
             };
           }
