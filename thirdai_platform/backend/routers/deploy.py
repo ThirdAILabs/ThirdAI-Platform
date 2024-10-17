@@ -403,6 +403,12 @@ def get_feedback(
             status_code=status.HTTP_400_BAD_REQUEST,
             message=str(error),
         )
+    
+    if model.type != ModelType.NDB:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message = "Feedback is only recorded for ndb model",
+        )
 
     feedback_dir = os.path.join(
         model_bazaar_path(),
