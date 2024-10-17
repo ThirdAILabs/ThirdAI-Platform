@@ -189,7 +189,7 @@ class CommonFunctions:
     def recovery_snapshot(inputs: Dict[str, Any]):
         logging.info(f"Recovery snapshot with inputs: {inputs}")
         config = {
-            "cloud_provider": None,
+            "provider": {"provider": "local"},
         }
         flow.bazaar_client.recovery_snapshot(config=config)
 
