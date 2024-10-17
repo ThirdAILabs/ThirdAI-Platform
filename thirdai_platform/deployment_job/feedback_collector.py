@@ -4,7 +4,7 @@ from collections import defaultdict, deque
 from datetime import datetime
 from typing import Union
 
-from pydantic_models.inputs import AssociateInput, UpvoteInput
+from deployment_job.pydantic_models.inputs import AssociateInput, UpvoteInput
 
 
 class FeedbackCollector:
@@ -29,9 +29,13 @@ class FeedbackCollector:
         self.update_counter += 1
 
         if self.update_counter % self.write_after_updates == 0:
+            queue_to_write = {
+                event: list(items) for event, items in self._queue.items()
+            }
+
             # write updates to jsonl file
             with open(self._log_file, "w") as fp:
-                json.dump(self._queue, fp, indent=4)
+                json.dump(queue_to_write, fp, indent=4)
 
             # reset update counter
             self.update_counter = 0
