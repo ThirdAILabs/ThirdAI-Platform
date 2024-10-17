@@ -212,7 +212,18 @@ function App() {
         // Common logic for both cases
         setChatEnabled(chatEnabled);
 
-        const newModelService = new ModelService(serviceUrl, ragUrl, uuidv4());
+        // This is so that the chat session is maintained if the tab is reloaded.
+        // The sessionStorage persists as long as the tab is open, and will not be
+        // cleared on reloads. https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage
+        var chatSessionId: string;
+        if (window.sessionStorage.getItem('chatSessionId')) {
+          chatSessionId = window.sessionStorage.getItem('chatSessionId')!;
+        } else {
+          chatSessionId = uuidv4();
+          window.sessionStorage.setItem('chatSessionId', chatSessionId);
+        }
+
+        const newModelService = new ModelService(serviceUrl, ragUrl, chatSessionId);
         setModelService(newModelService);
         newModelService.sources().then((fetchedSources) => setSources(fetchedSources));
       } catch (error) {
