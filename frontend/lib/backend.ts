@@ -374,6 +374,7 @@ export interface Workflow {
   deploy_status: string;
   publish_date: string;
   username: string;
+  user_email: string;
   attributes: Attributes;
   dependencies: Dependency[];
   size: string;

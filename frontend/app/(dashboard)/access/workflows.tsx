@@ -1,21 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { fetchWorkflows } from '@/lib/backend';
-
-type Workflow = {
-  name: string;
-  type: string;
-  status: string;
-  created_by: {
-    username: string;
-    email: string;
-  };
-  models: {
-    model_name: string;
-    type: string;
-    publish_date: string;
-  }[];
-};
+import { Workflow, fetchWorkflows } from '@/lib/backend';
 
 export default function Workflows() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -50,20 +35,19 @@ export default function Workflows() {
         <tbody>
           {workflows.map((workflow, index) => (
             <tr key={index} className="border-t">
-              <td className="py-3 px-4 text-gray-800">{workflow.name}</td>
+              <td className="py-3 px-4 text-gray-800">{workflow.model_name}</td>
               <td className="py-3 px-4 text-gray-800">{workflow.type}</td>
-              <td className="py-3 px-4 text-gray-800">{workflow.status}</td>
+              <td className="py-3 px-4 text-gray-800">{workflow.deploy_status}</td>
               <td className="py-3 px-4 text-gray-800">
-                <div>Username: {workflow.created_by.username}</div>
-                <div>Email: {workflow.created_by.email}</div>
+                <div>Username: {workflow.username}</div>
+                <div>Email: {workflow.user_email}</div>
               </td>
               <td className="py-3 px-4 text-gray-800">
-                {workflow.models.length > 0 ? (
-                  workflow.models.map((model, i) => (
+                {workflow.dependencies.length > 0 ? (
+                  workflow.dependencies.map((model, i) => (
                     <div key={i} className="mb-2">
                       <div>Model Name: {model.model_name}</div>
                       <div>Type: {model.type}</div>
-                      <div>Published On: {model.publish_date}</div>
                     </div>
                   ))
                 ) : (

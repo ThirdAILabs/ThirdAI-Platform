@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { retrain_ndb, delete_models, add_models_to_workflow, stop_workflow } from '@/lib/backend';
+import { retrain_ndb, stop_workflow } from '@/lib/backend';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
@@ -73,7 +73,7 @@ export default function UpdateButton() {
 
     try {
       // Step 1: Stop the old workflow
-      const stopData = await stop_workflow(workflowId);
+      const stopData = await stop_workflow(username, model_name);
       console.log('Workflow stopped successfully:', stopData);
 
       // Step 2: Retrain the model to create a new model
@@ -84,26 +84,6 @@ export default function UpdateButton() {
       };
       const retrainData = await retrain_ndb(retrainParams);
       console.log('Retrain initiated successfully:', retrainData);
-
-      const new_model_id = retrainData.data.model_id; // Adjust based on backend response
-
-      // Step 3: Delete the old model from the workflow
-      const deleteParams = {
-        workflow_id: workflowId,
-        model_ids: [old_model_id],
-        components: ['search'], // Adjust components as necessary
-      };
-      const deleteData = await delete_models(deleteParams);
-      console.log('Old model deleted successfully:', deleteData);
-
-      // Step 4: Add the new model to the workflow
-      const addParams = {
-        workflowId: workflowId,
-        modelIdentifiers: [new_model_id],
-        components: ['search'], // Adjust components as necessary
-      };
-      const addData = await add_models_to_workflow(addParams);
-      console.log('New model added successfully:', addData);
 
       // Optionally, update the UI or navigate
       router.push(
