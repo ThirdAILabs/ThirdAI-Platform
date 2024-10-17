@@ -55,7 +55,7 @@ class NDBRouter:
         self.insertion_logger = UpdateLogger.get_insertion_logger(self.model.data_dir)
         self.deletion_logger = UpdateLogger.get_deletion_logger(self.model.data_dir)
         self.feedback_collector = FeedbackCollector(
-            self.model.data_dir / "collected_feedbacks"
+            self.model.data_dir / "recent_feedbacks"
         )
 
         self.router = APIRouter()

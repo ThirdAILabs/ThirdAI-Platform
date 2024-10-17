@@ -413,7 +413,7 @@ def get_feedback(
     feedback_dir = os.path.join(
         model_bazaar_path(),
         "models",
-        model_identifier,
+        str(model.id),
         "deployments",
         "data",
         "collected_feedbacks",
@@ -431,7 +431,7 @@ def get_feedback(
             with open(alloc_dirEntry.path, "r") as fp:
                 feedbacks = json.load(fp)
 
-            for event, entries in feedbacks:
+            for event, entries in feedbacks.items():
                 accumlated_feedbacks[event].extend(entries)
 
     # sort each event
