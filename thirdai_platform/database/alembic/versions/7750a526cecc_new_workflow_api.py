@@ -65,84 +65,85 @@ def upgrade() -> None:
         sa.select(workflow_type_table.c.id).where(workflow_type_table.c.name == "rag")
     ).first()
 
-    rag_workflows = conn.execute(
-        sa.select(
-            workflow_table.c.id,
-            workflow_table.c.name,
-            workflow_table.c.published_date,
-            workflow_table.c.type_id,
-            workflow_table.c.user_id,
-            workflow_table.c.gen_ai_provider,
-        ).where(workflow_table.c.type_id == rag_type.id)
-    ).all()
+    if rag_type:
+        rag_workflows = conn.execute(
+            sa.select(
+                workflow_table.c.id,
+                workflow_table.c.name,
+                workflow_table.c.published_date,
+                workflow_table.c.type_id,
+                workflow_table.c.user_id,
+                workflow_table.c.gen_ai_provider,
+            ).where(workflow_table.c.type_id == rag_type.id)
+        ).all()
 
-    op.bulk_insert(
-        model_table,
-        [
-            {
-                "id": wf.id,
-                "name": wf.name,
-                "train_status": "complete",
-                "deploy_status": "not_started",
-                "type": "enterprise-search",
-                "downloads": 0,
-                "access_level": "private",
-                "default_permission": "read",
-                "published_date": wf.published_date,
-                "user_id": wf.user_id,
-            }
-            for wf in rag_workflows
-        ],
-    )
-
-    op.bulk_insert(
-        model_attributes_table,
-        [
-            {
-                "model_id": wf.id,
-                "key": "llm_provider",
-                "value": wf.gen_ai_provider,
-            }
-            for wf in rag_workflows
-        ],
-    )
-
-    rag_components = conn.execute(
-        sa.select(workflow_model_table)
-        .select_from(
-            sa.join(
-                workflow_model_table,
-                workflow_table,
-                workflow_model_table.c.workflow_id == workflow_table.c.id,
-            )
+        op.bulk_insert(
+            model_table,
+            [
+                {
+                    "id": wf.id,
+                    "name": wf.name,
+                    "train_status": "complete",
+                    "deploy_status": "not_started",
+                    "type": "enterprise-search",
+                    "downloads": 0,
+                    "access_level": "private",
+                    "default_permission": "read",
+                    "published_date": wf.published_date,
+                    "user_id": wf.user_id,
+                }
+                for wf in rag_workflows
+            ],
         )
-        .where(workflow_table.c.type_id == rag_type.id)
-    ).all()
 
-    op.bulk_insert(
-        model_attributes_table,
-        [
-            {
-                "model_id": comp.workflow_id,
-                "key": COMPONENT_TO_KEY[comp.component],
-                "value": comp.model_id,
-            }
-            for comp in rag_components
-            if comp.component in COMPONENT_TO_KEY
-        ],
-    )
+        op.bulk_insert(
+            model_attributes_table,
+            [
+                {
+                    "model_id": wf.id,
+                    "key": "llm_provider",
+                    "value": wf.gen_ai_provider,
+                }
+                for wf in rag_workflows
+            ],
+        )
 
-    op.bulk_insert(
-        model_dependencies_table,
-        [
-            {
-                "model_id": comp.workflow_id,
-                "dependency_id": comp.model_id,
-            }
-            for comp in rag_components
-            if comp.component in COMPONENT_TO_KEY
-        ],
-    )
+        rag_components = conn.execute(
+            sa.select(workflow_model_table)
+            .select_from(
+                sa.join(
+                    workflow_model_table,
+                    workflow_table,
+                    workflow_model_table.c.workflow_id == workflow_table.c.id,
+                )
+            )
+            .where(workflow_table.c.type_id == rag_type.id)
+        ).all()
+
+        op.bulk_insert(
+            model_attributes_table,
+            [
+                {
+                    "model_id": comp.workflow_id,
+                    "key": COMPONENT_TO_KEY[comp.component],
+                    "value": comp.model_id,
+                }
+                for comp in rag_components
+                if comp.component in COMPONENT_TO_KEY
+            ],
+        )
+
+        op.bulk_insert(
+            model_dependencies_table,
+            [
+                {
+                    "model_id": comp.workflow_id,
+                    "dependency_id": comp.model_id,
+                }
+                for comp in rag_components
+                if comp.component in COMPONENT_TO_KEY
+            ],
+        )
 
     op.drop_index("model_workflow_index", table_name="workflow_models")
     op.drop_index("workflow_model_index", table_name="workflow_models")
@@ -152,7 +153,7 @@ def upgrade() -> None:
     op.drop_table("model_shards")
 
     # Enums need to be dropped too: https://github.com/sqlalchemy/alembic/issues/89
-    sa.Enum("workflow_status").drop(op.get_bind(), checkfirst=False)
+    sa.Enum(name="workflowstatus").drop(op.get_bind(), checkfirst=False)
     # ### end Alembic commands ###
 
 
@@ -264,6 +265,7 @@ def downgrade() -> None:
                 "complete",
                 "failed",
                 name="status",
+                create_type=False,
             ),
             server_default=sa.text("'not_started'::status"),
             autoincrement=False,

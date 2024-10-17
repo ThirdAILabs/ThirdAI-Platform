@@ -190,6 +190,7 @@ class CommonFunctions:
         logging.info(f"Recovery snapshot with inputs: {inputs}")
         config = {
             "provider": {"provider": "local"},
+            "backup_limit": 2,
         }
         flow.bazaar_client.recovery_snapshot(config=config)
 
