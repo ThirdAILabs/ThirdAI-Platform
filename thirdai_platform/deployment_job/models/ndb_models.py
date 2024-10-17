@@ -10,8 +10,8 @@ import tempfile
 import traceback
 import uuid
 from abc import abstractmethod
-from threading import Lock
 from pathlib import Path
+from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
 
 import fitz
@@ -116,10 +116,10 @@ class NDBModel(Model):
         """
         provider = kwargs.get("provider", "openai")
 
-        # This is to handle an issue in which when multiple calls are made in parallel 
+        # This is to handle an issue in which when multiple calls are made in parallel
         # that create the chat object, the second one fails with a `table already exists`
         # error. This is likely becuase the first call as created the sqlite table but
-        # not finished updating the chat_instance map. The GIL likely does not prevent 
+        # not finished updating the chat_instance map. The GIL likely does not prevent
         # this because of IO operations related to sqlite.
         with self.chat_instance_lock:
             if provider in self.chat_instances and self.chat_instances[provider]:
