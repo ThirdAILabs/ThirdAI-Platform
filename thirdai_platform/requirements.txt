@@ -32,7 +32,7 @@ hvac
 httpx
 langchain
 langchain_openai
-mmh3==3.0.0
+mmh3
 msal
 nltk
 numpy
@@ -43,7 +43,7 @@ psycopg2-binary
 PyJWT>=2.6.0
 PyTrie
 python-dotenv
-python-multipart==0.0.5
+python-multipart
 pyyaml
 sendgrid
 sqlalchemy
