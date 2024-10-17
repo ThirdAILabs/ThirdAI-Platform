@@ -359,6 +359,40 @@ def get_feedback(
     model_identifier: str,
     session: Session = Depends(get_session),
 ):
+    """
+    Get the recent feedback of the model
+
+    Parameters:
+    - model_identifier: The identifier of the model to deploy.
+    - session: The database session (dependency).
+
+    Example Usage:
+    ```json
+    {
+        "model_identifier": "model_123",
+    }
+    ```
+
+    response:
+    ```json
+    {
+        "upvote": [
+            {
+                "query": "This is the query",
+                "Upvoted_result": "This is the result upvoted" 
+            },
+            ..
+        ],
+        "associate": [
+            {
+                "source": "This is the source text",
+                "target": "This is the target text"
+            },
+            ..
+        ]
+    }
+    ```
+    """
     try:
         model: schema.Model = get_model_from_identifier(model_identifier, session)
     except Exception as error:
@@ -396,6 +430,7 @@ def get_feedback(
         accumlated_feedbacks[key].sort(
             key=lambda x: datetime.strptime(x["timestamp"], "%Y-%m-%d %H-%M-%S")
         )
+
 
     return response(
         status_code=status.HTTP_200_OK,
