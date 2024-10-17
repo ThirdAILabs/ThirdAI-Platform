@@ -376,6 +376,12 @@ def get_feedback(
         "collected_feedbacks",
     )
 
+    if not os.path.exists(feedback_dir) or len(os.listdir(feedback_dir)) == 0:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"No feedback found for the model.",
+        )
+
     accumlated_feedbacks = defaultdict(list)
     for alloc_dirEntry in os.scandir(feedback_dir):
         if alloc_dirEntry.is_file() and alloc_dirEntry.name.endswith(".json"):

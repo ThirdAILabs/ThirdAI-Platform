@@ -8,10 +8,10 @@ from pydantic_models.inputs import AssociateInput, UpvoteInput
 
 
 class FeedbackCollector:
-    def __init__(self, log_dir, track_last_n: int = 50, write_after_updates: int = 50):
+    def __init__(self, log_dir, track_last_n: int = 50, write_after_updates: int = 5):
         os.makedirs(log_dir, exist_ok=True)
         self._log_file = os.path.join(log_dir, f"{os.getenv('NOMAD_ALLOC_ID')}.json")
-        self._queue = defaultdict(deque(maxlen=track_last_n))
+        self._queue = defaultdict(lambda: deque(maxlen=track_last_n))
         self.write_after_updates = write_after_updates
         self.update_counter = 0
 
