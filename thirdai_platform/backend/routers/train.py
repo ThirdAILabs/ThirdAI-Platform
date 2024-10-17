@@ -12,6 +12,7 @@ from backend.datagen import generate_data_for_train_job
 from backend.utils import (
     get_model,
     get_model_from_identifier,
+    get_model_status,
     get_platform,
     get_python_path,
     logger,
@@ -291,9 +292,7 @@ def retrain_ndb(
         )
 
     unsupervised_files = list_insertions(deployment_dir)
-    print("INSERTIONS:", unsupervised_files)
     deletions = list_deletions(deployment_dir)
-    print("DELETIONS:", deletions)
 
     feedback_dir = os.path.join(deployment_dir, "feedback")
     supervised_train_dir = os.path.join(
@@ -845,7 +844,7 @@ def train_complete(
 @train_router.post("/update-status")
 def train_fail(
     model_id: str,
-    status: schema.Status,
+    new_status: schema.Status,
     message: str,
     session: Session = Depends(get_session),
 ):
@@ -879,7 +878,7 @@ def train_fail(
             message=f"No model with id {model_id}.",
         )
 
-    trained_model.train_status = status
+    trained_model.train_status = new_status
     session.commit()
 
     return {"message": f"successfully updated with following {message}"}
@@ -909,11 +908,13 @@ def train_status(
             message=str(error),
         )
 
+    train_status, reasons = get_model_status(model, train_status=True)
     return response(
         status_code=status.HTTP_200_OK,
         message="Successfully got the train status.",
         data={
             "model_identifier": model_identifier,
-            "train_status": model.train_status,
+            "train_status": train_status,
+            "message": " ".join(reasons),
         },
     )

@@ -7,6 +7,7 @@ from typing import Any
 import uvicorn
 from deployment_job.permissions import Permissions
 from deployment_job.reporter import Reporter
+from deployment_job.routers.enterprise_search import EnterpriseSearchRouter
 from deployment_job.routers.ndb import NDBRouter
 from deployment_job.routers.udt import UDTRouter
 from deployment_job.utils import delete_deployment_job
@@ -75,10 +76,7 @@ async def async_timer() -> None:
             reset_event.clear()  # Clear the event if the endpoint was hit within the timeout period
         except asyncio.TimeoutError:
             # Timer expired, initiate shutdown
-            active_workflows_count = reporter.active_workflow_count(
-                model_id=config.model_id
-            )
-            if active_workflows_count == 0:
+            if reporter.active_deployment_count(config.model_id) == 0:
                 response, job_id = delete_deployment_job(
                     config.get_nomad_endpoint(),
                     config.model_id,
@@ -98,6 +96,8 @@ if config.model_options.model_type == ModelType.NDB:
     backend_router_factory = NDBRouter
 elif config.model_options.model_type == ModelType.UDT:
     backend_router_factory = UDTRouter
+elif config.model_options.model_type == ModelType.ENTERPRISE_SEARCH:
+    backend_router_factory = EnterpriseSearchRouter
 else:
     raise ValueError(f"Unsupported ModelType '{config.model_options.model_type}'.")
 

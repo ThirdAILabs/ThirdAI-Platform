@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+from unittest.mock import patch
 
 import pytest
 import thirdai
@@ -62,10 +63,6 @@ def mock_verify_permission(permission_type: str = "read"):
 
 def mock_check_permission(token: str, permission_type: str = "read"):
     return True
-
-
-Permissions.verify_permission = mock_verify_permission
-Permissions.check_permission = mock_check_permission
 
 
 def create_config(tmp_dir: str, sub_type: NDBSubType, autoscaling: bool):
@@ -181,6 +178,8 @@ def check_deletion_dev_mode(client: TestClient):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("sub_type", ["v1", "v2"])
+@patch.object(Permissions, "verify_permission", mock_verify_permission)
+@patch.object(Permissions, "check_permission", mock_check_permission)
 def test_deploy_ndb_dev_mode(tmp_dir, sub_type):
     from deployment_job.routers.ndb import NDBRouter
 
@@ -287,6 +286,8 @@ def check_log_lines(logdir, expected_lines):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("sub_type", ["v1", "v2"])
+@patch.object(Permissions, "verify_permission", mock_verify_permission)
+@patch.object(Permissions, "check_permission", mock_check_permission)
 def test_deploy_ndb_prod_mode(tmp_dir, sub_type):
     from deployment_job.routers.ndb import NDBRouter
 

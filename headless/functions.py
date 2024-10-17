@@ -749,69 +749,10 @@ class TeamAdminFunctions:
         logging.info("Cleanup process completed.")
 
 
-class WorkflowFunctions:
-    @staticmethod
-    def create_workflow(inputs: Dict[str, str]):
-        logging.info(f"inputs: {inputs}")
-        response = flow.workflow_client.create_workflow(
-            name=inputs.get("run_name"), type=inputs.get("type")
-        )
-
-        return response
-
-    @staticmethod
-    def add_models(inputs: Dict[str, str]):
-        logging.info(f"inputs: {inputs}")
-        response = flow.workflow_client.add_models(
-            workflow_id=inputs.get("workflow_id"),
-            model_ids=[inputs.get("model").model_id],
-            components=[inputs.get("component")],
-        )
-
-    @staticmethod
-    def delete_models(inputs: Dict[str, str]):
-        logging.info(f"inputs: {inputs}")
-        response = flow.workflow_client.delete_models(
-            workflow_id=inputs.get("workflow_id"),
-            model_ids=[inputs.get("model").model_id],
-            components=[inputs.get("component")],
-        )
-
-    @staticmethod
-    def validate_workflow(inputs: Dict[str, str]):
-        time.sleep(20)
-        logging.info(f"inputs: {inputs}")
-        response = flow.workflow_client.validate_workflow(
-            workflow_id=inputs.get("workflow_id")
-        )
-
-    @staticmethod
-    def stop_workflow(inputs: Dict[str, str]):
-        logging.info(f"inputs: {inputs}")
-        response = flow.workflow_client.stop_workflow(
-            workflow_id=inputs.get("workflow_id")
-        )
-
-    @staticmethod
-    def start_workflow(inputs: Dict[str, str]):
-        logging.info(f"inputs: {inputs}")
-        response = flow.workflow_client.start_workflow(
-            workflow_id=inputs.get("workflow_id")
-        )
-
-    @staticmethod
-    def delete_workflow(inputs: Dict[str, str]):
-        logging.info(f"inputs: {inputs}")
-        response = flow.workflow_client.delete_workflow(
-            workflow_id=inputs.get("workflow_id")
-        )
-
-
 functions_registry: Dict[str, Callable] = {
     **extract_static_methods(CommonFunctions),
     **extract_static_methods(NDBFunctions),
     **extract_static_methods(UDTFunctions),
     **extract_static_methods(GlobalAdminFunctions),
     **extract_static_methods(TeamAdminFunctions),
-    **extract_static_methods(WorkflowFunctions),
 }

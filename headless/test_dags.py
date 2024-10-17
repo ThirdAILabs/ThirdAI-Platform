@@ -62,7 +62,6 @@ dag_files = [
     ("headless/dag_config.yaml", "TeamAdmin"),
     ("headless/dag_config.yaml", "NDB"),
     ("headless/dag_config.yaml", "UDT"),
-    ("headless/dag_config.yaml", "Workflow"),
     ("headless/dag_config.yaml", "UDT_DATAGEN"),
 ]
 

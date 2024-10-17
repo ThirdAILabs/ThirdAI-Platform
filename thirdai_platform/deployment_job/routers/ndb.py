@@ -134,6 +134,7 @@ class NDBRouter:
         }
         ```
         """
+
         results = self.model.predict(**params.model_dump())
 
         return response(

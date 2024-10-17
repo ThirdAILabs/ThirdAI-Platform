@@ -4,16 +4,10 @@ from urllib.parse import urljoin
 
 import pytest
 import requests
+from utils import doc_dir
 
 from client.bazaar import ModelBazaar
 from client.utils import auth_header
-
-
-def doc_dir():
-    return os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        "thirdai_platform/train_job/sample_docs/",
-    )
 
 
 @pytest.mark.unit

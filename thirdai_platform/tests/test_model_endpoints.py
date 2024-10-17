@@ -72,7 +72,6 @@ def test_list_models(create_models_and_users):
     ]:
         res = client.get(
             "/api/model/list",
-            params={"name": "test_model"},
             headers=auth_header(token),
         )
         assert res.status_code == 200
