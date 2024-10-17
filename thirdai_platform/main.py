@@ -25,8 +25,6 @@ from backend.startup_jobs import (
 )
 from backend.status_sync import sync_job_statuses
 from backend.utils import get_platform
-from database.session import get_session
-from database.utils import initialize_default_workflow_types
 from fastapi.middleware.cors import CORSMiddleware
 
 app = fastapi.FastAPI()
@@ -43,9 +41,9 @@ app.include_router(user, prefix="/api/user", tags=["user"])
 app.include_router(train, prefix="/api/train", tags=["train"])
 app.include_router(model, prefix="/api/model", tags=["model"])
 app.include_router(deploy, prefix="/api/deploy", tags=["deploy"])
-app.include_router(workflow, prefix="/api/workflow", tags=["workflow"])
 app.include_router(vault, prefix="/api/vault", tags=["vault"])
 app.include_router(team, prefix="/api/team", tags=["team"])
+app.include_router(workflow, prefix="/api/workflow", tags=["workflow"])
 app.include_router(recovery, prefix="/api/recovery", tags=["recovery"])
 app.include_router(data_router, prefix="/api/data", tags=["data"])
 app.include_router(telemetry, prefix="/api/telemetry", tags=["telemetry"])
@@ -83,15 +81,6 @@ async def startup_event():
         print("Successfully started LLM Cache Job!")
     except Exception as error:
         print(f"Failed to start the LLM Cache Job : {error}", file=sys.stderr)
-
-    try:
-        print("Adding default workflow types")
-        with next(get_session()) as session:
-            initialize_default_workflow_types(session)
-        print("Added workflow types")
-    except Exception as error:
-        print(f"Initializing default workflow types failed: {error}", file=sys.stderr)
-        raise
 
     await sync_job_statuses()
 

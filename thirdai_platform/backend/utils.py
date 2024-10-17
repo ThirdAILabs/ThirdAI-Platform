@@ -4,7 +4,7 @@ import math
 import os
 import re
 import shutil
-import socket
+from collections import defaultdict, deque
 from functools import wraps
 from pathlib import Path
 from typing import List, Optional
@@ -12,13 +12,12 @@ from urllib.parse import urljoin
 
 import bcrypt
 import requests
-from backend.thirdai_storage import data_types, storage
-from backend.train_config import LabelEntity
 from database import schema
 from fastapi import HTTPException, status
-from fastapi.responses import JSONResponse
 from jinja2 import Template
 from licensing.verify.verify_license import valid_job_allocation, verify_license
+from platform_common.pydantic_models.training import LabelEntity
+from platform_common.thirdai_storage import data_types, storage
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger("ThirdAI_Platform")
@@ -54,29 +53,6 @@ def model_bazaar_path():
     return "/model_bazaar" if os.path.exists("/.dockerenv") else os.getenv("SHARE_DIR")
 
 
-def response(status_code: int, message: str, data={}, success: bool = None):
-    """
-    Create a JSON response.
-
-    Parameters:
-    - status_code: HTTP status code for the response.
-    - message: Message to include in the response.
-    - data: Optional data to include in the response (default is an empty dictionary).
-    - success: Optional boolean indicating success or failure (default is None).
-
-    Returns:
-    - JSONResponse: FastAPI JSONResponse object.
-    """
-    if success is not None:
-        status = "success" if success else "failed"
-    else:
-        status = "success" if status_code < 400 else "failed"
-    return JSONResponse(
-        status_code=status_code,
-        content={"status": status, "message": message, "data": data},
-    )
-
-
 def hash_password(password: str):
     """
     Hash a password using bcrypt.
@@ -90,6 +66,63 @@ def hash_password(password: str):
     byte_password = password.encode("utf-8")
     salt = bcrypt.gensalt()
     return bcrypt.hashpw(byte_password, salt).decode()
+
+
+def list_all_dependencies(model: schema.Model) -> List[schema.Model]:
+    queue = deque()
+    queue.append(model)
+    visited = set()
+
+    all_models = []
+
+    while len(queue) > 0:
+        m: schema.Model = queue.popleft()
+        if m.id in visited:
+            continue
+
+        visited.add(m.id)
+
+        all_models.append(m)
+
+        queue.extend(dep.dependency for dep in m.dependencies)
+
+    return all_models
+
+
+def get_model_status(model: schema.Model, train_status: bool) -> schema.Status:
+    # If the model train/deployment hasn't yet been started, was stopped, or has
+    # already failed, then the status of its dependencies is irrelevant.
+    status = model.train_status if train_status else model.deploy_status
+    if status in [
+        schema.Status.not_started,
+        schema.Status.stopped,
+        schema.Status.failed,
+    ]:
+        return status, [f"Workflow {model.name} has status {status.value}."]
+
+    statuses = defaultdict(list)
+    for m in list_all_dependencies(model):
+        status = m.train_status if train_status else m.deploy_status
+        if m.id == model.id:
+            statuses[status].append(f"Workflow {model.name} has status {status.value}.")
+        else:
+            statuses[status].append(
+                f"The workflow depends on workflow {model.name} which has status {status.value}."
+            )
+
+    status_priority_order = [
+        schema.Status.failed,
+        schema.Status.not_started,
+        schema.Status.stopped,
+        schema.Status.starting,
+        schema.Status.in_progress,
+        schema.Status.complete,
+    ]
+
+    for status_type in status_priority_order:
+        reasons = statuses[status_type]
+        if len(reasons) > 0:
+            return status_type, reasons
 
 
 def get_high_level_model_info(result: schema.Model):
@@ -110,12 +143,34 @@ def get_high_level_model_info(result: schema.Model):
         "access_level": result.access_level,
         "domain": result.domain,
         "type": result.type,
-        "train_status": result.train_status,
-        "deploy_status": result.deploy_status,
+        "train_status": get_model_status(result, train_status=True)[0],
+        "deploy_status": get_model_status(result, train_status=False)[0],
         "team_id": str(result.team_id),
         "model_id": str(result.id),
         "sub_type": result.sub_type,
     }
+
+    info["attributes"] = result.get_attributes()
+
+    info["dependencies"] = [
+        {
+            "model_id": m.dependency_id,
+            "model_name": m.dependency.name,
+            "type": m.dependency.type,
+            "sub_type": m.dependency.sub_type,
+            "username": m.dependency.user.username,
+        }
+        for m in result.dependencies
+    ]
+
+    info["used_by"] = [
+        {
+            "model_id": m.model_id,
+            "model_name": m.model.name,
+            "username": m.model.user.username,
+        }
+        for m in result.used_by
+    ]
 
     # Include metadata if it exists
     if result.meta_data:
@@ -412,6 +467,10 @@ def get_root_absolute_path():
     return Path(__file__).parent.parent.parent.absolute()
 
 
+def thirdai_platform_dir():
+    return str(get_root_absolute_path() / "thirdai_platform")
+
+
 def update_json(current_json, new_dict):
     """
     Update a JSON object with a new dictionary.
@@ -475,20 +534,6 @@ def model_accessible(model: schema.Model, user: schema.User) -> bool:
     return True
 
 
-def get_empty_port():
-    """
-    Get an empty port.
-
-    Returns:
-    - int: The empty port number.
-    """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(("", 0))  # Bind to an empty
-    port = sock.getsockname()[1]
-    sock.close()
-    return port
-
-
 def get_expiry_min(size: int):
     """
     This is a helper function to calculate the expiry time for the signed
@@ -496,41 +541,6 @@ def get_expiry_min(size: int):
     Taking an average speed of 300 to 400 KB/s we give an extra 60 min for every 1.5GB.
     """
     return 60 * (1 + math.floor(size / 1500))
-
-
-def list_workflow_models(workflow: schema.Workflow):
-    models_info = []
-    for workflow_model in workflow.workflow_models:
-        model_info = get_high_level_model_info(workflow_model.model)
-        model_info["component"] = workflow_model.component  # Append the component info
-        models_info.append(model_info)
-    return models_info
-
-
-def get_workflow(session, workflow_id, authenticated_user):
-    workflow: schema.Workflow = session.query(schema.Workflow).get(workflow_id)
-
-    if not workflow:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workflow not found.",
-        )
-
-    if (
-        workflow.user_id != authenticated_user.user.id
-        and not authenticated_user.user.is_global_admin()
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have owner permissions to this workflow",
-        )
-
-    return workflow
-
-
-def save_dict(obj: dict, path: str):
-    with open(path, "w") as fp:
-        json.dump(obj, fp, indent=4)
 
 
 def validate_license_info():

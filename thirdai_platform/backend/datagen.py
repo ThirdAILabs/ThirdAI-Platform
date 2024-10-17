@@ -3,26 +3,25 @@ import traceback
 from pathlib import Path
 from typing import List, Optional
 
-from backend.thirdai_storage.data_types import TokenClassificationData
-from backend.train_config import (
+from backend.utils import (
+    get_platform,
+    get_python_path,
+    model_bazaar_path,
+    submit_nomad_job,
+    thirdai_platform_dir,
+)
+from database import schema
+from database.session import get_session
+from fastapi import Depends, status
+from platform_common.pydantic_models.training import (
     DatagenOptions,
     JobOptions,
     LabelEntity,
     LLMProvider,
     UDTSubType,
 )
-from backend.utils import (
-    get_platform,
-    get_python_path,
-    get_root_absolute_path,
-    model_bazaar_path,
-    response,
-    save_dict,
-    submit_nomad_job,
-)
-from database import schema
-from database.session import get_session
-from fastapi import Depends, status
+from platform_common.thirdai_storage.data_types import TokenClassificationData
+from platform_common.utils import response, save_dict
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
@@ -55,8 +54,8 @@ def find_dataset(
 def dump_generation_args(path: str, args: BaseModel):
     os.makedirs(path, exist_ok=True)
     save_dict(
-        args.model_dump(),
         os.path.join(path, "generation_args.json"),
+        **args.model_dump(),
     )
 
 
@@ -141,7 +140,8 @@ def generate_text_data(
             docker_username=os.getenv("DOCKER_USERNAME"),
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("DATA_GENERATION_IMAGE_NAME"),
-            train_script=str(get_root_absolute_path() / "data_generation_job/run.py"),
+            thirdai_platform_dir=thirdai_platform_dir(),
+            generate_script="data_generation_job.run",
             task_prompt=task_prompt,
             data_id=data_id,
             storage_dir=storage_dir,
@@ -212,7 +212,8 @@ def generate_token_data(
             docker_username=os.getenv("DOCKER_USERNAME"),
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("DATA_GENERATION_IMAGE_NAME"),
-            train_script=str(get_root_absolute_path() / "data_generation_job/run.py"),
+            thirdai_platform_dir=thirdai_platform_dir(),
+            generate_script="data_generation_job.run",
             task_prompt=task_prompt,
             data_id=str(data_id),
             storage_dir=storage_dir,

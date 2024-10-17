@@ -52,11 +52,6 @@ Defines the `CloudProviderInterface` class, an abstract base class that outlines
 
 Manages the naming conventions for Docker images used in the project.
 
-#### Key Methods:
-
-- `to_list`: Converts image names to a list.
-- `peripherals_as_dict`: Converts peripheral image names to a dictionary excluding the platform image.
-
 ### `push.py`
 
 The main script that orchestrates the building and pushing of Docker images.

@@ -22,7 +22,7 @@ job "recovery-snapshot" {
         {% elif platform == "local" %}
         MODEL_BAZAAR_DIR = "{{ share_dir }}"
         {% endif %}
-        DB_URI = "{{ db_uri }}"
+        DATABASE_URI = "{{ db_uri }}"
       }
 
       config {
@@ -38,8 +38,8 @@ job "recovery-snapshot" {
             "{{ share_dir }}:/model_bazaar"
           ]
         {% elif platform == "local" %}
-          command = "{{ python_path }}"
-          args    = ["{{ recovery_snapshot_script }}"]
+          command = "/bin/sh"
+          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} -m {{ recovery_snapshot_script }}"]
         {% endif %}
       }
 

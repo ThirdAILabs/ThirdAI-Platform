@@ -5,7 +5,7 @@ from typing import Dict
 import yaml
 from azure_provider import AzureProvider
 from cloud_provider_interface import CloudProviderInterface
-from docker_constants import image_base_names, images_to_pull_from_private
+from docker_constants import images_to_build, images_to_pull_from_private
 from utils import Credentials, image_name_for_branch, load_config
 
 
@@ -71,7 +71,6 @@ def get_root_absolute_path() -> Path:
     while current_path.name != "ThirdAI-Platform":
         current_path = current_path.parent
 
-    print(current_path)
     return current_path
 
 
@@ -82,6 +81,8 @@ def build_image(
     tag: str,
     buildargs: Dict[str, str],
     nocache: bool,
+    dockerfile_path: str,
+    context_path: str,
 ) -> Dict[str, str]:
     """
     Build a Docker image.
@@ -92,11 +93,21 @@ def build_image(
     :param tag: Version tag
     :param buildargs: Build arguments for Docker
     :param nocache: Whether to use cache during build
+    :param dockerfile_path: Path to the actual Dockerfile
+    :param context_path: Path to the context used to build
     :return: Dictionary with image name and image ID
     """
-    path = get_root_absolute_path() / name
+    dockerfile_path = Path(dockerfile_path)
+    context_path = Path(context_path)
+    if not context_path.is_absolute():
+        context_path = get_root_absolute_path() / context_path
+    if not dockerfile_path.is_absolute():
+        dockerfile_path = context_path / Path(dockerfile_path)
+
     full_name = provider.get_full_image_name(name, branch, tag)
-    image_id = provider.build_image(str(path), full_name, nocache, buildargs)
+    image_id = provider.build_image(
+        str(dockerfile_path), str(context_path), full_name, nocache, buildargs
+    )
     return {name: image_id}
 
 
@@ -121,35 +132,36 @@ def build_images(
     """
     image_ids = {}
 
-    # Build ThirdAI platform image with specific buildargs
-    buildargs = {
-        "tag": tag,
-        "docker_registry": provider.get_registry_name(),
-        "docker_username": username,
-        "docker_password": password,
-        "export_image_names_command": (
-            " ".join(
-                [
-                    f"export {key}={image_name_for_branch(base_name, branch)}"
-                    for key, base_name in image_base_names.peripherals_as_dict().items()
-                ]
-            )
-        ),
-    }
-    image_ids.update(
-        build_image(
-            provider,
-            image_base_names.THIRDAI_PLATFORM_IMAGE_NAME,
-            branch,
-            tag,
-            buildargs,
-            nocache,
-        )
-    )
+    for image in images_to_build:
+        buildargs = {}
+        if image.name == "thirdai_platform":
+            buildargs = {
+                "tag": tag,
+                "docker_registry": provider.get_registry_name(),
+                "docker_username": username,
+                "docker_password": password,
+                "export_image_names_command": (
+                    " ".join(
+                        [
+                            f"export {image.key}={image_name_for_branch(image.name, branch)}"
+                            for image in images_to_build
+                        ]
+                    )
+                ),
+            }
 
-    # Build peripheral images without buildargs
-    for base_name in image_base_names.peripherals_as_dict().values():
-        image_ids.update(build_image(provider, base_name, branch, tag, {}, nocache))
+        image_ids.update(
+            build_image(
+                provider,
+                image.name,
+                branch,
+                tag,
+                buildargs,
+                nocache,
+                image.dockerfile_path,
+                image.context_path,
+            )
+        )
 
     return image_ids
 
@@ -256,8 +268,8 @@ def main() -> None:
             new_push_credentials = provider.create_credentials(
                 name=f"thirdaiplatform-push-{sanitized_branch}",
                 image_names=[
-                    image_name_for_branch(name, args.branch)
-                    for name in image_base_names.to_list()
+                    image_name_for_branch(image.name, args.branch)
+                    for image in images_to_build
                 ]
                 + images_to_pull_from_private,
                 push_access=True,
@@ -274,8 +286,8 @@ def main() -> None:
                 provider.update_credentials(
                     name=f"thirdaiplatform-push-{sanitized_branch}",
                     image_names=[
-                        image_name_for_branch(name, args.branch)
-                        for name in image_base_names.to_list()
+                        image_name_for_branch(image.name, args.branch)
+                        for image in images_to_build
                     ]
                     + images_to_pull_from_private,
                     push_access=True,
@@ -285,8 +297,8 @@ def main() -> None:
             new_pull_credentials = provider.create_credentials(
                 name=f"thirdaiplatform-pull-{sanitized_branch}",
                 image_names=[
-                    image_name_for_branch(name, args.branch)
-                    for name in image_base_names.to_list()
+                    image_name_for_branch(image.name, args.branch)
+                    for image in images_to_build
                 ]
                 + images_to_pull_from_private,
                 push_access=False,
@@ -303,8 +315,8 @@ def main() -> None:
                 provider.update_credentials(
                     name=f"thirdaiplatform-pull-{sanitized_branch}",
                     image_names=[
-                        image_name_for_branch(name, args.branch)
-                        for name in image_base_names.to_list()
+                        image_name_for_branch(image.name, args.branch)
+                        for image in images_to_build
                     ]
                     + images_to_pull_from_private,
                     push_access=False,

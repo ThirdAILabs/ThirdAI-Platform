@@ -8,17 +8,17 @@ import requests
 import yaml
 from backend.utils import (
     delete_nomad_job,
-    get_empty_port,
     get_platform,
     get_python_path,
     get_root_absolute_path,
     model_bazaar_path,
     nomad_job_exists,
-    response,
     submit_nomad_job,
+    thirdai_platform_dir,
 )
 from fastapi import status
 from licensing.verify.verify_license import valid_job_allocation, verify_license
+from platform_common.utils import response
 
 GENERATE_JOB_ID = "llm-generation"
 THIRDAI_PLATFORM_FRONTEND_ID = "thirdai-platform-frontend"
@@ -49,7 +49,8 @@ async def restart_generate_job():
         image_name=os.getenv("GENERATION_IMAGE_NAME"),
         model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
         python_path=get_python_path(),
-        generate_app_dir=str(get_root_absolute_path() / "llm_dispatch_job"),
+        thirdai_platform_dir=thirdai_platform_dir(),
+        app_dir="llm_dispatch_job",
     )
 
 
@@ -157,7 +158,6 @@ async def restart_llm_cache_job():
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "llm_cache_job.hcl.j2"),
         platform=platform,
-        port=None if platform == "docker" else get_empty_port(),
         tag=os.getenv("TAG"),
         registry=os.getenv("DOCKER_REGISTRY"),
         docker_username=os.getenv("DOCKER_USERNAME"),
@@ -166,7 +166,8 @@ async def restart_llm_cache_job():
         model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
         share_dir=os.getenv("SHARE_DIR"),
         python_path=get_python_path(),
-        llm_cache_app_dir=str(get_root_absolute_path() / "llm_cache_job"),
+        thirdai_platform_dir=thirdai_platform_dir(),
+        app_dir="llm_cache_job",
         license_key=license_info["boltLicenseKey"],
     )
 

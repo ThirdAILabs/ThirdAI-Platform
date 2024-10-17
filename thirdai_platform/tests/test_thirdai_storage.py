@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 import pytest
-from backend.thirdai_storage.data_types import (
+from platform_common.thirdai_storage.data_types import (
     DataSample,
     LabelEntity,
     LabelStatus,
@@ -11,7 +11,7 @@ from backend.thirdai_storage.data_types import (
     TagMetadata,
     TokenClassificationData,
 )
-from backend.thirdai_storage.storage import DataStorage, SQLiteConnector
+from platform_common.thirdai_storage.storage import DataStorage, SQLiteConnector
 
 
 @pytest.fixture

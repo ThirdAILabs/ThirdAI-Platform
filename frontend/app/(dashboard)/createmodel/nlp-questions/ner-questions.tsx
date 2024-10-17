@@ -1,11 +1,6 @@
 // app/NERQuestions.js
 import React, { useEffect, useState } from 'react';
-import {
-  getUsername,
-  trainTokenClassifier,
-  create_workflow,
-  add_models_to_workflow,
-} from '@/lib/backend';
+import { getUsername, trainTokenClassifier } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button, TextField, IconButton } from '@mui/material';
@@ -249,29 +244,13 @@ const NERQuestions = ({
         onCreateModel(modelId);
       }
 
-      // Create workflow after model creation
-      const workflowName = modelName;
-      const workflowTypeName = 'nlp'; // Assuming this is the type for NER workflows
-      const workflowResponse = await create_workflow({
-        name: workflowName,
-        typeName: workflowTypeName,
-      });
-      const workflowId = workflowResponse.data.workflow_id;
-
-      // Add the model to the workflow with the appropriate component
-      const addModelsResponse = await add_models_to_workflow({
-        workflowId,
-        modelIdentifiers: [modelId],
-        components: ['nlp'], // Specific to this use case
-      });
-
-      console.log('Workflow and model addition successful:', addModelsResponse);
+      console.log('NER model creation successful:', modelResponse);
 
       if (!stayOnPage) {
         router.push('/');
       }
     } catch (e) {
-      console.log(e || 'Failed to create NER model and workflow');
+      console.log(e || 'Failed to create NER model');
     } finally {
       setIsLoading(false);
     }

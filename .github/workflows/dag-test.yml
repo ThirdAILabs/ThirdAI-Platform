@@ -64,14 +64,15 @@ jobs:
       run: |
         python -m venv ${{ github.workspace }}/venv
         source venv/bin/activate
-        pip install -r deployment_job/requirements.txt
         pip install -r docs/requirements.txt
         pip install -r headless/requirements.txt
-        pip install -r llm_dispatch_job/requirements.txt
         sudo pip install -r thirdai_platform/requirements.txt
-        pip install -r train_job/requirements.txt
-        pip install -r data_generation_job/requirements.txt
-        pip install -r recovery_snapshot_job/requirements.txt
+        pip install -r thirdai_platform/deployment_job/requirements.txt
+        pip install -r thirdai_platform/llm_dispatch_job/requirements.txt
+        pip install -r thirdai_platform/train_job/requirements.txt
+        pip install -r thirdai_platform/data_generation_job/requirements.txt
+        pip install -r thirdai_platform/recovery_snapshot_job/requirements.txt
+        pip install -r thirdai_platform/platform_common/requirements.txt
     
     - name: Update openssl
       run: |

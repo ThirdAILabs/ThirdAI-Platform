@@ -9,9 +9,32 @@ from typing import Dict, List, Optional
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
 from backend.datagen import generate_data_for_train_job
-from backend.file_handler import download_local_files
-from backend.thirdai_storage import storage
-from backend.train_config import (
+from backend.utils import (
+    copy_data_storage,
+    delete_nomad_job,
+    get_model,
+    get_model_from_identifier,
+    get_model_status,
+    get_platform,
+    get_python_path,
+    logger,
+    model_bazaar_path,
+    nomad_job_exists,
+    remove_unused_samples,
+    retrieve_token_classification_samples_for_generation,
+    submit_nomad_job,
+    tags_in_storage,
+    thirdai_platform_dir,
+    update_json,
+    validate_license_info,
+    validate_name,
+)
+from database import schema
+from database.session import get_session
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
+from platform_common.file_handler import download_local_files
+from platform_common.pydantic_models.feedback_logs import DeleteLog, InsertLog
+from platform_common.pydantic_models.training import (
     DatagenOptions,
     FileInfo,
     FileLocation,
@@ -31,29 +54,8 @@ from backend.train_config import (
     UDTOptions,
     UDTSubType,
 )
-from backend.utils import (
-    copy_data_storage,
-    delete_nomad_job,
-    get_model,
-    get_model_from_identifier,
-    get_platform,
-    get_python_path,
-    get_root_absolute_path,
-    logger,
-    model_bazaar_path,
-    nomad_job_exists,
-    remove_unused_samples,
-    response,
-    retrieve_token_classification_samples_for_generation,
-    submit_nomad_job,
-    tags_in_storage,
-    update_json,
-    validate_license_info,
-    validate_name,
-)
-from database import schema
-from database.session import get_session
-from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
+from platform_common.thirdai_storage import storage
+from platform_common.utils import response
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
@@ -191,7 +193,8 @@ def train_ndb(
             docker_username=os.getenv("DOCKER_USERNAME"),
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("TRAIN_IMAGE_NAME"),
-            train_script=str(get_root_absolute_path() / "train_job/run.py"),
+            thirdai_platform_dir=thirdai_platform_dir(),
+            train_script="train_job.run",
             model_id=str(model_id),
             share_dir=os.getenv("SHARE_DIR", None),
             python_path=get_python_path(),
@@ -225,14 +228,6 @@ def train_ndb(
             "user_id": str(user.id),
         },
     )
-
-
-class InsertLog(BaseModel):
-    documents: List[FileInfo]
-
-
-class DeleteLog(BaseModel):
-    doc_ids: List[str]
 
 
 def list_insertions(deployment_dir: str) -> List[FileInfo]:
@@ -307,9 +302,7 @@ def retrain_ndb(
         )
 
     unsupervised_files = list_insertions(deployment_dir)
-    print("INSERTIONS:", unsupervised_files)
     deletions = list_deletions(deployment_dir)
-    print("DELETIONS:", deletions)
 
     feedback_dir = os.path.join(deployment_dir, "feedback")
     supervised_train_dir = os.path.join(
@@ -368,7 +361,8 @@ def retrain_ndb(
             docker_username=os.getenv("DOCKER_USERNAME"),
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("TRAIN_IMAGE_NAME"),
-            train_script=str(get_root_absolute_path() / "train_job/run.py"),
+            thirdai_platform_dir=thirdai_platform_dir(),
+            train_script="train_job.run",
             model_id=str(model_id),
             share_dir=os.getenv("SHARE_DIR", None),
             python_path=get_python_path(),
@@ -612,7 +606,8 @@ def datagen_callback(
             docker_username=os.getenv("DOCKER_USERNAME"),
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("TRAIN_IMAGE_NAME"),
-            train_script=str(get_root_absolute_path() / "train_job/run.py"),
+            thirdai_platform_dir=thirdai_platform_dir(),
+            train_script="train_job.run",
             model_id=str(model_id),
             share_dir=os.getenv("SHARE_DIR", None),
             python_path=get_python_path(),
@@ -628,8 +623,14 @@ def datagen_callback(
         model.train_status = schema.Status.starting
         session.commit()
     except Exception as err:
-        model.train_status = schema.Status.failed
+        # failed retraining job -> model is still valid
+        # failed non-retraining job -> model is not valid
+        if config.is_retraining:
+            model.train_status = schema.Status.complete
+        else:
+            model.train_status = schema.Status.failed
         session.commit()
+
         logger.info(str(err))
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -761,15 +762,10 @@ def retrain_udt(
         datagen_options=datagen_options,
         data=data,
         job_options=JobOptions(),
+        is_retraining=True if not base_model_identifier else False,
     )
 
-    config_path = os.path.join(
-        config.model_bazaar_dir, "models", str(model.id), "train_config.json"
-    )
-
-    os.makedirs(os.path.dirname(config_path), exist_ok=True)
-    with open(config_path, "w") as file:
-        file.write(config.model_dump_json(indent=4))
+    config.save_train_config()
 
     try:
         generate_data_for_train_job(
@@ -920,7 +916,8 @@ def train_udt(
             docker_username=os.getenv("DOCKER_USERNAME"),
             docker_password=os.getenv("DOCKER_PASSWORD"),
             image_name=os.getenv("TRAIN_IMAGE_NAME"),
-            train_script=str(get_root_absolute_path() / "train_job/run.py"),
+            thirdai_platform_dir=thirdai_platform_dir(),
+            train_script="train_job.run",
             model_id=str(model_id),
             share_dir=os.getenv("SHARE_DIR", None),
             python_path=get_python_path(),
@@ -1016,7 +1013,7 @@ def train_complete(
 @train_router.post("/update-status")
 def train_fail(
     model_id: str,
-    status: schema.Status,
+    new_status: schema.Status,
     message: str,
     session: Session = Depends(get_session),
 ):
@@ -1050,7 +1047,7 @@ def train_fail(
             message=f"No model with id {model_id}.",
         )
 
-    trained_model.train_status = status
+    trained_model.train_status = new_status
     session.commit()
 
     return {"message": f"successfully updated with following {message}"}
@@ -1080,11 +1077,13 @@ def train_status(
             message=str(error),
         )
 
+    train_status, reasons = get_model_status(model, train_status=True)
     return response(
         status_code=status.HTTP_200_OK,
         message="Successfully got the train status.",
         data={
             "model_identifier": model_identifier,
-            "train_status": model.train_status,
+            "train_status": train_status,
+            "message": " ".join(reasons),
         },
     )

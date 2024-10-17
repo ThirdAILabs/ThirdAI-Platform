@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { add_models_to_workflow, create_workflow, trainSentenceClassifier } from '@/lib/backend';
+import { trainSentenceClassifier } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
 
 interface SCQQuestionsProps {
@@ -159,25 +159,8 @@ const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) =>
         /* modelGoal= */ question,
         /* examples= */ categories
       );
-      const modelId = modelResponse.data.model_id;
 
-      // Create workflow after model creation
-      const workflowName = modelName;
-      const workflowTypeName = 'nlp'; // Assuming this is the type for NER workflows
-      const workflowResponse = await create_workflow({
-        name: workflowName,
-        typeName: workflowTypeName,
-      });
-      const workflowId = workflowResponse.data.workflow_id;
-
-      // Add the model to the workflow with the appropriate component
-      const addModelsResponse = await add_models_to_workflow({
-        workflowId,
-        modelIdentifiers: [modelId],
-        components: ['nlp'], // Specific to this use case
-      });
-
-      console.log('Workflow and model addition successful:', addModelsResponse);
+      console.log('created text classification model: ', modelResponse.data.model_id);
 
       router.push('/');
     } catch (e) {

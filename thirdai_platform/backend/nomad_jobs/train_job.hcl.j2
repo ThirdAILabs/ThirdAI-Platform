@@ -33,10 +33,10 @@ job "{{ train_job_name }}" {
             "{{ share_dir }}:/model_bazaar"
           ]
           command = "python3"
-          args    = ["run.py", "--config", "{{ config_path }}"]
+          args    = ["-m", "{{ train_script }}", "--config", "{{ config_path }}"]
         {% elif platform == "local" %}
-          command = "{{ python_path }}"
-          args    = ["{{ train_script }}", "--config", "{{ config_path }}"]
+          command = "/bin/sh"
+          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} -m {{ train_script }} --config {{ config_path }}"]
         {% endif %}
       }
 
