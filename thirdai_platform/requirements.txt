@@ -2,7 +2,7 @@ fastapi==0.109.2
 gunicorn==20.1.0
 jinja2==3.1.2
 pdftitle==0.11 # 0.12 has has a conflict with pdfplumber from thirdai
-pydantic>=2.0.0
+pydantic>=2.1.0
 PyMuPDF
 requests<2.32.0
 thirdai[neural_db_v2]>=0.9.12
@@ -32,7 +32,7 @@ hvac
 httpx
 langchain
 langchain_openai
-mmh3
+mmh3==3.0.0
 msal
 nltk
 numpy
@@ -43,7 +43,7 @@ psycopg2-binary
 PyJWT>=2.6.0
 PyTrie
 python-dotenv
-python-multipart
+python-multipart==0.0.5
 pyyaml
 sendgrid
 sqlalchemy
