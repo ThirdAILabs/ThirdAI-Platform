@@ -379,14 +379,17 @@ def get_feedback(
         "upvote": [
             {
                 "query": "This is the query",
-                "Upvoted_result": "This is the result upvoted" 
+                "reference_text": "This is the result upvoted",
+                "reference_id": 15
+                "timestamp": "2024-10-17 16-13-11"
             },
             ..
         ],
         "associate": [
             {
                 "source": "This is the source text",
-                "target": "This is the target text"
+                "target": "This is the target text",
+                "timestamp": "2024-10-17 16-13-13"
             },
             ..
         ]
@@ -423,12 +426,12 @@ def get_feedback(
                 feedbacks = json.load(fp)
 
             for event, entries in feedbacks:
-                accumlated_feedbacks[event].append(entries)
+                accumlated_feedbacks[event].extend(entries)
 
     # sort each event
     for key in accumlated_feedbacks:
         accumlated_feedbacks[key].sort(
-            key=lambda x: datetime.strptime(x["timestamp"], "%Y-%m-%d %H-%M-%S")
+            key=lambda x: datetime.strptime(x["timestamp"], "%d %B %Y %H:%M:%S")
         )
 
 

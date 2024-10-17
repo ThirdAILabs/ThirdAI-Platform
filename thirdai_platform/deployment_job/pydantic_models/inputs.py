@@ -69,6 +69,7 @@ class UpvoteInputSingle(BaseModel):
 
     query_text: str
     reference_id: int = Field(..., ge=0)
+    reference_text: str
 
 
 class UpvoteInput(BaseModel):

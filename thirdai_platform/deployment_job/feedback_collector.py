@@ -8,7 +8,7 @@ from deployment_job.pydantic_models.inputs import AssociateInput, UpvoteInput
 
 
 class FeedbackCollector:
-    def __init__(self, log_dir, track_last_n: int = 50, write_after_updates: int = 5):
+    def __init__(self, log_dir, track_last_n: int = 20, write_after_updates: int = 5):
         os.makedirs(log_dir, exist_ok=True)
         self._log_file = os.path.join(log_dir, f"{os.getenv('NOMAD_ALLOC_ID')}.json")
         self._queue = defaultdict(lambda: deque(maxlen=track_last_n))
@@ -23,9 +23,27 @@ class FeedbackCollector:
         else:
             raise ValueError("Input type not supported")
 
-        feedback = input.model_dump()
-        feedback["timestamp"] = str(datetime.now().strftime("%Y-%m-%d %H-%M-%S"))
-        self._queue[event].append(feedback)
+        current_time = str(datetime.now().strftime("%d %B %Y %H:%M:%S"))
+        if event == "upvote":
+            for text_id_pair in input.text_id_pairs:
+                self._queue[event].append(
+                    {
+                        "timestamp": current_time,
+                        "query_text": text_id_pair.query_text,
+                        "reference_id": text_id_pair.reference_id,
+                        "reference_text": text_id_pair.reference_text,
+                    }
+                )  
+        else:
+            for text_pair in input.text_pairs:
+                self._queue[event].append(
+                    {
+                        "timestamp": current_time,
+                        "source": text_pair.source,
+                        "target": text_pair.target
+                    }
+                )  
+
         self.update_counter += 1
 
         if self.update_counter % self.write_after_updates == 0:

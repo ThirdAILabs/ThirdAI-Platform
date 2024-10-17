@@ -505,6 +505,7 @@ export class ModelService {
           {
             query_text: queryText,
             reference_id: referenceId,
+            reference_text: referenceText
           },
         ],
       }),
