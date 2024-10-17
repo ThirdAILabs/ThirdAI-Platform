@@ -81,7 +81,7 @@ export default function AnalyticsPage() {
     ],
   };
 
-  const thirdaiPlatformBaseUrl = _.trim(process.env.THIRDAI_PLATFORM_BASE_URL!, '/');
+  const thirdaiPlatformBaseUrl = _.trim(process.env.thirdai_platform_services_URL!, '/');
   const grafanaUrl = `${thirdaiPlatformBaseUrl}/grafana`;
 
   return (
