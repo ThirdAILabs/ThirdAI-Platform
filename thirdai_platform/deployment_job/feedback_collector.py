@@ -2,7 +2,6 @@ import json
 import os
 from collections import defaultdict, deque
 from datetime import datetime
-from pathlib import Path
 from typing import Union
 
 from pydantic_models.inputs import AssociateInput, UpvoteInput
@@ -10,7 +9,7 @@ from pydantic_models.inputs import AssociateInput, UpvoteInput
 
 class FeedbackCollector:
     def __init__(
-        self, log_dir: Path, track_last_n: int = 50, write_after_updates: int = 50
+        self, log_dir, track_last_n: int = 50, write_after_updates: int = 50
     ):
         os.makedirs(log_dir, exist_ok=True)
         self._log_file = os.path.join(log_dir, f"{os.getenv('NOMAD_ALLOC_ID')}.json")
@@ -24,10 +23,10 @@ class FeedbackCollector:
         elif isinstance(input, UpvoteInput):
             event = "upvote"
         else:
-            raise ValueError("input type not supported")
+            raise ValueError("Input type not supported")
 
         feedback = input.model_dump()
-        feedback["timestamp"] = str(datetime.now())
+        feedback["timestamp"] = str(datetime.now().strftime("%Y-%m-%d %H-%M-%S"))
         self._queue[event].append(feedback)
         self.update_counter += 1
 

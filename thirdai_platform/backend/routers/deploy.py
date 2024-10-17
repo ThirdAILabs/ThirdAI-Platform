@@ -2,8 +2,9 @@ import json
 import os
 import traceback
 from pathlib import Path
+from datetime import datetime
 from typing import Optional, Union
-
+from collections import defaultdict
 from auth.jwt import (
     AuthenticatedUser,
     now_plus_minutes,
@@ -22,6 +23,7 @@ from backend.utils import (
     submit_nomad_job,
     thirdai_platform_dir,
     validate_license_info,
+    model_bazaar_path
 )
 from database import schema
 from database.session import get_session
@@ -292,6 +294,48 @@ def deploy_model(
         },
     )
 
+@deploy_router.get("/feedbacks", dependencies=[Depends(is_model_owner)])
+def get_feedback(
+    model_identifier: str,
+    session: Session = Depends(get_session),
+):
+    try:
+        model: schema.Model = get_model_from_identifier(model_identifier, session)
+    except Exception as error:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=str(error),
+        )
+
+    feedback_dir = os.path.join(
+        model_bazaar_path(),
+        "models",
+        model_identifier,
+        "deployments",
+        "data",
+        "collected_feedbacks"
+    )
+
+    accumlated_feedbacks = defaultdict(list)
+    for alloc_dirEntry in os.scandir(feedback_dir):
+        if alloc_dirEntry.is_file() and alloc_dirEntry.name.endswith(".json"):
+            with open(alloc_dirEntry.path, "r") as fp:
+                feedbacks = json.load(fp)
+            
+            for event, entries in feedbacks:
+                accumlated_feedbacks[event].append(entries)
+    
+    # sort each event
+    for key in accumlated_feedbacks:
+        accumlated_feedbacks[key].sort(
+            key=lambda x: datetime.strptime(x["timestamp"], "%Y-%m-%d %H-%M-%S")
+        )
+    
+    return response(
+        status_code=status.HTTP_200_OK,
+        message = "Successfully retrieved the feedbacks",
+        data = accumlated_feedbacks
+    )
 
 @deploy_router.get("/status")
 def deployment_status(
