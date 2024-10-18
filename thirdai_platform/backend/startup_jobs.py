@@ -118,7 +118,7 @@ async def restart_thirdai_platform_frontend():
         public_model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
         openai_api_key=os.getenv("GENAI_KEY"),
         deployment_base_url=os.getenv("PUBLIC_MODEL_BAZAAR_ENDPOINT"),
-        thirdai_platform_url=os.getenv("PUBLIC_MODEL_BAZAAR_ENDPOINT"),
+        thirdai_platform_base_url=os.getenv("PUBLIC_MODEL_BAZAAR_ENDPOINT"),
         platform=get_platform(),
         tag=os.getenv("TAG"),
         registry=os.getenv("DOCKER_REGISTRY"),
