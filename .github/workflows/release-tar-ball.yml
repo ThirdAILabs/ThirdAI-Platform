@@ -116,11 +116,11 @@ jobs:
         run: |
           docker login -u ${{ env.pull_username }} -p ${{ env.pull_password }} thirdaiplatform.azurecr.io
 
-      - name: Fetch the latest tag for thirdai_platform_services
+      - name: Fetch the latest tag for thirdai_platform
         id: fetch_latest_tag
         run: |
           latest_tag=$(az acr repository show-tags --name thirdaiplatform \
-            --repository thirdai_platform_services_${{ env.branch_name }} --orderby time_desc --output tsv | grep -v '^latest$' | head -n 1)
+            --repository thirdai_platform_${{ env.branch_name }} --orderby time_desc --output tsv | grep -v '^latest$' | head -n 1)
           echo "Latest tag is: $latest_tag"
           echo "latest_tag=$latest_tag" >> $GITHUB_ENV  # Save the latest_tag to the environment file
 
@@ -130,7 +130,7 @@ jobs:
           mkdir -p docker_images-${{ env.latest_tag }}
 
           # Pull and save images using the persisted ${{ env.latest_tag }} across steps
-          images=(thirdai_platform_services_${{ env.branch_name }} frontend_${{ env.branch_name }})
+          images=(thirdai_platform_${{ env.branch_name }} frontend_${{ env.branch_name }})
 
           for image in "${images[@]}"
           do

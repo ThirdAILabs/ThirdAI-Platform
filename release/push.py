@@ -134,7 +134,7 @@ def build_images(
 
     for image in images_to_build:
         buildargs = {}
-        if image.name == "thirdai_platform_services":
+        if image.name == "thirdai_platform":
             buildargs = {
                 "tag": tag,
                 "docker_registry": provider.get_registry_name(),

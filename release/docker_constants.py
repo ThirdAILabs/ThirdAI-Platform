@@ -19,7 +19,7 @@ class Image:
 
 images_to_build = [
     Image(
-        name="thirdai_platform_services",
+        name="thirdai_platform",
         dockerfile_path="Dockerfile",
         context_path="thirdai_platform",
     ),

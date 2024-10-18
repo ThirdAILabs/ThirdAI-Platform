@@ -22,7 +22,7 @@ job "{{ train_job_name }}" {
 
       config {
         {% if platform == "docker" %}
-          image = "{{ registry }}/thirdai_platform_services:{{ tag }}"
+          image = "{{ registry }}/thirdai_platform:{{ tag }}"
           image_pull_timeout = "15m"
           auth {
             username = "{{ docker_username }}"
