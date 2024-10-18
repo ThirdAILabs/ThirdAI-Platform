@@ -67,6 +67,7 @@ jobs:
         pip install -r docs/requirements.txt
         pip install -r headless/requirements.txt
         sudo pip install -r thirdai_platform/requirements.txt
+        pip install -r thirdai_platform/requirements.txt
     
     - name: Update openssl
       run: |
