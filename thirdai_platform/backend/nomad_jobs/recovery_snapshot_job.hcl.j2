@@ -27,7 +27,7 @@ job "recovery-snapshot" {
 
       config {
         {% if platform == "docker" %}
-          image = "{{ registry }}/thirdai_platform:{{ tag }}"
+          image = "{{ registry }}/{{ image_name }}:{{ tag }}"
           image_pull_timeout = "15m"
           auth {
             username = "{{ docker_username }}"

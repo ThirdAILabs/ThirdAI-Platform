@@ -75,7 +75,7 @@ EOF
 
       config {
         {% if platform == "docker" %}  
-          image = "{{ registry }}/thirdai_platform:{{ tag }}"
+          image = "{{ registry }}/{{ image_name }}:{{ tag }}"
           image_pull_timeout = "15m"
           ports = ["{{ model_id }}-http"]
           group_add = ["4646"]

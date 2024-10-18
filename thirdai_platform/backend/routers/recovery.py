@@ -57,6 +57,7 @@ def backup(config: BackupConfig):
             registry=os.getenv("DOCKER_REGISTRY"),
             docker_username=os.getenv("DOCKER_USERNAME"),
             docker_password=os.getenv("DOCKER_PASSWORD"),
+            image_name=os.getenv("THIRDAI_PLATFORM_IMAGE_NAME"),
             model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
             python_path=get_python_path(),
             thirdai_platform_dir=thirdai_platform_dir(),
