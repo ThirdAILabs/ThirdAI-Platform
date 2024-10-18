@@ -42,7 +42,7 @@ job "thirdai-platform-frontend" {
 
       config {
         {% if platform == "docker" %}
-          image = "{{ registry }}/frontend:{{ tag }}"
+          image = "{{ registry }}/{{ image_name }}:{{ tag }}"
           image_pull_timeout = "15m"
           ports = ["thirdai-platform-frontend-http"]
           auth {
