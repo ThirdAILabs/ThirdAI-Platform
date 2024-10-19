@@ -32,7 +32,7 @@ starlette
 httpx
 Authlib
 google-auth-oauthlib
-thirdai
+thirdai[neural_db_v2] --index-url https://download.pytorch.org/whl/cpu
 langchain_openai
 hvac
 nltk
