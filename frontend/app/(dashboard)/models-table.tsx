@@ -46,52 +46,12 @@ export function ModelsTable({ searchStr, offset }: { searchStr: string; offset: 
     }
   }
 
-  const [privateModels, setPrivateModels] = useState<SelectModel[]>([]);
-  const [pendingModels, setPendingModels] = useState<SelectModel[]>([]);
-
-  useEffect(() => {
-    async function getModels() {
-      try {
-        let response = await fetchPublicModels('');
-        const publicModels = response.data;
-        console.log('publicModels', publicModels);
-
-        response = await fetchPrivateModels('');
-        const privateModels: SelectModel[] = response.data;
-        console.log('privateModels', privateModels);
-
-        setPrivateModels(privateModels);
-
-        response = await fetchPendingModels();
-        const pendingModels: SelectModel[] = response.data; // Extract the data field
-        console.log('pendingModels', pendingModels);
-
-        setPendingModels(pendingModels);
-      } catch (err) {
-        if (err instanceof Error) {
-          console.log(err.message);
-        } else {
-          console.log('An unknown error occurred');
-        }
-      }
-    }
-
-    // Call the function immediately
-    getModels();
-
-    const intervalId = setInterval(getModels, 3000);
-
-    // Cleanup function to clear the interval when the component unmounts
-    return () => clearInterval(intervalId);
-  }, []);
-
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
 
   useEffect(() => {
     async function getWorkflows() {
       try {
         const fetchedWorkflows = await fetchWorkflows();
-        console.log('workflows', fetchedWorkflows);
         setWorkflows(fetchedWorkflows);
       } catch (err) {
         if (err instanceof Error) {
@@ -114,7 +74,7 @@ export function ModelsTable({ searchStr, offset }: { searchStr: string; offset: 
 
   // const displayedWorkflows = workflows.slice(offset, offset + modelsPerPage);
   const filteredWorkflows = workflows.filter((workflow) =>
-    workflow.name.toLowerCase().includes(searchStr.toLowerCase())
+    workflow.model_name.toLowerCase().includes(searchStr.toLowerCase())
   );
   const displayedWorkflows = filteredWorkflows.slice(offset, offset + modelsPerPage);
 
@@ -140,7 +100,7 @@ export function ModelsTable({ searchStr, offset }: { searchStr: string; offset: 
           </TableHeader>
           <TableBody>
             {displayedWorkflows
-              .sort((a, b) => a.name.localeCompare(b.name)) // Sort by name alphabetically
+              .sort((a, b) => a.model_name.localeCompare(b.model_name)) // Sort by name alphabetically
               .map((workflow, index) => (
                 <WorkFlow key={index + 200} workflow={workflow} />
               ))}

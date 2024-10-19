@@ -3,7 +3,11 @@ import logging
 import math
 import os
 import re
+import shutil
+from collections import defaultdict, deque
+from functools import wraps
 from pathlib import Path
+from typing import List, Optional
 from urllib.parse import urljoin
 
 import bcrypt
@@ -12,6 +16,8 @@ from database import schema
 from fastapi import HTTPException, status
 from jinja2 import Template
 from licensing.verify.verify_license import valid_job_allocation, verify_license
+from platform_common.pydantic_models.training import LabelEntity
+from platform_common.thirdai_storage import data_types, storage
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger("ThirdAI_Platform")
@@ -62,6 +68,63 @@ def hash_password(password: str):
     return bcrypt.hashpw(byte_password, salt).decode()
 
 
+def list_all_dependencies(model: schema.Model) -> List[schema.Model]:
+    queue = deque()
+    queue.append(model)
+    visited = set()
+
+    all_models = []
+
+    while len(queue) > 0:
+        m: schema.Model = queue.popleft()
+        if m.id in visited:
+            continue
+
+        visited.add(m.id)
+
+        all_models.append(m)
+
+        queue.extend(dep.dependency for dep in m.dependencies)
+
+    return all_models
+
+
+def get_model_status(model: schema.Model, train_status: bool) -> schema.Status:
+    # If the model train/deployment hasn't yet been started, was stopped, or has
+    # already failed, then the status of its dependencies is irrelevant.
+    status = model.train_status if train_status else model.deploy_status
+    if status in [
+        schema.Status.not_started,
+        schema.Status.stopped,
+        schema.Status.failed,
+    ]:
+        return status, [f"Workflow {model.name} has status {status.value}."]
+
+    statuses = defaultdict(list)
+    for m in list_all_dependencies(model):
+        status = m.train_status if train_status else m.deploy_status
+        if m.id == model.id:
+            statuses[status].append(f"Workflow {model.name} has status {status.value}.")
+        else:
+            statuses[status].append(
+                f"The workflow depends on workflow {model.name} which has status {status.value}."
+            )
+
+    status_priority_order = [
+        schema.Status.failed,
+        schema.Status.not_started,
+        schema.Status.stopped,
+        schema.Status.starting,
+        schema.Status.in_progress,
+        schema.Status.complete,
+    ]
+
+    for status_type in status_priority_order:
+        reasons = statuses[status_type]
+        if len(reasons) > 0:
+            return status_type, reasons
+
+
 def get_high_level_model_info(result: schema.Model):
     """
     Get high-level information about a model.
@@ -80,12 +143,34 @@ def get_high_level_model_info(result: schema.Model):
         "access_level": result.access_level,
         "domain": result.domain,
         "type": result.type,
-        "train_status": result.train_status,
-        "deploy_status": result.deploy_status,
+        "train_status": get_model_status(result, train_status=True)[0],
+        "deploy_status": get_model_status(result, train_status=False)[0],
         "team_id": str(result.team_id),
         "model_id": str(result.id),
         "sub_type": result.sub_type,
     }
+
+    info["attributes"] = result.get_attributes()
+
+    info["dependencies"] = [
+        {
+            "model_id": m.dependency_id,
+            "model_name": m.dependency.name,
+            "type": m.dependency.type,
+            "sub_type": m.dependency.sub_type,
+            "username": m.dependency.user.username,
+        }
+        for m in result.dependencies
+    ]
+
+    info["used_by"] = [
+        {
+            "model_id": m.model_id,
+            "model_name": m.model.name,
+            "username": m.model.user.username,
+        }
+        for m in result.used_by
+    ]
 
     # Include metadata if it exists
     if result.meta_data:
@@ -127,7 +212,9 @@ def validate_name(name):
         raise ValueError("name is not valid")
 
 
-def get_model(session: Session, username: str, model_name: str):
+def get_model(
+    session: Session, username: str, model_name: str
+) -> Optional[schema.Model]:
     """
     Get a model by username and model name.
 
@@ -456,36 +543,6 @@ def get_expiry_min(size: int):
     return 60 * (1 + math.floor(size / 1500))
 
 
-def list_workflow_models(workflow: schema.Workflow):
-    models_info = []
-    for workflow_model in workflow.workflow_models:
-        model_info = get_high_level_model_info(workflow_model.model)
-        model_info["component"] = workflow_model.component  # Append the component info
-        models_info.append(model_info)
-    return models_info
-
-
-def get_workflow(session, workflow_id, authenticated_user):
-    workflow: schema.Workflow = session.query(schema.Workflow).get(workflow_id)
-
-    if not workflow:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workflow not found.",
-        )
-
-    if (
-        workflow.user_id != authenticated_user.user.id
-        and not authenticated_user.user.is_global_admin()
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have owner permissions to this workflow",
-        )
-
-    return workflow
-
-
 def validate_license_info():
     try:
         license_info = verify_license(
@@ -504,3 +561,70 @@ def validate_license_info():
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"License is not valid. {str(e)}",
         )
+
+
+def handle_exceptions(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            class_name = args[0].__class__.__name__ if args else "UnknownClass"
+            method_name = func.__name__
+            logging.error(
+                f"Error in class '{class_name}', method '{method_name}' "
+                f"with arguments {args[1:]}, and keyword arguments {kwargs}. "
+                f"Error: {str(e)}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"An error occurred: {str(e)}",
+            )
+
+    return wrapper
+
+
+def tags_in_storage(data_storage: storage.DataStorage) -> List[LabelEntity]:
+    tag_metadata: data_types.TagMetadata = data_storage.get_metadata(
+        "tags_and_status"
+    ).data
+
+    tag_status = tag_metadata.tag_status
+    tags = [tag_status[tag] for tag in tag_status.keys() if tag != "O"]
+    return tags
+
+
+def copy_data_storage(old_model: schema.Model, new_model: schema.Model):
+
+    old_storage_dir = Path(model_bazaar_path()) / "data" / str(old_model.id)
+    new_storage_dir = Path(model_bazaar_path()) / "data" / str(new_model.id)
+
+    os.makedirs(new_storage_dir, exist_ok=True)
+    shutil.copy(old_storage_dir / "data_storage.db", new_storage_dir)
+
+
+def remove_unused_samples(model: schema.Model):
+    # remove unused samples from the old storage and rollback metadata to be in a consistent state
+    storage_dir = Path(model_bazaar_path()) / "data" / str(model.id)
+    data_storage = storage.DataStorage(
+        connector=storage.SQLiteConnector(db_path=storage_dir / "data_storage.db")
+    )
+    data_storage.remove_untrained_samples("ner")
+    data_storage.rollback_metadata("tags_and_status")
+
+
+def retrieve_token_classification_samples_for_generation(
+    data_storage: storage.DataStorage,
+) -> List[data_types.DataSample]:
+    # retrieve all the samples
+    samples: List[data_types.DataSample] = data_storage.retrieve_samples(
+        name="ner", num_samples=None, user_provided=True
+    )
+    # only use the samples that we did not generate synthetic data for
+    token_classification_samples = [
+        sample.data
+        for sample in samples
+        if sample.status == data_types.SampleStatus.untrained
+    ]
+
+    return token_classification_samples

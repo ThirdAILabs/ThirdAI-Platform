@@ -19,10 +19,17 @@ export interface ReferenceInfo {
   metadata: any;
 }
 
+export interface PiiEntity {
+  token: string;
+  label: string;
+}
+
 export interface SearchResult {
   queryId: string;
   query: string;
   references: ReferenceInfo[];
+
+  pii_entities: PiiEntity[] | null;
 }
 
 export interface PdfInfo {
@@ -98,14 +105,14 @@ type ImplicitFeecback = {
 
 export class ModelService {
   url: string;
+  ragUrl: string | undefined;
   sessionId: string;
   authToken: string | null;
-  tokenModelUrl: string;
 
-  constructor(url: string, tokenModelUrl: string, sessionId: string) {
+  constructor(url: string, ragUrl: string | undefined, sessionId: string) {
     this.url = url;
+    this.ragUrl = ragUrl;
     this.sessionId = sessionId;
-    this.tokenModelUrl = tokenModelUrl;
     this.authToken = window.localStorage.getItem('accessToken');
   }
 
@@ -149,44 +156,10 @@ export class ModelService {
         }
       })
       .then(({ data }) => {
-        console.log(data);
         return data;
       })
       .catch((e) => {
         return [];
-      });
-  }
-
-  async piiDetect(query: string): Promise<any> {
-    const url = new URL(this.tokenModelUrl + '/predict');
-
-    return fetch(url, {
-      method: 'POST',
-      headers: {
-        ...this.authHeader(),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ text: query, top_k: 1 }),
-    })
-      .then(this.handleInvalidAuth())
-      .then((response) => {
-        // console.log('response', response)
-        if (response.ok) {
-          return response.json();
-        } else {
-          return response.json().then((err) => {
-            throw new Error(err.detail || 'Unknown error occurred');
-          });
-        }
-      })
-      .then(({ data }) => {
-        // console.log(data);
-        return data as PIIDetectionResult;
-      })
-      .catch((e) => {
-        console.error(e);
-        alert(e);
-        throw new Error('Failed to detect PII');
       });
   }
 
@@ -227,31 +200,44 @@ export class ModelService {
 
   async addSources(files: File[], s3Urls: string[]): Promise<any> {
     const formData = new FormData();
-    const documentData: object[] = [];
+    const documents: object[] = [];
 
-    // Append local files to formData and documentData
+    // Process local files
     for (let i = 0; i < files.length; i++) {
       formData.append('files', files[i]);
       const extension = files[i].name.split('.').pop();
-      documentData.push({
+      documents.push({
         document_type: extension!.toUpperCase(),
         path: files[i].name,
         location: 'local',
+        metadata: {},
+        chunk_size: 100,
+        stride: 40,
+        emphasize_first_words: 0,
+        ignore_header_footer: true,
+        ignore_nonstandard_orientation: true,
       });
     }
 
-    // Append S3 URLs to documentData
+    // Process S3 URLs
     for (let i = 0; i < s3Urls.length; i++) {
       const url = s3Urls[i];
       const extension = url.split('.').pop();
-      documentData.push({
+      documents.push({
         document_type: extension ? extension.toUpperCase() : 'URL',
         path: url,
         location: 's3',
+        metadata: {},
+        chunk_size: 100,
+        stride: 40,
+        emphasize_first_words: 0,
+        ignore_header_footer: true,
+        ignore_nonstandard_orientation: true,
       });
     }
 
-    formData.append('documents', JSON.stringify(documentData));
+    // Wrap the documents array in an object with a 'documents' key
+    formData.append('documents', JSON.stringify({ documents }));
     const url = new URL(this.url + '/insert');
 
     return fetch(url, {
@@ -262,17 +248,19 @@ export class ModelService {
       },
     })
       .then(this.handleInvalidAuth())
-      .then((response) => {
+      .then(async (response) => {
         if (response.ok) {
           return response.json();
         }
+        const errorBody = await response.json();
+        throw new Error(JSON.stringify(errorBody));
       })
       .then(({ data }) => {
         return data;
       })
       .catch((e) => {
-        console.log(e);
-        return [];
+        console.error('Error in addSources:', e);
+        throw e;
       });
   }
 
@@ -305,12 +293,10 @@ export class ModelService {
   }
 
   async predict(queryText: string, topK: number, queryId?: string): Promise<SearchResult | null> {
-    const url = new URL(this.url + '/search');
+    const requestUrl = this.ragUrl || this.url;
+    const url = new URL(requestUrl + '/search');
 
-    // TODO(Geordie): Accept a "timeout" / "longer than expected" callback.
-    // E.g. if the query takes too long, then we can display a message
-    // saying that they should check the url, or maybe it's just taking a
-    // while.
+    console.log('REQUST URL: ', url);
 
     return fetch(url, {
       method: 'POST',
@@ -325,6 +311,7 @@ export class ModelService {
         if (response.ok) {
           return response.json();
         }
+        throw new Error('Network response was not ok');
       })
       .then(({ data }) => {
         const searchResults: SearchResult = {
@@ -337,12 +324,38 @@ export class ModelService {
             content: ref.text,
             metadata: ref.metadata,
           })),
+          pii_entities: data.pii_entities,
         };
         return searchResults;
       })
       .catch((e) => {
-        console.log(e);
+        console.error('Error in predict method:', e);
         return null;
+      });
+  }
+
+  async unredact(text: string, pii_map: Map<string, Map<string, string>>): Promise<string> {
+    const url = new URL(this.ragUrl + '/unredact');
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        ...this.authHeader(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: text, pii_map: pii_map }),
+    })
+      .then(this.handleInvalidAuth())
+      .then((response) => {
+        if (response.ok) {
+          return response.json();
+        }
+      })
+      .then(({ data }) => {
+        return data['unredacted_text'];
+      })
+      .catch((e) => {
+        console.log(e);
+        return '';
       });
   }
 

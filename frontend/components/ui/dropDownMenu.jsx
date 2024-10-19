@@ -88,9 +88,9 @@ const Dropdown = ({ title, handleSelectedTeam, teams }) => {
                 )}
               </motion.li>
 
-              {teams.map((team) => (
+              {teams.map((team, index) => (
                 <motion.li
-                  key={team.id}
+                  key={team?.id || team?.name}
                   onClick={() => handleChange(team)}
                   className="relative py-2 px-4 text-gray-900 cursor-pointer select-none pr-9 hover:bg-blue-500 transition-colors duration-150 ease-in-out"
                   whileHover={{ scale: 1.02 }}

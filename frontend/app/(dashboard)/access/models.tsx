@@ -1,53 +1,12 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Button, TextField } from '@mui/material';
-import {
-  fetchAllModels,
-  updateModelAccessLevel,
-  deleteModel,
-  fetchAllTeams,
-  fetchAllUsers,
-} from '@/lib/backend';
+import { Button } from '@mui/material';
+import { updateModelAccessLevel, deleteModel } from '@/lib/backend';
 import { UserContext } from '../../user_wrapper';
-
-// Define types
-type Model = {
-  name: string;
-  type: 'Private Model' | 'Protected Model' | 'Public Model';
-  owner: string;
-  users?: string[];
-  team?: string;
-  teamAdmin?: string;
-  domain: string;
-  latency: string;
-  modelId: string;
-  numParams: string;
-  publishDate: string;
-  size: string;
-  sizeInMemory: string;
-  subType: string;
-  thirdaiVersion: string;
-  trainingTime: string;
-};
-
-type Team = {
-  id: string;
-  name: string;
-  admins: string[];
-  members: string[];
-};
-
-type User = {
-  id: string;
-  name: string;
-  email: string;
-  role: 'Member' | 'Team Admin' | 'Global Admin';
-  teams: { id: string; name: string; role: 'Member' | 'team_admin' | 'Global Admin' }[];
-};
+import ConditionalButton from '@/components/ui/ConditionalButton';
+import { getModels, getTeams, getUsers, Model, Team, User } from '@/utils/apiRequests';
 
 export default function Models() {
-  const { user } = React.useContext(UserContext);
-
   // State variables
   const [models, setModels] = useState<Model[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -57,110 +16,36 @@ export default function Models() {
     'Private Model' | 'Protected Model' | 'Public Model' | null
   >(null);
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
-
-  // Fetch models on component mount
-  useEffect(() => {
-    getModels();
-  }, []);
-  // Function to fetch models
-  const getModels = async () => {
-    try {
-      const response = await fetchAllModels();
-      const modelData = response.data.map(
-        (model): Model => ({
-          name: model.model_name,
-          type:
-            model.access_level === 'private'
-              ? 'Private Model'
-              : model.access_level === 'protected'
-                ? 'Protected Model'
-                : 'Public Model',
-          owner: model.username,
-          users: [],
-          team: model.team_id !== 'None' ? model.team_id : undefined,
-          teamAdmin: undefined,
-          domain: model.domain,
-          latency: model.latency,
-          modelId: model.model_id,
-          numParams: model.num_params,
-          publishDate: model.publish_date,
-          size: model.size,
-          sizeInMemory: model.size_in_memory,
-          subType: model.sub_type,
-          thirdaiVersion: model.thirdai_version,
-          trainingTime: model.training_time,
-        })
-      );
-      setModels(modelData);
-      console.log('Fetched Models:', modelData);
-    } catch (error) {
-      console.error('Failed to fetch models', error);
-      alert('Failed to fetch models' + error);
-    }
-  };
+  const { user } = React.useContext(UserContext);
+  const [modelEditPermissions, setModelEditPermissions] = useState<boolean[]>([]);
 
   useEffect(() => {
-    getUsers();
+    getModelsData();
   }, []);
 
-  const getUsers = async () => {
-    try {
-      const response = await fetchAllUsers();
-      console.log('Fetched Users:', response.data);
-      const userData = response.data.map(
-        (user): User => ({
-          id: user.id,
-          name: user.username,
-          email: user.email,
-          role: user.global_admin ? 'Global Admin' : 'Member',
-          teams: user.teams.map((team) => ({
-            id: team.team_id,
-            name: team.team_name,
-            role: team.role,
-          })),
-        })
-      );
-      setUsers(userData);
-    } catch (error) {
-      console.error('Failed to fetch users', error);
-      alert('Failed to fetch users' + error);
-    }
-  };
+  async function getModelsData() {
+    const modelData = await getModels();
+    if (modelData) setModels(modelData);
+  }
 
   useEffect(() => {
-    getTeams();
+    getUsersData();
+  }, []);
+
+  async function getUsersData() {
+    const userData = await getUsers();
+    if (userData) setUsers(userData);
+  }
+
+  useEffect(() => {
+    getTeamsData();
   }, [users]);
-  const getTeams = async () => {
-    try {
-      const response = await fetchAllTeams();
-      const teamData = response.data.map((team): Team => {
-        const members: string[] = [];
-        const admins: string[] = [];
 
-        users.forEach((user) => {
-          const userTeam = user.teams.find((ut) => ut.id === team.id);
-          if (userTeam) {
-            members.push(user.name);
-            if (userTeam.role === 'team_admin') {
-              admins.push(user.name);
-            }
-          }
-        });
+  async function getTeamsData() {
+    const teamData = await getTeams();
+    if (teamData) setTeams(teamData);
+  }
 
-        return {
-          id: team.id,
-          name: team.name,
-          admins: admins,
-          members: members,
-        };
-      });
-
-      setTeams(teamData);
-    } catch (error) {
-      console.error('Failed to fetch teams', error);
-      alert('Failed to fetch teams' + error);
-    }
-  };
   // Function to handle model type change
   const handleModelTypeChange = async (index: number) => {
     if (!selectedType) return;
@@ -184,7 +69,7 @@ export default function Models() {
           break;
       }
       await updateModelAccessLevel(model_identifier, access_level, team_id);
-      await getModels();
+      await getModelsData();
 
       setEditingIndex(null);
       setSelectedType(null);
@@ -207,12 +92,43 @@ export default function Models() {
       if (!isConfirmed) return;
 
       await deleteModel(model_identifier);
-      await getModels();
+      await getModelsData();
     } catch (error) {
       console.error('Failed to delete model', error);
       alert('Failed to delete model: ' + error);
     }
   };
+
+  //The function decides if the user is allowed to make changes in the access level or delete the model out of n-models.
+  const getModelEditPermissions = () => {
+    const permissions = [];
+    for (let index = 0; index < models.length; index++) {
+      const model = models[index];
+      if (user?.global_admin) {
+        permissions.push(true);
+        continue;
+      }
+      if (model.owner === user?.username) permissions.push(true);
+      else {
+        let value = false;
+        if (user?.teams && model.type === 'Protected Model') {
+          for (let itr = 0; itr < user?.teams.length; itr++) {
+            if (user?.teams[itr].team_id === model.team && user.teams[itr].role === 'team_admin') {
+              value = true;
+              break;
+            }
+          }
+          permissions.push(value);
+        } else permissions.push(false);
+      }
+    }
+    setModelEditPermissions(permissions);
+  };
+
+  useEffect(() => {
+    getModelEditPermissions();
+  }, [models]);
+
   return (
     <div className="mb-12">
       <h3 className="text-xl font-semibold text-gray-800 mb-4">Models</h3>
@@ -295,16 +211,27 @@ export default function Models() {
                     </div>
                   </div>
                 ) : (
-                  <Button onClick={() => setEditingIndex(index)} variant="contained">
+                  <ConditionalButton
+                    onClick={() => setEditingIndex(index)}
+                    isDisabled={!modelEditPermissions[index]}
+                    tooltipMessage="Global Admin, Model owner and Team Admin can change access"
+                    variant="contained"
+                  >
                     Change Access
-                  </Button>
+                  </ConditionalButton>
                 )}
               </td>
 
               <td className="py-3 px-4">
-                <Button onClick={() => handleDeleteModel(index)} color="error" variant="contained">
+                <ConditionalButton
+                  onClick={() => handleDeleteModel(index)}
+                  isDisabled={!modelEditPermissions[index]}
+                  tooltipMessage="Global Admin, Model owner and Team Admin can delete"
+                  variant="contained"
+                  color="error"
+                >
                   Delete
-                </Button>
+                </ConditionalButton>
               </td>
             </tr>
           ))}

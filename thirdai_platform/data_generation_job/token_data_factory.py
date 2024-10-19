@@ -16,7 +16,7 @@ from data_generation_job.utils import (
     train_test_split,
     write_to_csv,
 )
-from data_generation_job.variables import Entity, NERSample
+from data_generation_job.variables import Entity, EntityStatus, NERSample
 from faker import Faker
 from platform_common.utils import save_dict
 from tqdm import tqdm
@@ -200,7 +200,11 @@ class TokenDataFactory(DataFactory):
 
         sampling_weights = np.array(
             [
-                untrained_tag_weight_multiplier if tag.status == "untrained" else 1
+                (
+                    untrained_tag_weight_multiplier
+                    if tag.status != EntityStatus.trained
+                    else 1
+                )
                 for tag in tags
             ]
         )

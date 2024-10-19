@@ -9,8 +9,18 @@ import jwt
 import thirdai
 from deployment_job.models.ndb_models import NDBModel, NDBV1Model, NDBV2Model
 from deployment_job.permissions import Permissions
-from deployment_job.pydantic_models import inputs
-from deployment_job.pydantic_models.inputs import NDBSearchParams
+from deployment_job.pydantic_models.inputs import (
+    AssociateInput,
+    ChatHistoryInput,
+    ChatInput,
+    ChatSettings,
+    DeleteInput,
+    DocumentList,
+    ImplicitFeedbackInput,
+    NDBSearchParams,
+    SaveModel,
+    UpvoteInput,
+)
 from deployment_job.reporter import Reporter
 from deployment_job.update_logger import UpdateLogger
 from deployment_job.utils import propagate_error, validate_name
@@ -134,6 +144,7 @@ class NDBRouter:
         }
         ```
         """
+
         results = self.model.predict(**params.model_dump())
 
         return response(
@@ -181,7 +192,7 @@ class NDBRouter:
         ```
         """
         try:
-            documents = inputs.DocumentList.model_validate_json(documents).documents
+            documents = DocumentList.model_validate_json(documents).documents
         except ValidationError as e:
             return response(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -220,7 +231,7 @@ class NDBRouter:
     @ndb_delete_metric.time()
     def delete(
         self,
-        input: inputs.DeleteInput,
+        input: DeleteInput,
         token: str = Depends(Permissions.verify_permission("write")),
     ):
         """
@@ -260,7 +271,7 @@ class NDBRouter:
     @ndb_upvote_metric.time()
     def upvote(
         self,
-        input: inputs.UpvoteInput,
+        input: UpvoteInput,
         token: str = Depends(Permissions.verify_permission("read")),
     ):
         """
@@ -314,7 +325,7 @@ class NDBRouter:
     @ndb_associate_metric.time()
     def associate(
         self,
-        input: inputs.AssociateInput,
+        input: AssociateInput,
         token: str = Depends(Permissions.verify_permission("read")),
     ):
         """
@@ -366,7 +377,7 @@ class NDBRouter:
     @ndb_implicit_feedback_metric.time()
     def implicit_feedback(
         self,
-        feedback: inputs.ImplicitFeedbackInput,
+        feedback: ImplicitFeedbackInput,
         token: str = Depends(Permissions.verify_permission("read")),
     ):
         self.feedback_logger.log(
@@ -390,7 +401,7 @@ class NDBRouter:
     @propagate_error
     def update_chat_settings(
         self,
-        settings: inputs.ChatSettings,
+        settings: ChatSettings,
         token=Depends(Permissions.verify_permission("write")),
     ):
         self.model.set_chat(**(settings.model_dump()))
@@ -403,7 +414,7 @@ class NDBRouter:
     @propagate_error
     def get_chat_history(
         self,
-        input: inputs.ChatHistoryInput,
+        input: ChatHistoryInput,
         token=Depends(Permissions.verify_permission("read")),
     ):
         chat = self.model.get_chat(provider=input.provider)
@@ -436,7 +447,7 @@ class NDBRouter:
     @propagate_error
     def chat(
         self,
-        input: inputs.ChatInput,
+        input: ChatInput,
         token=Depends(Permissions.verify_permission("read")),
     ):
         chat = self.model.get_chat(provider=input.provider)
@@ -493,7 +504,7 @@ class NDBRouter:
 
     def save(
         self,
-        input: inputs.SaveModel,
+        input: SaveModel,
         token: str = Depends(Permissions.verify_permission("read")),
     ):
         """

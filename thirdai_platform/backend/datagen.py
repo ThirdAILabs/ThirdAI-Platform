@@ -15,11 +15,12 @@ from database.session import get_session
 from fastapi import Depends, status
 from platform_common.pydantic_models.training import (
     DatagenOptions,
-    Entity,
     JobOptions,
+    LabelEntity,
     LLMProvider,
     UDTSubType,
 )
+from platform_common.thirdai_storage.data_types import TokenClassificationData
 from platform_common.utils import response, save_dict
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
@@ -91,7 +92,7 @@ def generate_data_for_train_job(
 
 class TextClassificationGenerateArgs(BaseModel):
     samples_per_label: int
-    target_labels: List[Entity]
+    target_labels: List[LabelEntity]
     user_vocab: Optional[List[str]] = None
     user_prompts: Optional[List[str]] = None
     vocab_per_sentence: int = 4
@@ -159,11 +160,15 @@ def generate_text_data(
 
 
 class TokenClassificationGenerateArgs(BaseModel):
-    tags: List[Entity]
+    tags: List[LabelEntity]
     num_sentences_to_generate: int
     num_samples_per_tag: Optional[int] = None
     allocation_cores: Optional[int] = None
     allocation_memory: Optional[int] = None
+
+    # example NER samples
+    samples: Optional[List[TokenClassificationData]] = None
+    templates_per_sample: int = 10
 
 
 def generate_token_data(

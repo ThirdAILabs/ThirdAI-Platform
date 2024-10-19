@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Button, TextField } from '@mui/material';
+import { Button, TextField, Tooltip } from '@mui/material';
+import ConditionalButton from '@/components/ui/ConditionalButton';
 import AutocompleteInput from '@/components/ui/AutocompleteInput';
 import {
   fetchAllTeams,
@@ -13,28 +14,16 @@ import {
   fetchAllUsers,
 } from '@/lib/backend';
 import DropdownMenu from '@/components/ui/dropDownMenu';
-type Team = {
-  id: string;
-  name: string;
-  admins: string[];
-  members: string[];
-};
-
-type User = {
-  id: string;
-  name: string;
-  email: string;
-  role: 'Member' | 'Team Admin' | 'Global Admin';
-  teams: { id: string; name: string; role: 'Member' | 'team_admin' | 'Global Admin' }[];
-};
-
-type Model = {
-  name: string;
-  type: 'Private Model' | 'Protected Model' | 'Public Model';
-  team?: string;
-};
+import { UserContext } from '../../user_wrapper';
+import { getModels, getTeams, getUsers, Model, Team, User } from '@/utils/apiRequests';
 
 export default function Teams() {
+  const { user } = React.useContext(UserContext);
+  const isGlobalAdmin = user?.global_admin;
+  const [isTeamAdmin, setIsTeamAdmin] = useState<boolean>(false);
+  const [canAddMember, setCanAddMember] = useState<boolean>(false);
+  const [canRemoveMember, setCanRemoveMember] = useState<boolean>(false);
+
   const [teams, setTeams] = useState<Team[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [models, setModels] = useState<Model[]>([]);
@@ -61,68 +50,33 @@ export default function Teams() {
   const [removeMemberKey, setRemoveMemberKey] = useState(0);
   const [addAdminKey, setAddAdminKey] = useState(0);
   const [removeAdminKey, setRemoveAdminKey] = useState(0);
+
   useEffect(() => {
-    getUsers();
+    getModelsData();
   }, []);
 
-  const getUsers = async () => {
-    try {
-      const response = await fetchAllUsers();
-      console.log('Fetched Users:', response.data);
-      const userData = response.data.map(
-        (user): User => ({
-          id: user.id,
-          name: user.username,
-          email: user.email,
-          role: user.global_admin ? 'Global Admin' : 'Member',
-          teams: user.teams.map((team) => ({
-            id: team.team_id,
-            name: team.team_name,
-            role: team.role,
-          })),
-        })
-      );
-      setUsers(userData);
-    } catch (error) {
-      console.error('Failed to fetch users', error);
-      alert('Failed to fetch users' + error);
-    }
-  };
+  async function getModelsData() {
+    const modelData = await getModels();
+    if (modelData) setModels(modelData);
+  }
 
   useEffect(() => {
-    getTeams();
+    getUsersData();
+  }, []);
+
+  async function getUsersData() {
+    const userData = await getUsers();
+    if (userData) setUsers(userData);
+  }
+
+  useEffect(() => {
+    getTeamsData();
   }, [users]);
-  const getTeams = async () => {
-    try {
-      const response = await fetchAllTeams();
-      const teamData = response.data.map((team): Team => {
-        const members: string[] = [];
-        const admins: string[] = [];
 
-        users.forEach((user) => {
-          const userTeam = user.teams.find((ut) => ut.id === team.id);
-          if (userTeam) {
-            members.push(user.name);
-            if (userTeam.role === 'team_admin') {
-              admins.push(user.name);
-            }
-          }
-        });
-
-        return {
-          id: team.id,
-          name: team.name,
-          admins: admins,
-          members: members,
-        };
-      });
-
-      setTeams(teamData);
-    } catch (error) {
-      console.error('Failed to fetch teams', error);
-      alert('Failed to fetch teams' + error);
-    }
-  };
+  async function getTeamsData() {
+    const teamData = await getTeams();
+    if (teamData) setTeams(teamData);
+  }
 
   const createNewTeam = async () => {
     try {
@@ -147,8 +101,8 @@ export default function Teams() {
         alert(`User with name ${newTeamAdmin} not found`);
       }
 
-      await getTeams();
-      await getUsers();
+      await getTeamsData();
+      await getUsersData();
       setNewTeamName('');
       setNewTeamAdmin('');
       setNewTeamMembers([]);
@@ -175,10 +129,11 @@ export default function Teams() {
       }
 
       await addUserToTeam(user.email, team.id);
-      await getTeams();
-      await getUsers();
+      await getTeamsData();
+      await getUsersData();
       setSelectedTeamForAdd('Select Team');
       setNewMember('');
+      setCanAddMember(false);
       setAddMemberKey((prevKey) => prevKey + 1); // Increment key to force re-render
     } catch (error) {
       console.error('Failed to add member to team', error);
@@ -203,10 +158,11 @@ export default function Teams() {
       }
 
       await deleteUserFromTeam(user.email, team.id);
-      await getTeams();
-      await getUsers();
+      await getTeamsData();
+      await getUsersData();
       setSelectedTeamForRemove('Select Team');
       setMemberToRemove('');
+      setCanRemoveMember(false);
       setRemoveMemberKey((prevKey) => prevKey + 1); // Increment key to force re-render
     } catch (error) {
       console.error('Failed to remove member from team', error);
@@ -224,7 +180,7 @@ export default function Teams() {
       }
 
       await deleteTeamById(team.id);
-      await getTeams();
+      await getTeamsData();
     } catch (error) {
       console.error('Failed to delete team', error);
       alert('Failed to delete team' + error);
@@ -247,8 +203,8 @@ export default function Teams() {
 
       try {
         await assignTeamAdmin(user.email, selectedTeam.id);
-        await getTeams();
-        await getUsers();
+        await getTeamsData();
+        await getUsersData();
         setSelectedTeamForAddAdmin('Select Team');
         setNewAdmin('');
         setAddAdminKey((prevKey) => prevKey + 1); // Increment key to force re-render
@@ -277,8 +233,8 @@ export default function Teams() {
 
       try {
         await removeTeamAdmin(user.email, selectedTeam.id);
-        await getTeams();
-        await getUsers();
+        await getTeamsData();
+        await getUsersData();
         setSelectedTeamForRemoveAdmin('Select Team');
         setAdminToRemove('');
         setRemoveAdminKey((prevKey) => prevKey + 1); // Increment key to force re-render
@@ -307,19 +263,36 @@ export default function Teams() {
     };
   };
 
-  const handleSelectedTeamAdd = (team: string) => {
-    setSelectedTeamForAdd(team);
+  const handleSelectedTeamAdd = (teamName: string) => {
+    setSelectedTeamForAdd(teamName);
+    setCanAddMember(false);
+    if (user?.teams.length !== undefined) {
+      for (let index = 0; index < user?.teams.length; index++) {
+        const team = user?.teams[index];
+        if (team.team_name === teamName && team.role === 'team_admin') setCanAddMember(true);
+      }
+    }
   };
-  const handleSelectedTeamRemove = (team: string) => {
-    setSelectedTeamForRemove(team);
+  const handleSelectedTeamRemove = (teamName: string) => {
+    setSelectedTeamForRemove(teamName);
+    setCanRemoveMember(false);
+    if (user?.teams.length !== undefined) {
+      for (let index = 0; index < user?.teams.length; index++) {
+        const team = user?.teams[index];
+        if (team.team_name === teamName && team.role === 'team_admin') setCanRemoveMember(true);
+      }
+    }
   };
-  const handleAdminAdd = (team: string) => {
-    setSelectedTeamForAddAdmin(team);
+  const handleAdminAdd = (teamName: string) => {
+    setSelectedTeamForAddAdmin(teamName);
   };
-  const handleAdminRemove = (team: string) => {
-    setSelectedTeamForRemoveAdmin(team);
+  const handleAdminRemove = (teamName: string) => {
+    setSelectedTeamForRemoveAdmin(teamName);
   };
-
+  //Check if the user is Team Admin
+  useEffect(() => {
+    if (user?.teams.some((team) => team.role === 'team_admin')) setIsTeamAdmin(true);
+  });
   return (
     <div className="mb-12">
       <h3 className="text-xl font-semibold text-gray-800 mb-4">Teams</h3>
@@ -336,168 +309,204 @@ export default function Teams() {
             <h5 className="text-md font-semibold text-gray-800">Protected Models</h5>
             <ul className="list-disc pl-5">
               {models
-                .filter((model) => model.type === 'Protected Model' && model.team === team.name)
+                .filter((model) => model.type === 'Protected Model' && model.team === team.id)
                 .map((model, modelIndex) => (
                   <li key={modelIndex}>{model.name}</li>
                 ))}
             </ul>
           </div>
-          <Button onClick={() => deleteTeam(team.name)} variant="contained" color="error">
-            Delete Team
-          </Button>
+          {isGlobalAdmin && (
+            <Button
+              onClick={() => deleteTeam(team.name)}
+              variant="contained"
+              color="error"
+              disabled={!isGlobalAdmin}
+            >
+              Delete Team
+            </Button>
+          )}
         </div>
       ))}
 
       {/* Create New Team */}
-      <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
-        <h4 className="text-lg font-semibold text-gray-800">Create New Team</h4>
-        <div className="grid grid-cols-1 gap-4 mt-4">
-          <TextField
-            type="text"
-            placeholder="Team Name"
-            value={newTeamName}
-            onChange={(e) => setNewTeamName(e.target.value)}
-          />
-          <AutocompleteInput
-            key={newTeamAdmin} // Use a dynamic key to force re-render
-            value={newTeamAdmin}
-            onChange={handleSingleChange(setNewTeamAdmin)}
-            options={users.map((user) => user.name)}
-            placeholder="Team Admin"
-          />
-          <AutocompleteInput
-            value={newTeamMembers}
-            onChange={handleMultipleChange(setNewTeamMembers)}
-            options={users.map((user) => user.name)}
-            multiple={true}
-            placeholder="Team Members"
-          />
-          <Button
-            onClick={() => {
-              if (newTeamAdmin && newTeamMembers.length > 0) {
-                createNewTeam();
-              } else {
-                alert('Please enter both Team Admin and at least one Team Member.');
-              }
-            }}
-            variant="contained"
-          >
-            Create Team
-          </Button>
+      {isGlobalAdmin && (
+        <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
+          <h4 className="text-lg font-semibold text-gray-800">Create New Team</h4>
+          <div className="grid grid-cols-1 gap-4 mt-4">
+            <TextField
+              type="text"
+              placeholder="Team Name"
+              value={newTeamName}
+              onChange={(e) => setNewTeamName(e.target.value)}
+            />
+            <AutocompleteInput
+              key={newTeamAdmin} // Use a dynamic key to force re-render
+              value={newTeamAdmin}
+              onChange={handleSingleChange(setNewTeamAdmin)}
+              options={users.map((user) => user.name)}
+              placeholder="Team Admin"
+            />
+            <AutocompleteInput
+              value={newTeamMembers}
+              onChange={handleMultipleChange(setNewTeamMembers)}
+              options={users.map((user) => user.name)}
+              multiple={true}
+              placeholder="Team Members"
+            />
+            <Button
+              onClick={() => {
+                if (newTeamAdmin && newTeamMembers.length > 0) {
+                  createNewTeam();
+                } else {
+                  alert('Please enter both Team Admin and at least one Team Member.');
+                }
+              }}
+              variant="contained"
+            >
+              Create Team
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Add Member to Team */}
-      <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
-        <h4 className="text-lg font-semibold text-gray-800">Add Member to Team</h4>
-        <div className="grid grid-cols-1 gap-4 mt-4">
-          <DropdownMenu
-            key={addMemberKey}
-            title="Select Team"
-            handleSelectedTeam={handleSelectedTeamAdd}
-            teams={teams}
-          />
+      {(isGlobalAdmin || isTeamAdmin) && (
+        <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
+          <h4 className="text-lg font-semibold text-gray-800">Add Member to Team</h4>
+          <div className="grid grid-cols-1 gap-4 mt-4">
+            <DropdownMenu
+              key={addMemberKey}
+              title="Select Team"
+              handleSelectedTeam={handleSelectedTeamAdd}
+              teams={teams}
+            />
 
-          <AutocompleteInput
-            key={selectedTeamForAdd + newMember} // Use a key to force re-render
-            value={newMember}
-            onChange={handleSingleChange(setNewMember)}
-            options={
-              selectedTeamForAdd
-                ? users
-                    .map((user) => user.name)
-                    .filter(
-                      (userName) =>
-                        !teams
-                          .find((team) => team.name === selectedTeamForAdd)
-                          ?.members.includes(userName)
-                    )
-                : []
-            }
-            placeholder="New Member"
-          />
-          <Button onClick={addMemberToTeam} variant="contained" color="success">
-            Add Member
-          </Button>
+            <AutocompleteInput
+              key={selectedTeamForAdd + newMember} // Use a key to force re-render
+              value={newMember}
+              onChange={handleSingleChange(setNewMember)}
+              options={
+                selectedTeamForAdd
+                  ? users
+                      .map((user) => user.name)
+                      .filter(
+                        (userName) =>
+                          !teams
+                            .find((team) => team.name === selectedTeamForAdd)
+                            ?.members.includes(userName)
+                      )
+                  : []
+              }
+              placeholder="New Member"
+            />
+            <ConditionalButton
+              isDisabled={!(isGlobalAdmin || canAddMember)}
+              tooltipMessage="Admins can add member"
+              onClick={addMemberToTeam}
+              variant="contained"
+              color="success"
+              fullWidth
+            >
+              Add Member
+            </ConditionalButton>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Remove Member from Team */}
-      <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
-        <h4 className="text-lg font-semibold text-gray-800">Remove Member from Team</h4>
-        <div className="grid grid-cols-1 gap-4 mt-4">
-          <DropdownMenu
-            key={removeMemberKey}
-            title="Select Team"
-            handleSelectedTeam={handleSelectedTeamRemove}
-            teams={teams}
-          />
-          <AutocompleteInput
-            key={selectedTeamForRemove + memberToRemove} // Use a dynamic key to force re-render
-            value={memberToRemove}
-            onChange={handleSingleChange(setMemberToRemove)}
-            options={
-              selectedTeamForRemove
-                ? teams.find((team) => team.name === selectedTeamForRemove)?.members || []
-                : []
-            }
-            placeholder="Member to Remove"
-          />
-          <Button onClick={removeMemberFromTeam} variant="contained" color="error">
-            Remove Member
-          </Button>
+      {(isGlobalAdmin || isTeamAdmin) && (
+        <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
+          <h4 className="text-lg font-semibold text-gray-800">Remove Member from Team</h4>
+          <div className="grid grid-cols-1 gap-4 mt-4">
+            <DropdownMenu
+              key={removeMemberKey}
+              title="Select Team"
+              handleSelectedTeam={handleSelectedTeamRemove}
+              teams={teams}
+            />
+            <AutocompleteInput
+              key={selectedTeamForRemove + memberToRemove} // Use a dynamic key to force re-render
+              value={memberToRemove}
+              onChange={handleSingleChange(setMemberToRemove)}
+              options={
+                selectedTeamForRemove
+                  ? teams.find((team) => team.name === selectedTeamForRemove)?.members || []
+                  : []
+              }
+              placeholder="Member to Remove"
+            />
+            <ConditionalButton
+              isDisabled={!(isGlobalAdmin || canRemoveMember)}
+              tooltipMessage="Admins can remove member"
+              onClick={removeMemberFromTeam}
+              variant="contained"
+              color="error"
+              fullWidth
+            >
+              Remove Member
+            </ConditionalButton>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Add Admin to Team */}
-      <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
-        <h4 className="text-lg font-semibold text-gray-800">Add Admin to Team</h4>
-        <div className="grid grid-cols-1 gap-4 mt-4">
-          <DropdownMenu
-            key={addAdminKey}
-            title="Select Team"
-            handleSelectedTeam={handleAdminAdd}
-            teams={teams}
-          />
-          <AutocompleteInput
-            key={selectedTeamForAddAdmin + newAdmin} // Use a dynamic key to force re-render
-            value={newAdmin}
-            onChange={handleSingleChange(setNewAdmin)}
-            options={users.map((user) => user.name)}
-            placeholder="New Admin"
-          />
-          <Button onClick={assignAdminToTeam} variant="contained" color="success">
-            Add Admin
-          </Button>
+      {isGlobalAdmin && (
+        <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
+          <h4 className="text-lg font-semibold text-gray-800">Add Admin to Team</h4>
+          <div className="grid grid-cols-1 gap-4 mt-4">
+            <DropdownMenu
+              key={addAdminKey}
+              title="Select Team"
+              handleSelectedTeam={handleAdminAdd}
+              teams={teams}
+            />
+            <AutocompleteInput
+              key={selectedTeamForAddAdmin + newAdmin} // Use a dynamic key to force re-render
+              value={newAdmin}
+              onChange={handleSingleChange(setNewAdmin)}
+              options={users.map((user) => user.name)}
+              placeholder="New Admin"
+            />
+            <Button onClick={assignAdminToTeam} variant="contained" color="success">
+              Add Admin
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Remove Admin from Team */}
-      <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
-        <h4 className="text-lg font-semibold text-gray-800">Remove Admin from Team</h4>
-        <div className="grid grid-cols-1 gap-4 mt-4">
-          <DropdownMenu
-            key={removeAdminKey}
-            title="Select Team"
-            handleSelectedTeam={handleAdminRemove}
-            teams={teams}
-          />
-          <AutocompleteInput
-            key={selectedTeamForRemoveAdmin + adminToRemove} // Use a dynamic key to force re-render
-            value={adminToRemove}
-            onChange={handleSingleChange(setAdminToRemove)}
-            options={
-              selectedTeamForRemoveAdmin
-                ? teams.find((team) => team.name === selectedTeamForRemoveAdmin)?.members || []
-                : []
-            }
-            placeholder="Admin to Remove"
-          />
-          <Button onClick={removeAdminFromTeam} variant="contained" color="error">
-            Remove Admin
-          </Button>
+      {isGlobalAdmin && (
+        <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
+          <h4 className="text-lg font-semibold text-gray-800">Remove Admin from Team</h4>
+          <div className="grid grid-cols-1 gap-4 mt-4">
+            <DropdownMenu
+              key={removeAdminKey}
+              title="Select Team"
+              handleSelectedTeam={handleAdminRemove}
+              teams={teams}
+            />
+            <AutocompleteInput
+              key={selectedTeamForRemoveAdmin + adminToRemove} // Use a dynamic key to force re-render
+              value={adminToRemove}
+              onChange={handleSingleChange(setAdminToRemove)}
+              options={
+                selectedTeamForRemoveAdmin
+                  ? teams.find((team) => team.name === selectedTeamForRemoveAdmin)?.members || []
+                  : []
+              }
+              placeholder="Admin to Remove"
+            />
+            <Button
+              onClick={removeAdminFromTeam}
+              variant="contained"
+              color="error"
+              disabled={!isGlobalAdmin}
+            >
+              Remove Admin
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

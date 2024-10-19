@@ -11,6 +11,7 @@ import traceback
 import uuid
 from abc import abstractmethod
 from pathlib import Path
+from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
 
 import fitz
@@ -36,6 +37,7 @@ class NDBModel(Model):
     def __init__(self, config: DeploymentConfig):
         super().__init__(config=config)
         self.chat_instances = {}
+        self.chat_instance_lock = Lock()
 
     @abstractmethod
     def predict(self, query: str, top_k: int, **kwargs: Any) -> inputs.SearchResultsNDB:
@@ -113,37 +115,46 @@ class NDBModel(Model):
         Set up a chat instance for the given provider, if it hasn't been set already.
         """
         provider = kwargs.get("provider", "openai")
-        if provider in self.chat_instances and self.chat_instances[provider]:
-            # Chat instance for this provider already exists, do not recreate
-            print(f"Chat instance for provider '{provider}' is already set.")
-            return
-        try:
-            sqlite_db_path = os.path.join(self.model_dir, provider, "chat_history.db")
 
-            os.makedirs(os.path.dirname(sqlite_db_path), exist_ok=True)
+        # This is to handle an issue in which when multiple calls are made in parallel
+        # that create the chat object, the second one fails with a `table already exists`
+        # error. This is likely becuase the first call as created the sqlite table but
+        # not finished updating the chat_instance map. The GIL likely does not prevent
+        # this because of IO operations related to sqlite.
+        with self.chat_instance_lock:
+            if provider in self.chat_instances and self.chat_instances[provider]:
+                # Chat instance for this provider already exists, do not recreate
+                print(f"Chat instance for provider '{provider}' is already set.")
+                return
+            try:
+                sqlite_db_path = os.path.join(
+                    self.model_dir, provider, "chat_history.db"
+                )
 
-            chat_history_sql_uri = f"sqlite:///{sqlite_db_path}"
+                os.makedirs(os.path.dirname(sqlite_db_path), exist_ok=True)
 
-            if provider not in llm_providers:
-                raise ValueError(f"Unsupported chat provider: {provider}")
+                chat_history_sql_uri = f"sqlite:///{sqlite_db_path}"
 
-            llm_chat_interface = llm_providers.get(provider)
+                if provider not in llm_providers:
+                    raise ValueError(f"Unsupported chat provider: {provider}")
 
-            key = kwargs.get("key") or self.config.model_options.genai_key
+                llm_chat_interface = llm_providers.get(provider)
 
-            # Remove 'key' from kwargs if present
-            kwargs.pop("key", None)
+                key = kwargs.get("key") or self.config.model_options.genai_key
 
-            self.chat_instances[provider] = llm_chat_interface(
-                db=self.db,
-                chat_history_sql_uri=chat_history_sql_uri,
-                key=key,
-                base_url=self.config.model_bazaar_endpoint,
-                **kwargs,
-            )
-        except Exception:
-            traceback.print_exc()
-            self.chat_instances[provider] = None
+                # Remove 'key' from kwargs if present
+                kwargs.pop("key", None)
+
+                self.chat_instances[provider] = llm_chat_interface(
+                    db=self.db,
+                    chat_history_sql_uri=chat_history_sql_uri,
+                    key=key,
+                    base_url=self.config.model_bazaar_endpoint,
+                    **kwargs,
+                )
+            except Exception:
+                traceback.print_exc()
+                self.chat_instances[provider] = None
 
     def get_chat(self, provider: str):
         """

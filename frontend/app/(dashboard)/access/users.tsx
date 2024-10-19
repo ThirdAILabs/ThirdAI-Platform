@@ -2,53 +2,22 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@mui/material';
 import { fetchAllUsers, deleteUserAccount } from '@/lib/backend';
-
-type UserTeam = {
-  id: string;
-  name: string;
-  role: 'Member' | 'team_admin' | 'Global Admin';
-};
-
-type User = {
-  id: string;
-  name: string;
-  email: string;
-  role: 'Member' | 'Team Admin' | 'Global Admin';
-  teams: UserTeam[];
-  ownedModels: string[];
-};
+import { UserContext } from '../../user_wrapper';
+import { getUsers, User } from '@/utils/apiRequests';
 
 export default function Users() {
+  const { user } = React.useContext(UserContext);
+  const isGlobalAdmin = user?.global_admin;
   const [users, setUsers] = useState<User[]>([]);
 
   useEffect(() => {
-    getUsers();
+    getUsersData();
   }, []);
 
-  const getUsers = async () => {
-    try {
-      const response = await fetchAllUsers();
-      console.log('Fetched Users:', response.data);
-      const userData = response.data.map(
-        (user): User => ({
-          id: user.id,
-          name: user.username,
-          email: user.email,
-          role: user.global_admin ? 'Global Admin' : 'Member',
-          teams: user.teams.map((team) => ({
-            id: team.team_id,
-            name: team.team_name,
-            role: team.role,
-          })),
-          ownedModels: [], // This should be populated with actual data if available
-        })
-      );
-      setUsers(userData);
-    } catch (error) {
-      console.error('Failed to fetch users', error);
-      alert('Failed to fetch users' + error);
-    }
-  };
+  async function getUsersData() {
+    const userData = await getUsers();
+    if (userData) setUsers(userData);
+  }
 
   const deleteUser = async (userName: string) => {
     try {
@@ -88,9 +57,18 @@ export default function Users() {
           {user.ownedModels.length > 0 && (
             <div className="text-gray-700">Owned Models: {user.ownedModels.join(', ')}</div>
           )}
-          <Button onClick={() => deleteUser(user.name)} variant="contained" color="error">
-            Delete User
-          </Button>
+          {isGlobalAdmin ? (
+            <Button
+              onClick={() => deleteUser(user.name)}
+              variant="contained"
+              color="error"
+              disabled={!isGlobalAdmin}
+            >
+              Delete User
+            </Button>
+          ) : (
+            <></>
+          )}
         </div>
       ))}
     </div>

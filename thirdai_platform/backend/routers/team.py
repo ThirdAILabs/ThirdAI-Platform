@@ -1,5 +1,6 @@
 from typing import List, Optional
 
+from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import (
     global_admin_only,
     is_model_owner,
@@ -56,7 +57,6 @@ def add_user_to_team(
 ):
     """
     Add a user to a team.
-
     Parameters:
     - email: The email of the user to add to the team.
     - team_id: The ID of the team to add the user to.
@@ -383,25 +383,41 @@ def remove_team_admin(
     )
 
 
-@team_router.get("/list", dependencies=[Depends(global_admin_only)])
-def list_all_teams(session: Session = Depends(get_session)):
+@team_router.get("/list")
+def list_accessible_teams(
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
     """
-    List all teams in the system.
+    List all teams related to that user.
 
     Parameters:
-    - session: The database session (dependency).
+    - session: Session - The database session (dependency).
+    - authenticated_user: AuthenticatedUser - The authenticated user (dependency).
 
     Returns:
-    - A JSON response with the list of all teams.
+    Global Admin:-
+        - A JSON response with the list of all teams.
+    Non Global Admin:-
+        - A JSON response with the list of accessible teams.
     """
-    teams: List[schema.Team] = session.query(schema.Team).all()
+
+    user: schema.User = authenticated_user.user
+
+    # Query to filter teams based on team_id present in user_teams
+    query = session.query(schema.Team)
+    if not user.global_admin:
+        user_teams = [ut.team_id for ut in user.teams]
+        query = query.filter(
+            schema.Team.id.in_(user_teams)
+        )  # Filter teams where team_id is in user_teams
 
     teams_info = [
         {
             "id": team.id,
             "name": team.name,
         }
-        for team in teams
+        for team in query.all()
     ]
 
     return response(

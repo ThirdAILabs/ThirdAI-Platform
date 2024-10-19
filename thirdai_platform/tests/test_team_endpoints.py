@@ -85,10 +85,6 @@ def test_team_management():
     res = add_user_to_team(client, green_team, "user_b@mail.com", user)
     assert res.status_code == 200
 
-    # Users cannot list teams
-    res = client.get("/api/team/list", headers=auth_header(user))
-    assert res.status_code == 403
-
     # Global admin can list teams
     res = client.get("/api/team/list", headers=auth_header(global_admin))
     assert res.status_code == 200
@@ -155,3 +151,53 @@ def test_team_management():
     assert res.status_code == 200
     all_teams = set([t["id"] for t in res.json()["data"]])
     assert len(set([purple_team]).intersection(all_teams)) == 1
+
+    # Using all ready created user_a and user_b.
+    res = login(client, username="user_a@mail.com", password="user_a_pwd")
+    assert res.status_code == 200
+    user_a_token = res.json()["data"]["access_token"]
+
+    res = login(client, username="user_b@mail.com", password="user_b_pwd")
+    assert res.status_code == 200
+    user_b_token = res.json()["data"]["access_token"]
+
+    # # Fetch purple_team by the global admin
+    # purple_team = fetch_team(client, "purple_team", global_admin)
+
+    # Create green_team
+    res = create_team(client, "green_team", global_admin)
+    assert res.status_code == 201
+    green_team = res.json()["data"]["team_id"]
+
+    # Add user_a to the green team
+    res = add_user_to_team(client, green_team, "user_a@mail.com", global_admin)
+    assert res.status_code == 200
+
+    # Add user_b to the purple team
+    res = add_user_to_team(client, purple_team, "user_b@mail.com", global_admin)
+    assert res.status_code == 200
+
+    # Test accessible teams for user_a (should see only the green team)
+    res = client.get("/api/team/list", headers=auth_header(user_a_token))
+    assert res.status_code == 200
+
+    teams = res.json()["data"]
+    assert len(teams) == 1
+    assert teams[0]["id"] == green_team
+
+    # Test accessible teams for user_b (should see only the purple team)
+    res = client.get("/api/team/list", headers=auth_header(user_b_token))
+    assert res.status_code == 200
+
+    teams = res.json()["data"]
+    assert len(teams) == 1
+    assert teams[0]["id"] == purple_team
+
+    # Test accessible teams for the global admin (should see both teams)
+    res = client.get("/api/team/list", headers=auth_header(global_admin))
+    assert res.status_code == 200
+
+    teams = res.json()["data"]
+    team_ids = {team["id"] for team in teams}
+    assert green_team in team_ids
+    assert purple_team in team_ids

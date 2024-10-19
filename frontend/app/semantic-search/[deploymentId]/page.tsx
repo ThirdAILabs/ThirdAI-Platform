@@ -14,7 +14,14 @@ import LogoImg from './assets/logos/logo.png';
 import { duration, fontSizes, padding } from './stylingConstants';
 import Teach from './components/Teach';
 import { ModelServiceContext } from './Context';
-import { ModelService, PdfInfo, ReferenceInfo, Source } from './modelServices';
+import {
+  ModelService,
+  PdfInfo,
+  ReferenceInfo,
+  Source,
+  SearchResult,
+  PiiEntity,
+} from './modelServices';
 import InvalidModelMessage from './components/InvalidModelMessage';
 import PdfViewer from './components/pdf_viewer/PdfViewer';
 import { Chunk } from './components/pdf_viewer/interfaces';
@@ -94,12 +101,6 @@ const UpvoteModalWrapper = styled.section`
   box-sizing: border-box;
 `;
 
-interface SearchResult {
-  queryId: string;
-  query: string;
-  references: ReferenceInfo[];
-}
-
 const defaultPrompt =
   'Write an answer that is about 100 words ' +
   'for the query, based on the provided context. ' +
@@ -142,12 +143,10 @@ function App() {
   const searchParams = useSearchParams();
   const [ifGenerationOn, setIfGenerationOn] = useState(false);
   const [cacheEnabled, setCacheEnabled] = useState(true); // default generation cache is on
-  const [ifGuardRailOn, setIfGuardRailOn] = useState(false);
   const [genAiProvider, setGenAiProvider] = useState<string | null>(null);
   const [workflowId, setWorkflowId] = useState<string | null>(null);
 
-  const [sentimentClassifierExists, setSentimentClassifierExists] = useState(false);
-  const [tokenClassifierExists, setTokenClassifierExists] = useState(false);
+  const [piiDetectionWorkflowId, setPiiDetectionWorkflowId] = useState<string | null>(null);
   const [sentimentClassifierWorkflowId, setSentimentClassifierWorkflowId] = useState<string | null>(
     null
   );
@@ -174,57 +173,62 @@ function App() {
     const fetchWorkflowDetails = async () => {
       try {
         const details = await getWorkflowDetails(receievedWorkflowId as string);
-        console.log('Models:', details.data.models);
+        console.log('details', details);
 
-        // Filter and find the model with component "search"
-        const searchModel = details.data.models.find((model) => model.component === 'search');
-        const serviceUrl = searchModel
-          ? createDeploymentUrl(searchModel.model_id)
-          : createDeploymentUrl('');
+        const data = details.data;
 
-        // Filter and find the model with component "nlp"
-        const nlpModel = details.data.models.find((model) => model.component === 'nlp');
-        const tokenModelUrl = nlpModel
-          ? createTokenModelUrl(nlpModel.model_id)
-          : createTokenModelUrl('');
+        let serviceUrl: string;
+        let ragUrl: string | undefined; // Initialize as undefined
+        let chatEnabled = false;
 
-        // Filter and find the model with component "nlp-classifier"
-        const sentimentClassifier = details.data.models.find(
-          (model) => model.component === 'nlp-classifier'
-        );
+        if (data.type === 'enterprise-search') {
+          // Enterprise-search logic
+          serviceUrl = data.attributes.retrieval_id
+            ? createDeploymentUrl(data.attributes.retrieval_id)
+            : createDeploymentUrl('');
 
-        if (nlpModel) {
-          setIfGuardRailOn(true);
+          ragUrl = createDeploymentUrl(data.model_id);
+
+          if (data.attributes.guardrail_id) {
+            setPiiDetectionWorkflowId(data.attributes.guardrail_id);
+          }
+
+          chatEnabled = true;
+
+          setIfGenerationOn(!!data.attributes.llm_provider);
+          setGenAiProvider(data.attributes.llm_provider || null);
+
+          if (data.attributes.nlp_classifier_id) {
+            setSentimentClassifierWorkflowId(data.attributes.nlp_classifier_id);
+          }
+        } else {
+          // Non-enterprise-search logic
+          serviceUrl = data ? createDeploymentUrl(data.model_id) : createDeploymentUrl('');
+
+          const chatWorkflows = ['rag'];
+          chatEnabled = chatWorkflows.includes(data.type);
         }
 
-        // Set whether token classifier exists
-        setTokenClassifierExists(!!nlpModel);
+        // Common logic for both cases
+        setChatEnabled(chatEnabled);
 
-        if (!generationOn) {
-          // if generation is off, turn off cache
-          setCacheEnabled(false);
+        // This is so that the chat session is maintained if the tab is reloaded.
+        // The sessionStorage persists as long as the tab is open, and will not be
+        // cleared on reloads. https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage
+        var chatSessionId: string;
+        if (window.sessionStorage.getItem('chatSessionId')) {
+          chatSessionId = window.sessionStorage.getItem('chatSessionId')!;
+        } else {
+          chatSessionId = uuidv4();
+          window.sessionStorage.setItem('chatSessionId', chatSessionId);
         }
 
-        // Set whether sentiment classifier exists
-        setSentimentClassifierExists(!!sentimentClassifier);
-
-        // Set the sentiment classifier workflow ID if the model exists
-        if (sentimentClassifier) {
-          setSentimentClassifierWorkflowId(sentimentClassifier.model_id);
-        }
-
-        // Only enable the chat option if the workflow is of type RAG
-        const chatWorkflows = ['rag'];
-        if (chatWorkflows.includes(details.data.type)) {
-          setChatEnabled(true);
-        }
-
-        const newModelService = new ModelService(serviceUrl, tokenModelUrl, uuidv4());
+        const newModelService = new ModelService(serviceUrl, ragUrl, chatSessionId);
         setModelService(newModelService);
         newModelService.sources().then((fetchedSources) => setSources(fetchedSources));
       } catch (error) {
-        console.error('Failed to fetch workflow details:', error);
-        alert('Failed to fetch workflow details:' + error);
+        console.error('Failed to fetch model details:', error);
+        // Optionally, handle the error (e.g., show a notification to the user)
       }
     };
 
@@ -241,7 +245,6 @@ function App() {
     const fetchSources = async () => {
       try {
         const fetchedSources = await modelService.sources();
-        console.log('fetchedSources', fetchedSources);
         setSources(fetchedSources);
       } catch (error) {
         console.error('Failed to fetch sources:', error);
@@ -275,6 +278,7 @@ function App() {
     return modelService!
       .predict(/* queryText= */ query, /* topK= */ topK, /* queryId= */ queryId)
       .then((searchResults) => {
+        console.log('searchResults', searchResults);
         if (searchResults) {
           setResults(searchResults);
           if (searchResults.references.length < topK) {
@@ -292,12 +296,6 @@ function App() {
       });
   }
 
-  interface PiiMapValue {
-    id: number;
-    originalToken: string;
-    tag: string;
-  }
-
   const [queryInfo, setQueryInfo] = useState<{
     cachedQuery: string;
     userQuery: string;
@@ -307,281 +305,60 @@ function App() {
   const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   async function submit(query: string, genaiPrompt: string, bypassCache = false) {
-    function replacePlaceholdersWithOriginal(
-      text: string,
-      piiMap: Map<string, PiiMapValue>
-    ): string {
-      const placeholderPattern = /\[([A-Z]+) #(\d+)\]/g;
-      return text.replace(placeholderPattern, (match, tag, id) => {
-        // Find the original value in piiMap by ID
-        for (const [originalSentence, value] of piiMap.entries()) {
-          if (value.id.toString() === id && value.tag === tag) {
-            return originalSentence;
-          }
-        }
-        return match; // Return the placeholder if no match is found (should not happen)
-      });
-    }
-
-    async function replacePIIWithPlaceholders(
-      content: string,
-      piiMap: Map<string, PiiMapValue>
-    ): Promise<string> {
-      function getSubstringOverlap(str1: string, str2: string): number {
-        const len1 = str1.length;
-        const len2 = str2.length;
-
-        let maxOverlap = 0;
-        for (let i = 0; i < len1; i++) {
-          for (let j = 0; j < len2; j++) {
-            let overlap = 0;
-            while (
-              i + overlap < len1 &&
-              j + overlap < len2 &&
-              str1[i + overlap] === str2[j + overlap]
-            ) {
-              overlap++;
-            }
-            maxOverlap = Math.max(maxOverlap, overlap);
-          }
-        }
-        return maxOverlap;
-      }
-
-      const prediction = await modelService!.piiDetect(content);
-      const { tokens, predicted_tags } = prediction;
-
-      // Step 1: Concatenate tokens into sentences
-      let sentences: string[] = [];
-      let sentenceTags: string[] = [];
-      let currentSentence = '';
-      let currentTag = '';
-
-      for (let i = 0; i < tokens.length; i++) {
-        const word = tokens[i];
-        if (!(predicted_tags && predicted_tags[i])) {
-          continue;
-        }
-        const tag = predicted_tags[i][0];
-        // console.log('tag:', tag)
-
-        if (tag === currentTag) {
-          currentSentence += ` ${word}`;
-        } else {
-          if (currentSentence) {
-            sentences.push(currentSentence.trim());
-            sentenceTags.push(currentTag);
-          }
-          currentSentence = word;
-          currentTag = tag;
-        }
-      }
-
-      // Push the last sentence and tag
-      if (currentSentence) {
-        sentences.push(currentSentence.trim());
-        sentenceTags.push(currentTag);
-      }
-
-      // console.log('sentences:', sentences)
-      // console.log('sentenceTags:', sentenceTags)
-
-      // Step 2: Operate on the level of sentences
-      let currentId = piiMap.size + 1;
-      const processedSentences = sentences.map((sentence, index) => {
-        const tag = sentenceTags[index];
-
-        if (tag !== 'O') {
-          // Filter existing entries in piiMap by the same tag
-          const filteredMapEntries = Array.from(piiMap.entries()).filter(
-            ([_, value]) => value.tag === tag
-          );
-
-          let matchedEntry: [string, PiiMapValue] | undefined;
-
-          // Check for substring overlap
-          for (const [existingToken, value] of filteredMapEntries) {
-            if (getSubstringOverlap(sentence, value.originalToken) > 5) {
-              matchedEntry = [existingToken, value];
-              break;
-            }
-          }
-
-          if (matchedEntry) {
-            return `[${tag} #${matchedEntry[1].id}]`;
-          } else {
-            piiMap.set(sentence, {
-              id: currentId,
-              originalToken: sentence,
-              tag,
-            });
-            currentId++;
-            return `[${tag} #${piiMap.get(sentence)?.id}]`;
-          }
-        } else {
-          return sentence;
-        }
-      });
-
-      return processedSentences.join(' ');
-    }
-
-    // If a generation is already in progress, abort it
-    if (abortController) {
-      abortController.abort();
-    }
-
     if (websocketRef.current) {
       websocketRef.current.close();
     }
     setAnswer('');
     setUpvoteQuery(query);
-    setResults({ queryId: '', query: '', references: [] });
+    setResults({ queryId: '', query: '', references: [], pii_entities: null });
     setCheckedIds(new Set<number>());
     setCanSearchMore(true);
     setNumReferences(c.numReferencesFirstLoad);
 
     if (query.trim().length > 0) {
-      if (ifGuardRailOn) {
-        // Case 1: Guardrail is ON
-        const piiMap = new Map<string, PiiMapValue>();
+      // Case 1: Guardrail is ON
+      const results = await getResults(
+        query,
+        c.numReferencesFirstLoad + 1 * c.numReferencesLoadMore
+      );
 
-        const results = await getResults(
-          query,
-          c.numReferencesFirstLoad + 1 * c.numReferencesLoadMore
-        );
+      if (results && ifGenerationOn) {
+        if (abortController) {
+          abortController.abort();
+        }
 
-        if (results && ifGenerationOn) {
-          const processedReferences = await Promise.all(
-            results.references.map(async (reference) => {
-              const processedContent = await replacePIIWithPlaceholders(reference.content, piiMap);
-              return { ...reference, content: processedContent };
-            })
-          );
+        console.log('processedQuery:', results.query);
+        console.log('piiMap:', results.pii_entities);
+        console.log('processedReferences:');
+        results.references.forEach((reference) => {
+          console.log(reference.content);
+        });
 
-          const processedQuery = await replacePIIWithPlaceholders(query, piiMap);
+        const controller = new AbortController();
+        setAbortController(controller); // Store it in state
 
-          console.log('processedQuery:', processedQuery);
-          console.log('piiMap:', piiMap);
-          console.log('processedReferences:');
-          processedReferences.forEach((reference) => {
-            console.log(reference.content);
+        modelService!
+          .generateAnswer(
+            results.query,
+            `${genaiPrompt}. [TAG #id] is sensitive information replaced as a placeholder, use them in your response for consistency.`,
+            results.references,
+            (next) => {
+              setAnswer((prev) => {
+                // Concatenate previous answer and the new part
+                const fullAnswer = prev + next;
+                // Return the final processed answer to update the state
+                return fullAnswer;
+              });
+            },
+            genAiProvider || undefined, // Convert null to undefined
+            workflowId || undefined,
+            undefined,
+            controller.signal
+          )
+          .finally(() => {
+            // Cleanup after generation completes or is aborted
+            setAbortController(null);
           });
-
-          // Create a new AbortController instance
-          const controller = new AbortController();
-          setAbortController(controller); // Store it in state
-
-          modelService!
-            .generateAnswer(
-              processedQuery,
-              `${genaiPrompt}. [TAG #id] is sensitive information replaced as a placeholder, use them in your response for consistency.`,
-              processedReferences,
-              (next) => {
-                setAnswer((prev) => {
-                  // Concatenate previous answer and the new part
-                  const fullAnswer = prev + next;
-
-                  // Replace placeholders in the concatenated string
-                  const replacedAnswer = replacePlaceholdersWithOriginal(fullAnswer, piiMap);
-
-                  // Return the final processed answer to update the state
-                  return replacedAnswer;
-                });
-              },
-              genAiProvider || undefined, // Convert null to undefined
-              workflowId || undefined,
-              undefined,
-              controller.signal // Pass the signal here
-            )
-            .finally(() => {
-              // Cleanup after generation completes or is aborted
-              setAbortController(null);
-            });
-        }
-      } else {
-        // Case 2: Guardrail is OFF (Normal generation)
-        const results = await getResults(
-          query,
-          c.numReferencesFirstLoad + 1 * c.numReferencesLoadMore
-        );
-
-        if (results && ifGenerationOn) {
-          const modelId = modelService?.getModelID();
-
-          // If we don't want to bypassCache AND cache generation is enabled
-          if (!bypassCache && cacheEnabled) {
-            try {
-              const cachedResult = await fetchCachedGeneration(modelId!, query);
-              console.log('cachedResult', cachedResult);
-
-              if (cachedResult && cachedResult.llm_res) {
-                console.log('cached query is', cachedResult.query);
-                console.log('cached generation is', cachedResult.llm_res);
-
-                // Set up an AbortController for cached generation
-                const cacheAbortController = new AbortController();
-                setAbortController(cacheAbortController);
-
-                const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-                setQueryInfo(null);
-                // Initialize the stopping index
-                let currentStoppingIndex = 0;
-                const tokens = cachedResult.llm_res.split(' ');
-
-                for (let i = 0; i < tokens.length; i++) {
-                  if (cacheAbortController.signal.aborted) {
-                    console.log('Cached generation paused');
-                    // Set the answer up to the current stopping index
-                    setAnswer(tokens.slice(0, currentStoppingIndex).join(' '));
-                    break;
-                  }
-
-                  currentStoppingIndex = i + 1; // Update stopping index to current position
-                  setAnswer(tokens.slice(0, currentStoppingIndex).join(' '));
-                  await sleep(20); // Mimic streaming response with a delay
-                }
-
-                setAbortController(null);
-
-                // Set the query information including whether they differ
-                setQueryInfo({
-                  cachedQuery: cachedResult.query,
-                  userQuery: query,
-                  isDifferent: cachedResult.query !== query,
-                });
-
-                return; // Stop further execution since the answer was found in cache
-              }
-            } catch (error) {
-              console.error('Failed to retrieve cached result:', error);
-              // Continue to generate a new answer if there's an error in fetching from the cache
-            }
-          }
-
-          // No cache hit or cache not used, proceed with generation
-          setQueryInfo(null); // Indicates no cached data was used
-
-          // Create a new AbortController instance
-          const controller = new AbortController();
-          setAbortController(controller); // Store it in state
-
-          modelService!
-            .generateAnswer(
-              query,
-              genaiPrompt,
-              results.references,
-              (next) => setAnswer((prev) => prev + next),
-              genAiProvider || undefined, // Convert null to undefined
-              workflowId || undefined,
-              undefined,
-              controller.signal // Pass the signal here
-            )
-            .finally(() => {
-              // Cleanup after generation completes or is aborted
-              setAbortController(null);
-            });
-        }
       }
     } else {
       setResults(null);
@@ -716,8 +493,7 @@ function App() {
             </TopRightCorner>
             {chatMode ? (
               <Chat
-                tokenClassifierExists={tokenClassifierExists}
-                sentimentClassifierExists={sentimentClassifierExists}
+                piiWorkflowId={piiDetectionWorkflowId}
                 sentimentWorkflowId={sentimentClassifierWorkflowId} // Pass the workflow ID for sentiment classifier
                 provider={genAiProvider || 'openai'}
               />
@@ -787,7 +563,7 @@ function App() {
                         checkedIds={checkedIds}
                         onCheck={onCheck}
                         modelService={modelService}
-                        ifGuardRailOn={ifGuardRailOn}
+                        piiEntities={results.pii_entities}
                       />
                     </Pad>
                   </Pad>

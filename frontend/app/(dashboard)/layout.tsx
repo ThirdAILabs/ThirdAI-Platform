@@ -12,14 +12,6 @@ import {
   Users2,
 } from 'lucide-react';
 
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -29,8 +21,6 @@ import { ThirdAILogo } from '@/components/icons';
 import Providers from './providers';
 import { NavItem } from './nav-item';
 import { SearchInput } from './search';
-import { useContext } from 'react';
-import { UserContext } from '../user_wrapper';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -40,7 +30,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
           <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
             <MobileNav />
-            {/* <DashboardBreadcrumb /> */}
             <SearchInput />
             <User />
           </header>
@@ -55,11 +44,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 }
 
 function DesktopNav() {
-  const { user } = useContext(UserContext);
-
-  // Determine if the user is an admin (global or team admin)
-  const isAdmin = user?.global_admin || user?.teams.some((team) => team.role === 'team_admin');
-
   return (
     <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">
       <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
@@ -75,17 +59,15 @@ function DesktopNav() {
           <Home className="h-5 w-5" />
         </NavItem>
 
-        {isAdmin && (
-          <>
-            <NavItem href="/access" label="Access">
-              <Users2 className="h-5 w-5" />
-            </NavItem>
+        <>
+          <NavItem href="/access" label="Access">
+            <Users2 className="h-5 w-5" />
+          </NavItem>
 
-            <NavItem href="/analytics" label="Analytics">
-              <LineChart className="h-5 w-5" />
-            </NavItem>
-          </>
-        )}
+          {/* <NavItem href="/analytics" label="Analytics">
+            <LineChart className="h-5 w-5" />
+          </NavItem> */}
+        </>
       </nav>
       <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
         <Tooltip>
@@ -160,27 +142,3 @@ function MobileNav() {
     </Sheet>
   );
 }
-
-// function DashboardBreadcrumb() {
-//   return (
-//     <Breadcrumb className="hidden md:flex">
-//       <BreadcrumbList>
-//         <BreadcrumbItem>
-//           <BreadcrumbLink asChild>
-//             <Link href="#">Dashboard</Link>
-//           </BreadcrumbLink>
-//         </BreadcrumbItem>
-//         <BreadcrumbSeparator />
-//         <BreadcrumbItem>
-//           <BreadcrumbLink asChild>
-//             <Link href="#">Apps</Link>
-//           </BreadcrumbLink>
-//         </BreadcrumbItem>
-//         <BreadcrumbSeparator />
-//         <BreadcrumbItem>
-//           <BreadcrumbPage>All Apps</BreadcrumbPage>
-//         </BreadcrumbItem>
-//       </BreadcrumbList>
-//     </Breadcrumb>
-//   );
-// }

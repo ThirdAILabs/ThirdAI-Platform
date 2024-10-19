@@ -570,26 +570,51 @@ def reset_password_verify(
     )
 
 
-@user_router.get("/all-users", dependencies=[Depends(global_admin_only)])
-def list_all_users(session: Session = Depends(get_session)):
+@user_router.get("/list")
+def list_accessible_users(
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
     """
-    List all users in the system along with their team memberships and roles.
+    List users along with their team memberships and roles according to the access level of the authenticated user.
+    Global Admin:-
+        - All users
+    Not Global Admin:-
+        - Union of all members from teams in which the user is either Member or Admin.
 
     Parameters:
     - session: The database session (dependency).
+    - authenticated_user: AuthenticatedUser - The authenticated user (dependency).
 
     Returns:
     - A JSON response with the list of all users and their team details.
     """
-    # selectinload loads related collections more efficiently when dealing with large datasets
-    # by fetching related records in a separate, batched query, avoiding heavy JOINs. useful in cases
-    # one to many/ many to many. joinedload will be helpful for many to one case.
-    users: List[schema.User] = (
-        session.query(schema.User)
-        .options(selectinload(schema.User.teams).selectinload(schema.UserTeam.team))
-        .all()
-    )
 
+    user: schema.User = authenticated_user.user
+
+    # If the user is a Global Admin, return all users
+    if user.global_admin:
+        users = (
+            session.query(schema.User)
+            .options(selectinload(schema.User.teams).selectinload(schema.UserTeam.team))
+            .all()
+        )
+    elif len(user.teams) != 0:
+        # For non-global admins, return users who are part of the user's teams
+        user_teams = [ut.team_id for ut in user.teams]
+        users = (
+            session.query(schema.User)
+            .join(schema.UserTeam)
+            .filter(schema.UserTeam.team_id.in_(user_teams))
+            .distinct()  # Avoid duplicate users if they're part of multiple teams
+            .options(selectinload(schema.User.teams).selectinload(schema.UserTeam.team))
+            .all()
+        )
+    else:
+        # If the user is not present in any team
+        users = [user]
+
+    # Build the response data with team membership information
     users_info = [
         {
             "id": user.id,

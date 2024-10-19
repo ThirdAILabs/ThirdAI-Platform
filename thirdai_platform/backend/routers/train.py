@@ -10,13 +10,20 @@ from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
 from backend.datagen import generate_data_for_train_job
 from backend.utils import (
+    copy_data_storage,
+    delete_nomad_job,
     get_model,
     get_model_from_identifier,
+    get_model_status,
     get_platform,
     get_python_path,
     logger,
     model_bazaar_path,
+    nomad_job_exists,
+    remove_unused_samples,
+    retrieve_token_classification_samples_for_generation,
     submit_nomad_job,
+    tags_in_storage,
     thirdai_platform_dir,
     update_json,
     validate_license_info,
@@ -32,12 +39,14 @@ from platform_common.pydantic_models.training import (
     FileInfo,
     FileLocation,
     JobOptions,
+    LLMProvider,
     ModelType,
     NDBData,
     NDBOptions,
     NDBSubType,
     NDBv2Options,
     TextClassificationOptions,
+    TokenClassificationDatagenOptions,
     TokenClassificationOptions,
     TrainConfig,
     UDTData,
@@ -45,6 +54,7 @@ from platform_common.pydantic_models.training import (
     UDTOptions,
     UDTSubType,
 )
+from platform_common.thirdai_storage import storage
 from platform_common.utils import response
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
@@ -292,9 +302,7 @@ def retrain_ndb(
         )
 
     unsupervised_files = list_insertions(deployment_dir)
-    print("INSERTIONS:", unsupervised_files)
     deletions = list_deletions(deployment_dir)
-    print("DELETIONS:", deletions)
 
     feedback_dir = os.path.join(deployment_dir, "feedback")
     supervised_train_dir = os.path.join(
@@ -586,6 +594,9 @@ def datagen_callback(
     model: schema.Model = session.query(schema.Model).get(model_id)
 
     try:
+        if nomad_job_exists(model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT")):
+            delete_nomad_job(model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT"))
+
         submit_nomad_job(
             str(Path(os.getcwd()) / "backend" / "nomad_jobs" / "train_job.hcl.j2"),
             nomad_endpoint=os.getenv("NOMAD_ENDPOINT"),
@@ -612,8 +623,14 @@ def datagen_callback(
         model.train_status = schema.Status.starting
         session.commit()
     except Exception as err:
-        model.train_status = schema.Status.failed
+        # failed retraining job -> model is still valid
+        # failed non-retraining job -> model is not valid
+        if config.is_retraining:
+            model.train_status = schema.Status.complete
+        else:
+            model.train_status = schema.Status.failed
         session.commit()
+
         logger.info(str(err))
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -626,6 +643,153 @@ def datagen_callback(
         data={
             "model_id": str(model_id),
             "user_id": str(model.user_id),
+        },
+    )
+
+
+@train_router.post("/retrain-udt")
+def retrain_udt(
+    model_name: str,
+    llm_provider: LLMProvider,
+    base_model_identifier: Optional[str] = None,
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
+    """
+    if base_model_identifier is not None:
+        create_new_model with name model_name
+    else:
+        update existing model with name model_name
+    """
+    user: schema.User = authenticated_user.user
+    license_info = validate_license_info()
+
+    try:
+        validate_name(model_name)
+    except:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"{model_name} is not a valid model name.",
+        )
+
+    if base_model_identifier:
+        base_model = get_base_model(base_model_identifier, user=user, session=session)
+        if base_model is None:
+            return response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message=f"Base model with id {base_model_identifier} does not exist.",
+            )
+
+        # create a new model
+        model: schema.Model = schema.Model(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            train_status=schema.Status.not_started,
+            deploy_status=schema.Status.not_started,
+            name=model_name,
+            type=base_model.type,
+            sub_type=base_model.sub_type,
+            domain=user.email.split("@")[1],
+            access_level=base_model.access_level,
+            parent_id=base_model.id,
+        )
+        session.add(model)
+        session.commit()
+        session.refresh(model)
+
+    else:
+        model = get_model(session, username=user.username, model_name=model_name)
+        if model is None:
+            return response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message=f"Model with name {model_name} does not exist for user {user.username}",
+            )
+
+    if model.type != ModelType.UDT and model.sub_type != UDTSubType.token:
+        return response(
+            status_cod=status.HTTP_400_BAD_REQUEST,
+            message=f"Cannot retrain model of the type : {model.type}, subtype : {model.sub_type}. Only UDT Token Classification supported.",
+        )
+
+    if base_model_identifier:
+        # if starting from a base model, copy the storage to the storage_dir of the new model
+        # remove unused samples and rollback metadata to be in a consistent state
+        copy_data_storage(base_model, model)
+        remove_unused_samples(base_model)
+
+    storage_dir = Path(model_bazaar_path()) / "data" / str(model.id)
+    data_storage = storage.DataStorage(
+        connector=storage.SQLiteConnector(db_path=storage_dir / "data_storage.db")
+    )
+
+    tags = tags_in_storage(data_storage)
+    token_classification_samples = retrieve_token_classification_samples_for_generation(
+        data_storage
+    )
+
+    token_classification_options = TokenClassificationDatagenOptions(
+        sub_type=UDTSubType.token,
+        tags=tags,
+        num_sentences_to_generate=10_000,
+        num_samples_per_tag=500,
+        samples=token_classification_samples,
+    )
+
+    placeholder_udt_options = TokenClassificationOptions(
+        target_labels=[], source_column="", target_column=""
+    )
+
+    secret_token = secrets.token_hex(32)
+    try:
+        data = UDTGeneratedData(secret_token=secret_token)
+    except Exception as error:
+        return response(status_code=status.HTTP_400_BAD_REQUEST, message=str(error))
+
+    datagen_options = DatagenOptions(
+        task_prompt="token_classification",
+        llm_provider=llm_provider,
+        datagen_options=token_classification_options,
+    )
+
+    config = TrainConfig(
+        model_bazaar_dir=model_bazaar_path(),
+        license_key=license_info["boltLicenseKey"],
+        model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT", None),
+        model_id=str(model.id),
+        data_id=str(model.id),
+        base_model_id=(None if not base_model_identifier else str(base_model.id)),
+        model_options=UDTOptions(udt_options=placeholder_udt_options),
+        datagen_options=datagen_options,
+        data=data,
+        job_options=JobOptions(),
+        is_retraining=True if not base_model_identifier else False,
+    )
+
+    config.save_train_config()
+
+    try:
+        generate_data_for_train_job(
+            data_id=str(model.id),
+            secret_token=secret_token,
+            license_key=license_info["boltLicenseKey"],
+            options=datagen_options,
+            job_options=JobOptions(),
+        )
+    except Exception as err:
+        model.train_status = schema.Status.failed
+        session.commit()
+        logger.info(str(err))
+        return response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=str(err),
+        )
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Successfully submitted the job",
+        data={
+            "model_id": str(model.id),
+            "user_id": str(user.id),
         },
     )
 
@@ -849,7 +1013,7 @@ def train_complete(
 @train_router.post("/update-status")
 def train_fail(
     model_id: str,
-    status: schema.Status,
+    new_status: schema.Status,
     message: str,
     session: Session = Depends(get_session),
 ):
@@ -883,7 +1047,7 @@ def train_fail(
             message=f"No model with id {model_id}.",
         )
 
-    trained_model.train_status = status
+    trained_model.train_status = new_status
     session.commit()
 
     return {"message": f"successfully updated with following {message}"}
@@ -913,11 +1077,13 @@ def train_status(
             message=str(error),
         )
 
+    train_status, reasons = get_model_status(model, train_status=True)
     return response(
         status_code=status.HTTP_200_OK,
         message="Successfully got the train status.",
         data={
             "model_identifier": model_identifier,
-            "train_status": model.train_status,
+            "train_status": train_status,
+            "message": " ".join(reasons),
         },
     )

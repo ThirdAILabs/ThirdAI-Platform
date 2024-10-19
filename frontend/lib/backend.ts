@@ -304,27 +304,44 @@ export function retrain_ndb({
   });
 }
 
-interface CreateWorkflowParams {
-  name: string;
-  typeName: string;
+export interface EnterpriseSearchOptions {
+  retrieval_id: string;
+  guardrail_id?: string;
+  nlp_classifier_id?: string;
+  llm_provider?: string;
+  default_mode?: string;
 }
 
-export function create_workflow({ name, typeName }: CreateWorkflowParams): Promise<any> {
+interface CreateWorkflowParams {
+  workflow_name: string;
+  options: EnterpriseSearchOptions;
+}
+
+export function create_enterprise_search_workflow({
+  workflow_name,
+  options,
+}: CreateWorkflowParams): Promise<any> {
   const accessToken = getAccessToken();
 
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-  const params = new URLSearchParams({ name, type_name: typeName });
+  // Prepare URLSearchParams to pass workflow_name as a query parameter
+  const params = new URLSearchParams({
+    workflow_name,
+  });
 
   return new Promise((resolve, reject) => {
     axios
-      .post(`${thirdaiPlatformBaseUrl}/api/workflow/create?${params.toString()}`)
+      .post(
+        `${thirdaiPlatformBaseUrl}/api/workflow/enterprise-search?${params.toString()}`,
+        options // Pass the options object as the request body
+      )
       .then((res) => {
         resolve(res.data);
       })
       .catch((err) => {
         if (err.response && err.response.data) {
-          reject(new Error(err.response.data.detail || 'Failed to create workflow'));
+          reject(new Error(err.response.data.message || 'Failed to create workflow'));
         } else {
           reject(new Error('Failed to create workflow'));
         }
@@ -332,122 +349,36 @@ export function create_workflow({ name, typeName }: CreateWorkflowParams): Promi
   });
 }
 
-interface AddModelsToWorkflowParams {
-  workflowId: string;
-  modelIdentifiers: string[];
-  components: string[];
+export interface Attributes {
+  llm_provider?: string;
+  default_mode?: string;
+  retrieval_id?: string;
+  guardrail_id?: string;
+  nlp_classifier_id?: string;
 }
 
-export function add_models_to_workflow({
-  workflowId,
-  modelIdentifiers,
-  components,
-}: AddModelsToWorkflowParams): Promise<any> {
-  const accessToken = getAccessToken();
-
-  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-
-  return new Promise((resolve, reject) => {
-    axios
-      .post(`${thirdaiPlatformBaseUrl}/api/workflow/add-models`, {
-        workflow_id: workflowId,
-        model_ids: modelIdentifiers,
-        components,
-      })
-      .then((res) => {
-        resolve(res.data);
-      })
-      .catch((err) => {
-        if (err.response && err.response.data) {
-          reject(new Error(err.response.data.detail || 'Failed to add models to workflow'));
-        } else {
-          reject(new Error('Failed to add models to workflow'));
-        }
-      });
-  });
-}
-
-export interface DeleteModelsParams {
-  workflow_id: string;
-  model_ids: string[];
-  components: string[];
-}
-
-export function delete_models({
-  workflow_id,
-  model_ids,
-  components,
-}: DeleteModelsParams): Promise<any> {
-  const accessToken = getAccessToken();
-  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-
-  return new Promise((resolve, reject) => {
-    axios
-      .post(`${thirdaiPlatformBaseUrl}/api/workflow/delete-models`, {
-        workflow_id,
-        model_ids,
-        components,
-      })
-      .then((res) => {
-        resolve(res.data);
-      })
-      .catch((err) => {
-        if (err.response && err.response.data) {
-          reject(new Error(err.response.data.message || 'Failed to delete models from workflow'));
-        } else {
-          reject(new Error('Failed to delete models from workflow'));
-        }
-      });
-  });
-}
-
-interface SetGenAIProviderParams {
-  workflowId: string;
-  provider: string;
-}
-
-export function set_gen_ai_provider({
-  workflowId,
-  provider,
-}: SetGenAIProviderParams): Promise<any> {
-  const accessToken = getAccessToken();
-
-  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-
-  return new Promise((resolve, reject) => {
-    axios
-      .post(`${thirdaiPlatformBaseUrl}/api/workflow/set-gen-ai-provider`, {
-        workflow_id: workflowId,
-        provider,
-      })
-      .then((res) => {
-        resolve(res.data);
-      })
-      .catch((err) => {
-        if (err.response && err.response.data) {
-          reject(new Error(err.response.data.detail || 'Failed to set generation AI provider'));
-        } else {
-          reject(new Error('Failed to set generation AI provider'));
-        }
-      });
-  });
-}
-
-export interface CreatedBy {
-  id: string;
+interface Dependency {
+  model_id: string;
+  model_name: string;
+  type: string;
+  sub_type: string;
   username: string;
-  email: string;
 }
 
 export interface Workflow {
-  id: string;
-  name: string;
+  model_id: string;
+  model_name: string;
   type: string;
-  status: string;
+  sub_type: string;
+  train_status: string;
+  deploy_status: string;
   publish_date: string;
-  created_by: CreatedBy;
-  models: WorkflowModel[];
-  gen_ai_provider: string;
+  username: string;
+  user_email: string;
+  attributes: Attributes;
+  dependencies: Dependency[];
+  size: string;
+  size_in_memory: string;
 }
 
 export function fetchWorkflows(): Promise<Workflow[]> {
@@ -457,7 +388,7 @@ export function fetchWorkflows(): Promise<Workflow[]> {
 
   return new Promise((resolve, reject) => {
     axios
-      .get(`${thirdaiPlatformBaseUrl}/api/workflow/list`)
+      .get(`${thirdaiPlatformBaseUrl}/api/model/list`)
       .then((res) => {
         resolve(res.data.data); // Assuming the data is inside `data` field
       })
@@ -479,29 +410,8 @@ interface ValidateWorkflowResponse {
   };
 }
 
-export function validate_workflow(workflowId: string): Promise<ValidateWorkflowResponse> {
-  const accessToken = getAccessToken();
-
-  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-
-  const params = new URLSearchParams({ workflow_id: workflowId });
-
-  return new Promise((resolve, reject) => {
-    axios
-      .post<ValidateWorkflowResponse>(
-        `${thirdaiPlatformBaseUrl}/api/workflow/validate?${params.toString()}`
-      )
-      .then((res) => {
-        resolve(res.data);
-      })
-      .catch((err) => {
-        if (err.response && err.response.data) {
-          reject(new Error(err.response.data.detail || 'Failed to validate workflow'));
-        } else {
-          reject(new Error('Failed to validate workflow'));
-        }
-      });
-  });
+function createModelIdentifier(username: string, model_name: string): string {
+  return `${username}/${model_name}`;
 }
 
 interface StartWorkflowResponse {
@@ -512,18 +422,21 @@ interface StartWorkflowResponse {
   };
 }
 
-export function start_workflow(workflowId: string): Promise<StartWorkflowResponse> {
+export function start_workflow(
+  username: string,
+  model_name: string
+): Promise<StartWorkflowResponse> {
   const accessToken = getAccessToken();
 
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-  const params = new URLSearchParams({ workflow_id: workflowId });
+  const params = new URLSearchParams({
+    model_identifier: createModelIdentifier(username, model_name),
+  });
 
   return new Promise((resolve, reject) => {
     axios
-      .post<StartWorkflowResponse>(
-        `${thirdaiPlatformBaseUrl}/api/workflow/start?${params.toString()}`
-      )
+      .post<StartWorkflowResponse>(`${thirdaiPlatformBaseUrl}/api/deploy/run?${params.toString()}`)
       .then((res) => {
         resolve(res.data);
       })
@@ -542,15 +455,15 @@ interface StopWorkflowResponse {
   message: string;
 }
 
-export function stop_workflow(workflowId: string): Promise<StopWorkflowResponse> {
+export function stop_workflow(username: string, model_name: string): Promise<StopWorkflowResponse> {
   const accessToken = getAccessToken();
 
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
   return new Promise((resolve, reject) => {
     axios
-      .post(`${thirdaiPlatformBaseUrl}/api/workflow/stop`, null, {
-        params: { workflow_id: workflowId },
+      .post(`${thirdaiPlatformBaseUrl}/api/deploy/stop`, null, {
+        params: { model_identifier: createModelIdentifier(username, model_name) },
       })
       .then((res) => {
         resolve(res.data);
@@ -570,16 +483,21 @@ interface DeleteWorkflowResponse {
   message: string;
 }
 
-export async function delete_workflow(workflowId: string): Promise<DeleteWorkflowResponse> {
+export async function delete_workflow(
+  username: string,
+  model_name: string
+): Promise<DeleteWorkflowResponse> {
   const accessToken = getAccessToken();
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-  const params = new URLSearchParams({ workflow_id: workflowId });
+  const params = new URLSearchParams({
+    model_identifier: createModelIdentifier(username, model_name),
+  });
 
   return new Promise((resolve, reject) => {
     axios
       .post<DeleteWorkflowResponse>(
-        `${thirdaiPlatformBaseUrl}/api/workflow/delete?${params.toString()}`
+        `${thirdaiPlatformBaseUrl}/api/model/delete?${params.toString()}`
       )
       .then((res) => {
         resolve(res.data);
@@ -592,60 +510,30 @@ export async function delete_workflow(workflowId: string): Promise<DeleteWorkflo
   });
 }
 
-interface WorkflowModel {
-  access_level: string;
-  component: string;
-  deploy_status: string;
-  domain: string;
-  latency: string;
-  model_id: string;
-  model_name: string;
-  num_params: string;
-  publish_date: string;
-  size: string;
-  size_in_memory: string;
-  sub_type: string;
-  team_id: string | null;
-  thirdai_version: string;
-  training_time: string;
-  type: string;
-  train_status: string;
-  user_email: string;
-  username: string;
-}
-
 interface WorkflowDetailsResponse {
   status_code: number;
   message: string;
-  data: {
-    id: string;
-    name: string;
-    type: string;
-    type_id: string;
-    status: string;
-    gen_ai_provider: string;
-    models: WorkflowModel[];
-  };
+  data: Workflow;
 }
 
-export async function getWorkflowDetails(workflowId: string): Promise<WorkflowDetailsResponse> {
+export async function getWorkflowDetails(workflow_id: string): Promise<WorkflowDetailsResponse> {
   const accessToken = getAccessToken();
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-  const params = new URLSearchParams({ workflow_id: workflowId });
+  const params = new URLSearchParams({ model_id: workflow_id });
 
   return new Promise((resolve, reject) => {
     axios
       .get<WorkflowDetailsResponse>(
-        `${thirdaiPlatformBaseUrl}/api/workflow/details?${params.toString()}`
+        `${thirdaiPlatformBaseUrl}/api/model/details?${params.toString()}`
       )
       .then((res) => {
         resolve(res.data);
       })
       .catch((err) => {
-        console.error('Error fetching workflow details:', err);
-        alert('Error fetching workflow details:' + err);
-        reject(new Error('Failed to fetch workflow details'));
+        console.error('Error fetching model details:', err);
+        alert('Error fetching model details:' + err);
+        reject(new Error('Failed to fetch model details'));
       });
   });
 }
@@ -714,13 +602,10 @@ function tokenClassifierDatagenForm(modelGoal: string, categories: Category[]) {
     examples: category.examples.map((ex) => ex.text),
     description: category.description,
   }));
-  const numSentences = 10_000;
   return {
     sub_type: 'token',
     task_prompt: modelGoal,
     tags: tags,
-    num_sentences_to_generate: numSentences,
-    num_samples_per_tag: Math.max(Math.ceil(numSentences / tags.length), 50),
   };
 }
 
@@ -880,18 +765,16 @@ export function useTokenClassificationEndpoints() {
       const accessToken = getAccessToken();
       axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-      const params = new URLSearchParams({ workflow_id: workflowId });
+      const params = new URLSearchParams({ model_id: workflowId });
 
       axios
         .get<WorkflowDetailsResponse>(
-          `${thirdaiPlatformBaseUrl}/api/workflow/details?${params.toString()}`
+          `${thirdaiPlatformBaseUrl}/api/model/details?${params.toString()}`
         )
         .then((res) => {
-          setWorkflowName(res.data.data.name);
-          for (const model of res.data.data.models) {
-            if (model.component === 'nlp') {
-              setDeploymentUrl(`${deploymentBaseUrl}/${model.model_id}`);
-            }
+          setWorkflowName(res.data.data.model_name);
+          if (res.data.data.model_id) {
+            setDeploymentUrl(`${deploymentBaseUrl}/${res.data.data.model_id}`);
           }
         })
         .catch((err) => {
@@ -1022,19 +905,15 @@ export function useTextClassificationEndpoints() {
       const accessToken = getAccessToken();
       axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-      const params = new URLSearchParams({ workflow_id: workflowId });
+      const params = new URLSearchParams({ model_id: workflowId });
 
       axios
         .get<WorkflowDetailsResponse>(
-          `${thirdaiPlatformBaseUrl}/api/workflow/details?${params.toString()}`
+          `${thirdaiPlatformBaseUrl}/api/model/details?${params.toString()}`
         )
         .then((res) => {
-          setWorkflowName(res.data.data.name);
-          for (const model of res.data.data.models) {
-            if (model.component === 'nlp') {
-              setDeploymentUrl(`${deploymentBaseUrl}/${model.model_id}`);
-            }
-          }
+          setWorkflowName(res.data.data.model_name);
+          setDeploymentUrl(`${deploymentBaseUrl}/${res.data.data.model_id}`);
         })
         .catch((err) => {
           console.error('Error fetching workflow details:', err);
@@ -1108,6 +987,24 @@ export function useSentimentClassification(workflowId: string | null) {
   };
 }
 
+export async function piiDetect(
+  query: string,
+  workflowId: string
+): Promise<TokenClassificationResult> {
+  try {
+    // Corrected the key from 'query' to 'text'
+    const response = await axios.post(`${deploymentBaseUrl}/${workflowId}/predict`, {
+      text: query,
+      top_k: 1,
+    });
+    return response.data.data;
+  } catch (error) {
+    console.error('Error performing pii detection:', error);
+    alert('Error performing pii detection: ' + error);
+    throw new Error('Failed to perform pii detection');
+  }
+}
+
 export interface DeploymentStatsTable {
   header: string[];
   rows: string[][];
@@ -1166,7 +1063,7 @@ export async function fetchAllModels(): Promise<{ data: ModelResponse[] }> {
 
   return new Promise((resolve, reject) => {
     axios
-      .get(`${thirdaiPlatformBaseUrl}/api/model/all-models`)
+      .get(`${thirdaiPlatformBaseUrl}/api/model/list`)
       .then((res) => {
         resolve(res.data);
       })
@@ -1200,7 +1097,7 @@ export async function fetchAllUsers(): Promise<{ data: UserResponse[] }> {
 
   return new Promise((resolve, reject) => {
     axios
-      .get(`${thirdaiPlatformBaseUrl}/api/user/all-users`)
+      .get(`${thirdaiPlatformBaseUrl}/api/user/list`)
       .then((res) => {
         resolve(res.data);
       })

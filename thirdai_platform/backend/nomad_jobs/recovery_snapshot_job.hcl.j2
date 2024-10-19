@@ -22,7 +22,7 @@ job "recovery-snapshot" {
         {% elif platform == "local" %}
         MODEL_BAZAAR_DIR = "{{ share_dir }}"
         {% endif %}
-        DB_URI = "{{ db_uri }}"
+        DATABASE_URI = "{{ db_uri }}"
       }
 
       config {

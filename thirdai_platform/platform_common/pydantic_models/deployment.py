@@ -13,11 +13,27 @@ class NDBDeploymentOptions(BaseModel):
     llm_provider: str = "openai"
     genai_key: Optional[str] = None
 
+    class Config:
+        protected_namespaces = ()
+
 
 class UDTDeploymentOptions(BaseModel):
     model_type: Literal[ModelType.UDT] = ModelType.UDT
 
     udt_sub_type: UDTSubType
+
+    class Config:
+        protected_namespaces = ()
+
+
+class EnterpriseSearchOptions(BaseModel):
+    model_type: Literal[ModelType.ENTERPRISE_SEARCH] = ModelType.ENTERPRISE_SEARCH
+
+    retrieval_id: str
+    guardrail_id: Optional[str] = None
+
+    class Config:
+        protected_namespaces = ()
 
 
 class DeploymentConfig(BaseModel):
@@ -28,9 +44,12 @@ class DeploymentConfig(BaseModel):
 
     autoscaling_enabled: bool = False
 
-    model_options: Union[NDBDeploymentOptions, UDTDeploymentOptions] = Field(
-        ..., discriminator="model_type"
-    )
+    model_options: Union[
+        NDBDeploymentOptions, UDTDeploymentOptions, EnterpriseSearchOptions
+    ] = Field(..., discriminator="model_type")
+
+    class Config:
+        protected_namespaces = ()
 
     def get_nomad_endpoint(self) -> str:
         # Parse the model_bazaar_endpoint to extract scheme and host

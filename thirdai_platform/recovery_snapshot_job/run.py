@@ -1,17 +1,22 @@
 import datetime
-import json
 import logging
+import os
 import subprocess
 import zipfile
 
 from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from platform_common.file_handler import (
     AzureStorageHandler,
     CloudStorageHandler,
     GCPStorageHandler,
     S3StorageHandler,
+)
+from platform_common.pydantic_models.recovery_snapshot import (
+    AzureConfig,
+    BackupConfig,
+    GCPConfig,
+    S3Config,
 )
 
 logging.basicConfig(
@@ -22,28 +27,45 @@ logging.basicConfig(
 scheduler = BlockingScheduler()
 
 
-def load_config(config_file):
-    with open(config_file, "r") as f:
-        return json.load(f)
+def get_cloud_storage_handler(config: BackupConfig):
+    """Get the appropriate cloud storage handler based on the provider."""
+    provider_config = config.provider
 
-
-def get_cloud_storage_handler(config):
-    if config["cloud_provider"] == "s3":
+    if isinstance(provider_config, S3Config):
         return S3StorageHandler(
-            aws_access_key=config["aws_access_key"],
-            aws_secret_access_key=config["aws_secret_access_key"],
+            aws_access_key=provider_config.aws_access_key,
+            aws_secret_access_key=provider_config.aws_secret_access_key,
         )
-    elif config["cloud_provider"] == "azure":
+    elif isinstance(provider_config, AzureConfig):
         return AzureStorageHandler(
-            config["azure_account_name"], config["azure_account_key"]
+            account_name=provider_config.azure_account_name,
+            account_key=provider_config.azure_account_key,
         )
-    elif config["cloud_provider"] == "gcp":
-        return GCPStorageHandler(config["gcp_credentials_file_path"])
+    elif isinstance(provider_config, GCPConfig):
+        return GCPStorageHandler(provider_config.gcp_credentials_file_path)
     else:
-        return None  # No cloud provider
+        return None  # Local backup, no cloud handler
+
+
+def extract_timestamp(backup_name: str) -> datetime:
+    """
+    Extract the timestamp from the backup filename and convert it to a datetime object.
+    Assumes the backup format is 'backup_YYYYMMDD_HHMMSS.zip'.
+    """
+    try:
+        # Extract the timestamp part (e.g., '20241010_203418') from the backup filename
+        timestamp_str = (
+            backup_name.split("_")[1] + "_" + backup_name.split("_")[2].split(".")[0]
+        )
+        # Convert the timestamp string to a datetime object
+        return datetime.datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
+    except (IndexError, ValueError):
+        # If the timestamp format is invalid, return a minimum date to avoid deletion
+        return datetime.datetime.min
 
 
 def delete_local_backup(zip_file_path: str, dump_file_path: str):
+    """Delete local backup files after successful backup."""
     try:
         os.remove(f"{zip_file_path}")
         logging.info(f"Deleted local zip file: {zip_file_path}")
@@ -81,8 +103,9 @@ def create_backup_files(
 
 
 def manage_backup_limit_local(backup_dir: str, backup_limit: int):
+    """Ensure that the number of local backups does not exceed the limit."""
     all_backups = [f for f in os.listdir(backup_dir) if f.startswith("backup_")]
-    sorted_backups = sorted(all_backups, key=lambda x: x.split("_")[-1], reverse=True)
+    sorted_backups = sorted(all_backups, key=extract_timestamp, reverse=True)
     if len(sorted_backups) > backup_limit:
         for backup in sorted_backups[backup_limit:]:
             backup_path = os.path.join(backup_dir, backup)
@@ -93,8 +116,9 @@ def manage_backup_limit_local(backup_dir: str, backup_limit: int):
 def manage_backup_limit(
     cloud_handler: CloudStorageHandler, bucket_name: str, backup_limit: int
 ):
+    """Ensure that the number of backups in the cloud does not exceed the limit."""
     all_backups = cloud_handler.list_files(bucket_name, "backup_")
-    sorted_backups = sorted(all_backups, key=lambda x: x.split("_")[-1], reverse=True)
+    sorted_backups = sorted(all_backups, key=extract_timestamp, reverse=True)
     if len(sorted_backups) > backup_limit:
         for backup in sorted_backups[backup_limit:]:
             cloud_handler.delete_path(bucket_name, backup)
@@ -102,48 +126,49 @@ def manage_backup_limit(
 
 
 def perform_backup(config_file):
-    config = load_config(config_file)
+    """Perform the backup operation based on the provided config."""
+    config = BackupConfig.parse_file(config_file)
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-
     model_bazaar_dir = os.getenv("MODEL_BAZAAR_DIR")
-    backup_dir = os.path.join(model_bazaar_dir, "backups")
-    os.makedirs(backup_dir, exist_ok=True)
 
-    db_uri = os.getenv("DB_URI")
-    bucket_name = config.get("bucket_name")
-    backup_limit = config.get("backup_limit", 5)
+    try:
+        backup_dir = os.path.join(model_bazaar_dir, "backups")
+        os.makedirs(backup_dir, exist_ok=True)
 
-    # Create the backup files (zip and database dump)
-    zip_file_path, dump_file_path = create_backup_files(
-        db_uri, model_bazaar_dir, backup_dir, timestamp
-    )
+        db_uri = os.getenv("DATABASE_URI")
+        backup_limit = config.backup_limit
 
-    # If a cloud provider is configured, upload the backup to the cloud
-    cloud_handler = get_cloud_storage_handler(config)
-    if cloud_handler:
-        cloud_handler.create_bucket_if_not_exists(bucket_name)
-        cloud_handler.upload_file(
-            f"{zip_file_path}", bucket_name, f"backup_{timestamp}.zip"
+        zip_file_path, dump_file_path = create_backup_files(
+            db_uri, model_bazaar_dir, backup_dir, timestamp
         )
-        manage_backup_limit(cloud_handler, bucket_name, backup_limit)
-        delete_local_backup(zip_file_path, dump_file_path)
-    else:
-        # No cloud provider, manage local backups
-        manage_backup_limit_local(backup_dir, backup_limit)
-        os.remove(dump_file_path)
-        logging.info(f"Deleted local DB dump file: {dump_file_path}")
 
-    logging.info(f"Backup completed successfully at {timestamp}.")
+        # If a cloud provider is configured, upload the backup to the cloud
+        cloud_handler = get_cloud_storage_handler(config)
+        if cloud_handler:
+            cloud_handler.create_bucket_if_not_exists(config.provider.bucket_name)
+            cloud_handler.upload_file(
+                f"{zip_file_path}",
+                config.provider.bucket_name,
+                f"backup_{timestamp}.zip",
+            )
+            manage_backup_limit(
+                cloud_handler, config.provider.bucket_name, backup_limit
+            )
+            delete_local_backup(zip_file_path, dump_file_path)
+        else:
+            # No cloud provider, manage local backups
+            manage_backup_limit_local(backup_dir, backup_limit)
+            os.remove(dump_file_path)
+            logging.info(f"Deleted local DB dump file: {dump_file_path}")
 
-    # If this is a one-time backup, shut down the scheduler
-    if not config.get("interval_minutes"):
-        scheduler.shutdown(wait=False)  # Stops the scheduler after the job completes
+    except Exception as e:
+        logging.error(f"Backup failed: {e}")
 
 
 def schedule_backup(config_file):
     """Schedule backup based on interval in config or run once."""
-    config = load_config(config_file)
-    interval_minutes = config.get("interval_minutes")
+    config = BackupConfig.parse_file(config_file)
+    interval_minutes = config.interval_minutes
 
     if interval_minutes:
         # Schedule recurring backups
@@ -155,23 +180,17 @@ def schedule_backup(config_file):
             replace_existing=True,
         )
         logging.info(f"Scheduled periodic backup every {interval_minutes} minutes.")
-    else:
-        # Run one-time backup
-        scheduler.add_job(
-            perform_backup,
-            trigger=DateTrigger(run_date=datetime.datetime.now()),
-            args=[config_file],
-            id="one_time_backup_job",
-            replace_existing=True,
-        )
-        logging.info("Scheduled one-time backup.")
 
-    # Start the scheduler
-    try:
-        scheduler.start()
-    except Exception as e:
-        logging.error(f"Scheduler encountered an error: {e}")
-        scheduler.shutdown()
+        # Start the scheduler for periodic backups
+        try:
+            scheduler.start()
+        except Exception as e:
+            logging.error(f"Scheduler encountered an error: {e}")
+            scheduler.shutdown()
+    else:
+        # Run one-time backup directly, no scheduler needed
+        logging.info("Starting one-time backup.")
+        perform_backup(config_file)
 
 
 if __name__ == "__main__":
@@ -182,4 +201,5 @@ if __name__ == "__main__":
     try:
         schedule_backup(config_file)
     except Exception as err:
+        # TODO(YASH): Figure out a way to propagate this error messages to user.
         logging.error(f"Error during backup: {err}")

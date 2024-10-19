@@ -100,6 +100,27 @@ class SearchResultsNDB(BaseModel):
     references: List[Reference]
 
 
+class PiiEntity(BaseModel):
+    token: str
+    label: str
+
+
+class EnterpriseSearchResults(BaseModel):
+    """
+    Represents the search results including the query and references.
+    """
+
+    query_text: str
+    references: List[Reference]
+
+    pii_entities: Optional[List[PiiEntity]] = None
+
+
+class UnredactArgs(BaseModel):
+    text: str
+    pii_entities: List[PiiEntity]
+
+
 class DocumentList(BaseModel):
     documents: List[FileInfo]
 

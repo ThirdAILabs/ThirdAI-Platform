@@ -2,19 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { SelectModel } from '@/lib/db';
 import NERQuestions from './nlp-questions/ner-questions';
 import SemanticSearchQuestions from './semantic-search-questions';
-import { create_workflow, add_models_to_workflow, set_gen_ai_provider } from '@/lib/backend';
 import { CardDescription } from '@/components/ui/card';
 import { Button, TextField } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import DropdownMenu from '@/components/ui/dropDownMenu';
+import { create_enterprise_search_workflow, EnterpriseSearchOptions } from '@/lib/backend';
 
 interface RAGQuestionsProps {
   models: SelectModel[];
   workflowNames: string[];
+  isChatbot: boolean;
 }
 
-const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
+enum LlmProvider {
+  OpenAI = 'openai',
+  OnPrem = 'on-prem',
+  SelfHosted = 'self-hosted',
+}
+
+const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) => {
   const [currentStep, setCurrentStep] = useState(0);
 
   // Begin state variables & func for source
@@ -63,7 +70,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
 
   // Begin state variables & func for LLM
 
-  const [llmType, setLlmType] = useState<string | null>(null);
+  const [llmType, setLlmType] = useState<LlmProvider | null>(null);
 
   // End state variables & func for LLM
 
@@ -75,90 +82,53 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
     setIsLoading(true);
 
     const workflowName = modelName;
-    const workflowTypeName = 'chatbot';
 
     try {
-      // Step 1: Create the workflow
-      const workflowResponse = await create_workflow({
-        name: workflowName,
-        typeName: workflowTypeName,
-      });
-      const workflowId = workflowResponse.data.workflow_id;
-      console.log('Workflow created:', workflowId);
+      // Prepare options
+      let options: EnterpriseSearchOptions = {
+        retrieval_id: ssModelId || '',
+        guardrail_id: grModelId || '',
+        nlp_classifier_id: nlpClassifierModelId || '',
+        llm_provider: '',
+        default_mode: isChatbot ? 'chat' : 'search',
+      };
 
-      // Step 2: Prepare the models to be added
-      const modelIdentifiers = [];
-      const components = [];
-
-      // Find and add the semantic search model
-      if (ssModelId) {
-        modelIdentifiers.push(ssModelId);
-        components.push('search');
-      } else {
-        console.error(`Semantic search model with identifier ${ssIdentifier} not found.`);
-        alert(`Semantic search model with identifier ${ssIdentifier} not found.`);
-      }
-
-      // Find and add the NER model if it exists
-      if (grModelId) {
-        modelIdentifiers.push(grModelId);
-        components.push('nlp');
-      } else {
-        console.error(`NER model with identifier ${grIdentifier} not found.`);
-        // alert(`NER model with identifier ${grIdentifier} not found.`)
-      }
-
-      // Add the NLP classifier model if it exists
-      if (nlpClassifierModelId) {
-        modelIdentifiers.push(nlpClassifierModelId);
-        components.push('nlp-classifier');
-      }
-
-      // Step 3: Add the models to the workflow
-      if (modelIdentifiers.length > 0) {
-        const addModelsResponse = await add_models_to_workflow({
-          workflowId,
-          modelIdentifiers,
-          components,
-        });
-        console.log('Models added to workflow:', addModelsResponse);
-      } else {
-        console.error('No models to add to the workflow');
-        alert('No models to add to the workflow');
-      }
-
-      // Step 4: Set the generation AI provider based on the selected LLM type
-      let provider = '';
+      // Set llm_provider based on llmType
       switch (llmType) {
-        case 'OpenAI':
-          provider = 'openai';
+        case LlmProvider.OpenAI:
+          options.llm_provider = 'openai';
           break;
-        case 'On-prem':
-          provider = 'on-prem';
+        case LlmProvider.OnPrem:
+          options.llm_provider = 'on-prem';
           break;
-        case 'Self-host':
-          provider = 'self-host';
+        case LlmProvider.SelfHosted:
+          options.llm_provider = 'self-host';
           break;
         default:
-        // handle
+          console.error('Invalid LLM type selected');
+          alert('Invalid LLM type selected');
+          setIsLoading(false);
+          return;
       }
 
-      if (provider) {
-        const setProviderResponse = await set_gen_ai_provider({
-          workflowId,
-          provider,
-        });
-        console.log('Generation AI provider set:', setProviderResponse);
-      } else {
-        console.error('Invalid LLM type selected');
-        alert('Invalid LLM type selected');
-      }
+      // Clean up options by removing undefined or empty values
+      options = Object.fromEntries(
+        Object.entries(options).filter(([_, v]) => v !== undefined && v !== '')
+      ) as EnterpriseSearchOptions;
+
+      // Call create_workflow
+      const workflowResponse = await create_enterprise_search_workflow({
+        workflow_name: workflowName,
+        options,
+      });
+      const workflowId = workflowResponse.data.model_id;
+      console.log('Workflow created:', workflowId);
 
       // Go back home page
       router.push('/');
     } catch (error) {
-      console.error('Error during workflow creation or model addition:', error);
-      alert('Error during workflow creation or model addition:' + error);
+      console.error('Error during workflow creation:', error);
+      alert('Error during workflow creation: ' + error);
       setIsLoading(false);
     }
   };
@@ -340,20 +310,20 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
                 }}
               >
                 <Button
-                  variant={llmType === 'OpenAI' ? 'contained' : 'outlined'}
-                  onClick={() => setLlmType('OpenAI')}
+                  variant={llmType === LlmProvider.OpenAI ? 'contained' : 'outlined'}
+                  onClick={() => setLlmType(LlmProvider.OpenAI)}
                 >
                   OpenAI
                 </Button>
                 <Button
-                  variant={llmType === 'On-prem' ? 'contained' : 'outlined'}
-                  onClick={() => setLlmType('On-prem')}
+                  variant={llmType === LlmProvider.OnPrem ? 'contained' : 'outlined'}
+                  onClick={() => setLlmType(LlmProvider.OnPrem)}
                 >
                   On-prem
                 </Button>
                 <Button
-                  variant={llmType === 'Self-host' ? 'contained' : 'outlined'}
-                  onClick={() => setLlmType('Self-host')}
+                  variant={llmType === LlmProvider.SelfHosted ? 'contained' : 'outlined'}
+                  onClick={() => setLlmType(LlmProvider.SelfHosted)}
                 >
                   Self-host
                 </Button>
@@ -478,83 +448,87 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
           </div>
 
           {/* Sentiment Analysis (Optional) */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', marginTop: '20px' }}>
-              <span className="block text-lg font-semibold">Sentiment Analysis (Optional)</span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span style={{ marginLeft: '8px', cursor: 'pointer' }}>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="w-5 h-5"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8" x2="12" y2="8" />
-                      <line x1="12" y1="12" x2="12" y2="16" />
-                    </svg>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="right" style={{ maxWidth: '250px' }}>
-                  A sentiment analysis model can determine the emotional tone behind a user&apos;s
-                  query, providing insights into their attitude and emotional state.
-                </TooltipContent>
-              </Tooltip>
-            </div>
+          {isChatbot && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', marginTop: '20px' }}>
+                <span className="block text-lg font-semibold">Sentiment Analysis (Optional)</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span style={{ marginLeft: '8px', cursor: 'pointer' }}>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-5 h-5"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="8" />
+                        <line x1="12" y1="12" x2="12" y2="16" />
+                      </svg>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" style={{ maxWidth: '250px' }}>
+                    A sentiment analysis model can determine the emotional tone behind a user&apos;s
+                    query, providing insights into their attitude and emotional state.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
 
-            <CardDescription>Would you like to detect sentiment of user query?</CardDescription>
-            <div style={{ display: 'flex', flexDirection: 'row', gap: '10px', marginTop: '10px' }}>
-              <Button
-                variant={ifUseNLPClassifier === 'Yes' ? 'contained' : 'outlined'}
-                color={ifUseNLPClassifier === 'Yes' ? 'secondary' : 'primary'}
-                onClick={() => setIfUseNLPClassifier('Yes')}
+              <CardDescription>Would you like to detect sentiment of user query?</CardDescription>
+              <div
+                style={{ display: 'flex', flexDirection: 'row', gap: '10px', marginTop: '10px' }}
               >
-                Yes
-              </Button>
-              <Button
-                variant={ifUseNLPClassifier === 'No' ? 'contained' : 'outlined'}
-                color={ifUseNLPClassifier === 'No' ? 'secondary' : 'primary'}
-                onClick={() => {
-                  setNlpClassifierIdentifier(null);
-                  setIfUseNLPClassifier('No');
-                }}
-              >
-                No
-              </Button>
-            </div>
-
-            {ifUseNLPClassifier === 'Yes' && (
-              <div style={{ marginTop: '20px' }}>
-                <CardDescription>Choose from existing sentiment analysis models</CardDescription>
-                <select
-                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                  value={nlpClassifierIdentifier || ''}
-                  onChange={(e) => {
-                    const classifierID = e.target.value;
-                    setNlpClassifierIdentifier(classifierID);
-                    const classifierModel = existingNLPClassifierModels.find(
-                      (model) => `${model.username}/${model.model_name}` === classifierID
-                    );
-                    if (classifierModel) {
-                      setNlpClassifierModelId(classifierModel.model_id);
-                    }
+                <Button
+                  variant={ifUseNLPClassifier === 'Yes' ? 'contained' : 'outlined'}
+                  color={ifUseNLPClassifier === 'Yes' ? 'secondary' : 'primary'}
+                  onClick={() => setIfUseNLPClassifier('Yes')}
+                >
+                  Yes
+                </Button>
+                <Button
+                  variant={ifUseNLPClassifier === 'No' ? 'contained' : 'outlined'}
+                  color={ifUseNLPClassifier === 'No' ? 'secondary' : 'primary'}
+                  onClick={() => {
+                    setNlpClassifierIdentifier(null);
+                    setIfUseNLPClassifier('No');
                   }}
                 >
-                  <option value="">-- Please choose a model --</option>
-                  {existingNLPClassifierModels.map((model) => (
-                    <option key={model.id} value={`${model.username}/${model.model_name}`}>
-                      {`${model.username}/${model.model_name}`}
-                    </option>
-                  ))}
-                </select>
+                  No
+                </Button>
               </div>
-            )}
-          </div>
+
+              {ifUseNLPClassifier === 'Yes' && (
+                <div style={{ marginTop: '20px' }}>
+                  <CardDescription>Choose from existing sentiment analysis models</CardDescription>
+                  <select
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                    value={nlpClassifierIdentifier || ''}
+                    onChange={(e) => {
+                      const classifierID = e.target.value;
+                      setNlpClassifierIdentifier(classifierID);
+                      const classifierModel = existingNLPClassifierModels.find(
+                        (model) => `${model.username}/${model.model_name}` === classifierID
+                      );
+                      if (classifierModel) {
+                        setNlpClassifierModelId(classifierModel.model_id);
+                      }
+                    }}
+                  >
+                    <option value="">-- Please choose a model --</option>
+                    {existingNLPClassifierModels.map((model) => (
+                      <option key={model.id} value={`${model.username}/${model.model_name}`}>
+                        {`${model.username}/${model.model_name}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ),
     },
@@ -565,7 +539,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
 
   if (!modelName) missingRequirements.push('App Name is not specified (Step 1)');
   if (!ssModelId) missingRequirements.push('Retrieval app is not specified (Step 2)');
-  if (!llmType) missingRequirements.push('LLM Type is not specified (Step 3)');
+  if (!llmType && isChatbot) missingRequirements.push('LLM Type is not specified (Step 3)');
 
   const errorMessage = missingRequirements.length > 0 && (
     <div>
@@ -632,7 +606,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
           <Button onClick={() => setCurrentStep(currentStep + 1)}>Next</Button>
         ) : (
           <>
-            {ssModelId && modelName && llmType ? (
+            {ssModelId && modelName && (llmType || !isChatbot) ? (
               <div>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -640,7 +614,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
                       <Button
                         onClick={handleSubmit}
                         style={{ width: '100%' }}
-                        disabled={isLoading || !(ssModelId && modelName && llmType)}
+                        disabled={isLoading || !(ssModelId && modelName && (llmType || !isChatbot))}
                       >
                         {isLoading ? (
                           <div className="flex items-center justify-center">
@@ -653,7 +627,7 @@ const RAGQuestions = ({ models, workflowNames }: RAGQuestionsProps) => {
                       </Button>
                     </div>
                   </TooltipTrigger>
-                  {!(ssModelId && modelName && llmType) && (
+                  {!(ssModelId && modelName && (llmType || !isChatbot)) && (
                     <TooltipContent side="bottom">Requirements not met</TooltipContent>
                   )}
                 </Tooltip>

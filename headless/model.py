@@ -2,7 +2,6 @@ import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from client.bazaar import ModelBazaar
-from client.clients import WorkflowClient
 from headless.utils import get_csv_source_id
 
 
@@ -20,7 +19,6 @@ class Flow:
         self._global_email = email
         self._global_password = password
         self._bazaar_client.log_in(email=email, password=password)
-        self._workflow_client = WorkflowClient(self._bazaar_client._login_instance)
 
     @property
     def bazaar_client(self) -> ModelBazaar:

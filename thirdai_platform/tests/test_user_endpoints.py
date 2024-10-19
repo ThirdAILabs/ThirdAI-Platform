@@ -1,7 +1,14 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from .utils import auth_header, create_user, login
+from .utils import (
+    add_user_to_team,
+    assign_team_admin,
+    auth_header,
+    create_team,
+    create_user,
+    login,
+)
 
 pytestmark = [pytest.mark.unit]
 
@@ -131,10 +138,6 @@ def test_add_remove_global_admin():
     assert res.status_code == 200
     admin_jwt = res.json()["data"]["access_token"]
 
-    # Verify the user does not have admin access initially
-    res = client.get("/api/user/all-users", headers=auth_header(user_jwt))
-    assert res.status_code == 403  # Access forbidden for non-admin
-
     # Promote the user to global admin
     res = client.post(
         "/api/user/add-global-admin",
@@ -143,10 +146,8 @@ def test_add_remove_global_admin():
     )
     assert res.status_code == 200
 
-    # Verify the user can access admin routes after promotion
-    res = client.get("/api/user/all-users", headers=auth_header(user_jwt))
+    res = client.get("/api/user/list", headers=auth_header(user_jwt))
     assert res.status_code == 200
-
     # Check that all expected users are listed
     users_found = set(user["username"] for user in res.json()["data"])
     assert len(users_found.intersection(["future-admin", "user1", "admin"])) == 3
@@ -159,10 +160,6 @@ def test_add_remove_global_admin():
     )
     assert res.status_code == 200
 
-    # Verify the user no longer has admin access after demotion
-    res = client.get("/api/user/all-users", headers=auth_header(user_jwt))
-    assert res.status_code == 403
-
     # Attempt to remove the last global admin and expect failure
     res = client.post(
         "/api/user/delete-global-admin",
@@ -172,6 +169,110 @@ def test_add_remove_global_admin():
     assert (
         res.status_code == 400
     )  # Should fail as there must be at least one global admin
+
+
+# Add test for list_accessible_users
+def test_list_accessible_users():
+    from main import app
+
+    client = TestClient(app)
+
+    # Global Admin login to get access token
+    res = login(client, username="admin@mail.com", password="password")
+    assert res.status_code == 200
+    admin_jwt = res.json()["data"]["access_token"]
+
+    # Create team1 and team2
+    res = create_team(client, "team1", admin_jwt)
+    assert res.status_code == 201
+    team1_id = res.json()["data"]["team_id"]
+
+    res = create_team(client, "team2", admin_jwt)
+    assert res.status_code == 201
+    team2_id = res.json()["data"]["team_id"]
+
+    # Create users
+    res = create_user(
+        client, username="user2", email="user2@mail.com", password="password2"
+    )
+    assert res.status_code == 200
+
+    res = create_user(
+        client, username="user3", email="user3@mail.com", password="password3"
+    )
+    assert res.status_code == 200
+
+    res = create_user(
+        client, username="team_admin", email="team_admin@mail.com", password="password4"
+    )
+    assert res.status_code == 200
+
+    # Add user1 to team1
+    res = add_user_to_team(client, team1_id, "user1@mail.com", admin_jwt)
+    assert res.status_code == 200
+
+    # Add user2 to team2
+    res = add_user_to_team(client, team2_id, "user2@mail.com", admin_jwt)
+    assert res.status_code == 200
+
+    # Assign team_admin as the admin of both team1 and team2
+    res = assign_team_admin(client, team1_id, "team_admin@mail.com", admin_jwt)
+    assert res.status_code == 200
+    res = assign_team_admin(client, team2_id, "team_admin@mail.com", admin_jwt)
+    assert res.status_code == 200
+
+    # User1 logs in and should only see users from team1
+    res = login(client, username="user1@mail.com", password="firstpassword")
+    assert res.status_code == 200
+    user1_jwt = res.json()["data"]["access_token"]
+
+    res = client.get("/api/user/list", headers=auth_header(user1_jwt))
+    assert res.status_code == 200
+    accessible_users = [user["email"] for user in res.json()["data"]]
+    assert "user1@mail.com" in accessible_users  # User1 should see themself
+    assert (
+        "team_admin@mail.com" in accessible_users
+    )  # Admin of their team should be accessible
+    assert (
+        "user2@mail.com" not in accessible_users
+    )  # User1 should not see users from team2
+
+    # User3 logs in and should only see User3 as it is not associated with any team
+    res = login(client, username="user3@mail.com", password="password3")
+    assert res.status_code == 200
+    user3_jwt = res.json()["data"]["access_token"]
+
+    res = client.get("/api/user/list", headers=auth_header(user3_jwt))
+    assert res.status_code == 200
+    accessible_users = [user["email"] for user in res.json()["data"]]
+    assert "user3@mail.com" in accessible_users  # User3 should see themself
+    assert len(accessible_users) == 1  # Ensure that it is not accessing other users.
+
+    # team_admin logs in and should see users from both team1 and team2
+    res = login(client, username="team_admin@mail.com", password="password4")
+    assert res.status_code == 200
+    team_admin_jwt = res.json()["data"]["access_token"]
+
+    res = client.get("/api/user/list", headers=auth_header(team_admin_jwt))
+    assert res.status_code == 200
+    accessible_users = [user["email"] for user in res.json()["data"]]
+    assert "user1@mail.com" in accessible_users  # Admin should see user1 (team1)
+    assert "user2@mail.com" in accessible_users  # Admin should see user2 (team2)
+    assert "team_admin@mail.com" in accessible_users  # Admin should see themself
+
+    # Test for global admin: should retrieve all users
+    res = client.get("/api/user/list", headers=auth_header(admin_jwt))
+    assert (
+        res.status_code == 200
+    ), f"Unexpected status code: {res.status_code}. Response: {res.json()}"
+
+    data = res.json()
+    accessible_users = [user["email"] for user in res.json()["data"]]
+    assert "user1@mail.com" in accessible_users
+    assert "user2@mail.com" in accessible_users
+    assert "team_admin@mail.com" in accessible_users
+    assert "admin@mail.com" in accessible_users
+    assert data["message"] == "Successfully got the list of all users"
 
 
 def test_reset_password():

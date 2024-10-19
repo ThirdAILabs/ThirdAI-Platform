@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from .utils import (
     add_user_to_team,
+    assign_team_admin,
     auth_header,
     create_team,
     create_user,
@@ -72,7 +73,6 @@ def test_list_models(create_models_and_users):
     ]:
         res = client.get(
             "/api/model/list",
-            params={"name": "test_model"},
             headers=auth_header(token),
         )
         assert res.status_code == 200
@@ -292,3 +292,127 @@ def test_model_team_permissions(create_models_and_users):
         read=[],
         write=["user_y", "user_z"],
     )
+
+
+@pytest.fixture(scope="session")
+def setup_users_and_models():
+    from licensing.verify import verify_license
+    from main import app
+
+    client = TestClient(app)
+
+    # License activation for ThirdAI NeuralDB
+    license_info = verify_license.verify_license(os.environ["LICENSE_PATH"])
+    thirdai.licensing.activate(license_info["boltLicenseKey"])
+
+    global_admin = global_admin_token(client)
+    # creating team
+    res = create_team(client, "team_1", access_token=global_admin)
+    assert res.status_code == 201
+    team_id = res.json()["data"]["team_id"]
+
+    # Create and login users
+    tokens = {
+        "global_admin": global_admin,
+        "user_1_model": create_and_login(client, "user_1_model"),
+        "user_2_model": create_and_login(client, "user_2_model"),
+        "user_3_model": create_and_login(client, "user_3_model"),
+        "team_1": team_id,
+    }
+    # Assigning user_2_model and user_3_model to team_1
+    res = add_user_to_team(
+        client, team=team_id, user="user_2_model@mail.com", access_token=global_admin
+    )
+    assert res.status_code == 200
+
+    res = assign_team_admin(client, team_id, "user_3_model@mail.com", global_admin)
+    assert res.status_code == 200
+
+    # Upload models
+    upload_model(client, tokens["user_1_model"], "model5", "private")
+    upload_model(client, tokens["user_2_model"], "model4", "private")
+    upload_model(client, tokens["user_3_model"], "model3", "private")
+    upload_model(client, tokens["user_3_model"], "model2", "private")
+    upload_model(client, tokens["global_admin"], "model1", "public")
+
+    res = client.post(
+        "/api/model/update-access-level",
+        params={
+            "model_identifier": "user_3_model/model3",
+            "access_level": "protected",
+            "team_id": team_id,
+        },
+        headers=auth_header(tokens["user_3_model"]),
+    )
+    assert res.status_code == 200
+
+    return client, tokens
+
+
+def test_accessible_models_as_global_admin(setup_users_and_models):
+    client, tokens = setup_users_and_models
+
+    # Global admin should be able to access all models
+    res = client.get("/api/model/list", headers=auth_header(tokens["global_admin"]))
+    assert res.status_code == 200
+
+    data = res.json()["data"]
+    model_names = [model["model_name"] for model in data]
+    assert set(model_names) == {
+        "model1",
+        "model2",
+        "model3",
+        "model4",
+        "model5",
+        "test_model_a",
+        "test_model_b",
+    }
+
+
+def test_accessible_models_user_1_model(setup_users_and_models):
+    client, tokens = setup_users_and_models
+
+    # user_1_model should see only model1 (public) and model5 (private to them)
+    res = client.get("/api/model/list", headers=auth_header(tokens["user_1_model"]))
+    assert res.status_code == 200
+
+    data = res.json()["data"]
+    model_names = [model["model_name"] for model in data]
+    assert set(model_names) == {"model1", "model5"}
+
+
+def test_accessible_models_user_2_model(setup_users_and_models):
+    client, tokens = setup_users_and_models
+
+    # user_2_model should see model1 (public), model4 (private to them), and model3 (protected and owned by them)
+    res = client.get("/api/model/list", headers=auth_header(tokens["user_2_model"]))
+    assert res.status_code == 200
+
+    data = res.json()["data"]
+    model_names = [model["model_name"] for model in data]
+    assert set(model_names) == {"model1", "model3", "model4"}
+
+
+def test_accessible_models_user_3_model(setup_users_and_models):
+    client, tokens = setup_users_and_models
+
+    # user_3_model should see model1 (public), model2 (private to them), and model3 (protected and they belong to the same team)
+    res = client.get("/api/model/list", headers=auth_header(tokens["user_3_model"]))
+    assert res.status_code == 200
+
+    data = res.json()["data"]
+    model_names = [model["model_name"] for model in data]
+    assert set(model_names) == {"model1", "model2", "model3"}
+
+
+def test_accessible_models_no_access(setup_users_and_models):
+    client, tokens = setup_users_and_models
+
+    # user_3_model should not see model4 (private to user_2_model) or model5 (private to user_1_model)
+    res = client.get("/api/model/list", headers=auth_header(tokens["user_3_model"]))
+    assert res.status_code == 200
+
+    data = res.json()["data"]
+    model_names = [model["model_name"] for model in data]
+    assert "model4" not in model_names
+    assert "model5" not in model_names

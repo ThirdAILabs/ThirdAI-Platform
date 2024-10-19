@@ -1,7 +1,5 @@
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-
-import Image from 'next/image';
+import { useContext, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@mui/material';
 import {
@@ -13,61 +11,72 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
-import {
-  Workflow,
-  validate_workflow,
-  start_workflow,
-  stop_workflow,
-  delete_workflow,
-} from '@/lib/backend';
-import { useRouter } from 'next/navigation';
+import { Workflow, start_workflow, stop_workflow, delete_workflow } from '@/lib/backend';
 import { Modal } from '@/components/ui/Modal';
 import { InformationCircleIcon } from '@heroicons/react/solid';
+import { Model, getModels } from '@/utils/apiRequests';
+import { UserContext } from '../user_wrapper';
+
+enum DeployStatus {
+  None = '',
+  TrainingFailed = 'Training failed',
+  Training = 'Training',
+  Inactive = 'Inactive',
+  Starting = 'Starting',
+  Active = 'Active',
+  Failed = 'Failed',
+}
 
 export function WorkFlow({ workflow }: { workflow: Workflow }) {
-  const router = useRouter();
-  const [deployStatus, setDeployStatus] = useState<string>('');
-  // Deploystatus can be one of following:
-  // Inactive
-  // Failed
-  // Starting
-  // Active
-  // Starting
-  // Error: Underlying model not present
-  // Training failed
-  // Training...
-  const [isTrainingIncomplete, setIsTrainingIncomplete] = useState<boolean>(false);
+  const { user } = useContext(UserContext);
+  const [deployStatus, setDeployStatus] = useState<DeployStatus>(DeployStatus.None);
   const [deployType, setDeployType] = useState<string>('');
+  const [modelOwner, setModelOwner] = useState<{ [key: string]: string }>({});
 
+  useEffect(() => {
+    getModelsData();
+  }, []);
+
+  async function getModelsData() {
+    const modelData = await getModels();
+    const tempModelOwner: { [key: string]: string } = {}; // TypeScript object to store name as key and owner as value
+    if (modelData) {
+      for (let index = 0; index < modelData.length; index++) {
+        const name = modelData[index].name;
+        const owner = modelData[index].owner;
+        tempModelOwner[name] = owner;
+      }
+    }
+    setModelOwner(tempModelOwner);
+  }
   function goToEndpoint() {
     switch (workflow.type) {
-      case 'semantic_search': {
-        let ifGenerationOn = false; // false if semantic search, true if RAG
-        const newUrl = `/semantic-search/${workflow.id}?workflowId=${workflow.id}&ifGenerationOn=${ifGenerationOn}`;
-        window.open(newUrl, '_blank');
-        break;
-      }
-      case 'nlp': {
-        const prefix =
-          workflow.models[0].sub_type === 'token'
-            ? '/token-classification'
-            : '/text-classification';
-        window.open(`${prefix}/${workflow.id}`, '_blank');
-        break;
-      }
-      case 'rag': {
-        let ifGenerationOn = true; // false if semantic search, true if RAG
-        const genAiProvider = `${workflow.gen_ai_provider}`;
+      case 'enterprise-search': {
+        // enterprise-search is rag with generation
+
         // TODO don't use url params
-        const newUrl = `/semantic-search/${workflow.id}?workflowId=${workflow.id}&ifGenerationOn=${ifGenerationOn}&genAiProvider=${genAiProvider}`;
+        const llmProvider = `${workflow.attributes.llm_provider}`;
+        const ifGenerationOn = true;
+        const chatMode = workflow.attributes.default_mode == 'chat';
+        const newUrl = `/semantic-search/${workflow.model_id}?workflowId=${workflow.model_id}&ifGenerationOn=${ifGenerationOn}&genAiProvider=${llmProvider}&chatMode=${chatMode}`;
         window.open(newUrl, '_blank');
         break;
       }
-      case 'chatbot': {
-        let ifGenerationOn = true; // true for chatbot
-        const genAiProvider = `${workflow.gen_ai_provider}`;
-        const newUrl = `/semantic-search/${workflow.id}?workflowId=${workflow.id}&ifGenerationOn=${ifGenerationOn}&genAiProvider=${genAiProvider}&chatMode=true`;
+      case 'ndb': {
+        // ndb is is rag without generation
+        const llmProvider = workflow.attributes.llm_provider
+          ? workflow.attributes.llm_provider
+          : null;
+        // TODO don't use url params
+        const ifGenerationOn = llmProvider != null;
+        const newUrl = `/semantic-search/${workflow.model_id}?workflowId=${workflow.model_id}&ifGenerationOn=${ifGenerationOn}&genAiProvider=${llmProvider}`;
         window.open(newUrl, '_blank');
+        break;
+      }
+      case 'udt': {
+        const prefix =
+          workflow.sub_type === 'token' ? '/token-classification' : '/text-classification';
+        window.open(`${prefix}/${workflow.model_id}`, '_blank');
         break;
       }
       default:
@@ -76,132 +85,79 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
     }
   }
 
-  const [isValid, setIsValid] = useState(false);
-
-  useEffect(() => {
-    const validateWorkflow = async () => {
-      try {
-        const validationResponse = await validate_workflow(workflow.id);
-        if (validationResponse.status == 'success') {
-          setIsValid(true);
-          console.log('Validation passed.');
-        } else {
-          setIsValid(false);
-          console.log('Validation failed.');
-        }
-      } catch (e) {
-        setIsValid(false);
-        setDeployStatus('Starting');
-        console.error('Validation failed.', e);
-      }
-    };
-
-    // Call the validation function immediately
-    validateWorkflow();
-
-    const validateInterval = setInterval(validateWorkflow, 3000); // Adjust the interval as needed
-
-    return () => clearInterval(validateInterval);
-  }, [workflow.id]);
+  function getButtonValue(status: DeployStatus): string {
+    switch (status) {
+      case DeployStatus.TrainingFailed:
+        return 'Training failed';
+      case DeployStatus.Training:
+        return 'Training...';
+      case DeployStatus.Inactive:
+        return 'Start';
+      case DeployStatus.Starting:
+        return 'Starting...';
+      case DeployStatus.Active:
+        return 'Endpoint';
+      case DeployStatus.Failed:
+        return 'Failed';
+      default:
+        return '-';
+    }
+  }
 
   const handleDeploy = async () => {
-    try {
-      if (isValid) {
-        setDeployStatus('Starting'); // set to starting because user intends to start workflow
-        await start_workflow(workflow.id);
+    if (deployStatus == DeployStatus.Inactive) {
+      setDeployStatus(DeployStatus.Starting);
+      try {
+        await start_workflow(workflow.username, workflow.model_name);
+      } catch (e) {
+        console.error('Failed to start workflow.', e);
       }
-    } catch (e) {
-      setDeployStatus('Starting'); // set to starting because user intends to start workflow
-      console.error('Failed to start workflow.', e);
     }
   };
 
   useEffect(() => {
-    if (workflow.models && workflow.models.length > 0) {
-      let hasFailed = false;
-      let isInProgress = false;
-      let allComplete = true;
-      let trainingIncomplete = false;
-      let trainingFailed = false; // New variable to track training failure
-
-      for (const model of workflow.models) {
-        if (model.train_status === 'failed') {
-          trainingFailed = true; // At least one model has a failed training status
-          break; // No need to check further
-        }
-        if (model.train_status !== 'complete') {
-          trainingIncomplete = true; // Training is still ongoing for at least one model
-        }
-
-        if (model.deploy_status === 'failed') {
-          hasFailed = true;
-          break; // If any model has failed deployment, no need to check further
-        } else if (model.deploy_status === 'in_progress') {
-          isInProgress = true;
-          allComplete = false; // If any model is in progress, not all can be complete
-        } else if (model.deploy_status !== 'complete') {
-          allComplete = false; // If any model is not complete, mark allComplete as false
-
-          // if user previously has specified they want to start workflow
-          if (workflow.status == 'active') {
-            console.log(
-              'user previously specified they want to start workflow, automatically deploy model.'
-            );
-            handleDeploy(); // automatically deploy model
-          }
-        }
-      }
-
-      setIsTrainingIncomplete(trainingIncomplete);
-
-      if (trainingFailed) {
-        setDeployStatus('Training failed'); // Set the new deploy status for failed training
-      } else if (trainingIncomplete) {
-        setDeployStatus('Training...');
-      } else if (hasFailed) {
-        setDeployStatus('Failed');
-      } else if (isInProgress) {
-        setDeployStatus('Starting');
-        return;
-      } else if (workflow.status === 'inactive' && deployStatus != 'Starting') {
-        // if user hasn't chosen to start the workflow, we want to set it to Inactive
-        setDeployStatus('Inactive');
-        return;
-      } else if (allComplete) {
-        setDeployStatus('Active'); // Models are complete and workflow is active
-      }
-    } else {
-      // If no models are present, the workflow is ready to deploy
-      setDeployStatus('Error: Underlying model not present');
+    if (workflow.train_status === 'failed') {
+      setDeployStatus(DeployStatus.TrainingFailed);
+    } else if (workflow.train_status !== 'complete') {
+      setDeployStatus(DeployStatus.Training);
+    } else if (workflow.deploy_status === 'failed') {
+      setDeployStatus(DeployStatus.Failed);
+    } else if (workflow.deploy_status === 'starting') {
+      setDeployStatus(DeployStatus.Starting);
+    } else if (workflow.deploy_status === 'not_started' || workflow.deploy_status === 'stopped') {
+      setDeployStatus(DeployStatus.Inactive);
+    } else if (workflow.deploy_status === 'complete') {
+      setDeployStatus(DeployStatus.Active);
     }
-  }, [workflow.models, workflow.status, deployStatus]);
+  }, [workflow.train_status, workflow.deploy_status, deployStatus]);
 
   useEffect(() => {
-    if (workflow.type === 'semantic_search') {
-      setDeployType('Enterprise Search');
-    } else if (workflow.type === 'nlp') {
+    if (workflow.type === 'ndb') {
+      if (workflow.attributes.default_mode && workflow.attributes.default_mode == 'chat') {
+        setDeployType('Chatbot');
+      } else {
+        setDeployType('Enterprise Search');
+      }
+    } else if (workflow.type === 'udt') {
       setDeployType('Natural Language Processing');
-    } else if (workflow.type === 'rag') {
+    } else if (workflow.type === 'enterprise-search') {
       setDeployType('Enterprise Search & Summarizer');
-    } else if (workflow.type === 'chatbot') {
-      setDeployType('Chatbot');
     }
   }, [workflow.type]);
 
-  const getBadgeColor = (status: string) => {
+  const getBadgeColor = (status: DeployStatus) => {
     switch (status) {
-      case 'Active':
+      case DeployStatus.Active:
         return 'bg-green-500 text-white'; // Green for good status
-      case 'Starting':
+      case DeployStatus.Starting:
         return 'bg-yellow-500 text-white'; // Yellow for in-progress status
-      case 'Inactive':
+      case DeployStatus.Inactive:
         return 'bg-gray-500 text-white'; // Gray for inactive status
-      case 'Training...':
+      case DeployStatus.Training:
         return 'bg-blue-500 text-white';
-      case 'Training failed': // New case for training failed
+      case DeployStatus.TrainingFailed: // New case for training failed
         return 'bg-red-500 text-white';
-      case 'Failed':
-      case 'Error: Underlying model not present':
+      case DeployStatus.Failed:
         return 'bg-red-500 text-white'; // Red for error statuses
       default:
         return 'bg-gray-500 text-white'; // Default to gray if status is unknown
@@ -218,12 +174,9 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
     return (parseInt(bytes) / (1024 * 1024)).toFixed(2) + ' MB';
   };
 
-  // Find the model where component === "search"
-  const searchModel = workflow.models.find((model) => model.component === 'search');
-
   return (
     <TableRow>
-      <TableCell className="font-bold text-center">{workflow.name}</TableCell>
+      <TableCell className="font-bold text-center">{workflow.model_name}</TableCell>
       <TableCell className="text-center font-medium">
         <Badge variant="outline" className={`capitalize ${getBadgeColor(deployStatus)}`}>
           {deployStatus}
@@ -242,27 +195,9 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
           onClick={deployStatus === 'Active' ? goToEndpoint : handleDeploy}
           variant="contained"
           style={{ width: '100px' }}
-          disabled={
-            isTrainingIncomplete ||
-            [
-              'Failed',
-              'Starting',
-              'Error: Underlying model not present',
-              'Training failed',
-            ].includes(deployStatus)
-          }
+          disabled={deployStatus != DeployStatus.Active && deployStatus != DeployStatus.Inactive}
         >
-          {deployStatus === 'Training failed' // Check explicitly for 'Training failed'
-            ? 'Training Failed' // Show 'Training Failed' text
-            : isTrainingIncomplete
-              ? 'Training...'
-              : deployStatus === 'Active'
-                ? 'Endpoint'
-                : deployStatus === 'Inactive'
-                  ? 'Start'
-                  : ['Failed', 'Error: Underlying model not present'].includes(deployStatus)
-                    ? 'Start'
-                    : 'Endpoint'}
+          {getButtonValue(deployStatus)}
         </Button>
       </TableCell>
       <TableCell className="text-center font-medium">
@@ -291,60 +226,69 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            {deployStatus === 'Active' && (
-              <>
+            {deployStatus === DeployStatus.Active && (
+              <DropdownMenuItem>
+                <form>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const response = await stop_workflow(
+                          workflow.username,
+                          workflow.model_name
+                        );
+                        console.log('Workflow undeployed successfully:', response);
+                        // Optionally, update the UI state to reflect the undeployment
+                        setDeployStatus(DeployStatus.Inactive);
+                      } catch (error) {
+                        console.error('Error undeploying workflow:', error);
+                        alert('Error undeploying workflow:' + error);
+                      }
+                    }}
+                  >
+                    Stop App
+                  </button>
+                </form>
+              </DropdownMenuItem>
+            )}
+
+            {workflow.type === 'ndb' &&
+              (modelOwner[workflow.model_name] === user?.username || user?.global_admin) && (
                 <DropdownMenuItem>
                   <form>
                     <button
                       type="button"
                       onClick={async () => {
-                        try {
-                          const response = await stop_workflow(workflow.id);
-                          console.log('Workflow undeployed successfully:', response);
-                          // Optionally, update the UI state to reflect the undeployment
-                          setDeployStatus('Inactive');
-                        } catch (error) {
-                          console.error('Error undeploying workflow:', error);
-                          alert('Error undeploying workflow:' + error);
+                        if (window.confirm('Are you sure you want to delete this workflow?')) {
+                          try {
+                            const response = await delete_workflow(
+                              workflow.username,
+                              workflow.model_name
+                            );
+                            console.log('Workflow deleted successfully:', response);
+                          } catch (error) {
+                            console.error('Error deleting workflow:', error);
+                            alert('Error deleting workflow:' + error);
+                          }
                         }
                       }}
                     >
-                      Stop App
+                      Delete App
                     </button>
                   </form>
                 </DropdownMenuItem>
-              </>
-            )}
-            <DropdownMenuItem>
-              <form>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (window.confirm('Are you sure you want to delete this workflow?')) {
-                      try {
-                        const response = await delete_workflow(workflow.id);
-                        console.log('Workflow deleted successfully:', response);
-                      } catch (error) {
-                        console.error('Error deleting workflow:', error);
-                        alert('Error deleting workflow:' + error);
-                      }
-                    }
-                  }}
-                >
-                  Delete App
-                </button>
-              </form>
-            </DropdownMenuItem>
+              )}
 
-            {searchModel && (
-              <Link
-                href={`/analytics?id=${encodeURIComponent(workflow.id)}&username=${encodeURIComponent(searchModel.username)}&model_name=${encodeURIComponent(searchModel.model_name)}&old_model_id=${encodeURIComponent(searchModel.model_id)}`}
-              >
-                <DropdownMenuItem>
-                  <button type="button">Search usage stats</button>
-                </DropdownMenuItem>
-              </Link>
-            )}
+            {workflow.type === 'ndb' &&
+              (modelOwner[workflow.model_name] === user?.username || user?.global_admin) && (
+                <Link
+                  href={`/analytics?id=${encodeURIComponent(workflow.model_id)}&username=${encodeURIComponent(workflow.username)}&model_name=${encodeURIComponent(workflow.model_name)}&old_model_id=${encodeURIComponent(workflow.model_id)}`}
+                >
+                  <DropdownMenuItem>
+                    <button type="button">Search usage stats</button>
+                  </DropdownMenuItem>
+                </Link>
+              )}
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>
@@ -364,13 +308,20 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {workflow.models.map((model, index) => (
+                  {/* {workflow.models.map((model, index) => (
                     <tr key={index} className="hover:bg-gray-100">
                       <td className="border px-4 py-2">{model.model_name}</td>
                       <td className="border px-4 py-2">{formatBytesToMB(model.size)}</td>
                       <td className="border px-4 py-2">{formatBytesToMB(model.size_in_memory)}</td>
                     </tr>
-                  ))}
+                  ))} */}
+                  {/* {workflow.models.map((model, index) => ( */}
+                  <tr className="hover:bg-gray-100">
+                    <td className="border px-4 py-2">{workflow.model_name}</td>
+                    <td className="border px-4 py-2">{formatBytesToMB(workflow.size)}</td>
+                    <td className="border px-4 py-2">{formatBytesToMB(workflow.size_in_memory)}</td>
+                  </tr>
+                  {/* ))} */}
                 </tbody>
               </table>
             </div>
