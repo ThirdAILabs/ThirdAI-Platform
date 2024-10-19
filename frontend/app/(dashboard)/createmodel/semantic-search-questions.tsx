@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { train_ndb } from '@/lib/backend';
-import { SelectModel } from '@/lib/db';
+import { Workflow } from '@/lib/backend';
 import { Button, TextField } from '@mui/material';
 import { CardDescription } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 
 interface SemanticSearchQuestionsProps {
   workflowNames: string[];
-  models: SelectModel[];
+  models: Workflow[];
   onCreateModel?: (modelID: string) => void;
   stayOnPage?: boolean;
   appName?: string;

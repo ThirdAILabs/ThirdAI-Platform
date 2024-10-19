@@ -51,18 +51,6 @@ def create_models_and_users():
     return client, tokens
 
 
-def test_list_public_models(create_models_and_users):
-    client, _ = create_models_and_users
-
-    res = client.get("/api/model/public-list", params={"name": "test_model"})
-    assert res.status_code == 200
-
-    data = res.json()["data"]
-    assert len(data) == 1
-    assert data[0]["model_name"] == "test_model_a"
-    assert data[0]["username"] == "user_x"
-
-
 def test_list_models(create_models_and_users):
     client, user_tokens = create_models_and_users
 
@@ -169,7 +157,11 @@ def test_list_all_models(create_models_and_users):
 def test_update_access_level(create_models_and_users):
     client, user_tokens = create_models_and_users
 
-    res = client.get("/api/model/public-list", params={"name": "test_model"})
+    res = client.get(
+        "/api/model/list",
+        params={"name": "test_model", "access_level": ["public"]},
+        headers=auth_header(user_tokens[0]),
+    )
     assert res.status_code == 200
     assert ["test_model_a"] == [m["model_name"] for m in res.json()["data"]]
 
@@ -180,7 +172,11 @@ def test_update_access_level(create_models_and_users):
     )
     assert res.status_code == 200
 
-    res = client.get("/api/model/public-list", params={"name": "test_model"})
+    res = client.get(
+        "/api/model/list",
+        params={"name": "test_model", "access_level": ["public"]},
+        headers=auth_header(user_tokens[0]),
+    )
     assert res.status_code == 200
     assert [] == [m["model_name"] for m in res.json()["data"]]
 

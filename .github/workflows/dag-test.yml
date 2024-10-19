@@ -60,19 +60,17 @@ jobs:
         python-version: '3.11'
 
     - name: Setup Python and Install Dependencies
-    # We need to install uvicorn in sudo mode so that we can run the backend with sudo, which is required for delete endpoint to work.
+      # We need to run the backend in sudo for the delete endpoint to work, thus
+      # we need to install the requirements for the backend job in sudo. However,
+      # since the other jobs (train_job, cache_job, etc) are spun up as seperate
+      # processes, we also need so install their requirements in the virtual env
       run: |
         python -m venv ${{ github.workspace }}/venv
         source venv/bin/activate
         pip install -r docs/requirements.txt
         pip install -r headless/requirements.txt
         sudo pip install -r thirdai_platform/requirements.txt
-        pip install -r thirdai_platform/deployment_job/requirements.txt
-        pip install -r thirdai_platform/llm_dispatch_job/requirements.txt
-        pip install -r thirdai_platform/train_job/requirements.txt
-        pip install -r thirdai_platform/data_generation_job/requirements.txt
-        pip install -r thirdai_platform/recovery_snapshot_job/requirements.txt
-        pip install -r thirdai_platform/platform_common/requirements.txt
+        pip install -r thirdai_platform/requirements.txt
     
     - name: Update openssl
       run: |

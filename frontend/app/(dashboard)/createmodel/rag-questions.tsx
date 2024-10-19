@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SelectModel } from '@/lib/db';
+import { Workflow } from '@/lib/backend';
 import NERQuestions from './nlp-questions/ner-questions';
 import SemanticSearchQuestions from './semantic-search-questions';
 import { CardDescription } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import DropdownMenu from '@/components/ui/dropDownMenu';
 import { create_enterprise_search_workflow, EnterpriseSearchOptions } from '@/lib/backend';
 
 interface RAGQuestionsProps {
-  models: SelectModel[];
+  models: Workflow[];
   workflowNames: string[];
   isChatbot: boolean;
 }
@@ -26,7 +26,7 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
 
   // Begin state variables & func for source
   const [ifUseExistingSS, setUseExistingSS] = useState<string | null>(null);
-  const [existingSSmodels, setExistingSSmodels] = useState<SelectModel[]>([]);
+  const [existingSSmodels, setExistingSSmodels] = useState<Workflow[]>([]);
   const [ssIdentifier, setSsIdentifier] = useState<string | null>(null);
   const [ssModelId, setSsModelId] = useState<string | null>(null);
   const [createdSS, setCreatedSS] = useState<boolean>(false);
@@ -41,7 +41,7 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
 
   const [ifUseLGR, setIfUseLGR] = useState('');
   const [ifUseExistingLGR, setIfUseExistingLGR] = useState<string | null>(null);
-  const [existingNERModels, setExistingNERModels] = useState<SelectModel[]>([]);
+  const [existingNERModels, setExistingNERModels] = useState<Workflow[]>([]);
   const [grIdentifier, setGrIdentifier] = useState<string | null>(null);
   const [grModelId, setGrModelId] = useState<string | null>(null);
   const [createdGR, setCreatedGR] = useState<boolean>(false);
@@ -56,7 +56,7 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
   const [ifUseNLPClassifier, setIfUseNLPClassifier] = useState<string | null>(null);
   const [nlpClassifierIdentifier, setNlpClassifierIdentifier] = useState<string | null>(null);
   const [nlpClassifierModelId, setNlpClassifierModelId] = useState<string | null>(null);
-  const [existingNLPClassifierModels, setExistingNLPClassifierModels] = useState<SelectModel[]>([]);
+  const [existingNLPClassifierModels, setExistingNLPClassifierModels] = useState<Workflow[]>([]);
 
   useEffect(() => {
     setExistingNLPClassifierModels(
@@ -105,10 +105,15 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
           options.llm_provider = 'self-host';
           break;
         default:
-          console.error('Invalid LLM type selected');
-          alert('Invalid LLM type selected');
-          setIsLoading(false);
-          return;
+          if (isChatbot) {
+            console.error('Invalid LLM type selected');
+            alert('Invalid LLM type selected');
+            setIsLoading(false);
+            return;
+          } else {
+            // LLM is not required for enterprise search
+            break;
+          }
       }
 
       // Clean up options by removing undefined or empty values
@@ -135,14 +140,14 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
   // Creating drop-down list for choosing model....
   const modelDropDownList = existingSSmodels.map((model) => {
     return {
-      id: model.user_id,
+      id: model.model_id,
       name: model.username + '/' + model.model_name,
     };
   });
 
   const grDropDownList = existingNERModels.map((model) => {
     return {
-      id: model.user_id,
+      id: model.model_id,
       name: model.username + '/' + model.model_name,
     };
   });
@@ -520,7 +525,7 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
                   >
                     <option value="">-- Please choose a model --</option>
                     {existingNLPClassifierModels.map((model) => (
-                      <option key={model.id} value={`${model.username}/${model.model_name}`}>
+                      <option key={model.model_id} value={`${model.username}/${model.model_name}`}>
                         {`${model.username}/${model.model_name}`}
                       </option>
                     ))}

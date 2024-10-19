@@ -57,6 +57,8 @@ job "llm-cache" {
           volumes = [
             "{{ share_dir }}:/model_bazaar"
           ]
+          command = "python3"
+          args    = ["-m", "uvicorn", "main:app", "--app-dir", "{{ app_dir }}", "--host", "0.0.0.0", "--port", "80"]
         {% elif platform == "local" %}
           command = "/bin/sh"
           args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} -m uvicorn main:app --app-dir {{ app_dir }} --host 0.0.0.0 --port ${NOMAD_PORT_llm_cache_http}"]

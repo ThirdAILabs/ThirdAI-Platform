@@ -10,19 +10,11 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Model } from './model';
 import { WorkFlow } from './workflow';
-import { SelectModel } from '@/lib/db';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@mui/material';
-import {
-  fetchPublicModels,
-  fetchPrivateModels,
-  fetchPendingModels,
-  fetchWorkflows,
-  Workflow,
-} from '@/lib/backend';
+import { fetchWorkflows, Workflow } from '@/lib/backend';
 
 export function ModelsTable({ searchStr, offset }: { searchStr: string; offset: number }) {
   // Hardcode the model display

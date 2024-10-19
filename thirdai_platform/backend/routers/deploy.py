@@ -249,7 +249,7 @@ async def deploy_single_model(
             registry=os.getenv("DOCKER_REGISTRY"),
             docker_username=os.getenv("DOCKER_USERNAME"),
             docker_password=os.getenv("DOCKER_PASSWORD"),
-            image_name=os.getenv("DEPLOY_IMAGE_NAME"),
+            image_name=os.getenv("THIRDAI_PLATFORM_IMAGE_NAME"),
             model_id=str(model.id),
             share_dir=os.getenv("SHARE_DIR", None),
             config_path=config.save_deployment_config(),

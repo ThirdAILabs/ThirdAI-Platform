@@ -25,57 +25,6 @@ export function getUsername(): string {
   return username;
 }
 
-export async function fetchPrivateModels(name: string) {
-  // Retrieve the access token from local storage
-  const accessToken = getAccessToken();
-
-  // Set the default authorization header for axios
-  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-
-  try {
-    const response = await axios.get(`${thirdaiPlatformBaseUrl}/api/model/list`, {
-      params: { name },
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching private models:', error);
-    // alert('Error fetching private models:' + error)
-    throw new Error('Failed to fetch private models');
-  }
-}
-
-export async function fetchPublicModels(name: string) {
-  const response = await fetch(`${thirdaiPlatformBaseUrl}/api/model/public-list?name=${name}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch public models');
-  }
-  return response.json();
-}
-
-// Define a type for the pending model data structure
-type PendingModel = {
-  model_name: string;
-  status: string;
-  username: string;
-};
-
-export async function fetchPendingModels(): Promise<PendingModel> {
-  // Retrieve the access token from local storage
-  const accessToken = getAccessToken();
-
-  // Set the default authorization header for axios
-  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-
-  try {
-    const response = await axios.get(`${thirdaiPlatformBaseUrl}/api/model/pending-train-models`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching private models:', error);
-    // alert('Error fetching private models:' + error)
-    throw new Error('Failed to fetch private models');
-  }
-}
-
 export interface Deployment {
   name: string;
   deployment_username: string;

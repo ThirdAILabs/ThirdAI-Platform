@@ -130,7 +130,7 @@ jobs:
           mkdir -p docker_images-${{ env.latest_tag }}
 
           # Pull and save images using the persisted ${{ env.latest_tag }} across steps
-          images=(thirdai_platform_${{ env.branch_name }} data_generation_job_${{ env.branch_name }} train_job_${{ env.branch_name }} deployment_job_${{ env.branch_name }} llm_dispatch_job_${{ env.branch_name }} frontend_${{ env.branch_name }} llm_cache_job_${{ env.branch_name }})
+          images=(thirdai_platform_${{ env.branch_name }} frontend_${{ env.branch_name }})
 
           for image in "${images[@]}"
           do

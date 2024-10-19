@@ -1,7 +1,6 @@
 // app/NERQuestions.js
 import Link from 'next/link';
 import React, { useState } from 'react';
-import { SelectModel } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {

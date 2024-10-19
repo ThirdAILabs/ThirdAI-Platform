@@ -1,42 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { SelectModel } from '@/lib/db';
 import RAGQuestions from './rag-questions';
 import NLPQuestions from './nlp-questions/nlp-questions';
 import DocumentClassificationQuestions from './document-class-questions';
 import SemanticSearchQuestions from './semantic-search-questions';
 import TabularClassificationQuestions from './tabular-class-questions';
-import {
-  fetchPublicModels,
-  fetchPrivateModels,
-  fetchPendingModels,
-  fetchWorkflows,
-  Workflow,
-} from '@/lib/backend';
+import { fetchWorkflows, Workflow } from '@/lib/backend';
 import { Divider } from '@mui/material';
 import { CardDescription } from '@/components/ui/card';
 import DropdownMenu from '@/components/ui/dropDownMenu';
 export default function ChooseProblem() {
   const [modelType, setModelType] = useState('');
 
-  const [privateModels, setPrivateModels] = useState<SelectModel[]>([]);
-  const [pendingModels, setPendingModels] = useState<SelectModel[]>([]);
+  const [privateModels, setPrivateModels] = useState<Workflow[]>([]);
 
   useEffect(() => {
     async function getModels() {
       try {
-        let response = await fetchPublicModels('');
-        const publicModels = response.data;
-        console.log('publicModels', publicModels);
-
-        response = await fetchPrivateModels('');
-        const privateModels: SelectModel[] = response.data;
-        setPrivateModels(privateModels);
-
-        response = await fetchPendingModels();
-        const pendingModels = response.data; // Extract the data field
-        console.log('pendingModels', pendingModels);
+        const response = await fetchWorkflows();
+        setPrivateModels(response);
       } catch (err) {
         if (err instanceof Error) {
           console.log(err.message);
