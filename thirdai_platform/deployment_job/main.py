@@ -145,7 +145,9 @@ async def startup_event() -> None:
     try:
         await asyncio.sleep(10)
         reporter.update_deploy_status(config.model_id, "complete")
-        asyncio.create_task(async_timer())
+        # We will not shutdown the instance if autoscaling is enabled (Production mode)
+        if not config.autoscaling_enabled:
+            asyncio.create_task(async_timer())
     except Exception as e:
         reporter.update_deploy_status(config.model_id, "failed")
         print(f"Failed to startup the application, {e}")
