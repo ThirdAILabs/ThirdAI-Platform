@@ -3,4 +3,4 @@ networkx
 pyyaml
 boto3
 pytest
-thirdai
+thirdai[neural_db_v2] --index-url https://download.pytorch.org/whl/cpu
