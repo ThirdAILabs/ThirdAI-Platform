@@ -239,7 +239,13 @@ def test_udt_token_train():
                         "examples": ["shubh"],
                         "description": "name of person",
                         "status": "uninserted",
-                    }
+                    },
+                    {
+                        "name": "EMAIL",
+                        "examples": ["shubh@gmail.com"],
+                        "description": "email of person",
+                        "status": "uninserted",
+                    },
                 ],
                 num_sentences_to_generate=1000,
                 num_samples_per_tag=None,
@@ -253,6 +259,10 @@ def test_udt_token_train():
 
     model.train()
 
-    bolt.UniversalDeepTransformer.load(
+    boltmodel = bolt.UniversalDeepTransformer.load(
         os.path.join(MODEL_BAZAAR_DIR, "models", "udt_123", "model.udt")
     )
+
+    predictions = boltmodel.predict({"text": "shubh@gmail.com"})
+
+    assert predictions[0][0][0] == "EMAIL", f"predictions : {predictions}"

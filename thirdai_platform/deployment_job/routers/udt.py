@@ -1,3 +1,4 @@
+import os
 import time
 
 from deployment_job.models.classification_models import (
@@ -12,8 +13,9 @@ from deployment_job.pydantic_models.inputs import (
 )
 from deployment_job.reporter import Reporter
 from deployment_job.utils import propagate_error
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, UploadFile, status
 from fastapi.encoders import jsonable_encoder
+from platform_common.ndb.ndbv1_parser import convert_to_ndb_file
 from platform_common.pydantic_models.deployment import DeploymentConfig, UDTSubType
 from platform_common.thirdai_storage.data_types import (
     LabelCollection,
@@ -23,7 +25,9 @@ from platform_common.thirdai_storage.data_types import (
 from platform_common.utils import response
 from prometheus_client import Summary
 from reporter import Reporter
+from thirdai import neural_db as ndb
 from throughput import Throughput
+from utils import propagate_error, response
 
 udt_predict_metric = Summary("udt_predict", "UDT predictions")
 
@@ -41,6 +45,7 @@ class UDTRouter:
         self.router = APIRouter()
         self.router.add_api_route("/predict", self.predict, methods=["POST"])
         self.router.add_api_route("/stats", self.stats, methods=["GET"])
+        self.router.add_api_route("/get-text", self.get_text, methods=["POST"])
 
         # The following routes are only applicable for token classification models
         # TODO(Shubh) : Make different routers for text and token classification models
@@ -50,6 +55,9 @@ class UDTRouter:
                 "/insert_sample", self.insert_sample, methods=["POST"]
             )
             self.router.add_api_route("/get_labels", self.get_labels, methods=["GET"])
+            self.router.add_api_route(
+                "/get_recent_samples", self.get_recent_samples, methods=["GET"]
+            )
 
     @staticmethod
     def get_model(config: DeploymentConfig) -> ClassificationModel:
@@ -60,6 +68,49 @@ class UDTRouter:
             return TokenClassificationModel(config=config)
         else:
             raise ValueError(f"Unsupported UDT subtype '{subtype}'.")
+
+    @propagate_error
+    def get_text(
+        self,
+        file: UploadFile,
+        _: str = Depends(Permissions.verify_permission("read")),
+    ):
+        """
+        Process an uploaded file to extract text content.
+
+        Args:
+            file (UploadFile): The uploaded file to process.
+            _ (str): Unused parameter for permission check dependency injection.
+
+        Returns:
+            A JSON response containing the extracted text content.
+        """
+        # Define the path where the uploaded file will be temporarily saved
+        destination_path = self.model.data_dir / file.filename
+
+        # Save the uploaded file to the temporary location
+        with open(destination_path, "wb") as f:
+            f.write(file.file.read())
+
+        # Convert the file to an ndb Document object
+        # This likely involves parsing and processing the file content
+        doc: ndb.Document = convert_to_ndb_file(
+            destination_path, metadata=None, options=None
+        )
+
+        # Extract the 'display' column from the document's table
+        # and convert it to a list
+        display_list = doc.table.df["display"].tolist()
+
+        # Remove the temporary file
+        os.remove(destination_path)
+
+        # Return a JSON response with the extracted text content
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successful",
+            data=jsonable_encoder(display_list),
+        )
 
     @propagate_error
     @udt_predict_metric.time()
@@ -222,4 +273,29 @@ class UDTRouter:
             status_code=status.HTTP_200_OK,
             message="Successful",
             data=jsonable_encoder(labels),
+        )
+
+    @propagate_error
+    def get_recent_samples(
+        self,
+        num_samples: int = Query(
+            default=5, ge=1, le=100, description="Number of recent samples to retrieve"
+        ),
+        token: str = Depends(Permissions.verify_permission("read")),
+    ):
+        """
+        Retrieves the most recent samples from the model.
+
+        Parameters:
+        - num_samples: int - Number of recent samples to retrieve (default: 5, min: 1, max: 100)
+        - token: str - Authorization token (inferred from permissions dependency)
+
+        Returns:
+        - JSONResponse: The most recent samples from the model
+        """
+        recent_samples = self.model.get_recent_samples(num_samples=num_samples)
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successful",
+            data=jsonable_encoder(recent_samples),
         )

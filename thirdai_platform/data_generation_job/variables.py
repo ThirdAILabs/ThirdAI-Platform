@@ -6,6 +6,7 @@ from dataclasses import MISSING, dataclass, fields
 from enum import Enum
 from typing import Dict, List, Optional, Type, TypeVar, Union, get_args, get_origin
 
+from platform_common.pii.udt_common_patterns import find_common_pattern
 from pydantic import BaseModel, Field, field_validator
 
 T = TypeVar("T", bound="EnvLoader")
@@ -191,3 +192,9 @@ class TokenGenerationVariables(BaseModel):
         result["tags"] = self.tags
         result["samples"] = self.samples
         return result
+
+    def remove_common_patterns(self):
+        self.tags = [tag for tag in self.tags if find_common_pattern(tag.name) is None]
+
+    def find_common_patterns(self):
+        return [tag.name for tag in self.tags if find_common_pattern(tag.name)]

@@ -48,7 +48,7 @@
     "lucide-react": "^0.400.0",
     "mammoth": "^1.8.0",
     "next": "14.2.5",
-    "next-auth": "5.0.0-beta.19",
+    "next-auth": "^4.24.8",
     "npm": "^10.8.2",
     "openai": "^4.53.2",
     "papaparse": "^5.4.1",
@@ -92,5 +92,10 @@
     "singleQuote": true,
     "tabWidth": 2,
     "trailingComma": "none"
+  },
+  "pnpm": {
+    "overrides": {
+      "oidc-token-hash": "5.0.1"
+    }
   }
 }

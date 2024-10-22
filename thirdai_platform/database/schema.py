@@ -193,7 +193,9 @@ class Model(SQLDeclarativeBase):
     )  # Not null if this model comes from starting training from a base model
 
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
     )
     team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id"), nullable=True)
 

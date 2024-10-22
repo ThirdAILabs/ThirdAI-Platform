@@ -88,6 +88,7 @@ class NDBv2Options(BaseModel):
     ndb_sub_type: Literal[NDBSubType.v2] = NDBSubType.v2
 
     on_disk: bool = True
+    advanced_search: bool = False
 
 
 class NDBOptions(BaseModel):
@@ -176,12 +177,6 @@ class UDTData(BaseModel):
 
     class Config:
         protected_namespaces = ()
-
-    @model_validator(mode="after")
-    def check_nonempty(self):
-        if len(self.supervised_files) == 0:
-            raise ValueError("Supervised files must not be empty for UDT training.")
-        return self
 
 
 class UDTGeneratedData(BaseModel):

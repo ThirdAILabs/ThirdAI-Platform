@@ -13,12 +13,12 @@ function install_ansible() {
                 sudo apt install -y software-properties-common
                 sudo add-apt-repository --yes --update ppa:ansible/ansible
                 sudo apt install -y ansible
+            elif [ -f /etc/system-release ] && grep -q "Amazon Linux release 2023" /etc/system-release; then
+                echo "Installing Ansible on CentOS/RHEL..."
+                sudo dnf install -y ansible
             elif [ -f /etc/system-release ] && grep -q "Amazon Linux release 2" /etc/system-release; then
                 echo "Installing Ansible on Amazon Linux 2..."
                 sudo amazon-linux-extras install -y ansible2
-            elif [ -f /etc/redhat-release ]; then
-                echo "Installing Ansible on CentOS/RHEL..."
-                sudo dnf install -y ansible
             else
                 echo "Unsupported OS: $OSTYPE"
                 echo "Please download and install Ansible manually for your operating system."
@@ -39,7 +39,13 @@ function install_ansible() {
     echo "Installing required Ansible Galaxy collections..."
     ansible-galaxy collection install community.general
     ansible-galaxy collection install ansible.posix
-    ansible-galaxy collection install community.docker
+    # From v4.0.0 commuinty docker support is not there for amazon linux 2
+    if [ -f /etc/system-release ] && grep -q "Amazon Linux release 2" /etc/system-release; then
+        ansible-galaxy collection install community.docker:==3.13.1 --force
+    else
+        ansible-galaxy collection install community.docker
+    fi
+    ansible-galaxy collection install community.postgresql
 
     echo "All required Ansible Galaxy collections are installed."
 }

@@ -1,11 +1,12 @@
 http:
   routers:
     modelbazaar-http:
-      rule: "PathPrefix(`/api`)"
+      rule: "(PathPrefix(`/api`) && !PathPrefix(`/api/auth`))"
       priority: 10
       service: "modelbazaar-service"
+
     frontend-http:
-      rule: "PathPrefix(`/`)"
+      rule: "(PathPrefix(`/api/auth`) || PathPrefix(`/`))"
       priority: 1
       service: "frontend-service"
 
@@ -14,7 +15,7 @@ http:
       loadBalancer:
         servers:
           - url: "http://localhost:8000"
-    
+
     frontend-service:
       loadBalancer:
         servers:

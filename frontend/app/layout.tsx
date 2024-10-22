@@ -2,6 +2,9 @@ import './globals.css';
 
 import { Analytics } from '@vercel/analytics/react';
 import UserWrapper from './user_wrapper';
+import SessionGuard from '@/utils/SessionGuard';
+import { Providers } from './Providers';
+
 import ThemeProvider from '../theme';
 export const metadata = {
   title: 'ThirdAI Platform',
@@ -13,7 +16,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="flex min-h-screen w-full flex-col bg-muted/40">
         <ThemeProvider>
-          <UserWrapper>{children}</UserWrapper>
+          <Providers>
+            <SessionGuard>
+              <UserWrapper>{children}</UserWrapper>
+            </SessionGuard>
+          </Providers>
         </ThemeProvider>
       </body>
       <Analytics />

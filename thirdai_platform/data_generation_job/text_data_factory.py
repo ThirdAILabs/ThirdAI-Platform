@@ -155,7 +155,7 @@ class TextDataFactory(DataFactory):
             "input_feature": TextDataFactory.SOURCE_COLUMN,
             "target_feature": TextDataFactory.TARGET_COLUMN,
             "target_labels": [t.name for t in target_labels],
-            "num_samples": self.train_sentences_generated,
+            "train_samples": self.train_sentences_generated,
         }
         save_dict(self.config_file_location, **dataset_config)
 

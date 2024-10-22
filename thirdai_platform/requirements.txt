@@ -35,6 +35,9 @@ langchain_openai
 mmh3
 msal
 nltk
+jinja2
+pyyaml
+python-keycloak
 numpy
 openai
 pandas

@@ -4,9 +4,16 @@ from typing import Union
 
 import fastapi
 import jwt
-from auth.utils import CREDENTIALS_EXCEPTION, token_bearer
+from auth.utils import (
+    CREDENTIALS_EXCEPTION,
+    identity_provider,
+    keycloak_openid,
+    token_bearer,
+)
 from database import schema
 from database.session import get_session
+from fastapi import HTTPException, status
+from jwt.exceptions import ExpiredSignatureError, ImmatureSignatureError
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -58,24 +65,83 @@ def verify_access_token(
     # this endpoint. See the comment above for `token_bearer` to see what exactly
     # it does in this case.
     # Docs: https://fastapi.tiangolo.com/tutorial/dependencies/
-    try:
-        # This function automatically checks for token expiration:
-        # https://pyjwt.readthedocs.io/en/stable/usage.html#expiration-time-claim-exp
-        payload = TokenPayload(
-            **jwt.decode(
-                jwt=access_token,
-                key=os.getenv("JWT_SECRET"),
-                algorithms=["HS256"],
-            )
+    if identity_provider == "keycloak":
+        # Get the Keycloak public key
+        public_key = keycloak_openid.public_key()
+        KEYCLOAK_PUBLIC_KEY = (
+            f"-----BEGIN PUBLIC KEY-----\n{public_key}\n-----END PUBLIC KEY-----"
         )
-        if payload.user_id is None:
+
+        try:
+            decoded_token = jwt.decode(
+                access_token,
+                key=KEYCLOAK_PUBLIC_KEY,
+                options={"verify_signature": True, "verify_aud": False, "exp": True},
+                algorithms=["RS256"],
+            )
+
+            user_info = keycloak_openid.userinfo(access_token)
+            keycloak_user_id = user_info.get("sub")
+
+            if not keycloak_user_id:
+                raise CREDENTIALS_EXCEPTION
+
+            user = (
+                session.query(schema.User)
+                .filter(schema.User.email == user_info.get("email"))
+                .first()
+            )
+            if not user:
+                raise CREDENTIALS_EXCEPTION
+
+            user_id = user.id
+            expiration = decoded_token.get("exp")
+
+        except ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has expired"
+            )
+        except ImmatureSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token is not yet valid",
+            )
+        except jwt.exceptions.DecodeError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token signature",
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Failed to verify access token: {str(e)}",
+            )
+
+    else:
+        # Non-Keycloak authentication flow
+        try:
+            # This function automatically checks for token expiration:
+            # https://pyjwt.readthedocs.io/en/stable/usage.html#expiration-time-claim-exp
+            payload = TokenPayload(
+                **jwt.decode(
+                    jwt=access_token,
+                    key=os.getenv("JWT_SECRET"),
+                    algorithms=["HS256"],
+                )
+            )
+            if payload.user_id is None:
+                raise CREDENTIALS_EXCEPTION
+            user_id = payload.user_id
+            expiration = payload.exp
+
+            user: schema.User = session.query(schema.User).get(user_id)
+            if not user:
+                raise CREDENTIALS_EXCEPTION
+
+        except jwt.PyJWTError:
             raise CREDENTIALS_EXCEPTION
-        user: schema.User = session.query(schema.User).get(payload.user_id)
-        if not user:
-            raise CREDENTIALS_EXCEPTION
-        return AuthenticatedUser(user=user, exp=payload.exp)
-    except jwt.PyJWTError:
-        raise CREDENTIALS_EXCEPTION
+
+    return AuthenticatedUser(user=user, exp=expiration)
 
 
 def verify_access_token_no_throw(

@@ -9,7 +9,7 @@ from platform_common.utils import load_dict
 general_variables: GeneralVariables = GeneralVariables.load_from_env()
 
 
-def launch_train_job(file_location: str, udt_options: dict):
+def launch_train_job(dataset_config: dict, udt_options: dict):
     try:
         api_url = general_variables.model_bazaar_endpoint
         headers = {"User-Agent": "Datagen job"}
@@ -19,7 +19,13 @@ def launch_train_job(file_location: str, udt_options: dict):
         )
         data = {
             "file_info": json.dumps(
-                {"supervised_files": [{"path": file_location, "location": "nfs"}]}
+                {
+                    "supervised_files": [
+                        {"path": dataset_config["filepath"], "location": "nfs"}
+                    ]
+                }
+                if dataset_config["train_samples"] > 0
+                else {"supervised_files": []}
             ),
             "model_options": json.dumps(
                 {"model_type": "udt", "udt_options": udt_options}
@@ -55,6 +61,8 @@ def main():
 
         factory = TokenDataFactory()
         args = TokenGenerationVariables.model_validate(load_dict(generation_arg_fp))
+        common_patterns = args.find_common_patterns()
+        args.remove_common_patterns()
 
     dataset_config = factory.generate_data(
         general_variables.task_prompt, **args.to_dict()
@@ -72,11 +80,11 @@ def main():
             "udt_sub_type": "token",
             "source_column": dataset_config["input_feature"],
             "target_column": dataset_config["target_feature"],
-            "target_labels": dataset_config["target_labels"],
+            "target_labels": dataset_config["target_labels"] + common_patterns,
         }
 
     if general_variables.secret_token:
-        launch_train_job(dataset_config["filepath"], udt_options)
+        launch_train_job(dataset_config, udt_options)
 
 
 if __name__ == "__main__":

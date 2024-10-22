@@ -10,6 +10,7 @@ from typing import List
 import pandas as pd
 import thirdai
 from platform_common.file_handler import expand_s3_buckets_and_directories
+from platform_common.pii.udt_common_patterns import find_common_pattern
 from platform_common.pydantic_models.training import (
     FileInfo,
     TextClassificationOptions,
@@ -249,16 +250,34 @@ class TokenClassificationModel(ClassificationModel):
         )
 
         default_tag = self.tkn_cls_vars.default_tag
-        return bolt.UniversalDeepTransformer(
+
+        rule_based_tags = []
+        bolt_tags = []
+        for tag in target_labels:
+            common_pattern = find_common_pattern(tag)
+            if common_pattern:
+                rule_based_tags.append(common_pattern)
+            else:
+                bolt_tags.append(tag)
+
+        model = bolt.UniversalDeepTransformer(
             data_types={
                 self.tkn_cls_vars.source_column: bolt.types.text(),
                 self.tkn_cls_vars.target_column: bolt.types.token_tags(
-                    tags=target_labels,
+                    tags=bolt_tags,
                     default_tag=default_tag,
                 ),
             },
             target=self.tkn_cls_vars.target_column,
         )
+
+        for tag in rule_based_tags:
+            try:
+                model.add_ner_rule(tag)
+            except Exception as e:
+                self.logger.error(f"Failed to add rule based tag {tag} with error {e}")
+
+        return model
 
     def load_storage(self):
         data_storage_path = self.data_dir / "data_storage.db"
@@ -299,11 +318,21 @@ class TokenClassificationModel(ClassificationModel):
 
         if new_labels:
             for new_label in new_labels:
+                common_pattern = find_common_pattern(new_label)
                 try:
-                    model.add_ner_entities([new_label])
+                    if common_pattern:
+                        self.logger.debug(
+                            f"Adding rule based tag {common_pattern} to the model."
+                        )
+                        model.add_ner_rule(common_pattern)
+                    else:
+                        self.logger.debug(
+                            f"Adding bolt based tag {new_label} to the model."
+                        )
+                        model.add_ner_entities([new_label])
                 except Exception as e:
                     self.logger.error(
-                        f"Failed to add new label {new_label} to the model with error {e}"
+                        f"Failed to add new label {new_label} to the model with error {e}."
                     )
 
         for train_file in self.supervised_files():
@@ -314,6 +343,7 @@ class TokenClassificationModel(ClassificationModel):
                 batch_size=self.train_options.batch_size,
                 metrics=self.train_options.metrics,
             )
+
         training_time = time.time() - start_time
 
         # converts the status of all tags to trained and update in the storage

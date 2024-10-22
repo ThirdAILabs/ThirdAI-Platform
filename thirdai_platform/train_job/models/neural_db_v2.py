@@ -24,6 +24,8 @@ class NeuralDBV2(Model):
 
         self.ndb_options: NDBv2Options = self.config.model_options.ndb_options
 
+        splade = self.ndb_options.advanced_search
+
         if self.config.base_model_id:
             base_model_path = os.path.join(
                 self.config.model_bazaar_dir,
@@ -48,7 +50,7 @@ class NeuralDBV2(Model):
                 save_path = self.ndb_save_path()
             else:
                 save_path = None
-            self.db = ndbv2.NeuralDB(save_path=save_path)
+            self.db = ndbv2.NeuralDB(save_path=save_path, splade=splade)
 
     def ndb_save_path(self):
         return os.path.join(self.model_dir, "model.ndb")

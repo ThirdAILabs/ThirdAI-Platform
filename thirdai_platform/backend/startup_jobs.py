@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 import requests
 import yaml
+from auth.utils import get_hostname_from_url
 from backend.utils import (
     delete_nomad_job,
     get_platform,
@@ -126,6 +127,13 @@ async def restart_thirdai_platform_frontend():
         docker_username=os.getenv("DOCKER_USERNAME"),
         docker_password=os.getenv("DOCKER_PASSWORD"),
         image_name=os.getenv("FRONTEND_IMAGE_NAME"),
+        identity_provider=os.getenv("IDENTITY_PROVIDER", "postgres"),
+        model_bazaar_public_hostname=get_hostname_from_url(
+            os.getenv("PUBLIC_MODEL_BAZAAR_ENDPOINT")
+        ),
+        use_ssl_in_login=os.getenv("USE_SSL_IN_LOGIN", "False").lower(),
+        share_dir=os.getenv("SHARE_DIR"),
+        nextauth_secret=os.getenv("JWT_SECRET", "random secret"),
         # Model bazaar dockerfile does not include neuraldb_frontend code,
         # but app_dir is only used if platform == local.
         app_dir=str(get_root_absolute_path() / "frontend"),

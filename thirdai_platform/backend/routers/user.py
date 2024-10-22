@@ -1,10 +1,12 @@
 import os
 import pathlib
+import re
 from typing import List, Optional
 from urllib.parse import urlencode, urljoin
 
 import bcrypt
 from auth.jwt import AuthenticatedUser, create_access_token, verify_access_token
+from auth.utils import identity_provider, keycloak_admin, keycloak_openid
 from backend.auth_dependencies import global_admin_only
 from backend.mailer import mailer
 from backend.utils import hash_password
@@ -27,6 +29,10 @@ template_directory = root_folder.joinpath("../templates/").resolve()
 templates = Jinja2Templates(directory=template_directory)
 
 
+class AccessToken(BaseModel):
+    access_token: str
+
+
 class AccountSignupBody(BaseModel):
     username: str
     email: str
@@ -35,6 +41,34 @@ class AccountSignupBody(BaseModel):
 
 class AdminRequest(BaseModel):
     email: str
+
+
+def delete_all_models_for_user(user_to_delete, session):
+    team_admins: List[schema.UserTeam] = (
+        session.query(schema.UserTeam).filter_by(role=schema.Role.team_admin).all()
+    )
+    team_admin_map = {
+        team_admin.team_id: team_admin.user_id for team_admin in team_admins
+    }
+
+    models: List[schema.Model] = user_to_delete.models
+
+    for model in models:
+        if model.access_level == schema.Access.protected:
+            new_owner_id = team_admin_map.get(model.team_id, user_to_delete.id)
+        else:
+            # current user is the global_admin.
+            new_owner_id = user_to_delete.id
+
+        model.user_id = new_owner_id
+
+    session.bulk_save_objects(models)
+
+
+def slugify_username(preferred_username):
+    safe_username = re.sub(r"[^\w]", "", preferred_username)
+
+    return safe_username
 
 
 def send_verification_mail(email: str, verification_token: str, username: str):
@@ -283,6 +317,7 @@ def delete_user(
     - A JSON response indicating the success of the operation.
     """
     email = admin_request.email
+
     user: Optional[schema.User] = (
         session.query(schema.User)
         .options(selectinload(schema.User.models))
@@ -296,26 +331,19 @@ def delete_user(
             message=f"User with email {email} not found.",
         )
 
-    team_admins: List[schema.UserTeam] = (
-        session.query(schema.UserTeam).filter_by(role=schema.Role.team_admin).all()
-    )
-    team_admin_map = {
-        team_admin.team_id: team_admin.user_id for team_admin in team_admins
-    }
+    delete_all_models_for_user(user, session)
 
-    models: List[schema.Model] = user.models
-
-    for model in models:
-        if model.access_level == schema.Access.protected:
-            new_owner_id = team_admin_map.get(model.team_id, current_user.id)
-        else:
-            # current user is the global_admin.
-            new_owner_id = current_user.id
-
-        model.user_id = new_owner_id
-
-    session.bulk_save_objects(models)
     session.delete(user)
+
+    if identity_provider == "keycloak":
+        try:
+            keycloak_admin.delete_user(user.id)
+        except Exception as e:
+            return response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"Failed to delete user in Keycloak: {str(e)}",
+            )
+
     session.commit()
 
     return response(
@@ -431,6 +459,57 @@ def email_login(
             "verified": user.verified,
         },
     )
+
+
+@user_router.post("/email-login-with-keycloak")
+def email_login_with_keycloak(
+    access_token: AccessToken,
+    session: Session = Depends(get_session),
+):
+    """
+    This endpoint handles the login process using a Keycloak access token.
+    It verifies the token directly in this function and returns user info.
+    If the user doesnot exists we create the user here.
+    """
+    try:
+        user_info = keycloak_openid.userinfo(access_token.access_token)
+
+        keycloak_user_id = user_info.get("sub")
+
+        user = (
+            session.query(schema.User)
+            .filter(schema.User.email == user_info.get("email"))
+            .first()
+        )
+        if not user:
+            user = schema.User(
+                id=keycloak_user_id,
+                username=slugify_username(user_info.get("preferred_username")),
+                email=user_info.get("email"),
+            )
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successfully logged in using Keycloak token.",
+            data={
+                "user": {
+                    "username": user.username,
+                    "email": user.email,
+                    "user_id": str(user.id),
+                },
+                "access_token": access_token.access_token,
+            },
+        )
+    except HTTPException as e:
+        return response(status_code=e.status_code, message=e.detail)
+    except Exception as e:
+        return response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"An unexpected error occurred: {str(e)}",
+        )
 
 
 @user_router.get("/reset-password")

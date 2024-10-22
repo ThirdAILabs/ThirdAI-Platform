@@ -23,7 +23,7 @@ job "thirdai-platform-frontend" {
 
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.thirdai-platform-frontend-http.rule=PathPrefix(`/`)",
+        "traefik.http.routers.thirdai-platform-frontend-http.rule=(PathPrefix(`/api/auth`) || PathPrefix(`/`))",
         "traefik.http.routers.thirdai-platform-frontend-http.priority=1"
       ]
     }
@@ -38,6 +38,17 @@ job "thirdai-platform-frontend" {
 
       env {
         NEXT_PUBLIC_OPENAI_API_KEY = "{{ openai_api_key }}"
+        NEXT_PUBLIC_IDENTITY_PROVIDER = "{{ identity_provider }}"
+        KEYCLOAK_CLIENT_ID = "thirdai-login-client"
+        KEYCLOAK_CLIENT_SECRET = ""
+        KEYCLOAK_ISSUER = "https://{{ model_bazaar_public_hostname }}/keycloak/realms/ThirdAI-Platform"
+        {# The following is URL for http application #}
+        NEXTAUTH_URL = "http://{{ model_bazaar_public_hostname }}"
+        NEXTAUTH_SECRET = "{{ nextauth_secret }}"
+
+        {% if use_ssl_in_login == "true" %}
+        NODE_EXTRA_CA_CERTS = "/certs/traefik.crt"
+        {% endif %}
       }
 
       config {
@@ -50,12 +61,17 @@ job "thirdai-platform-frontend" {
             password = "{{ docker_password }}"
             server_address = "{{ registry }}"
           }
+          {% if use_ssl_in_login == "true" %}
+            volumes = [
+              "{{ share_dir }}/certs:/certs",
+            ]
+          {% endif %}
         {% endif %}
       }
 
       resources {
         cpu    = 500
-        memory = 1000
+        memory = 1500
         memory_max = 4000
       }
     }

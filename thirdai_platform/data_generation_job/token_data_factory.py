@@ -428,6 +428,17 @@ Example : {str(random.sample(tag_values[tag.name], k=2))} not limited to given b
         samples: List[NERSample] = None,
         templates_per_sample: int = 4,
     ):
+        if len(tags) == 0:
+            return {
+                "error_file": str(self.errored_file_location),
+                "task": "TOKEN_CLASSIFICATION",
+                "input_feature": TokenDataFactory.SOURCE_COLUMN,
+                "target_feature": TokenDataFactory.TARGET_COLUMN,
+                "target_labels": [],
+                "train_samples": 0,
+                "test_samples": 0,
+            }
+
         templates_to_generate = self._templates_to_generate(num_sentences_to_generate)
 
         if samples is None:

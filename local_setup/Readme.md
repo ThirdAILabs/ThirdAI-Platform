@@ -90,14 +90,37 @@ Without this process, it is cumbersome to test out platform changes. We would ha
       export DATABASE_URI="your local database postgresql connection string"
       alembic upgrade head
       ```
+8. **Start KeyCloak in dev mode when using Keycloak as IDP**
+    - Download Keycloak version 26.0.0 from the official GitHub repository using the link below:
+     [Download Keycloak 26.0.0](https://github.com/keycloak/keycloak/releases/download/26.0.0/keycloak-26.0.0.zip).
+    - Extract the downloaded `keycloak-26.0.0.zip` file to a directory of your choice.
+    - After extraction, you should have a directory named `keycloak-26.0.0`.
+    - Open a terminal and navigate to the `keycloak-26.0.0` directory:
+     ```bash
+     cd keycloak-26.0.0/bin
+     ```
+    - Start the Keycloak server in development mode with the following command:
+     ```bash
+     ./kc.sh start-dev --http-port=8180 --debug --bootstrap-admin-username temp_admin --bootstrap-admin-password password
+     ```
+    - Wait for the server to start, and you should see a message indicating that the server is running. The server will be accessible at `http://localhost:8180`.
+    - Once the server has started, you can access the Keycloak Admin Console by navigating to:
+     [http://localhost:8180](http://localhost:8180).
+    - Log in using the following credentials:
+     - **Username**: `temp_admin`
+     - **Password**: `password`
+    - To stop the server, press `Ctrl+C` in the terminal where the server is running.
+    - For more detailed instructions and advanced setup options, visit the official Keycloak documentation:
+     [Getting Started with Keycloak ZIP](https://www.keycloak.org/getting-started/getting-started-zip).
 
-8. **Launch Backend:**
+
+9. **Launch Backend:**
     - Start the backend service using Uvicorn:
       ```
       uvicorn main:app --reload --host 0.0.0.0 --port 8000
       ```
 
-9. **Launch Nomad Jobs**
+10. **Launch Nomad Jobs**
     - Start the Autoscaler job and Redis job using the following command, first cd into `local_setup` folder and run
       ```
       bash launch_nomad_jobs.sh
@@ -113,7 +136,8 @@ Without this process, it is cumbersome to test out platform changes. We would ha
         
         ![screenshot](Nomad_driver_status.png)
 
-10. **Launch Frontend**
+
+11. **Launch Frontend**
 
     To run the frontend, follow these steps:
     - Make sure you have `npm` installed to handle the dependencies. Navigate to the `frontend` directory and run `pnpm install` to install dependencies, if you dont have pnpm you can install it globally using `npm install -g pnpm`
@@ -123,7 +147,7 @@ Without this process, it is cumbersome to test out platform changes. We would ha
     - Your application should now be running, and you can access it in the browser at port 80.
 
 
-11. **Insert existing datasets in DB:**
+12. **Insert existing datasets in DB:**
     - These existing datasets are present in the share directory of blade. 
     - Make sure you are on blade when you insert the datasets
     - Go to `thirdai_platform` folder and run

@@ -1,121 +1,77 @@
-'use client';
+import React, { useState } from 'react';
+import { Button } from '@mui/material';
+import { retrainTokenClassifier } from '@/lib/backend';
 
-import { Button } from '@/components/ui/button';
-import { retrain_ndb, stop_workflow } from '@/lib/backend';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
-
-function generateTimestamp(): string {
-  const now = new Date();
-
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0'); // Months are zero-based
-  const day = String(now.getDate()).padStart(2, '0');
-
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
-
-  return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+interface UpdateButtonProps {
+  modelName: string;
 }
 
-export default function UpdateButton() {
-  const params = useSearchParams();
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isEnabled, setIsEnabled] = useState(false);
+interface UpdateResponse {
+  status: string;
+  message: string;
+  data: {
+    model_id: string;
+    user_id: string;
+  };
+}
 
-  // Extract parameters from URL
-  const workflowId = params.get('id');
-  const username = params.get('username');
-  const model_name = params.get('model_name');
-  const old_model_id = params.get('old_model_id'); // Assuming you pass the old model ID
+export default function UpdateButton({ modelName }: UpdateButtonProps) {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState('');
+  const [initiateUpdateSuccess, setInitiateUpdateSuccess] = useState(false);
 
-  // Effect to determine if the button should be enabled
-  useEffect(() => {
-    if (workflowId && username && model_name && old_model_id) {
-      setIsEnabled(true);
-    } else {
-      setIsEnabled(false);
-    }
-  }, [workflowId, username, model_name, old_model_id]);
-
-  /**
-   * Handles the update button click by initiating the retrain process,
-   * deleting the old model, and adding the new model to the workflow.
-   */
-  async function handleUpdate() {
-    console.log('Update button called');
-
-    // Validate required parameters
-    if (!workflowId || !username || !model_name || !old_model_id) {
-      setError('Missing required parameters: id, username, model_name, or old_model_id.');
-      return;
-    }
-
-    // Define the base_model_identifier in the format 'username/model_name'
-    const base_model_identifier = `${username}/${model_name}`;
-
-    // Define job options as per your requirements
-    const job_options = {
-      allocation_cores: 4, // Example value
-      allocation_memory: 8192, // Example value in MB
-      // Add other JobOptions fields as necessary
-    };
-
-    setLoading(true);
-    setError(null);
-
-    // Generate a new model name using the current timestamp
-    const timestamp = generateTimestamp();
-    const new_model_name = `${model_name}_${timestamp}`;
+  const handleUpdateModel = async () => {
+    setIsUpdating(true);
+    setUpdateError('');
+    setInitiateUpdateSuccess(false);
 
     try {
-      // Step 1: Stop the old workflow
-      const stopData = await stop_workflow(username, model_name);
-      console.log('Workflow stopped successfully:', stopData);
-
-      // Step 2: Retrain the model to create a new model
-      const retrainParams = {
-        model_name: new_model_name,
-        base_model_identifier: base_model_identifier,
-        job_options: job_options,
-      };
-      const retrainData = await retrain_ndb(retrainParams);
-      console.log('Retrain initiated successfully:', retrainData);
-
-      // Optionally, update the UI or navigate
-      router.push(
-        `/analytics?id=${encodeURIComponent(`${workflowId}-updated`)}&username=${encodeURIComponent(username)}&model_name=${encodeURIComponent(new_model_name)}`
+      const response: UpdateResponse = await retrainTokenClassifier({ model_name: modelName });
+      if (response.status === 'success') {
+        setInitiateUpdateSuccess(true);
+        console.log('Model update initiated successfully:', response.message);
+      } else {
+        throw new Error(response.message || 'Failed to initiate update');
+      }
+    } catch (error) {
+      setUpdateError(
+        error instanceof Error
+          ? error.message
+          : 'An error occurred while initiating the model update'
       );
-    } catch (err: any) {
-      console.error('Error during the update process:', err);
-      setError(err.message);
-      alert('Error updating model: ' + err.message);
     } finally {
-      setLoading(false);
+      setIsUpdating(false);
     }
-  }
+  };
 
-  // If the button should not be enabled, do not render it
-  if (!isEnabled) {
-    return null; // Or render an alternative UI if desired
-  }
+  const getButtonText = () => {
+    if (isUpdating) return 'Initiating Update...';
+    if (initiateUpdateSuccess) return 'Update Initiated!';
+    return 'Update Existing Model';
+  };
+
+  const getButtonColor = () => {
+    if (initiateUpdateSuccess) return 'success';
+    return 'primary';
+  };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        marginTop: '20px',
-        marginBottom: '20vh',
-      }}
-    >
-      <Button onClick={handleUpdate} disabled={loading}>
-        {loading ? 'Updating...' : 'Update model with feedback'}
+    <div className="flex flex-col items-center space-y-4 mt-6">
+      <Button
+        onClick={handleUpdateModel}
+        disabled={isUpdating}
+        variant="contained"
+        style={{ width: '200px' }}
+        color={getButtonColor()}
+      >
+        {getButtonText()}
       </Button>
-      {error && <p style={{ color: 'red', marginTop: '10px' }}>{error}</p>}
+      {updateError && <p className="text-red-500">{updateError}</p>}
+      {initiateUpdateSuccess && (
+        <div className="text-green-500">
+          <p>Update process initiated successfully. This may take some time to complete.</p>
+        </div>
+      )}
     </div>
   );
 }

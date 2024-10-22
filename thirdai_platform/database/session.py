@@ -1,6 +1,7 @@
 import os
 from contextlib import contextmanager
 
+from auth.utils import identity_provider, keycloak_admin
 from backend.utils import hash_password
 from database import schema
 from database.schema import SQLDeclarativeBase as Base
@@ -62,11 +63,54 @@ def get_session():
         session.close()
 
 
-# Adding a global_admin by default initially
 class AdminAddition:
     @classmethod
-    def add_admin(cls):
+    def add_admin(
+        cls,
+        admin_mail: str,
+        admin_username: str,
+        admin_password: str,
+    ):
+        """
+        Add or update a global admin based on the current identity provider (Keycloak or Postgres).
+        If Keycloak is used, Google as an identity provider can also be added or updated.
+        """
         with contextmanager(get_session)() as session:
+
+            if identity_provider == "keycloak":
+                # Keycloak logic
+                keycloak_user_id = keycloak_admin.get_user_id(admin_username)
+                if keycloak_user_id:
+                    keycloak_admin.update_user(
+                        keycloak_user_id,
+                        {
+                            "email": admin_mail,
+                            "emailVerified": True,
+                            "firstName": admin_username,
+                            "lastName": "User",
+                        },
+                    )
+                else:
+
+                    keycloak_user_id = keycloak_admin.create_user(
+                        {
+                            "username": admin_username,
+                            "email": admin_mail,
+                            "enabled": True,
+                            "emailVerified": True,
+                            "credentials": [
+                                {
+                                    "type": "password",
+                                    "value": admin_password,
+                                    "temporary": False,
+                                }
+                            ],
+                            "realmRoles": ["admin"],
+                            "firstName": admin_username,
+                            "lastName": "User",
+                        }
+                    )
+
             user: schema.User = (
                 session.query(schema.User)
                 .filter(schema.User.email == admin_mail)
@@ -89,4 +133,8 @@ class AdminAddition:
                 session.commit()
 
 
-AdminAddition.add_admin()
+AdminAddition.add_admin(
+    admin_mail=admin_mail,
+    admin_username=admin_username,
+    admin_password=admin_password,
+)
