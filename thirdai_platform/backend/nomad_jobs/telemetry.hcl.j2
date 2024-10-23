@@ -8,12 +8,15 @@ job "telemetry" {
       If there are more than one node in the cluster, 
         then this constraint ensures that telemetry job always run on client node,
 
-      The issue originates from victoriametric and grafana creating db on nfs.
-        so, if the telemetry job is started by node of a class [server or (any client)], the job won't get restarted by node of different class [(any client) or server] 
+      The issue originates from ownerships of files created by victoriametric on nfs.
+        if server starts the job, files created is having (root, nomad_nfs) as ownership and group ownership
+        if client starts the job, file files created is having (nomad_nfs, nomad_nfs) as ownership and group ownership,
+
+        so, different client is able to restart the victoriametric task but not the server.
       
       Incase multiple nodes are in the cluster,
         Assumption: There will be more client nodes than server.
-        so constraint the job to always get scheduled on client node.
+        so constrain the job to always get scheduled on client node.
     #}
     {% if platform == "docker" and target_count != "1" -%}
     constraint {
@@ -43,6 +46,11 @@ job "telemetry" {
         name     = "vicky-web"
         provider = "nomad"
         port     = "vicky-http"
+        tags = [
+          "traefik.enable=true",
+          "traefik.http.routers.vicky-http.rule=PathPrefix(`/victoriametric`)",
+          "traefik.http.routers.vicky-http.priority=10"
+        ]
       }
 
       config {
@@ -57,6 +65,7 @@ job "telemetry" {
         args = [
           "--storageDataPath={{ nomad_monitoring_dir }}/victoriametric",
           "--retentionPeriod=1d",
+          "--http.pathPrefix=/victoriametric",
           "--httpListenAddr=:${NOMAD_PORT_vicky_http}",
           "--promscrape.config={{ nomad_monitoring_dir }}/node_discovery/prometheus.yaml"
         ]
@@ -230,7 +239,7 @@ datasources:
     type: prometheus
     access: proxy
     {% if platform == "local" -%}
-    url: http://host.docker.internal:{% raw %}{{ range nomadService "vicky-web" }}{{ .Port }}{{ end }}{% endraw %}
+    url: http://host.docker.internal/victoriametric
     {%- else -%}
     {% raw %}{{ range nomadService "vicky-web" }}url: http://{{ .Address }}:{{ .Port }}{{ end }}{% endraw %}
     {%- endif %}

@@ -1,9 +1,14 @@
 import json
 import os
+
+pass
 import traceback
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Union
+from urllib.parse import urljoin
 
+import requests
 from auth.jwt import (
     AuthenticatedUser,
     now_plus_minutes,
@@ -28,6 +33,7 @@ from backend.utils import (
 from database import schema
 from database.session import get_session
 from fastapi import APIRouter, Depends, HTTPException, status
+from typing_extensions import Annotated
 
 pass
 from platform_common.pydantic_models.deployment import (
@@ -38,6 +44,7 @@ from platform_common.pydantic_models.deployment import (
 )
 from platform_common.pydantic_models.training import ModelType
 from platform_common.utils import response
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 deploy_router = APIRouter()
@@ -394,6 +401,175 @@ def deployment_status(
             "message": " ".join(reasons),
             "model_id": str(model.id),
         },
+    )
+
+
+class UsageStatOptions(BaseModel):
+    duration: int  # In seconds
+    num_datapoints: Annotated[int, Field(strict=True, gt=0)]  # Data points required
+
+    @property
+    def interval(self):
+        return f"{self.duration // self.num_datapoints}s"
+
+    def step_in_words(self):
+        seconds_per_minute = 60
+        seconds_per_hour = 60 * seconds_per_minute
+        seconds_per_day = 24 * seconds_per_hour
+        seconds_per_month = (
+            30.44 * seconds_per_day
+        )  # Average days in a month 30.44 days
+        seconds_per_year = 12 * seconds_per_month
+
+        temp = int(self.interval.rstrip("s"))
+        years = temp // seconds_per_year
+        temp %= seconds_per_year
+
+        months = temp // seconds_per_month
+        temp %= seconds_per_month
+
+        days = temp // seconds_per_day
+        temp %= seconds_per_day
+
+        hours = temp // seconds_per_hour
+        temp %= seconds_per_hour
+
+        minutes = temp // seconds_per_minute
+        seconds = temp % seconds_per_minute
+
+        parts = []
+        if years > 0:
+            parts.append(f"{str(int(years)) + ' years' if years > 1 else 'year'}")
+
+        for unit_name, unit_value in [
+            ("month", months),
+            ("day", days),
+            ("hour", hours),
+            ("minute", minutes),
+            ("second", seconds),
+        ]:
+            if unit_value > 0:
+                parts.append(
+                    f"{int(unit_value)} {unit_name + 's' if unit_value > 1 else unit_name}"
+                )
+
+        return f"per {' '.join(parts)}"
+
+
+@deploy_router.post("/usage-stats")
+def usage_stats(
+    model_identifier: str,
+    usage_stat_option: UsageStatOptions,
+    session: Session = Depends(get_session),
+    # authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+):
+    """
+    Get the usage stats of the deployment
+
+    Parameters:
+    - model_identifier: The identifier of the model.
+    - duration: Duration for which stats are required. (In seconds)
+    - step: Time difference between the intervals
+    - session: The database session (dependency).
+    - authenticated_user: The authenticated user (dependency).
+
+    Example Usage:
+    ```json
+    {
+        "model_identifier": "user123/model_name"
+        "duration":"604800       # 1 week in seconds
+        "steps": "1d"
+    }
+    ```
+    Response data:
+    ```json
+    {
+        Query per_day: {
+                "2024-10-16 16:35:00": 7,
+                "2024-10-17 16:35:00": 15,
+                "2024-10-18 16:35:00": 8,
+                "2024-10-19 16:35:00": 45,
+                "2024-10-20 16:35:00": 51,
+                "2024-10-21 16:35:00": 13,
+                "2024-10-22 16:35:00": 15,
+                "2024-10-23 16:35:00": 20,
+            },
+        Associate per_day: {
+                "2024-10-16 16:35:00": 2,
+                "2024-10-17 16:35:00": 2,
+                "2024-10-18 16:35:00": 3,
+                "2024-10-19 16:35:00": 0,
+                "2024-10-20 16:35:00": 1,
+                "2024-10-21 16:35:00": 0,
+                "2024-10-22 16:35:00": 1,
+                "2024-10-23 16:35:00": 3,
+            },
+        Upvote per_day: {
+                "2024-10-16 16:35:00": 0,
+                "2024-10-17 16:35:00": 1,
+                "2024-10-18 16:35:00": 2,
+                "2024-10-19 16:35:00": 4,
+                "2024-10-20 16:35:00": 2,
+                "2024-10-21 16:35:00": 0,
+                "2024-10-22 16:35:00": 1,
+                "2024-10-23 16:35:00": 1,
+            }
+    }
+    ```
+    """
+    try:
+        model: schema.Model = get_model_from_identifier(model_identifier, session)
+    except Exception as error:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=str(error),
+        )
+
+    query_endpoint = urljoin(
+        os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"), "/victoriametric/api/v1/query_range"
+    )
+
+    # Common params
+    end_time = datetime.now()
+    start_time = end_time - timedelta(seconds=usage_stat_option.duration)
+    params = {
+        "start": int(start_time.timestamp()),
+        "end": int(end_time.timestamp()),
+        "step": usage_stat_option.interval,
+    }
+
+    worded_steps = usage_stat_option.step_in_words()
+    metrics = (
+        [
+            (f"Query {worded_steps}", "ndb_query_count"),
+            (f"Upvote {worded_steps}", "ndb_upvote_count"),
+            (f"Associate {worded_steps}", "ndb_associate_count"),
+        ]
+        if model.type == "ndb"
+        else [(f"Query {worded_steps}", "udt_predict")]
+    )
+    usage_data = {}
+    for metric_name, metric_id in metrics:
+        params["query"] = (
+            f'sum(increase({metric_id}{{job="deployment-jobs", model_id="{model.id}"}}[{usage_stat_option.interval}]))'  # summing over all allocations
+        )
+        query_response = requests.get(query_endpoint, params=params)
+        if query_response.status_code == 200:
+            timeseries_data = query_response.json()["data"]["result"]
+
+            if len(timeseries_data) == 0:
+                # model was never deployed, so there will be no usage stats
+                break
+
+            usage_data[metric_name] = {}
+            for timestamp, value in timeseries_data[0]["values"]:
+                dt = datetime.fromtimestamp(timestamp)
+                usage_data[metric_name][str(dt)] = value
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Successfully retreived the usage stats",
+        data=usage_data,
     )
 
 
