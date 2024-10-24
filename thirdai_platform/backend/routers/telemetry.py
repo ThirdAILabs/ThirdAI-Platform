@@ -1,10 +1,14 @@
 import os
 
+from backend.auth_dependencies import global_admin_only
 from backend.utils import get_platform, get_service_info, list_services, logger
-from fastapi import APIRouter, status
+from database.schema import Usage
+from database.session import get_session
+from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from platform_common.utils import response
+from sqlalchemy.orm import Session
 
 telemetry_router = APIRouter()
 
@@ -57,3 +61,16 @@ def deployment_services():
                 )
 
     return JSONResponse(content=jsonable_encoder(targets))
+
+
+@telemetry_router.get("/usage-stats", dependencies=[Depends(global_admin_only)])
+def usage_stats(
+    session: Session = Depends(get_session),
+):
+    disk_stats = session.query(Usage).all()
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        data=disk_stats.__dict__,
+        message="Successfully retrieved the usage stats",
+    )

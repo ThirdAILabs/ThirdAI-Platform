@@ -12,11 +12,13 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import ENUM, UUID
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import declarative_base, relationship, validates
 
 SQLDeclarativeBase = declarative_base()
@@ -385,3 +387,20 @@ class Catalog(SQLDeclarativeBase):
     task = Column(ENUM(UDT_Task), nullable=False)
     num_generated_samples = Column(Integer)
     target_labels = Column(ARRAY(String), nullable=False)
+
+
+class SupportedStats(str, enum.Enum):
+    disk = "disk"
+
+
+class Usage(SQLDeclarativeBase):
+    __tablename__ = "usage"
+
+    stat_name = Column(ENUM(SupportedStats), primary_key=True)
+    usage = Column(Numeric(20, 3), nullable=False)
+    free = Column(Numeric(20, 3), nullable=False)
+
+    @hybrid_property
+    def usage_percent(self):
+        total = self.usage + self.free
+        return round((self.usage * 100) / total, 3) if total > 0 else 0

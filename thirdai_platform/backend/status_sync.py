@@ -1,6 +1,7 @@
 import os
+import shutil
 
-from backend.utils import get_nomad_job
+from backend.utils import get_nomad_job, model_bazaar_path
 from database import schema
 from database.session import get_session
 from fastapi_utils.tasks import repeat_every
@@ -58,4 +59,29 @@ async def sync_job_statuses() -> None:
 
         session.commit()
     finally:
+        session.close()
+
+
+@repeat_every(seconds=5)
+async def update_resource_usage() -> None:
+    current_disk_stats = shutil.disk_usage(model_bazaar_path())
+    session = next(get_session())
+
+    try:
+        disk_usage_entry = (
+            session.query(schema.Usage).filter(schema.Usage.stat_name == "disk").first()
+        )
+        if disk_usage_entry:
+            disk_usage_entry.usage = current_disk_stats.used
+            disk_usage_entry.free = current_disk_stats.free
+        else:
+            session.add(
+                schema.Usage(
+                    stat_name="disk",
+                    usage=current_disk_stats.used,
+                    free=current_disk_stats.free,
+                )
+            )
+    finally:
+        session.commit()
         session.close()

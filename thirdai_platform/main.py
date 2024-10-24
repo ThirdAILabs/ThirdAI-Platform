@@ -23,7 +23,7 @@ from backend.startup_jobs import (
     restart_telemetry_jobs,
     restart_thirdai_platform_frontend,
 )
-from backend.status_sync import sync_job_statuses
+from backend.status_sync import sync_job_statuses, update_resource_usage
 from backend.utils import get_platform
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -83,6 +83,7 @@ async def startup_event():
         print(f"Failed to start the LLM Cache Job : {error}", file=sys.stderr)
 
     await sync_job_statuses()
+    await update_resource_usage()
 
 
 if __name__ == "__main__":
