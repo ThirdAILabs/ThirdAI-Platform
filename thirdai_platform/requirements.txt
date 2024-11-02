@@ -5,7 +5,7 @@ pdftitle==0.11 # 0.12 has has a conflict with pdfplumber from thirdai
 pydantic>=2.1.0
 PyMuPDF
 requests<2.32.0
-thirdai[neural_db_v2]>=0.9.12
+thirdai[neural_db_v2]>=0.9.21
 aiohttp
 alembic
 apscheduler

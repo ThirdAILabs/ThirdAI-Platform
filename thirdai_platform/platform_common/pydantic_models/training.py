@@ -228,6 +228,7 @@ class UDTTrainOptions(BaseModel):
     learning_rate: float = 0.005
     batch_size: int = 2048
     max_in_memory_batches: Optional[int] = None
+    test_split: Optional[float] = None
 
     metrics: List[str] = ["precision@1", "loss"]
     validation_metrics: List[str] = ["categorical_accuracy", "recall@1"]

@@ -917,6 +917,10 @@ def train_udt(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message=str(err),
         )
+    
+    if base_model:
+        copy_data_storage(base_model, new_model)
+        remove_unused_samples(base_model)
 
     work_dir = os.getcwd()
 
@@ -966,6 +970,46 @@ def train_udt(
             "model_id": str(model_id),
             "user_id": str(user.id),
         },
+    )
+
+
+@train_router.get("/train-report", dependencies=[Depends(verify_model_read_access)])
+def train_report(model_identifier: str, session: Session = Depends(get_session)):
+    try:
+        model: schema.Model = get_model_from_identifier(model_identifier, session)
+    except Exception as error:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=str(error),
+        )
+
+    if model.train_status != schema.Status.complete:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"Cannot get train report for model {model_identifier} since training is not completed.",
+        )
+
+    report_dir = os.path.join(
+        model_bazaar_path(), "models", str(model.id), "train_reports"
+    )
+    if not os.path.exists(report_dir) or len(os.listdir(report_dir)) == 0:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=(
+                f"No training reports found for model {model_identifier}. Train reports "
+                "are currently only availible for token classification use cases and if a test set "
+                "or test_split is provided."
+            ),
+        )
+
+    reports = os.listdir(report_dir)
+    most_recent_report = max([int(os.path.splitext(report)[0]) for report in reports])
+
+    with open(os.path.join(report_dir, f"{most_recent_report}.json")) as f:
+        report = json.load(f)
+
+    return response(
+        status_code=status.HTTP_200_OK, message="Retrieved train report", data=report
     )
 
 

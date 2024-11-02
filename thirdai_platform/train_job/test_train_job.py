@@ -24,6 +24,7 @@ from platform_common.pydantic_models.training import (
     TrainConfig,
     UDTData,
     UDTOptions,
+    UDTTrainOptions,
 )
 from thirdai import bolt, licensing
 from thirdai import neural_db as ndb
@@ -210,7 +211,8 @@ def test_udt_text_train():
     )
 
 
-def test_udt_token_train():
+@pytest.mark.parametrize("test_split", [0, 0.25])
+def test_udt_token_train(test_split):
     licensing.activate(THIRDAI_LICENSE)
     config = TrainConfig(
         model_bazaar_dir=MODEL_BAZAAR_DIR,
@@ -225,14 +227,17 @@ def test_udt_token_train():
                 target_column="tags",
                 default_tag="O",
             ),
+            train_options=UDTTrainOptions(test_split=test_split),
         ),
         data=UDTData(
             supervised_files=[
                 FileInfo(path=os.path.join(file_dir(), "ner.csv"), location="local")
             ],
-            test_files=[
-                FileInfo(path=os.path.join(file_dir(), "ner.csv"), location="local")
-            ],
+            test_files=(
+                [FileInfo(path=os.path.join(file_dir(), "ner.csv"), location="local")]
+                if test_split == 0
+                else []
+            ),
         ),
         job_options=JobOptions(),
         datagen_options=DatagenOptions(
