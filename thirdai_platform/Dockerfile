@@ -17,7 +17,7 @@ RUN pip install -r /app/requirements.txt
 
 # Install thirdai package separately since this is the dependency that changes
 # the most often. This allows the other packages to stay cached.
-RUN python3 -m pip install thirdai[neural_db_v2]>=0.9.17 --index-url https://download.pytorch.org/whl/cpu
+RUN python3 -m pip install thirdai[neural_db_v2]>=0.9.17
 RUN python3 -m pip install -U langchain-community
 
 COPY . /app
