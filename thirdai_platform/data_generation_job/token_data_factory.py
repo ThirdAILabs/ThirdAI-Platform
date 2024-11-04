@@ -1,6 +1,7 @@
 import random
 import re
 from collections import defaultdict
+from logging import Logger
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -26,10 +27,8 @@ class TokenDataFactory(DataFactory):
     SOURCE_COLUMN = "source"
     TARGET_COLUMN = "target"
 
-    def __init__(
-        self,
-    ):
-        super().__init__()
+    def __init__(self, logger: Logger):
+        super().__init__(logger)
         self.faker = Faker()
         self.sentences_per_template = 4
 
@@ -47,19 +46,22 @@ class TokenDataFactory(DataFactory):
         matched_attrs = list(
             filter(lambda method: tag.lower() == method.lower(), self.faked_methods)
         )
+        self.logger.debug(
+            f"Fetching tag values from Faker tag={tag}, matched_attrs={matched_attrs}"
+        )
 
         if not matched_attrs:
+            self.logger.warning(f"No Faker attributes match the tag={tag}")
             return []
 
-        return list(
-            map(
-                lambda x: str(x),
-                [
-                    self.faker.__getattr__(random.choice(matched_attrs))()
-                    for _ in range(num_samples)
-                ],
-            ),
+        values = [
+            str(self.faker.__getattr__(random.choice(matched_attrs))())
+            for _ in range(num_samples)
+        ]
+        self.logger.info(
+            f"Generated tag values from Faker tag={tag}, values={values[:5]},total_generated={len(values)}"
         )
+        return values
 
     def get_tag_values_from_llm(
         self,
@@ -69,50 +71,51 @@ class TokenDataFactory(DataFactory):
         complete_tag_values: Dict[str, List[str]],
         generate_at_a_time: int = 100,
     ):
-        print(f"{values_to_generate = }")
+        self.logger.info(
+            f"Generating tag values from LLM tag={tag.name},values_to_generate={values_to_generate}"
+        )
         sampled_tag_values = random.sample(tag.examples, k=min(3, len(tag.examples)))
 
         # Collecting prompts
-        arguments = []
-        for idx in range(0, values_to_generate, generate_at_a_time):
-            arguments.append(
-                {
-                    "prompt": tag_value_prompt.format(
-                        task_prompt=task_prompt,
-                        num_samples_per_tag=min(
-                            generate_at_a_time,
-                            values_to_generate - idx,
-                        ),
-                        tag=tag.name,
-                        tag_example=str(sampled_tag_values),
-                        tag_description=tag.description,
+        arguments = [
+            {
+                "prompt": tag_value_prompt.format(
+                    task_prompt=task_prompt,
+                    num_samples_per_tag=min(
+                        generate_at_a_time, values_to_generate - idx
                     ),
-                }
-            )
-        total_chunks = len(arguments) // self.write_chunk_size + 1
+                    tag=tag.name,
+                    tag_example=str(sampled_tag_values),
+                    tag_description=tag.description,
+                )
+            }
+            for idx in range(0, values_to_generate, generate_at_a_time)
+        ]
 
-        # Making llm call with collected prompts parallelly.
+        responses = []
         for idx in tqdm(
             range(0, len(arguments), self.write_chunk_size),
-            desc=f"Generating {tag.name} values: ",
-            total=total_chunks,
+            desc=f"Generating {tag.name} values",
             leave=False,
         ):
             # TODO(Gautam): If there are limited values to a tag, only should make call to get those many values atmost.
-            chunks_to_process = arguments[idx : idx + self.write_chunk_size]
-
-            responses: List[Dict[str, Any]] = self.run_and_collect_results(
-                tasks_prompt=chunks_to_process, parallelize=True
+            chunk_to_process = arguments[idx : idx + self.write_chunk_size]
+            responses.extend(
+                self.run_and_collect_results(
+                    tasks_prompt=chunk_to_process, parallelize=True
+                )
             )
 
-            generated_tag_values = [
-                value.strip()
-                for res in responses
-                for value in res["response_text"].split("\n")
-            ]
-
-            complete_tag_values[tag.name].extend(generated_tag_values)
-            save_dict(write_to=self.save_dir / "tags_value.json", **complete_tag_values)
+        generated_tag_values = [
+            value.strip()
+            for res in responses
+            for value in res["response_text"].split("\n")
+        ]
+        complete_tag_values[tag.name].extend(generated_tag_values)
+        save_dict(write_to=self.save_dir / "tags_value.json", **complete_tag_values)
+        self.logger.info(
+            f"Completed LLM tag value generation tag={tag.name},generated_count={len(generated_tag_values)}"
+        )
 
     # Function to generate the tag_values by using faker library or LLM calls.
     def get_tag_values(
@@ -125,6 +128,7 @@ class TokenDataFactory(DataFactory):
         complete_tag_values = defaultdict(list)
 
         for tag in tqdm(tags, desc="Generating values for tags: ", leave=False):
+            self.logger.debug(f"Processing tag={tag.name}")
             complete_tag_values[tag.name].extend(tag.examples)
 
             # Trying to generate more examples from faker
@@ -166,6 +170,7 @@ class TokenDataFactory(DataFactory):
         shuffle: bool = True,
         save: bool = True,
     ):
+        self.logger.info(f"Splitting tag values into train/test test_size={test_size}")
         if shuffle:
             for tag_name, values in tag_values.items():
                 random.shuffle(values)
@@ -186,6 +191,9 @@ class TokenDataFactory(DataFactory):
             save_dict(self.save_dir / "train" / "tag_values.json", **train_tags)
             save_dict(self.save_dir / "test" / "tag_values.json", **test_tags)
 
+        self.logger.info(
+            f"Completed train/test split for tags train_tag_count={len(train_tags)},test_tag_count={len(test_tags)}"
+        )
         return train_tags, test_tags
 
     # Function to calculate the number of templates to generate
@@ -531,6 +539,7 @@ Example : {str(random.sample(tag_values[tag.name], k=2))} not limited to given b
                 # word is a tag
                 word_tag = match.group(1).upper()
                 if word_tag not in tag_values:
+                    self.logger.error(f"Tag not found in tag values tag={word_tag}")
                     self.write_on_errorfile(
                         text=f"Tag {word_tag} not present in the allowed tags {', '.join(tag_values.keys())}\n"
                         + f"template: {template}\n"

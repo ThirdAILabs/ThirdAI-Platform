@@ -1,3 +1,4 @@
+import logging
 import traceback
 import uuid
 from typing import Dict, List
@@ -32,11 +33,13 @@ def validate_and_generate_data(
 
         extra_options = {k: v for k, v in extra_options.items() if v is not None}
         if extra_options:
-            print(f"Extra options for job: {extra_options}")
+            logging.info(f"Extra options for job: {extra_options}")
     except ValidationError as e:
+        message = f"Invalid option format\nDetails: {str(e)}"
+        logging.error(message)
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"Invalid option format\nDetails: {str(e)}",
+            message=message,
         )
 
     license_info = validate_license_info()
@@ -162,8 +165,8 @@ def find_datasets(
         )
 
     except Exception as e:
-        traceback.print_exc()
+        logging.error(traceback.print_exc())
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message="Unable to find a suitable dataset",
+            message=f"Unable to find a suitable dataset: {e}",
         )

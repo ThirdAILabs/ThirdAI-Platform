@@ -10,7 +10,6 @@ from platform_common.pydantic_models.recovery_snapshot import (
     BackupConfig,
     LocalBackupConfig,
 )
-from recovery_snapshot_job.run import perform_backup
 
 
 @pytest.fixture(autouse=True)
@@ -43,6 +42,8 @@ def setup_and_teardown():
 
 @patch("subprocess.run")  # Mock subprocess.run for pg_dump
 def test_local_backup(mock_subprocess_run):
+    from recovery_snapshot_job.run import perform_backup
+
     config_path = os.getenv("CONFIG_PATH")
 
     # Simulate a successful pg_dump execution
@@ -76,6 +77,8 @@ def test_local_backup(mock_subprocess_run):
 @patch("subprocess.run")  # Mock subprocess.run for pg_dump
 def test_backup_limit(mock_subprocess_run):
     """Test to check if the backup limit is respected."""
+    from recovery_snapshot_job.run import perform_backup
+
     config_path = os.getenv("CONFIG_PATH")
 
     # Simulate a successful pg_dump execution

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Papa from 'papaparse';
-import { Button } from '@/components/ui/button';
+import { Button } from '@mui/material';
 import { Input } from '@/components/ui/input';
 import { CardDescription } from '@/components/ui/card';
 
@@ -200,6 +200,7 @@ const TabularClassificationQuestions: React.FC<TabularClassificationQuestionsPro
           onClick={submit}
           style={{ marginTop: '30px', width: '100%' }}
           disabled={isLoading || !csvFile || !!warningMessage || !targetColumn}
+          variant="contained"
         >
           {isLoading ? (
             <div className="flex items-center">

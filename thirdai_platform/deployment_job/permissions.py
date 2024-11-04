@@ -1,4 +1,5 @@
 import datetime
+import logging
 from threading import Lock
 from typing import Callable, Dict, List, Tuple
 from urllib.parse import urljoin
@@ -98,7 +99,7 @@ class Permissions:
                 "override": False,
             }
         elif response.status_code != status.HTTP_200_OK:
-            print(response.text)
+            logging.info(response.text)
             return {
                 "read": False,
                 "write": False,

@@ -5,6 +5,8 @@ import { useLabels, useRecentSamples } from '@/lib/backend';
 import { associations, reformulations, upvotes } from './mock_samples';
 import useRollingSamples from './rolling';
 import axios from 'axios';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { IconButton } from '@mui/material';
 
 const Separator: React.FC = () => <hr className="my-3 border-t border-gray-200" />;
 
@@ -175,8 +177,27 @@ interface RecentSamplesProps {
 }
 
 export default function RecentSamples({ deploymentUrl }: RecentSamplesProps) {
-  const { recentLabels, error: labelError } = useLabels({ deploymentUrl });
-  const { recentSamples, error: sampleError } = useRecentSamples({ deploymentUrl });
+  const {
+    recentLabels,
+    error: labelError,
+    isLoading: isLoadingLabels,
+    refresh: refreshLabels,
+  } = useLabels({ deploymentUrl });
+  const {
+    recentSamples,
+    error: sampleError,
+    isLoading: isLoadingSamples,
+    refresh: refreshSamples,
+  } = useRecentSamples({ deploymentUrl });
+
+  const handleRefresh = async () => {
+    await Promise.all([refreshLabels(), refreshSamples()]);
+  };
+
+  // Initial load when component mounts
+  useEffect(() => {
+    handleRefresh();
+  }, []);
 
   const recentUpvotes = useRollingSamples(upvotes, 5, 2, 0.2, 2);
   const recentAssociations = useRollingSamples(associations, 5, 2, 0.1, 3);
@@ -226,43 +247,62 @@ export default function RecentSamples({ deploymentUrl }: RecentSamplesProps) {
   const uniqueLabels = Array.from(new Set(recentLabels));
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-      <Card className="h-[calc(100vh-16rem)] overflow-hidden">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-xl font-semibold">Recent Labels</CardTitle>
-          <CardDescription>The latest added labels</CardDescription>
-        </CardHeader>
-        <CardContent className="overflow-y-auto h-[calc(100%-5rem)]">
-          {labelError && (
-            <div className="text-red-500">Error fetching labels: {labelError.message}</div>
-          )}
-          {uniqueLabels.map((label, idx) => (
-            <React.Fragment key={idx}>
-              {idx > 0 && <Separator />}
-              <div className="mb-2 p-2 bg-gray-100 rounded-md">
-                <span className="font-medium">{label}</span>
-              </div>
-            </React.Fragment>
-          ))}
-        </CardContent>
-      </Card>
-      <Card className="h-[calc(100vh-16rem)] overflow-hidden">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-xl font-semibold">Recent Samples</CardTitle>
-          <CardDescription>The latest inserted samples</CardDescription>
-        </CardHeader>
-        <CardContent className="overflow-y-auto h-[calc(100%-5rem)]">
-          {sampleError && (
-            <div className="text-red-500">Error fetching samples: {sampleError.message}</div>
-          )}
-          {recentSamples.map((sample, idx) => (
-            <React.Fragment key={idx}>
-              {idx > 0 && <Separator />}
-              <HighlightedSample tokens={sample.tokens} tags={sample.tags} tagColors={tagColors} />
-            </React.Fragment>
-          ))}
-        </CardContent>
-      </Card>
+    <div className="flex flex-col w-full px-8 box-border">
+      <div className="flex justify-end mb-4">
+        <IconButton
+          onClick={handleRefresh}
+          disabled={isLoadingLabels || isLoadingSamples}
+          color="primary"
+          size="large"
+          className={isLoadingLabels || isLoadingSamples ? 'animate-spin' : ''}
+        >
+          <RefreshIcon />
+        </IconButton>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="h-[calc(100vh-16rem)] overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xl font-semibold">Recent Labels</CardTitle>
+            <CardDescription>The latest added labels</CardDescription>
+          </CardHeader>
+          <CardContent className="overflow-y-auto h-[calc(100%-5rem)]">
+            {labelError && (
+              <div className="text-red-500">Error fetching labels: {labelError.message}</div>
+            )}
+            {uniqueLabels.map((label, idx) => (
+              <React.Fragment key={idx}>
+                {idx > 0 && <Separator />}
+                <div className="mb-2 p-2 bg-gray-100 rounded-md">
+                  <span className="font-medium">{label}</span>
+                </div>
+              </React.Fragment>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="h-[calc(100vh-16rem)] overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xl font-semibold">Recent Samples</CardTitle>
+            <CardDescription>The latest inserted samples</CardDescription>
+          </CardHeader>
+          <CardContent className="overflow-y-auto h-[calc(100%-5rem)]">
+            {sampleError && (
+              <div className="text-red-500">Error fetching samples: {sampleError.message}</div>
+            )}
+            {recentSamples.map((sample, idx) => (
+              <React.Fragment key={idx}>
+                {idx > 0 && <Separator />}
+                <HighlightedSample
+                  tokens={sample.tokens}
+                  tags={sample.tags}
+                  tagColors={tagColors}
+                />
+              </React.Fragment>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

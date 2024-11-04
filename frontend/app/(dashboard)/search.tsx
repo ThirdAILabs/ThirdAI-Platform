@@ -2,7 +2,6 @@
 
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Input } from '@/components/ui/input';
 import { TextField, InputAdornment } from '@mui/material';
 import { Spinner } from '@/components/icons';
 import SearchIcon from '@mui/icons-material/Search';

@@ -1,6 +1,7 @@
 import io
 import traceback
 import uuid
+from logging import Logger
 from pathlib import Path
 from typing import AsyncGenerator, List
 
@@ -23,11 +24,11 @@ from deployment_job.pydantic_models.inputs import (
 )
 from deployment_job.reporter import Reporter
 from deployment_job.update_logger import UpdateLogger
-from deployment_job.utils import propagate_error, validate_name
+from deployment_job.utils import validate_name
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
-from platform_common.file_handler import download_local_files
+from platform_common.file_handler import download_local_files, get_cloud_client
 from platform_common.pydantic_models.deployment import DeploymentConfig, NDBSubType
 from platform_common.pydantic_models.feedback_logs import (
     AssociateLog,
@@ -48,17 +49,22 @@ ndb_implicit_feedback_metric = Summary("ndb_implicit_feedback", "NDB implicit fe
 ndb_insert_metric = Summary("ndb_insert", "NDB insertions")
 ndb_delete_metric = Summary("ndb_delete", "NDB deletions")
 
-ndb_top_k_selections = Counter(
-    "ndb_top_k_selections", "Number of top-k results selected by user."
-)
+TOPK_SELECTIONS_TO_TRACK = 5
+ndb_top_k_selections = [
+    Counter(
+        f"ndb_result_{i}_selections", f"Number of selections of result {i} by user."
+    )
+    for i in range(1, 1 + TOPK_SELECTIONS_TO_TRACK)
+]
 
 
 class NDBRouter:
-    def __init__(self, config: DeploymentConfig, reporter: Reporter):
+    def __init__(self, config: DeploymentConfig, reporter: Reporter, logger: Logger):
         self.config = config
         self.reporter = reporter
+        self.logger = logger
 
-        self.model: NDBModel = NDBRouter.get_model(config)
+        self.model: NDBModel = NDBRouter.get_model(config, logger)
 
         self.feedback_logger = UpdateLogger.get_feedback_logger(self.model.data_dir)
         self.insertion_logger = UpdateLogger.get_insertion_logger(self.model.data_dir)
@@ -87,19 +93,28 @@ class NDBRouter:
         )
         self.router.add_api_route("/pdf-blob", self.pdf_blob, methods=["GET"])
         self.router.add_api_route("/pdf-chunks", self.pdf_chunks, methods=["GET"])
+        self.router.add_api_route(
+            "/get-signed-url", self.get_signed_url, methods=["GET"]
+        )
 
     @staticmethod
-    def get_model(config: DeploymentConfig) -> NDBModel:
+    def get_model(config: DeploymentConfig, logger: Logger) -> NDBModel:
         subtype = config.model_options.ndb_sub_type
+        logger.info(f"Initializing model subtype: {subtype}")
         if subtype == NDBSubType.v1:
-            return NDBV1Model(config=config, write_mode=not config.autoscaling_enabled)
+            return NDBV1Model(
+                config=config, logger=logger, write_mode=not config.autoscaling_enabled
+            )
         elif subtype == NDBSubType.v2:
-            return NDBV2Model(config=config, write_mode=not config.autoscaling_enabled)
+            return NDBV2Model(
+                config=config, logger=logger, write_mode=not config.autoscaling_enabled
+            )
         else:
-            raise ValueError(f"Unsupported NDB subtype '{subtype}'.")
+            error_message = f"Unsupported NDB subtype '{subtype}'."
+            logger.error(error_message)
+            raise ValueError(error_message)
 
     @ndb_query_metric.time()
-    @propagate_error
     def search(
         self,
         params: NDBSearchParams,
@@ -144,7 +159,6 @@ class NDBRouter:
         }
         ```
         """
-
         results = self.model.predict(**params.model_dump())
 
         return response(
@@ -153,7 +167,6 @@ class NDBRouter:
             data=jsonable_encoder(results),
         )
 
-    @propagate_error
     @ndb_insert_metric.time()
     def insert(
         self,
@@ -206,6 +219,19 @@ class NDBRouter:
                 message="No documents supplied for insertion. Must supply at least one document.",
             )
 
+        total_filesize = sum(file.size or 0 for file in files)
+
+        if self.config.autoscaling_enabled:
+            max_filesize_mb = 200
+        else:
+            max_filesize_mb = 50
+
+        if total_filesize > (max_filesize_mb * 1024 * 1024):
+            return response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message=f"Size of uploaded files exceeds maximum of {max_filesize_mb}Mb for insertion endpoint on active deployment. Please use retraining api for updates of this size.",
+            )
+
         documents = download_local_files(
             files=files,
             file_infos=documents,
@@ -214,20 +240,19 @@ class NDBRouter:
 
         if self.config.autoscaling_enabled:
             self.insertion_logger.log(InsertLog(documents=documents))
-
+            self.logger.info("Document insertion logged for autoscaling deployment")
             return response(
                 status_code=status.HTTP_202_ACCEPTED,
                 message="Insert logged successfully.",
             )
         else:
             self.model.insert(documents=documents)
-
+            self.logger.info("Document insertion applied successfully")
             return response(
                 status_code=status.HTTP_200_OK,
                 message="Insert applied successfully.",
             )
 
-    @propagate_error
     @ndb_delete_metric.time()
     def delete(
         self,
@@ -254,12 +279,17 @@ class NDBRouter:
 
         if self.config.autoscaling_enabled:
             self.deletion_logger.log(DeleteLog(doc_ids=input.source_ids))
-
+            self.logger.info("Deletion logged for autoscaling deployment")
             return response(
                 status_code=status.HTTP_202_ACCEPTED,
                 message="Delete logged successfully.",
             )
         else:
+            if len(input.source_ids) > 5:
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message=f"Number of deletions exceeds the maximum {input.source_ids} that can be processed synchronously in an active deployment.",
+                )
             self.model.delete(input.source_ids)
 
             return response(
@@ -267,7 +297,6 @@ class NDBRouter:
                 message="Delete applied successfully.",
             )
 
-    @propagate_error
     @ndb_upvote_metric.time()
     def upvote(
         self,
@@ -297,23 +326,32 @@ class NDBRouter:
         write_permission = Permissions.check_permission(
             token=token, permission_type="write"
         )
+        prod_mode = not write_permission or self.config.autoscaling_enabled
 
-        if not write_permission or self.config.autoscaling_enabled:
-            self.feedback_logger.log(
-                FeedbackLog(
-                    event=UpvoteLog(
-                        chunk_ids=[
-                            sample.reference_id for sample in input.text_id_pairs
-                        ],
-                        queries=[sample.query_text for sample in input.text_id_pairs],
-                    )
-                )
+        self.feedback_logger.log(
+            FeedbackLog(
+                event=UpvoteLog(
+                    chunk_ids=[sample.reference_id for sample in input.text_id_pairs],
+                    queries=[sample.query_text for sample in input.text_id_pairs],
+                    reference_texts=[
+                        sample.reference_text for sample in input.text_id_pairs
+                    ],
+                ),
+                perform_rlhf_later=prod_mode,
             )
+        )
+
+        if prod_mode:
             return response(
                 status_code=status.HTTP_202_ACCEPTED,
                 message="Upvote logged successfully.",
             )
         else:
+            if len(input.text_id_pairs) > 100:
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message=f"Number of upvote samples exceeds the maximum {input.text_id_pairs} that can be processed synchronously in an active deployment.",
+                )
             self.model.upvote(input.text_id_pairs)
 
             return response(
@@ -321,7 +359,6 @@ class NDBRouter:
                 message="Upvote applied successfully.",
             )
 
-    @propagate_error
     @ndb_associate_metric.time()
     def associate(
         self,
@@ -351,21 +388,29 @@ class NDBRouter:
         write_permission = Permissions.check_permission(
             token=token, permission_type="write"
         )
+        prod_mode = not write_permission or self.config.autoscaling_enabled
 
-        if not write_permission or self.config.autoscaling_enabled:
-            self.feedback_logger.log(
-                FeedbackLog(
-                    event=AssociateLog(
-                        sources=[sample.source for sample in input.text_pairs],
-                        targets=[sample.target for sample in input.text_pairs],
-                    )
-                )
+        self.feedback_logger.log(
+            FeedbackLog(
+                event=AssociateLog(
+                    sources=[sample.source for sample in input.text_pairs],
+                    targets=[sample.target for sample in input.text_pairs],
+                ),
+                perform_rlhf_later=prod_mode,
             )
+        )
+
+        if prod_mode:
             return response(
                 status_code=status.HTTP_202_ACCEPTED,
                 message="Associate logged successfully.",
             )
         else:
+            if len(input.text_pairs) > 100:
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message=f"Number of association samples exceeds the maximum {input.text_pairs} that can be processed synchronously in an active deployment.",
+                )
             self.model.associate(input.text_pairs)
 
             return response(
@@ -373,7 +418,6 @@ class NDBRouter:
                 message="Associate applied successfully.",
             )
 
-    @propagate_error
     @ndb_implicit_feedback_metric.time()
     def implicit_feedback(
         self,
@@ -386,19 +430,21 @@ class NDBRouter:
                     chunk_id=feedback.reference_id,
                     query=feedback.query_text,
                     event_desc=feedback.event_desc,
-                )
+                ),
+                perform_rlhf_later=True,
             )
         )
 
-        if feedback.reference_rank is not None and feedback.reference_rank < 5:
-            ndb_top_k_selections.inc()
+        if feedback.reference_rank is not None and feedback.reference_rank < len(
+            ndb_top_k_selections
+        ):
+            ndb_top_k_selections[feedback.reference_rank].inc()
 
         return response(
             status_code=status.HTTP_200_OK,
             message="Implicit feedback logged successfully.",
         )
 
-    @propagate_error
     def update_chat_settings(
         self,
         settings: ChatSettings,
@@ -411,7 +457,6 @@ class NDBRouter:
             message="Successfully updated chat settings",
         )
 
-    @propagate_error
     def get_chat_history(
         self,
         input: ChatHistoryInput,
@@ -444,7 +489,6 @@ class NDBRouter:
             data=chat_history,
         )
 
-    @propagate_error
     def chat(
         self,
         input: ChatInput,
@@ -475,7 +519,6 @@ class NDBRouter:
 
         return StreamingResponse(generate_response(), media_type="text/plain")
 
-    @propagate_error
     def get_sources(self, token=Depends(Permissions.verify_permission("read"))):
         """
         Get the sources used in the model.
@@ -570,7 +613,7 @@ class NDBRouter:
                     metadata={"thirdai_version": str(thirdai.__version__)},
                 )
         except Exception as err:
-            traceback.print_exc()
+            self.logger.error(traceback.print_exc())
             return response(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(err)
             )
@@ -581,7 +624,6 @@ class NDBRouter:
             data={"new_model_id": model_id if not input.override else None},
         )
 
-    @propagate_error
     def highlighted_pdf(
         self, reference_id: int, token=Depends(Permissions.verify_permission("read"))
     ):
@@ -606,7 +648,6 @@ class NDBRouter:
             buffer.getvalue(), headers=headers, media_type="application/pdf"
         )
 
-    @propagate_error
     def pdf_blob(
         self, source: str, token=Depends(Permissions.verify_permission("read"))
     ):
@@ -630,7 +671,22 @@ class NDBRouter:
             buffer.getvalue(), headers=headers, media_type="application/pdf"
         )
 
-    @propagate_error
+    def get_signed_url(
+        self,
+        source: str,
+        provider: str,
+        token=Depends(Permissions.verify_permission("read")),
+    ):
+        cloud_client = get_cloud_client(provider=provider)
+
+        signed_url = cloud_client.generate_url_from_source(source=source)
+
+        return response(
+            status_code=status.HTTP_200_OK,
+            message=f"Successfully got the signed url",
+            data={"signed_url": signed_url},
+        )
+
     def pdf_chunks(
         self, reference_id: int, token=Depends(Permissions.verify_permission("read"))
     ):

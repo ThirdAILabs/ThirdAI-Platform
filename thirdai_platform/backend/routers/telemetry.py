@@ -1,6 +1,7 @@
+import logging
 import os
 
-from backend.utils import get_platform, get_service_info, list_services, logger
+from backend.utils import get_platform, get_service_info, list_services
 from fastapi import APIRouter, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
@@ -18,7 +19,7 @@ def deployment_services():
     services_res = list_services(nomad_endpoint)
 
     if services_res.status_code != 200:
-        logger.error(f"Unable to retrieve list of services from nomad")
+        logging.error(f"Unable to retrieve list of services from nomad")
         # TODO(Nicholas): Should this just return an empty list to avoid causing
         # errors for downstream metric scrapper?
         return response(
@@ -35,7 +36,9 @@ def deployment_services():
         if service_name.startswith("deployment"):
             service_info_res = get_service_info(nomad_endpoint, service_name)
             if service_info_res.status_code != 200:
-                logger.error(f"Unable to retrieve info for service {service_name}")
+                logging.error(
+                    f"Unable to retrieve info for service {service_name}",
+                )
                 continue
 
             _, model_id = service_name.split("-", maxsplit=1)

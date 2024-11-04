@@ -19,6 +19,7 @@ enum LlmProvider {
   OpenAI = 'openai',
   OnPrem = 'on-prem',
   SelfHosted = 'self-hosted',
+  None = 'none',
 }
 
 const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) => {
@@ -38,7 +39,6 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
   // End state variables & func for source
 
   // Begin state variables & func for LLM guardrail
-
   const [ifUseLGR, setIfUseLGR] = useState('');
   const [ifUseExistingLGR, setIfUseExistingLGR] = useState<string | null>(null);
   const [existingNERModels, setExistingNERModels] = useState<Workflow[]>([]);
@@ -104,6 +104,8 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
         case LlmProvider.SelfHosted:
           options.llm_provider = 'self-host';
           break;
+        case LlmProvider.None:
+        // LLM is not added
         default:
           if (isChatbot) {
             console.error('Invalid LLM type selected');
@@ -179,7 +181,6 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
       title: 'App Name',
       content: (
         <div>
-          <span className="block text-lg font-semibold">App Name</span>
           <TextField
             className="text-md w-full"
             value={modelName}
@@ -222,13 +223,12 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
       ),
     },
     {
-      title: 'Retrieval App',
+      title: 'Knowledge base',
       content: (
         <div>
-          <span className="block text-lg font-semibold">Retrieval App</span>
           {!createdSS && (
             <>
-              <CardDescription>Use an existing retrieval app?</CardDescription>
+              <CardDescription>Use an existing knowledge base?</CardDescription>
               <div
                 style={{
                   display: 'flex',
@@ -261,10 +261,10 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
 
           {ifUseExistingSS === 'Yes' && (
             <div className="mb-4 mt-2">
-              <CardDescription>Choose from existing semantic search model(s)</CardDescription>
+              <CardDescription>Choose from an existing Knowledge Base</CardDescription>
               <div className="mt-2">
                 <DropdownMenu
-                  title=" Please choose a model  "
+                  title="Choose a Knowledge Base  "
                   handleSelectedTeam={handleSSIdentifier}
                   teams={modelDropDownList}
                 />
@@ -275,7 +275,15 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
           {ifUseExistingSS === 'No' && (
             <>
               {createdSS ? (
-                <div>Semantic search model created.</div>
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg shadow-sm">
+                  <div className="flex items-center justify-center space-x-3">
+                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-600"></div>
+                    <span className="text-lg font-medium text-blue-800">Knowledge base queued</span>
+                  </div>
+                  <div className="mt-2 text-sm text-blue-600 text-center">
+                    You may continue to the next step while this processes
+                  </div>
+                </div>
               ) : (
                 <div>
                   <SemanticSearchQuestions
@@ -286,7 +294,7 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
                       setCreatedSS(true);
                     }}
                     stayOnPage={true}
-                    appName={`${modelName}-Retrieval`}
+                    appName={`${modelName}-KB`}
                   />
                 </div>
               )}
@@ -302,10 +310,10 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
           {/* LLM selection */}
           <div>
             <span className="block text-lg font-semibold" style={{ marginTop: '20px' }}>
-              LLM
+              LLM {!isChatbot && '(Optional)'}
             </span>
             <div>
-              <CardDescription>Choose an LLM option</CardDescription>
+              <CardDescription>Choose an LLM for generating answers</CardDescription>
               <div
                 style={{
                   display: 'flex',
@@ -332,6 +340,14 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
                 >
                   Self-host
                 </Button>
+                {!isChatbot && (
+                  <Button
+                    variant={llmType === LlmProvider.None ? 'contained' : 'outlined'}
+                    onClick={() => setLlmType(LlmProvider.None)}
+                  >
+                    None
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -344,8 +360,8 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
             {!createdGR && (
               <>
                 <CardDescription>
-                  Would you like to reduce PII (Personally identifiable information) from your
-                  reference?
+                  Would you like to redact PII (Personally Identifiable Information) from your
+                  references?
                 </CardDescription>
                 <div
                   style={{
@@ -509,27 +525,16 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
               {ifUseNLPClassifier === 'Yes' && (
                 <div style={{ marginTop: '20px' }}>
                   <CardDescription>Choose from existing sentiment analysis models</CardDescription>
-                  <select
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                    value={nlpClassifierIdentifier || ''}
-                    onChange={(e) => {
-                      const classifierID = e.target.value;
-                      setNlpClassifierIdentifier(classifierID);
-                      const classifierModel = existingNLPClassifierModels.find(
-                        (model) => `${model.username}/${model.model_name}` === classifierID
-                      );
-                      if (classifierModel) {
-                        setNlpClassifierModelId(classifierModel.model_id);
+                  <DropdownMenu
+                    title="Please choose a model"
+                    handleSelectedTeam={(selectedValue: string, modelId?: string) => {
+                      setNlpClassifierIdentifier(selectedValue);
+                      if (modelId) {
+                        setNlpClassifierModelId(modelId);
                       }
                     }}
-                  >
-                    <option value="">-- Please choose a model --</option>
-                    {existingNLPClassifierModels.map((model) => (
-                      <option key={model.model_id} value={`${model.username}/${model.model_name}`}>
-                        {`${model.username}/${model.model_name}`}
-                      </option>
-                    ))}
-                  </select>
+                    teams={existingNLPClassifierModels}
+                  />
                 </div>
               )}
             </div>
@@ -580,13 +585,16 @@ const RAGQuestions = ({ models, workflowNames, isChatbot }: RAGQuestionsProps) =
             onClick={() => setCurrentStep(index)}
             style={{
               marginBottom: '10px',
-              width: '140px',
+              minWidth: '140px',
               height: '40px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               textTransform: 'none',
-              lineHeight: '1.2',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              padding: '0 16px',
             }}
           >
             {step.title}

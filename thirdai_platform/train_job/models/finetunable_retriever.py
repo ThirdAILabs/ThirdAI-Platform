@@ -23,7 +23,7 @@ class FinetunableRetriever(NDBModel):
             db (ndb.NeuralDB): The NeuralDB instance.
             files (List[str]): List of file paths for unsupervised training data.
         """
-        self.logger.info("Starting unsupervised training.")
+        self.logger.info("Starting unsupervised training with %d files.", len(files))
         buffer = queue.Queue()
 
         producer_thread = threading.Thread(
@@ -54,7 +54,7 @@ class FinetunableRetriever(NDBModel):
             db (ndb.NeuralDB): The NeuralDB instance.
             files (List[str]): List of file paths for supervised training data.
         """
-        self.logger.info("Starting supervised training.")
+        self.logger.info("Starting supervised training with %d files.", len(files))
         supervised_sources = self.get_supervised_files(files)
 
         db.supervised_train(supervised_sources)
@@ -87,7 +87,7 @@ class FinetunableRetriever(NDBModel):
             self.logger.info("Completed Supervised Training")
 
         total_time = time.time() - start_time
-        self.logger.info(f"Total training time: {total_time} seconds")
+        self.logger.info("Total training time: %.2f seconds", total_time)
 
         if self.config.data.deletions:
             db.delete(self.config.data.deletions)
@@ -129,6 +129,7 @@ class FinetunableRetriever(NDBModel):
         """
         try:
             if not self.model_save_path.exists():
+                self.logger.info("Model save path doesn't exist, saving directly")
                 super().save(db)
             else:
                 # If model_save_path exists, save to a temporary location first

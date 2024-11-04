@@ -87,12 +87,6 @@ export default function TeachPanel({
         value={answer}
         onChange={(e) => setAnswer(e.target.value)}
       />
-      {canAddAnswer && (
-        <>
-          <Spacer $height="15px" />
-          {button('Add answer', 'Answer added!', onAddAnswer)}
-        </>
-      )}
       <Spacer $height="15px" />
       {button('Associate', 'Feedback received!', onAssociate)}
       <Spacer $height="15px" />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@mui/material';
 import { Input } from '@/components/ui/input';
 import { retrainTokenClassifier } from '@/lib/backend';
 
@@ -48,7 +48,7 @@ export default function RetrainButton({ modelName, username }: RetrainButtonProp
           onChange={(e) => setNewModelName(e.target.value)}
           className="w-64"
         />
-        <Button onClick={handleCreateNewModel} disabled={isRetraining}>
+        <Button onClick={handleCreateNewModel} disabled={isRetraining} variant="contained">
           Create new model with feedback
         </Button>
       </div>

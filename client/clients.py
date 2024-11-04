@@ -378,6 +378,16 @@ class NeuralDBClient(BaseClient):
             headers=auth_header(self.login_instance.access_token),
         )
 
+    @check_deployment_decorator
+    def get_signed_url(self, source: str, provider: str):
+        response = http_get_with_error(
+            urljoin(self.base_url, "get-signed-url"),
+            params={"source": source, "provider": provider},
+            headers=auth_header(self.login_instance.access_token),
+        )
+
+        return response.json()["data"]["signed_url"]
+
 
 class LLMClient:
     def __init__(self, login_instance: Login, neuraldb_client: NeuralDBClient):

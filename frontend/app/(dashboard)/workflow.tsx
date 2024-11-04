@@ -1,7 +1,8 @@
 import Link from 'next/link';
+import { AlertCircle } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@mui/material';
+import { Button, RadioGroup, Radio } from '@mui/material';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,11 +12,21 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
-import { Workflow, start_workflow, stop_workflow, delete_workflow } from '@/lib/backend';
+import {
+  Workflow,
+  start_workflow,
+  stop_workflow,
+  delete_workflow,
+  getTrainingStatus,
+  getDeployStatus,
+  getTrainingLogs,
+  getDeploymentLogs,
+} from '@/lib/backend';
 import { Modal } from '@/components/ui/Modal';
 import { InformationCircleIcon } from '@heroicons/react/solid';
 import { Model, getModels } from '@/utils/apiRequests';
 import { UserContext } from '../user_wrapper';
+import { ContentCopy, Download } from '@mui/icons-material'; // MUI icons instead of SVG paths
 
 enum DeployStatus {
   None = '',
@@ -27,11 +38,23 @@ enum DeployStatus {
   Failed = 'Failed',
 }
 
+enum DeployMode {
+  Dev = 'Dev',
+  Production = 'Production',
+}
+
+interface ErrorState {
+  type: 'training' | 'deployment';
+  messages: string[];
+}
+
 export function WorkFlow({ workflow }: { workflow: Workflow }) {
   const { user } = useContext(UserContext);
   const [deployStatus, setDeployStatus] = useState<DeployStatus>(DeployStatus.None);
   const [deployType, setDeployType] = useState<string>('');
   const [modelOwner, setModelOwner] = useState<{ [key: string]: string }>({});
+  const [selectedMode, setSelectedMode] = useState<DeployMode>(DeployMode.Dev);
+  const [showDeploymentModal, setShowDeploymentModal] = useState(false);
 
   useEffect(() => {
     getModelsData();
@@ -104,15 +127,35 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
     }
   }
 
-  const handleDeploy = async () => {
+  const handleStartWorkflow = () => {
+    if (deployStatus === DeployStatus.Active) {
+      goToEndpoint();
+    } else if (workflow.type === 'ndb' || workflow.type === 'enterprise-search') {
+      setShowDeploymentModal(true);
+    } else {
+      handleDeploy(null); // For 'udt' type, start directly without mode selection
+    }
+  };
+
+  const handleDeploy = async (mode: DeployMode | null = null) => {
     if (deployStatus == DeployStatus.Inactive) {
       setDeployStatus(DeployStatus.Starting);
       try {
-        await start_workflow(workflow.username, workflow.model_name);
+        const autoscalingEnabled = mode === DeployMode.Production;
+        await start_workflow(workflow.username, workflow.model_name, autoscalingEnabled);
       } catch (e) {
         console.error('Failed to start workflow.', e);
       }
     }
+  };
+
+  const toggleDeploymentModal = () => {
+    setShowDeploymentModal(!showDeploymentModal);
+  };
+
+  const handleModeSelection = async () => {
+    toggleDeploymentModal();
+    await handleDeploy();
   };
 
   useEffect(() => {
@@ -174,6 +217,57 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
     return (parseInt(bytes) / (1024 * 1024)).toFixed(2) + ' MB';
   };
 
+  // Add new state for error handling
+  const [error, setError] = useState<ErrorState | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+
+  useEffect(() => {
+    const fetchStatuses = async () => {
+      try {
+        if (workflow.username && workflow.model_name) {
+          const modelIdentifier = `${workflow.username}/${workflow.model_name}`;
+          const [trainStatus, deployStatus] = await Promise.all([
+            getTrainingStatus(modelIdentifier),
+            getDeployStatus(modelIdentifier),
+          ]);
+
+          // Check training status first
+          if (trainStatus.data.train_status === 'failed' && trainStatus.data.messages?.length > 0) {
+            setError({
+              type: 'training',
+              messages: trainStatus.data.messages,
+            });
+            return; // Exit early if training failed
+          }
+
+          // Only check deployment if training was successful
+          if (
+            deployStatus.data.deploy_status === 'failed' &&
+            deployStatus.data.messages?.length > 0
+          ) {
+            setError({
+              type: 'deployment',
+              messages: deployStatus.data.messages,
+            });
+          } else {
+            setError(null); // Clear error if everything is successful
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching statuses:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchStatuses();
+
+    // Set up polling interval
+    const intervalId = setInterval(fetchStatuses, 2000);
+
+    // Cleanup function to clear interval when component unmounts
+    return () => clearInterval(intervalId);
+  }, [workflow.username, workflow.model_name]); // Dependencies stay the same
+
   return (
     <TableRow>
       <TableCell className="font-bold text-center">{workflow.model_name}</TableCell>
@@ -192,10 +286,10 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
       </TableCell>
       <TableCell className="hidden md:table-cell text-center font-medium">
         <Button
-          onClick={deployStatus === 'Active' ? goToEndpoint : handleDeploy}
+          onClick={handleStartWorkflow}
           variant="contained"
           style={{ width: '100px' }}
-          disabled={deployStatus != DeployStatus.Active && deployStatus != DeployStatus.Inactive}
+          disabled={deployStatus !== DeployStatus.Active && deployStatus !== DeployStatus.Inactive}
         >
           {getButtonValue(deployStatus)}
         </Button>
@@ -227,65 +321,53 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             {deployStatus === DeployStatus.Active && (
-              <DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={async () => {
+                  try {
+                    const response = await stop_workflow(workflow.username, workflow.model_name);
+                    console.log('Workflow undeployed successfully:', response);
+                    // Optionally, update the UI state to reflect the undeployment
+                    setDeployStatus(DeployStatus.Inactive);
+                  } catch (error) {
+                    console.error('Error undeploying workflow:', error);
+                    alert('Error undeploying workflow:' + error);
+                  }
+                }}
+              >
+                <button type="button">Stop App</button>
+              </DropdownMenuItem>
+            )}
+
+            {(modelOwner[workflow.model_name] === user?.username || user?.global_admin) && (
+              <DropdownMenuItem
+                onClick={async () => {
+                  if (window.confirm('Are you sure you want to delete this workflow?')) {
+                    try {
+                      const response = await delete_workflow(
+                        workflow.username,
+                        workflow.model_name
+                      );
+                      console.log('Workflow deleted successfully:', response);
+                    } catch (error) {
+                      console.error('Error deleting workflow:', error);
+                      alert('Error deleting workflow:' + error);
+                    }
+                  }
+                }}
+              >
                 <form>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const response = await stop_workflow(
-                          workflow.username,
-                          workflow.model_name
-                        );
-                        console.log('Workflow undeployed successfully:', response);
-                        // Optionally, update the UI state to reflect the undeployment
-                        setDeployStatus(DeployStatus.Inactive);
-                      } catch (error) {
-                        console.error('Error undeploying workflow:', error);
-                        alert('Error undeploying workflow:' + error);
-                      }
-                    }}
-                  >
-                    Stop App
-                  </button>
+                  <button type="button">Delete App</button>
                 </form>
               </DropdownMenuItem>
             )}
 
-            {workflow.type === 'ndb' &&
-              (modelOwner[workflow.model_name] === user?.username || user?.global_admin) && (
-                <DropdownMenuItem>
-                  <form>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (window.confirm('Are you sure you want to delete this workflow?')) {
-                          try {
-                            const response = await delete_workflow(
-                              workflow.username,
-                              workflow.model_name
-                            );
-                            console.log('Workflow deleted successfully:', response);
-                          } catch (error) {
-                            console.error('Error deleting workflow:', error);
-                            alert('Error deleting workflow:' + error);
-                          }
-                        }
-                      }}
-                    >
-                      Delete App
-                    </button>
-                  </form>
-                </DropdownMenuItem>
-              )}
-
-            {workflow.type === 'ndb' &&
+            {workflow.type === 'enterprise-search' &&
               (modelOwner[workflow.model_name] === user?.username || user?.global_admin) && (
                 <Link
                   href={`/analytics?id=${encodeURIComponent(workflow.model_id)}&username=${encodeURIComponent(workflow.username)}&model_name=${encodeURIComponent(workflow.model_name)}&old_model_id=${encodeURIComponent(workflow.model_id)}`}
                 >
                   <DropdownMenuItem>
-                    <button type="button">Search usage stats</button>
+                    <button type="button">Usage Dashboard</button>
                   </DropdownMenuItem>
                 </Link>
               )}
@@ -295,13 +377,155 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
                 href={`/analytics?id=${encodeURIComponent(workflow.model_id)}&username=${encodeURIComponent(workflow.username)}&model_name=${encodeURIComponent(workflow.model_name)}&old_model_id=${encodeURIComponent(workflow.model_id)}`}
               >
                 <DropdownMenuItem>
-                  <button type="button">NLP usage stats</button>
+                  <button type="button">Usage Dashboard</button>
                 </DropdownMenuItem>
               </Link>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>
+
+      {/* Add error notification icon in the last cell */}
+      <TableCell className="text-right pr-4">
+        {error && (
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => setShowErrorModal(true)}
+            size="small"
+            sx={{
+              minWidth: 'unset', // To maintain the circular shape
+              padding: '8px',
+              borderRadius: '50%',
+            }}
+          >
+            <AlertCircle className="h-5 w-5" />
+          </Button>
+        )}
+      </TableCell>
+
+      {/* Error Modal */}
+      {showErrorModal && error && (
+        <Modal onClose={() => setShowErrorModal(false)}>
+          <div className="p-6 max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">
+                {error.type === 'training' ? 'Training Failed' : 'Deployment Failed'}
+              </h2>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<ContentCopy />}
+                onClick={() => {
+                  const errorText = error.messages.join('\n');
+                  navigator.clipboard.writeText(errorText).then(() => {
+                    const notification = document.createElement('div');
+                    notification.className =
+                      'fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded-md shadow-lg';
+                    notification.textContent = 'Error copied to clipboard';
+                    document.body.appendChild(notification);
+                    setTimeout(() => {
+                      document.body.removeChild(notification);
+                    }, 2000);
+                  });
+                }}
+              >
+                Copy Error
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <div className="space-y-2">
+                <h3 className="font-medium text-gray-700 sticky top-0 bg-white py-2">
+                  Error Details:
+                </h3>
+                <ul className="list-disc pl-5 space-y-2">
+                  {error.messages.map((message, index) => (
+                    <li key={index} className="text-gray-600">
+                      {message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end pt-4 border-t sticky bottom-0 bg-white">
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<Download />}
+                onClick={async () => {
+                  try {
+                    const modelIdentifier = `${workflow.username}/${workflow.model_name}`;
+                    const logs = await (error.type === 'training'
+                      ? getTrainingLogs(modelIdentifier)
+                      : getDeploymentLogs(modelIdentifier));
+
+                    // Create base content with metadata
+                    const contentParts = [
+                      `Error Type: ${error.type}`,
+                      `Time: ${new Date().toISOString()}`,
+                      `Model: ${modelIdentifier}`,
+                      '',
+                      'Error Messages:',
+                      error.messages.join('\n'),
+                      '',
+                    ];
+
+                    // Add each log entry with index
+                    logs.data.forEach((log, index) => {
+                      contentParts.push(
+                        `Log Entry ${index + 1}:`,
+                        '----------------',
+                        'Standard Output:',
+                        log.stdout,
+                        '',
+                        'Standard Error:',
+                        log.stderr,
+                        ''
+                      );
+                    });
+
+                    const content = contentParts.join('\n').trim();
+
+                    const blob = new Blob([content], { type: 'text/plain' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${error.type}_logs_${workflow.model_name}_${new Date().toISOString()}.txt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+
+                    const notification = document.createElement('div');
+                    notification.className =
+                      'fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded-md shadow-lg';
+                    notification.textContent = 'Bug report downloaded successfully';
+                    document.body.appendChild(notification);
+                    setTimeout(() => {
+                      document.body.removeChild(notification);
+                    }, 2000);
+
+                    setShowErrorModal(false);
+                  } catch (err) {
+                    console.error('Failed to download logs:', err);
+                    const notification = document.createElement('div');
+                    notification.className =
+                      'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-md shadow-lg';
+                    notification.textContent = 'Failed to generate bug report';
+                    document.body.appendChild(notification);
+                    setTimeout(() => {
+                      document.body.removeChild(notification);
+                    }, 2000);
+                  }
+                }}
+                className="inline-flex items-center px-6 py-3 space-x-2 text-sm bg-blue-600 hover:bg-blue-700 rounded-md text-white font-medium transition-colors"
+              >
+                Cannot figure out the bug? Download the bug report and send to us
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Modal for displaying model details */}
       {showModal && (
@@ -334,6 +558,42 @@ export function WorkFlow({ workflow }: { workflow: Workflow }) {
                   {/* ))} */}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal for selecting between Dev mode and Production mode */}
+      {showDeploymentModal && (
+        <Modal onClose={toggleDeploymentModal}>
+          <div className="p-2 max-w-[200px] mx-auto">
+            <h2 className="text-sm font-semibold mb-2">Choose Configuration</h2>
+            <div>
+              <RadioGroup
+                aria-label="mode-selection"
+                value={selectedMode}
+                onChange={(e) => setSelectedMode(e.target.value as DeployMode)}
+                className="space-y-1"
+              >
+                <div className="flex items-center space-x-1">
+                  <Radio value={DeployMode.Dev} size="small" />
+                  <span className="text-sm">Dev</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Radio value={DeployMode.Production} size="small" />
+                  <span className="text-sm">Prod</span>
+                </div>
+              </RadioGroup>
+              <div className="mt-2 flex justify-center">
+                <Button
+                  onClick={handleModeSelection}
+                  variant="contained"
+                  size="small"
+                  className="text-sm py-1 px-3"
+                >
+                  Confirm
+                </Button>
+              </div>
             </div>
           </div>
         </Modal>

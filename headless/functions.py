@@ -243,8 +243,16 @@ class NDBFunctions:
         logging.info(f"upvoting the model")
         upvote_response = deployment.upvote(
             [
-                {"query_text": query_text, "reference_id": best_answer["id"]},
-                {"query_text": query_text, "reference_id": good_answer["id"]},
+                {
+                    "query_text": query_text,
+                    "reference_id": best_answer["id"],
+                    "reference_text": best_answer["text"],
+                },
+                {
+                    "query_text": query_text,
+                    "reference_id": good_answer["id"],
+                    "reference_text": good_answer["text"],
+                },
             ]
         )
 

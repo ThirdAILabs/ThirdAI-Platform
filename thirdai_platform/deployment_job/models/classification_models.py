@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from logging import Logger
 from pathlib import Path
 from typing import List, Optional
 
@@ -24,13 +25,15 @@ from thirdai import bolt
 
 
 class ClassificationModel(Model):
-    def __init__(self, config: DeploymentConfig):
-        super().__init__(config=config)
+    def __init__(self, config: DeploymentConfig, logger: Logger):
+        super().__init__(config=config, logger=logger)
         self.model: bolt.UniversalDeepTransformer = self.load()
 
     def get_udt_path(self, model_id: Optional[str] = None) -> str:
         model_id = model_id or self.config.model_id
-        return str(self.get_model_dir(model_id) / "model.udt")
+        udt_path = str(self.get_model_dir(model_id) / "model.udt")
+        self.logger.debug(f"UDT model path: {udt_path}")
+        return udt_path
 
     def load(self):
         return bolt.UniversalDeepTransformer.load(
@@ -46,12 +49,16 @@ class ClassificationModel(Model):
 
 
 class TextClassificationModel(ClassificationModel):
-    def __init__(self, config: DeploymentConfig):
-        super().__init__(config=config)
+    def __init__(self, config: DeploymentConfig, logger: Logger):
+        super().__init__(config=config, logger=logger)
         self.num_classes = self.model.predict({"text": "test"}).shape[-1]
+        self.logger.info(
+            f"TextClassificationModel initialized with {self.num_classes} classes"
+        )
 
     def predict(self, text: str, top_k: int, **kwargs):
         top_k = min(top_k, self.num_classes)
+        self.logger.info(f"Predicting for text '{text}' with top_k={top_k}")
         prediction = self.model.predict({"text": text}, top_k=top_k)
         predicted_classes = [
             (self.model.class_name(class_id), activation)
@@ -65,8 +72,8 @@ class TextClassificationModel(ClassificationModel):
 
 
 class TokenClassificationModel(ClassificationModel):
-    def __init__(self, config: DeploymentConfig):
-        super().__init__(config=config)
+    def __init__(self, config: DeploymentConfig, logger: Logger):
+        super().__init__(config=config, logger=logger)
         self.load_storage()
 
     def predict(self, text: str, **kwargs):
@@ -131,6 +138,7 @@ class TokenClassificationModel(ClassificationModel):
         return self.data_storage.get_metadata("tags_and_status").data
 
     def update_tag_metadata(self, tag_metadata, status: MetadataStatus):
+        self.logger.info(f"Updating tag metadata with status: {status}")
         self.data_storage.insert_metadata(
             metadata=Metadata(name="tags_and_status", data=tag_metadata, status=status)
         )
@@ -140,6 +148,7 @@ class TokenClassificationModel(ClassificationModel):
         return list(self.tag_metadata.tag_status.keys())
 
     def add_labels(self, labels: LabelCollection):
+        self.logger.info(f"Adding labels: {[label.name for label in labels.tags]}")
         tag_metadata = self.tag_metadata
         for label in labels.tags:
             tag_metadata.add_tag(label)
@@ -148,6 +157,7 @@ class TokenClassificationModel(ClassificationModel):
         self.update_tag_metadata(tag_metadata, MetadataStatus.updated)
 
     def insert_sample(self, sample: TokenClassificationData):
+        self.logger.info(f"Inserting sample: {sample}")
         token_tag_sample = DataSample(
             name="ner", data=sample, user_provided=True, status=SampleStatus.untrained
         )

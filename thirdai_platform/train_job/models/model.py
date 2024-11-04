@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from logging import Logger
 from pathlib import Path
 
-from platform_common.logging import LoggerConfig
+import thirdai
 from platform_common.pydantic_models.training import TrainConfig
 from train_job.exceptional_handler import apply_exception_handler
 from train_job.reporter import Reporter
@@ -18,13 +18,16 @@ class Model(ABC):
     report_failure_method = "report_status"
     logger: Logger = None
 
-    def __init__(self, config: TrainConfig, reporter: Reporter):
+    def __init__(self, config: TrainConfig, reporter: Reporter, logger: Logger):
         """
         Initialize the model with general and training options, create necessary
         directories, and set up a reporter for status updates.
         """
         self.config: TrainConfig = config
         self.reporter: Reporter = reporter
+        self.__class__.logger = logger
+
+        self.logger.info(f"THIRDAI VERSION {thirdai.__version__}")
 
         # Directory for storing data
         self.data_dir: Path = (
@@ -32,16 +35,15 @@ class Model(ABC):
         )
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
+        self.logger.info(f"Data directory created at: {self.data_dir}")
+
         # Directory for storing model outputs
         self.model_dir: Path = (
             Path(self.config.model_bazaar_dir) / "models" / self.config.model_id
         )
         self.model_dir.mkdir(parents=True, exist_ok=True)
 
-        logger_file_path = self.model_dir / "train.log"
-        self.__class__.logger = LoggerConfig(logger_file_path).get_logger(
-            "train-logger"
-        )
+        self.logger.info(f"Model directory created at: {self.model_dir}")
 
         self.unsupervised_checkpoint_dir: Path = (
             self.model_dir / "checkpoints" / "unsupervised"
@@ -49,6 +51,8 @@ class Model(ABC):
         self.supervised_checkpoint_dir: Path = (
             self.model_dir / "checkpoints" / "supervised"
         )
+
+        self.logger.info("Model initialization complete.")
 
     @abstractmethod
     def train(self, **kwargs):

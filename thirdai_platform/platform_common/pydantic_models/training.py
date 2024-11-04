@@ -25,6 +25,8 @@ class FileLocation(str, Enum):
     local = "local"
     nfs = "nfs"
     s3 = "s3"
+    azure = "azure"
+    gcp = "gcp"
 
 
 class FileInfo(BaseModel):
@@ -37,6 +39,81 @@ class FileInfo(BaseModel):
     def ext(self) -> str:
         _, ext = os.path.splitext(self.path)
         return ext
+
+    def parse_s3_url(self):
+        """
+        Parses an S3 URL and returns the bucket name and key.
+        Only works for FileInfo objects where location is S3.
+
+        Returns:
+            tuple: (bucket_name, key) where bucket_name is the name of the S3 bucket
+                   and key is the path within the bucket.
+        """
+        if self.location != FileLocation.s3:
+            raise ValueError(
+                f"Invalid operation. File location is not S3: {self.location}"
+            )
+
+        if not self.path.startswith("s3://"):
+            raise ValueError(f"Invalid S3 URL: {self.path}")
+
+        # Remove the 's3://' prefix and split the remaining string
+        s3_path = self.path[5:]  # Remove 's3://'
+        bucket_name, _, key = s3_path.partition("/")
+
+        return bucket_name, key
+
+    def parse_azure_url(self):
+        """
+        Parses an Azure Blob Storage URL and returns the container name and blob path.
+        Only works for FileInfo objects where location is Azure.
+
+        Returns:
+            tuple: (container_name, blob_path) where container_name is the name of the
+                   Azure container and blob_path is the path to the blob inside the container.
+        """
+        if self.location != FileLocation.azure:
+            raise ValueError(
+                f"Invalid operation. File location is not Azure: {self.location}"
+            )
+
+        if not self.path.startswith("https://"):
+            raise ValueError(f"Invalid Azure Blob URL: {self.path}")
+
+        # Azure Blob URLs follow the pattern: https://<account_name>.blob.core.windows.net/<container>/<blob_path>
+        url_parts = self.path.split("/")
+
+        if len(url_parts) < 4:
+            raise ValueError(f"Invalid Azure Blob URL structure: {self.path}")
+
+        container_name = url_parts[
+            3
+        ]  # After 'https://<account_name>.blob.core.windows.net/'
+        blob_path = "/".join(url_parts[4:])  # Remaining path as the blob key
+
+        return container_name, blob_path
+
+    def parse_gcp_url(self):
+        """
+        Parses a GCP Cloud Storage URL and returns the bucket name and key.
+        Only works for FileInfo objects where location is GCP.
+
+        Returns:
+            tuple: (bucket_name, key) where bucket_name is the name of the GCP bucket
+                   and key is the path within the bucket.
+        """
+        if self.location != FileLocation.gcp:
+            raise ValueError(
+                f"Invalid operation. File location is not GCP: {self.location}"
+            )
+
+        if not self.path.startswith("gs://"):
+            raise ValueError(f"Invalid GCP URL: {self.path}")
+
+        gcs_path = self.path[5:]  # Remove 'gs://'
+        bucket_name, _, key = gcs_path.partition("/")
+
+        return bucket_name, key
 
 
 class MachOptions(BaseModel):

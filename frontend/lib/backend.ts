@@ -60,27 +60,100 @@ export async function listDeployments(deployment_id: string): Promise<Deployment
   }
 }
 
-interface StatusResponse {
+interface BaseStatusResponse {
   data: {
     model_id: string;
+    messages: string[];
+  };
+}
+
+interface DeployStatusResponse extends BaseStatusResponse {
+  data: {
+    model_id: string;
+    messages: string[];
     deploy_status: string;
   };
 }
 
-export function getDeployStatus(values: {
-  deployment_identifier: string;
-  model_identifier: string;
-}): Promise<StatusResponse> {
-  // Retrieve the access token from local storage
-  const accessToken = getAccessToken();
+interface TrainStatusResponse extends BaseStatusResponse {
+  data: {
+    model_id: string;
+    messages: string[];
+    train_status: string;
+  };
+}
 
-  // Set the default authorization header for axios
+export function getDeployStatus(modelIdentifier: string): Promise<DeployStatusResponse> {
+  const accessToken = getAccessToken();
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
   return new Promise((resolve, reject) => {
     axios
       .get(
-        `${thirdaiPlatformBaseUrl}/api/deploy/status?deployment_identifier=${encodeURIComponent(values.deployment_identifier)}&model_identifier=${encodeURIComponent(values.model_identifier)}`
+        `${thirdaiPlatformBaseUrl}/api/deploy/status?model_identifier=${encodeURIComponent(modelIdentifier)}`
+      )
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        reject(err);
+      });
+  });
+}
+
+export function getTrainingStatus(modelIdentifier: string): Promise<TrainStatusResponse> {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  return new Promise((resolve, reject) => {
+    axios
+      .get(
+        `${thirdaiPlatformBaseUrl}/api/train/status?model_identifier=${encodeURIComponent(modelIdentifier)}`
+      )
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        reject(err);
+      });
+  });
+}
+
+interface LogEntry {
+  stderr: string;
+  stdout: string;
+}
+
+interface LogResponse {
+  data: LogEntry[]; // Now it's an array of LogEntry objects
+}
+
+export function getTrainingLogs(modelIdentifier: string): Promise<LogResponse> {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  return new Promise((resolve, reject) => {
+    axios
+      .get(
+        `${thirdaiPlatformBaseUrl}/api/train/logs?model_identifier=${encodeURIComponent(modelIdentifier)}`
+      )
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        reject(err);
+      });
+  });
+}
+
+export function getDeploymentLogs(modelIdentifier: string): Promise<LogResponse> {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  return new Promise((resolve, reject) => {
+    axios
+      .get(
+        `${thirdaiPlatformBaseUrl}/api/deploy/logs?model_identifier=${encodeURIComponent(modelIdentifier)}`
       )
       .then((res) => {
         resolve(res.data);
@@ -417,7 +490,8 @@ interface StartWorkflowResponse {
 
 export function start_workflow(
   username: string,
-  model_name: string
+  model_name: string,
+  autoscalingEnabled: boolean
 ): Promise<StartWorkflowResponse> {
   const accessToken = getAccessToken();
 
@@ -425,6 +499,7 @@ export function start_workflow(
 
   const params = new URLSearchParams({
     model_identifier: createModelIdentifier(username, model_name),
+    autoscaling_enabled: autoscalingEnabled.toString(), // Convert boolean to string for URL param
   });
 
   return new Promise((resolve, reject) => {
@@ -796,7 +871,6 @@ function useAccessToken() {
 
 interface UseLabelsOptions {
   deploymentUrl: string;
-  pollingInterval?: number;
   maxRecentLabels?: number;
 }
 
@@ -804,18 +878,21 @@ interface UseLabelsResult {
   allLabels: Set<string>;
   recentLabels: string[];
   error: Error | null;
+  isLoading: boolean;
+  refresh: () => Promise<void>;
 }
 
 export function useLabels({
   deploymentUrl,
-  pollingInterval = 5000,
   maxRecentLabels = 5,
 }: UseLabelsOptions): UseLabelsResult {
   const [allLabels, setAllLabels] = useState<Set<string>>(new Set());
   const [recentLabels, setRecentLabels] = useState<string[]>([]);
   const [error, setError] = useState<Error | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const fetchLabels = useCallback(async () => {
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
     try {
       const accessToken = getAccessToken();
       axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
@@ -838,18 +915,12 @@ export function useLabels({
     } catch (err) {
       console.error('Error fetching labels:', err);
       setError(err instanceof Error ? err : new Error('An unknown error occurred'));
+    } finally {
+      setIsLoading(false);
     }
   }, [deploymentUrl, maxRecentLabels]);
 
-  useEffect(() => {
-    fetchLabels(); // Fetch labels immediately on mount
-
-    const intervalId = setInterval(fetchLabels, pollingInterval);
-
-    return () => clearInterval(intervalId); // Clean up on unmount
-  }, [fetchLabels, pollingInterval]);
-
-  return { allLabels, recentLabels, error };
+  return { allLabels, recentLabels, error, isLoading, refresh };
 }
 
 interface Sample {
@@ -859,24 +930,26 @@ interface Sample {
 
 interface UseRecentSamplesOptions {
   deploymentUrl: string;
-  pollingInterval?: number;
   maxRecentSamples?: number;
 }
 
 interface UseRecentSamplesResult {
   recentSamples: Sample[];
   error: Error | null;
+  isLoading: boolean;
+  refresh: () => Promise<void>;
 }
 
 export function useRecentSamples({
   deploymentUrl,
-  pollingInterval = 5000,
   maxRecentSamples = 5,
 }: UseRecentSamplesOptions): UseRecentSamplesResult {
   const [recentSamples, setRecentSamples] = useState<Sample[]>([]);
   const [error, setError] = useState<Error | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const fetchRecentSamples = useCallback(async () => {
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
     try {
       const accessToken = getAccessToken();
       axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
@@ -887,16 +960,12 @@ export function useRecentSamples({
     } catch (err) {
       console.error('Error fetching recent samples:', err);
       setError(err instanceof Error ? err : new Error('An unknown error occurred'));
+    } finally {
+      setIsLoading(false);
     }
   }, [deploymentUrl, maxRecentSamples]);
 
-  useEffect(() => {
-    fetchRecentSamples();
-    const intervalId = setInterval(fetchRecentSamples, pollingInterval);
-    return () => clearInterval(intervalId);
-  }, [fetchRecentSamples, pollingInterval]);
-
-  return { recentSamples, error };
+  return { recentSamples, error, isLoading, refresh };
 }
 
 export interface TokenClassificationResult {
@@ -1158,8 +1227,28 @@ export function useTextClassificationEndpoints() {
     }
   };
 
+  const getTextFromFile = async (file: File): Promise<string[]> => {
+    axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await axios.post(`${deploymentUrl}/get-text`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error('Error parsing file:', error);
+      alert('Error parsing file:' + error);
+      throw new Error('Failed to parse file');
+    }
+  };
+
   return {
     workflowName,
+    getTextFromFile,
     predict,
   };
 }
@@ -1624,5 +1713,28 @@ export async function temporaryCacheToken(modelId: string) {
   } catch (err) {
     console.error('Error getting temporary cache access token:', err);
     throw err; // Re-throwing the error to handle it in the component
+  }
+}
+
+export async function fetchFeedback(username: string, modelName: string) {
+  const modelIdentifier = `${username}/${modelName}`;
+  const accessToken = getAccessToken();
+
+  try {
+    const response = await axios({
+      method: 'get',
+      url: `${deploymentBaseUrl}/api/deploy/feedbacks`,
+      params: {
+        model_identifier: modelIdentifier,
+      },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    return response?.data?.data;
+  } catch (error) {
+    console.error('Error getting Feedback Response:', error);
+    throw error;
   }
 }

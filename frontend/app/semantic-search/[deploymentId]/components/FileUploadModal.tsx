@@ -4,7 +4,10 @@ import styled from 'styled-components';
 type Props = {
   isOpen: boolean;
   handleCloseModal: () => void;
-  addSources: (selectedFiles: FileList | null, s3Urls: string[]) => Promise<any>;
+  addSources: (
+    selectedFiles: FileList | null,
+    cloudUrls: { type: 's3' | 'azure' | 'gcp'; url: string }[]
+  ) => Promise<any>;
   refreshSources: () => void;
 };
 
@@ -65,44 +68,45 @@ const FileUploadModal: React.FC<Props> = ({
 }) => {
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
-  const [s3Urls, setS3Urls] = useState<string[]>(['']);
+  const [cloudUrls, setCloudUrls] = useState<{ type: 's3' | 'azure' | 'gcp'; url: string }[]>([
+    { type: 's3', url: '' },
+  ]);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedFiles(event.target.files);
   };
 
-  const handleS3UrlChange = (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
-    const newS3Urls = [...s3Urls];
-    newS3Urls[index] = event.target.value;
-    setS3Urls(newS3Urls);
+  const handleCloudUrlChange = (index: number, field: 'type' | 'url', value: string) => {
+    const newCloudUrls = [...cloudUrls];
+    newCloudUrls[index] = { ...newCloudUrls[index], [field]: value };
+    setCloudUrls(newCloudUrls);
   };
 
-  const handleAddS3Url = () => {
-    setS3Urls([...s3Urls, '']);
+  const handleAddCloudUrl = () => {
+    setCloudUrls([...cloudUrls, { type: 's3', url: '' }]);
   };
 
-  const handleRemoveS3Url = (index: number) => {
-    const newS3Urls = s3Urls.filter((_, i) => i !== index);
-    setS3Urls(newS3Urls);
+  const handleRemoveCloudUrl = (index: number) => {
+    const newCloudUrls = cloudUrls.filter((_, i) => i !== index);
+    setCloudUrls(newCloudUrls);
   };
 
   const handleUpload = async () => {
-    if (selectedFiles || s3Urls.some((url) => url.trim() !== '')) {
+    const validCloudUrls = cloudUrls.filter((entry) => entry.url.trim() !== '');
+    if (selectedFiles || validCloudUrls.length > 0) {
       setUploading(true);
       try {
-        await addSources(
-          selectedFiles,
-          s3Urls.filter((url) => url.trim() !== '')
-        );
+        await addSources(selectedFiles, validCloudUrls);
+        setSelectedFiles(null);
+        setCloudUrls([{ type: 's3', url: '' }]);
+        handleCloseModal();
+        refreshSources();
       } catch (error) {
         console.error('Upload error:', error);
         alert(`Upload failed due to error ${error}. Please try again.`);
+      } finally {
+        setUploading(false);
       }
-      setUploading(false);
-      setSelectedFiles(null);
-      setS3Urls(['']);
-      handleCloseModal();
-      refreshSources();
     }
   };
 
@@ -115,7 +119,8 @@ const FileUploadModal: React.FC<Props> = ({
   }
 
   const isUploadDisabled =
-    ((!selectedFiles || selectedFiles.length === 0) && s3Urls.every((url) => url.trim() === '')) ||
+    ((!selectedFiles || selectedFiles.length === 0) &&
+      cloudUrls.every((entry) => entry.url.trim() === '')) ||
     uploading;
 
   return (
@@ -129,8 +134,9 @@ const FileUploadModal: React.FC<Props> = ({
           onChange={handleChange}
           accept=".pdf,.csv,.docx,.txt,.pptx,.eml"
         />
-        <p>Or add S3 URLs:</p>
-        {s3Urls.map((url, index) => (
+
+        <p>Or add Cloud URLs:</p>
+        {cloudUrls.map((entry, index) => (
           <div
             key={index}
             style={{
@@ -139,21 +145,31 @@ const FileUploadModal: React.FC<Props> = ({
               marginBottom: '10px',
             }}
           >
+            <select
+              value={entry.type}
+              onChange={(e) => handleCloudUrlChange(index, 'type', e.target.value)}
+              style={{ marginRight: '10px' }}
+            >
+              <option value="s3">S3</option>
+              <option value="azure">Azure</option>
+              <option value="gcp">GCP</option>
+            </select>
             <input
               type="text"
-              placeholder={`S3 URL ${index + 1}`}
-              value={url}
-              onChange={(e) => handleS3UrlChange(index, e)}
+              placeholder="Cloud URL"
+              value={entry.url}
+              onChange={(e) => handleCloudUrlChange(index, 'url', e.target.value)}
               style={{ flex: 1, marginRight: '10px' }}
             />
-            <button onClick={() => handleRemoveS3Url(index)}>Remove</button>
+            <button onClick={() => handleRemoveCloudUrl(index)}>Remove</button>
           </div>
         ))}
         <ButtonContainer>
-          <button onClick={handleAddS3Url} style={{ marginRight: '10px' }}>
-            Add More
+          <button onClick={handleAddCloudUrl} style={{ marginRight: '10px' }}>
+            Add More URLs
           </button>
         </ButtonContainer>
+
         <ButtonContainer>
           <UploadButton onClick={handleUpload} disabled={isUploadDisabled}>
             {uploading ? 'Adding files to model...' : 'Upload Files'}

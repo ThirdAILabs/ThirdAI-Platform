@@ -52,10 +52,7 @@ def test_enterprise_search_with_guardrails():
     model = admin_client.train(
         model_name,
         unsupervised_docs=[os.path.join(doc_dir(), "articles.csv")],
-        model_options={
-            "ndb_options": {"ndb_sub_type": "v2"},
-            "rag_options": {"guardrail_model_id": guardrail_id},
-        },
+        model_options={"ndb_options": {"ndb_sub_type": "v2"}},
         supervised_docs=[],
     )
 

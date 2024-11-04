@@ -1,15 +1,11 @@
-import Fuse from 'fuse.js';
 import React, { useContext, useEffect, useState } from 'react';
-import styled from 'styled-components';
-import { borderRadius, color, duration, fontSizes, shadow, padding } from '../stylingConstants';
-import { ReadSourceButton, StyledArrow } from './Reference';
-import { Spacer } from './Layout';
-import { ModelService, Source } from '../modelServices';
-import { ModelServiceContext } from '../Context';
-import FileUploadModal from './FileUploadModal';
 import { DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Button } from '@mui/material';
+import Fuse from 'fuse.js';
+import { ModelService, Source, PdfInfo } from '../modelServices';
+import { ModelServiceContext } from '../Context';
+import FileUploadModal from './FileUploadModal';
 
 interface SourcesProps {
   sources: Source[];
@@ -17,110 +13,35 @@ interface SourcesProps {
   setSources: (sources: Source[]) => void;
 }
 
-const Panel = styled.section`
-  display: flex;
-  flex-direction: column;
-  padding: 10px;
-  padding-bottom: 0;
-  box-shadow: ${shadow.card};
-  border-radius: ${borderRadius.card};
-  width: 400px;
-  background-color: white;
-`;
+interface FuseSource {
+  source: string;
+  source_id: string;
+  originalSource?: Source;
+}
 
-const Search = styled.input`
-  font-size: ${fontSizes.s};
-  padding: 10px 10px 13px 10px;
-  background-color: ${color.textInput};
-  border-radius: ${borderRadius.textInput};
-  border: none;
-  height: ${fontSizes.s};
-  font-family: Helvetica, Arial, sans-serif;
-`;
+interface CloudUrl {
+  type: 's3' | 'azure' | 'gcp';
+  url: string;
+}
 
-const SourceButton = styled.section`
-  font-size: ${fontSizes.s};
-  font-weight: normal;
-  display: flex;
-  justify-content: space-between;
-  text-align: left;
-  align-items: center;
-  margin-bottom: 10px;
-  text-decoration: none;
-  color: black;
-  transition-duration: ${duration.transition};
+const PAGE_SIZE = 10;
 
-  &:hover {
-    color: ${color.accent};
-    transition-duration: ${duration.transition};
-    cursor: pointer;
-  }
-`;
-
-const Scrollable = styled.section`
-  max-height: 300px;
-  overflow-y: scroll;
-`;
-
-export const DeleteSourceButton = styled.section`
-  background-color: white;
-  border: 1px solid ${color.delete};
-  border-radius: ${borderRadius.smallButton};
-  transition-duration: ${duration.transition};
-  font-size: ${fontSizes.s};
-  font-weight: normal;
-  color: ${color.delete};
-  width: fit-content;
-  padding: ${padding.smallButton};
-  margin-bottom: 10px;
-
-  &:hover {
-    background-color: ${color.delete};
-    color: white;
-    cursor: pointer;
-  }
-`;
-
-const AddSourceButton = styled.section`
-  background-color: white;
-  border: 1px solid ${color.accent};
-  border-radius: ${borderRadius.smallButton};
-  transition-duration: ${duration.transition};
-  font-size: ${fontSizes.s};
-  font-weight: normal;
-  color: ${color.accent};
-  width: fit-content;
-  padding: ${padding.smallButton};
-  margin-top: 10px;
-  margin-bottom: 10px;
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-
-  &:hover {
-    background-color: ${color.accent};
-    color: white;
-    cursor: pointer;
-  }
-
-  &:active {
-    background-color: ${color.accentDark};
-  }
-`;
-
-const Divider = styled.div`
-  height: 1px;
-  background-color: #ccc;
-`;
-
-export default function Sources(props: SourcesProps) {
-  const [fuse, setFuse] = useState<Fuse<Source> | null>(null);
-  const [matches, setMatches] = useState(props.sources);
-  const [open, setOpen] = useState(false);
+const Sources: React.FC<SourcesProps> = ({ sources, visible, setSources }) => {
+  const [fuse, setFuse] = useState<Fuse<FuseSource> | null>(null);
+  const [matches, setMatches] = useState<FuseSource[]>([]);
+  const [open, setOpen] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<number>(0);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [lastSourcesLength, setLastSourcesLength] = useState<number>(sources.length);
 
   const modelService = useContext<ModelService | null>(ModelServiceContext);
 
-  function formatSource(source: string) {
+  const totalPages = Math.ceil(matches.length / PAGE_SIZE);
+  const startIndex = currentPage * PAGE_SIZE;
+  const endIndex = Math.min(startIndex + PAGE_SIZE, matches.length);
+  const currentDocs = matches.slice(startIndex, endIndex);
+
+  function formatSource(source: string): string {
     const lowerSource = source.toLowerCase();
     if (
       lowerSource.endsWith('.pdf') ||
@@ -130,128 +51,236 @@ export default function Sources(props: SourcesProps) {
       lowerSource.endsWith('.pptx') ||
       lowerSource.endsWith('.eml')
     ) {
-      return source.split('/').pop();
+      return source.split('/').pop() || source;
     }
     return source;
   }
 
+  // Update matches when sources change
   useEffect(() => {
-    setMatches(props.sources);
-  }, [props.visible, props.sources]);
+    const currentLength = sources.length;
 
+    if (currentLength !== lastSourcesLength) {
+      const fuseData = sources.map((source) => ({
+        source: formatSource(source.source),
+        source_id: source.source_id,
+        originalSource: source,
+      }));
+
+      setFuse(
+        new Fuse(fuseData, {
+          keys: ['source'],
+          threshold: 0.3,
+        })
+      );
+
+      setMatches(fuseData);
+      setLastSourcesLength(currentLength);
+    }
+  }, [sources, lastSourcesLength]);
+
+  // Update matches when visibility changes
   useEffect(() => {
-    setFuse(
-      new Fuse(
-        props.sources.map((source) => ({
-          source: formatSource(source.source)!,
-          source_id: source.source_id,
-        })),
-        { keys: ['source'] }
-      )
-    );
-  }, [props.sources]);
+    if (!visible) return;
 
-  function handleSearchBarChangeEvent(e: React.ChangeEvent<HTMLInputElement>) {
-    if (e.target.value.trim() === '') {
-      setMatches(props.sources);
+    const fuseData = sources.map((source) => ({
+      source: formatSource(source.source),
+      source_id: source.source_id,
+      originalSource: source,
+    }));
+    setMatches(fuseData);
+  }, [visible]);
+
+  const handleSearchBarChangeEvent = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    setCurrentPage(0);
+
+    if (!fuse || value.trim() === '') {
+      const fuseData = sources.map((source) => ({
+        source: formatSource(source.source),
+        source_id: source.source_id,
+        originalSource: source,
+      }));
+      setMatches(fuseData);
       return;
     }
-    setMatches(fuse!.search(e.target.value).map((res) => res.item));
-  }
 
-  function refreshSources() {
-    modelService!.sources().then(props.setSources);
-  }
-
-  const handleAddSources = async (selectedFiles: FileList | null, s3Urls: string[]) => {
-    const filesArray = selectedFiles ? Array.from(selectedFiles) : [];
-    await modelService!.addSources(filesArray, s3Urls);
+    const searchResults = fuse.search(value).map((res) => res.item);
+    setMatches(searchResults);
   };
 
-  function canReadSource(source: string): boolean {
-    const lowerSource = source.toLowerCase();
-    return lowerSource.endsWith('.pdf') || lowerSource.endsWith('.docx');
-  }
+  const handleDeleteSource = (e: React.MouseEvent<HTMLButtonElement>, sourceId: string): void => {
+    e.stopPropagation();
+    if (modelService) {
+      modelService.deleteSources([sourceId]);
+      setSources(sources.filter((x) => x.source_id !== sourceId));
+    }
+  };
+
+  const handlePageChange = (newPage: number): void => {
+    setCurrentPage(newPage);
+  };
+
+  const refreshSources = (): void => {
+    if (modelService) {
+      modelService.sources().then(setSources);
+    }
+  };
+
+  const handleAddSources = async (
+    selectedFiles: FileList | null,
+    cloudUrls: CloudUrl[]
+  ): Promise<void> => {
+    if (!modelService) return;
+
+    const filesArray = selectedFiles ? Array.from(selectedFiles) : [];
+    await modelService.addSources(filesArray, cloudUrls);
+    refreshSources();
+  };
+
+  const renderPageNumbers = (): React.ReactNode[] => {
+    const maxVisiblePages = 5;
+    let pageNumbers: number[] = [];
+
+    if (totalPages <= maxVisiblePages) {
+      pageNumbers = Array.from({ length: totalPages }, (_, i) => i);
+    } else if (currentPage < 2) {
+      pageNumbers = [0, 1, 2, 3, 4];
+    } else if (currentPage > totalPages - 3) {
+      pageNumbers = Array.from({ length: 5 }, (_, i) => totalPages - 5 + i);
+    } else {
+      pageNumbers = [
+        currentPage - 2,
+        currentPage - 1,
+        currentPage,
+        currentPage + 1,
+        currentPage + 2,
+      ];
+    }
+
+    return pageNumbers.map((pageNum) => (
+      <Button
+        key={pageNum}
+        size="small"
+        className="min-w-0 w-6 h-6 p-0 text-xs"
+        variant={currentPage === pageNum ? 'contained' : 'outlined'}
+        onClick={() => handlePageChange(pageNum)}
+      >
+        {pageNum + 1}
+      </Button>
+    ));
+  };
 
   return (
-    fuse && (
-      <DropdownMenuContent
-        style={{ width: '300px', maxHeight: '300px', overflowY: 'auto' }}
-        align="start"
-        side="bottom" // Ensure the dropdown opens downward
-      >
+    <DropdownMenuContent
+      className="w-[400px] max-h-[400px] overflow-hidden flex flex-col"
+      align="start"
+      side="bottom"
+    >
+      <div className="p-1 border-b space-y-3 pb-4">
         <Input
           autoFocus
-          className="font-medium"
-          placeholder="Filter documents by name..."
+          className="text-sm h-8"
+          placeholder="Filter documents..."
+          value={searchTerm}
           onChange={handleSearchBarChangeEvent}
-          style={{ marginBottom: '5px' }}
-          onKeyDown={(e) => {
-            e.stopPropagation(); // Stop the event from propagating to other elements in the dropdown
-          }}
+          onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
         />
-        <Button
-          style={{ width: '100%', marginTop: '15px' }}
-          onClick={() => {
-            setOpen(true);
-          }}
-        >
-          Add Documents
-        </Button>
-        <Scrollable>
-          <Spacer $height="10px" />
-          {matches.map((source, i) => (
-            <DropdownMenuItem
-              key={i}
-              style={{
-                display: 'flex',
-                paddingRight: '10px',
-                justifyContent: 'space-between',
-              }}
-              onClick={() => {
-                if (source.source) {
-                  // Ensure source.source is defined
-                  const fileExtension = source.source.split('.').pop()?.toLowerCase(); // Get file extension
+        <div className="flex justify-center">
+          <Button
+            size="small"
+            className="w-1/2 h-8 text-sm"
+            onClick={() => setOpen(true)}
+            variant="contained"
+          >
+            Add Documents
+          </Button>
+        </div>
+      </div>
 
-                  if (fileExtension === 'pdf' || fileExtension === 'docx') {
-                    // If file is a .pdf or .docx, proceed to open the source
-                    console.log('Opening source:', source.source);
-                    modelService!.openSource(source.source);
-                  }
+      <div className="flex-1 overflow-y-auto min-h-[150px] max-h-[250px] pt-2">
+        {currentDocs.map((source, i) => (
+          <DropdownMenuItem
+            key={`${source.source_id}-${i}`}
+            className="flex justify-between items-center py-1 px-2 hover:bg-gray-100 cursor-pointer text-sm"
+            onClick={() => {
+              if (source.originalSource?.source) {
+                const fileExtension = source.originalSource.source.split('.').pop()?.toLowerCase();
+                if (fileExtension === 'pdf' || fileExtension === 'docx') {
+                  console.log('Opening source:', source.originalSource.source);
+                  modelService?.openSource(source.originalSource.source);
                 }
-              }}
+              }
+            }}
+          >
+            <span className="truncate flex-1 text-sm">{source.source}</span>
+            <Button
+              size="small"
+              className="min-w-[30px] h-6 ml-1 bg-transparent hover:bg-red-500 text-red-500 hover:text-white border border-red-500 text-xs p-0"
+              onClick={(e) => handleDeleteSource(e, source.source_id)}
             >
-              {formatSource(source.source)}
-              <div style={{ marginLeft: 'auto', marginRight: '10px' }}>
-                {' '}
-                {/* Add margin here */}
-                <Button
-                  className="bg-transparent hover:bg-red-500 text-red-500 hover:text-white"
-                  style={{
-                    height: '2rem',
-                    width: '2rem',
-                    border: '1px solid red',
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    modelService!.deleteSources([source.source_id]);
-                    props.setSources(props.sources.filter((x) => x.source_id !== source.source_id));
-                  }}
-                >
-                  ✕
-                </Button>
-              </div>
-            </DropdownMenuItem>
-          ))}
-        </Scrollable>
-        <Spacer $height="70px" />
-        <FileUploadModal
-          isOpen={open}
-          handleCloseModal={() => setOpen(false)}
-          addSources={handleAddSources}
-          refreshSources={refreshSources}
-        />
-      </DropdownMenuContent>
-    )
+              ✕
+            </Button>
+          </DropdownMenuItem>
+        ))}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="p-1 border-t flex items-center justify-between bg-white">
+          <div className="text-xs text-gray-500">
+            {`${startIndex + 1}-${endIndex} of ${matches.length}`}
+          </div>
+          <div className="flex gap-1">
+            <Button
+              size="small"
+              className="min-w-0 px-2 py-0 h-6 text-xs"
+              disabled={currentPage === 0}
+              onClick={() => handlePageChange(0)}
+              variant="outlined"
+            >
+              First
+            </Button>
+            <Button
+              size="small"
+              className="min-w-0 px-2 py-0 h-6 text-xs"
+              disabled={currentPage === 0}
+              onClick={() => handlePageChange(currentPage - 1)}
+              variant="outlined"
+            >
+              Prev
+            </Button>
+            <div className="flex items-center gap-[2px]">{renderPageNumbers()}</div>
+            <Button
+              size="small"
+              className="min-w-0 px-2 py-0 h-6 text-xs"
+              disabled={currentPage >= totalPages - 1}
+              onClick={() => handlePageChange(currentPage + 1)}
+              variant="outlined"
+            >
+              Next
+            </Button>
+            <Button
+              size="small"
+              className="min-w-0 px-2 py-0 h-6 text-xs"
+              disabled={currentPage >= totalPages - 1}
+              onClick={() => handlePageChange(totalPages - 1)}
+              variant="outlined"
+            >
+              Last
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <FileUploadModal
+        isOpen={open}
+        handleCloseModal={() => setOpen(false)}
+        addSources={handleAddSources}
+        refreshSources={refreshSources}
+      />
+    </DropdownMenuContent>
   );
-}
+};
+
+export default Sources;

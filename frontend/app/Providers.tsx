@@ -2,8 +2,13 @@
 
 import { SessionProvider } from 'next-auth/react';
 import { ReactNode } from 'react';
-import { minutesInSeconds } from '../utils/time';
+import { Session } from 'next-auth';
 
-export function Providers({ children }: { children: ReactNode }) {
-  return <SessionProvider refetchInterval={minutesInSeconds(4)}>{children}</SessionProvider>;
+interface ProvidersProps {
+  children: ReactNode;
+  session?: Session; // The session prop should be optional (Session | undefined)
+}
+
+export function Providers({ children, session }: ProvidersProps) {
+  return <SessionProvider session={session}>{children}</SessionProvider>;
 }

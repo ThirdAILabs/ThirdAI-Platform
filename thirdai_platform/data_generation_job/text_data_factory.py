@@ -1,4 +1,5 @@
 import random
+from logging import Logger
 from typing import Dict, List, Optional
 
 from data_generation_job.data_factory_interface import DataFactory
@@ -13,8 +14,8 @@ class TextDataFactory(DataFactory):
     SOURCE_COLUMN = "text"
     TARGET_COLUMN = "label"
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, logger: Logger):
+        super().__init__(logger=logger)
 
     def collect_arguments(
         self,
@@ -29,6 +30,7 @@ class TextDataFactory(DataFactory):
 
         arguments = []
         for target_label in target_labels:
+            self.logger.debug(f"Processing target label_name={target_label.name}")
             for current_sentence_idx in range(
                 0, sentence_to_generate_per_target_label, self.generate_at_a_time
             ):
@@ -67,6 +69,8 @@ class TextDataFactory(DataFactory):
                 arguments.append(
                     {"prompt": prompt, "kwargs": {"target_label": target_label.name}}
                 )
+
+        self.logger.info(f"Collected all arguments total_arguments={len(arguments)}")
         return arguments
 
     def generate_data(
@@ -82,6 +86,10 @@ class TextDataFactory(DataFactory):
         sentence_to_generate_per_target_label = (
             total_expected_sentences - self.train_sentences_generated
         ) // len(target_labels)
+
+        self.logger.info(
+            f"Starting data generation total_sentences={total_expected_sentences}, samples_per_label={samples_per_label}"
+        )
 
         prompt_tasks = self.collect_arguments(
             task_prompt=task_prompt,
@@ -133,6 +141,9 @@ class TextDataFactory(DataFactory):
                 )
 
                 self.train_sentences_generated += len(transformed_data_points)
+                self.logger.debug(
+                    f"Updated train file new_entries={len(train_data_points)},total_generated={self.train_sentences_generated}"
+                )
 
             if test_data_points:
                 write_to_csv(
@@ -147,6 +158,9 @@ class TextDataFactory(DataFactory):
                 )
 
                 self.test_sentences_generated += len(transformed_data_points)
+                self.logger.debug(
+                    f"Updated test file new_entries={len(test_data_points)},total_generated={self.test_sentences_generated}"
+                )
 
         dataset_config = {
             "filepath": str(self.train_file_location),
@@ -158,7 +172,7 @@ class TextDataFactory(DataFactory):
             "train_samples": self.train_sentences_generated,
         }
         save_dict(self.config_file_location, **dataset_config)
-
+        self.logger.info(f"Data generation completed config={dataset_config}")
         return dataset_config
 
     def fill_and_transform(self, texts: str, target_label: str):

@@ -1,11 +1,12 @@
-import json
+from logging import Logger
+from typing import Optional
 from urllib.parse import urljoin
 
 import requests
 
 
 class Reporter:
-    def __init__(self, api_url: str):
+    def __init__(self, api_url: str, logger: Logger):
         """
         Initializes the Reporter instance with the API URL.
 
@@ -13,6 +14,7 @@ class Reporter:
             api_url (str): The base URL for the API.
         """
         self._api = api_url
+        self.logger = logger
 
     def _request(self, method: str, suffix: str, *args, **kwargs) -> dict:
         """
@@ -39,25 +41,24 @@ class Reporter:
         kwargs["headers"].update({"User-Agent": "NDB Deployment job"})
 
         url = urljoin(self._api, suffix)
-        try:
-            if method == "post":
-                response = requests.post(url, *args, **kwargs)
-            elif method == "get":
-                response = requests.get(url, *args, **kwargs)
-            if 200 <= response.status_code < 300:
-                content = json.loads(response.content)
-                return content
-            else:
-                print(response.content)
-                raise requests.exceptions.HTTPError(
-                    "Failed with status code:", response.status_code
-                )
 
-        except Exception as exception:
-            # This could be other forms of error like connection error, stuff not found.
-            # In this case, we log the response from the server, but ignore the error.
-            print(exception)
-            raise exception
+        self.logger.info(
+            f"Making {method.upper()} request to {url} with args: {args}, kwargs: {kwargs}"
+        )
+        try:
+            response = requests.request(method, url, *args, **kwargs)
+            response.raise_for_status()
+            content = response.json()
+            self.logger.info(f"Response from {url}: {content}")
+            return content
+        except requests.exceptions.HTTPError as http_err:
+            self.logger.error(
+                f"HTTPError for {method.upper()} request to {url}: {http_err}, Response: {response.text}"
+            )
+            raise
+        except Exception as e:
+            self.logger.error(f"Error during {method.upper()} request to {url}: {e}")
+            raise
 
     def save_model(
         self,
@@ -77,7 +78,7 @@ class Reporter:
             model_name (str): The name of the model.
             metadata (dict): Metadata associated with the model.
         """
-        content = self._request(
+        self._request(
             "post",
             "api/model/save-deployed",
             json={
@@ -88,7 +89,6 @@ class Reporter:
             },
             headers=self.auth_header(access_token=access_token),
         )
-        print(content)
 
     def auth_header(self, access_token: str) -> dict:
         """
@@ -123,11 +123,12 @@ class Reporter:
             },
             headers=self.auth_header(access_token=access_token),
         )
-        print(content)
 
         return content["data"]["model_present"]
 
-    def update_deploy_status(self, model_id: str, status: str) -> None:
+    def update_deploy_status(
+        self, model_id: str, status: str, message: Optional[str] = None
+    ) -> None:
         """
         Updates the deployment status.
 
@@ -135,7 +136,7 @@ class Reporter:
             model_id (str): The ID of the model.
             status (str): The new status of the deployment.
         """
-        content = self._request(
+        self._request(
             "post",
             "api/deploy/update-status",
             params={
@@ -143,7 +144,6 @@ class Reporter:
                 "new_status": status,
             },
         )
-        print(content)
 
     def log(
         self,
@@ -163,7 +163,7 @@ class Reporter:
             access_token (str): The access token for authentication.
             used (bool): Whether the action was used. Defaults to False.
         """
-        content = self._request(
+        self._request(
             "post",
             "api/deploy/log",
             json={
@@ -174,7 +174,6 @@ class Reporter:
             },
             headers=self.auth_header(access_token=access_token),
         )
-        print(content)
 
     def active_deployment_count(
         self,
@@ -187,6 +186,5 @@ class Reporter:
                 "model_id": model_id,
             },
         )
-        print(content)
 
         return content["data"]["deployment_count"]

@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import secrets
 import shutil
@@ -12,12 +13,13 @@ from backend.datagen import generate_data_for_train_job
 from backend.utils import (
     copy_data_storage,
     delete_nomad_job,
+    get_detailed_reasons,
+    get_job_logs,
     get_model,
     get_model_from_identifier,
     get_model_status,
     get_platform,
     get_python_path,
-    logger,
     model_bazaar_path,
     nomad_job_exists,
     remove_unused_samples,
@@ -91,7 +93,7 @@ def train_ndb(
         model_options = NDBOptions.model_validate_json(model_options)
         data = NDBData.model_validate_json(file_info)
         job_options = JobOptions.model_validate_json(job_options)
-        print(f"Extra options for training: {model_options}")
+        logging.info(f"Extra options for training: {model_options}")
     except ValidationError as e:
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -200,6 +202,10 @@ def train_ndb(
             python_path=get_python_path(),
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
+            aws_region_name=(os.getenv("AWS_REGION_NAME", "")),
+            azure_account_name=(os.getenv("AZURE_ACCOUNT_NAME", "")),
+            azure_account_key=(os.getenv("AZURE_ACCOUNT_KEY", "")),
+            gcp_credentials_file=(os.getenv("GCP_CREDENTIALS_FILE", "")),
             train_job_name=new_model.get_train_job_name(),
             config_path=config.save_train_config(),
             allocation_cores=job_options.allocation_cores,
@@ -214,7 +220,7 @@ def train_ndb(
     except Exception as err:
         new_model.train_status = schema.Status.failed
         session.commit()
-        logger.info(str(err))
+        logging.error(str(err))
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message=str(err),
@@ -368,6 +374,10 @@ def retrain_ndb(
             python_path=get_python_path(),
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
+            aws_region_name=(os.getenv("AWS_REGION_NAME", "")),
+            azure_account_name=(os.getenv("AZURE_ACCOUNT_NAME", "")),
+            azure_account_key=(os.getenv("AZURE_ACCOUNT_KEY", "")),
+            gcp_credentials_file=(os.getenv("GCP_CREDENTIALS_FILE", "")),
             train_job_name=new_model.get_train_job_name(),
             config_path=config.save_train_config(),
             allocation_cores=job_options.allocation_cores,
@@ -380,7 +390,7 @@ def retrain_ndb(
     except Exception as err:
         new_model.train_status = schema.Status.failed
         session.commit()
-        logger.info(str(err))
+        logging.error(str(err))
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message=str(err),
@@ -411,7 +421,7 @@ def nlp_datagen(
         datagen_options = DatagenOptions.model_validate_json(datagen_options)
         datagen_job_options = JobOptions.model_validate_json(datagen_job_options)
         train_job_options = JobOptions.model_validate_json(train_job_options)
-        print(f"Datagen options: {datagen_options}")
+        logging.info(f"Datagen options: {datagen_options}")
     except ValidationError as e:
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -514,7 +524,7 @@ def nlp_datagen(
     except Exception as err:
         new_model.train_status = schema.Status.failed
         session.commit()
-        logger.info(str(err))
+        logging.error(str(err))
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message=str(err),
@@ -542,7 +552,7 @@ def datagen_callback(
     try:
         model_options = UDTOptions.model_validate_json(model_options)
         data = UDTData.model_validate_json(file_info)
-        print(f"Extra options for training: {model_options}")
+        logging.info(f"Extra options for training: {model_options}")
     except ValidationError as e:
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -613,6 +623,10 @@ def datagen_callback(
             python_path=get_python_path(),
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
+            aws_region_name=(os.getenv("AWS_REGION_NAME", "")),
+            azure_account_name=(os.getenv("AZURE_ACCOUNT_NAME", "")),
+            azure_account_key=(os.getenv("AZURE_ACCOUNT_KEY", "")),
+            gcp_credentials_file=(os.getenv("GCP_CREDENTIALS_FILE", "")),
             train_job_name=model.get_train_job_name(),
             config_path=config_path,
             allocation_cores=config.job_options.allocation_cores,
@@ -631,7 +645,7 @@ def datagen_callback(
             model.train_status = schema.Status.failed
         session.commit()
 
-        logger.info(str(err))
+        logging.error(str(err))
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message=str(err),
@@ -778,7 +792,7 @@ def retrain_udt(
     except Exception as err:
         model.train_status = schema.Status.failed
         session.commit()
-        logger.info(str(err))
+        logging.error(str(err))
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message=str(err),
@@ -810,7 +824,7 @@ def train_udt(
         model_options = UDTOptions.model_validate_json(model_options)
         data = UDTData.model_validate_json(file_info)
         job_options = JobOptions.model_validate_json(job_options)
-        print(f"Extra options for training: {model_options}")
+        logging.info(f"Extra options for training: {model_options}")
     except ValidationError as e:
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -923,6 +937,10 @@ def train_udt(
             python_path=get_python_path(),
             aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
             aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
+            aws_region_name=(os.getenv("AWS_REGION_NAME", "")),
+            azure_account_name=(os.getenv("AZURE_ACCOUNT_NAME", "")),
+            azure_account_key=(os.getenv("AZURE_ACCOUNT_KEY", "")),
+            gcp_credentials_file=(os.getenv("GCP_CREDENTIALS_FILE", "")),
             train_job_name=new_model.get_train_job_name(),
             config_path=config_path,
             allocation_cores=job_options.allocation_cores,
@@ -935,7 +953,7 @@ def train_udt(
     except Exception as err:
         new_model.train_status = schema.Status.failed
         session.commit()
-        logger.info(str(err))
+        logging.error(str(err))
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message=str(err),
@@ -1014,7 +1032,7 @@ def train_complete(
 def train_fail(
     model_id: str,
     new_status: schema.Status,
-    message: str,
+    message: Optional[str] = None,
     session: Session = Depends(get_session),
 ):
     """
@@ -1048,6 +1066,15 @@ def train_fail(
         )
 
     trained_model.train_status = new_status
+    if message:
+        session.add(
+            schema.JobError(
+                model_id=trained_model.id,
+                job_type="train",
+                status=new_status,
+                message=message,
+            )
+        )
     session.commit()
 
     return {"message": f"successfully updated with following {message}"}
@@ -1078,12 +1105,39 @@ def train_status(
         )
 
     train_status, reasons = get_model_status(model, train_status=True)
+    reasons = get_detailed_reasons(
+        session=session, job_type="train", status=train_status, reasons=reasons
+    )
     return response(
         status_code=status.HTTP_200_OK,
         message="Successfully got the train status.",
         data={
             "model_identifier": model_identifier,
             "train_status": train_status,
-            "message": " ".join(reasons),
+            "messages": reasons,
         },
+    )
+
+
+@train_router.get("/logs", dependencies=[Depends(verify_model_read_access)])
+def train_logs(
+    model_identifier: str,
+    session: Session = Depends(get_session),
+):
+    try:
+        model: schema.Model = get_model_from_identifier(model_identifier, session)
+    except Exception as error:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=str(error),
+        )
+
+    logs = get_job_logs(
+        nomad_endpoint=os.getenv("NOMAD_ENDPOINT"), model=model, job_type="train"
+    )
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message="Successfully got the train logs.",
+        data=logs,
     )

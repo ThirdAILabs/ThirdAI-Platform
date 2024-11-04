@@ -7,6 +7,7 @@ import pytest
 import thirdai
 from deployment_job.permissions import Permissions
 from fastapi.testclient import TestClient
+from platform_common.logging import get_default_logger
 from platform_common.pydantic_models.deployment import (
     DeploymentConfig,
     NDBDeploymentOptions,
@@ -17,6 +18,8 @@ from thirdai import neural_db_v2 as ndbv2
 
 MODEL_ID = "xyz"
 LICENSE_KEY = "236C00-47457C-4641C5-52E3BB-3D1F34-V3"
+
+logger = get_default_logger()
 
 
 def doc_dir():
@@ -101,7 +104,15 @@ def check_upvote_dev_mode(client: TestClient):
 
     res = client.post(
         "/upvote",
-        json={"text_id_pairs": [{"query_text": random_query, "reference_id": 78}]},
+        json={
+            "text_id_pairs": [
+                {
+                    "query_text": random_query,
+                    "reference_id": 78,
+                    "reference_text": "This is the corresponding reference text.",
+                }
+            ]
+        },
     )
     assert res.status_code == 200
 
@@ -185,7 +196,7 @@ def test_deploy_ndb_dev_mode(tmp_dir, sub_type):
 
     config = create_config(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=False)
 
-    router = NDBRouter(config, None)
+    router = NDBRouter(config, None, logger)
     client = TestClient(router.router)
 
     check_query(client)
@@ -202,7 +213,15 @@ def check_upvote_prod_mode(client: TestClient):
     # Here 78 is just a random chunk that we are upvoting for this query
     res = client.post(
         "/upvote",
-        json={"text_id_pairs": [{"query_text": random_query, "reference_id": 78}]},
+        json={
+            "text_id_pairs": [
+                {
+                    "query_text": random_query,
+                    "reference_id": 78,
+                    "reference_text": "This is the corresponding reference text.",
+                }
+            ]
+        },
     )
     assert res.status_code == 202
 
@@ -293,7 +312,7 @@ def test_deploy_ndb_prod_mode(tmp_dir, sub_type):
 
     config = create_config(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=True)
 
-    router = NDBRouter(config, None)
+    router = NDBRouter(config, None, logger)
     client = TestClient(router.router)
 
     deployment_dir = os.path.join(

@@ -35,6 +35,11 @@ job "llm-dispatch" {
 
       env {
         MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
+        {% if platform == "docker" %}
+        MODEL_BAZAAR_DIR = "/model_bazaar"
+        {% elif platform == "local" %}
+        MODEL_BAZAAR_DIR = "{{ share_dir }}"
+        {% endif %}
       }
       config {
         {% if platform == "docker" %}  

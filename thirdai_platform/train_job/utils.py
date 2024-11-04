@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import sys
@@ -45,9 +46,9 @@ def producer(files: List[FileInfo], buffer, tmp_dir: str):
                 ndb_file = future.result()
                 if ndb_file and not isinstance(ndb_file, str):
                     buffer.put(ndb_file)
-                    print(f"Successfully processed {file.path}", flush=True)
+                    logging.info(f"Successfully processed {file.path}", flush=True)
             except Exception as e:
-                print(f"Error processing file {file}: {e}")
+                logging.warning(f"Error processing file {file}: {e}")
 
     buffer.put(None)  # Signal that the producer is done
 
@@ -87,10 +88,9 @@ def check_disk(db, model_bazaar_dir: str, files: List[FileInfo]):
     ).free
 
     if available_nfs_storage < approx_ndb_size:
-        print(
-            f"Available NFS storage : {available_nfs_storage/GB_1} GB is less than approx model size : {approx_ndb_size/GB_1} GB."
-        )
-        raise Exception("Training aborted due to low disk space.")
+        critical_message = f"Available NFS storage : {available_nfs_storage/GB_1} GB is less than approx model size : {approx_ndb_size/GB_1} GB."
+        logging.critical(critical_message)
+        raise Exception(critical_message)
 
 
 def convert_supervised_to_ndb_file(file: FileInfo) -> ndb.Sup:

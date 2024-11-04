@@ -1,5 +1,5 @@
 import React, { MouseEventHandler, useMemo, useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@mui/material';
 
 const Separator: React.FC = () => <hr className="my-4 border-t border-gray-200" />;
 
@@ -169,8 +169,8 @@ const FeedbackDashboard: React.FC<FeedbackDashboardProps> = ({
           <div className="flex items-start">
             <div style={{ flex: 1, lineHeight: 2 }}>{renderFeedbackContent(tags)}</div>
             <Button
-              size="sm"
-              variant="destructive"
+              variant="contained"
+              color="error"
               onClick={() => deleteFeedbackExample(feedbackKey)}
               className="ml-2 px-2 h-6 text-xs"
             >
@@ -181,7 +181,7 @@ const FeedbackDashboard: React.FC<FeedbackDashboardProps> = ({
       ))}
       <Separator />
       <Button
-        size="sm"
+        variant="contained"
         className="mt-4"
         onClick={submitFeedback}
         disabled={Object.keys(cachedTags).length === 0}

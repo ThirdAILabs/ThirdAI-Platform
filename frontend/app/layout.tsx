@@ -10,18 +10,21 @@ export const metadata = {
   title: 'ThirdAI Platform',
   description: 'Democratize AI for everyone.',
 };
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await getServerSession(authOptions);
+
   return (
     <html lang="en">
       <body className="flex min-h-screen w-full flex-col bg-muted/40">
-        <ThemeProvider>
-          <Providers>
-            <SessionGuard>
-              <UserWrapper>{children}</UserWrapper>
-            </SessionGuard>
-          </Providers>
-        </ThemeProvider>
+        <Providers session={session ?? undefined}>
+          <ThemeProvider>
+            <UserWrapper>{children}</UserWrapper>
+          </ThemeProvider>
+          <SessionGuard />
+        </Providers>
       </body>
       <Analytics />
     </html>

@@ -4,7 +4,6 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Models from './models';
-import Workflows from './workflows';
 import Teams from './teams';
 import Users from './users';
 import OpenAIKey from './apiKey';
@@ -69,15 +68,12 @@ function AccessContent() {
               <TabsTrigger value="models" className="flex-1">
                 Models
               </TabsTrigger>
-              <TabsTrigger value="workflows" className="flex-1">
-                Workflows
-              </TabsTrigger>
-              {user?.teams.length && (
+
+              {(user?.global_admin || (user?.teams && user.teams.length > 0)) && (
                 <TabsTrigger value="teams" className="flex-1">
                   Teams
                 </TabsTrigger>
               )}
-
               <TabsTrigger value="users" className="flex-1">
                 Users
               </TabsTrigger>
@@ -91,9 +87,7 @@ function AccessContent() {
               <TabsContent value="models" className="w-full">
                 <Models />
               </TabsContent>
-              <TabsContent value="workflows" className="w-full">
-                <Workflows />
-              </TabsContent>
+
               <TabsContent value="teams" className="w-full">
                 <Teams />
               </TabsContent>

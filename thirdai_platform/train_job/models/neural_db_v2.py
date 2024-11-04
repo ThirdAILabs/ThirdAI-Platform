@@ -3,10 +3,11 @@ import os
 import shutil
 import time
 from collections import defaultdict
+from logging import Logger
 from typing import List
 
 import thirdai
-from platform_common.file_handler import expand_s3_buckets_and_directories
+from platform_common.file_handler import expand_cloud_buckets_and_directories
 from platform_common.ndb.ndbv2_parser import parse_doc
 from platform_common.pydantic_models.feedback_logs import ActionType, FeedbackLog
 from platform_common.pydantic_models.training import FileInfo, NDBv2Options, TrainConfig
@@ -17,14 +18,16 @@ from train_job.utils import check_disk, get_directory_size
 
 
 class NeuralDBV2(Model):
-    def __init__(self, config: TrainConfig, reporter: Reporter):
-        super().__init__(config=config, reporter=reporter)
-
-        self.logger.info(f"THIRDAI VERSION {thirdai.__version__}")
+    def __init__(self, config: TrainConfig, reporter: Reporter, logger: Logger):
+        super().__init__(config=config, reporter=reporter, logger=logger)
 
         self.ndb_options: NDBv2Options = self.config.model_options.ndb_options
 
         splade = self.ndb_options.advanced_search
+
+        self.logger.info(
+            f"NDB options - advanced_search: {splade}, on_disk: {self.ndb_options.on_disk}"
+        )
 
         if self.config.base_model_id:
             base_model_path = os.path.join(
@@ -59,10 +62,12 @@ class NeuralDBV2(Model):
         return os.path.join(self.ndb_save_path(), "documents")
 
     def unsupervised_files(self) -> List[FileInfo]:
-        return expand_s3_buckets_and_directories(self.config.data.unsupervised_files)
+        return expand_cloud_buckets_and_directories(self.config.data.unsupervised_files)
 
     def supervised_files(self) -> List[FileInfo]:
-        all_files = expand_s3_buckets_and_directories(self.config.data.supervised_files)
+        all_files = expand_cloud_buckets_and_directories(
+            self.config.data.supervised_files
+        )
         for file in all_files:
             if file.ext() != ".csv" and file.ext() != ".jsonl":
                 raise ValueError(
@@ -92,7 +97,7 @@ class NeuralDBV2(Model):
             )
             first_batch_end = time.perf_counter()
             self.logger.info(
-                f"Parsed first batch time={first_batch_end - first_batch_start:.3f}s"
+                f"First batch parsed in {first_batch_end - first_batch_start:.3f}s"
             )
 
             for i in range(len(batches)):
@@ -118,7 +123,8 @@ class NeuralDBV2(Model):
 
                 end = time.perf_counter()
                 self.logger.info(
-                    f"Inserted batch time={end-start:.3f} insert_time={index_end-index_start:.3f} total_docs={docs_indexed}"
+                    f"Batch {i+1} inserted in {end - start:.3f}s, insertion time: {index_end - index_start:.3f}s, "
+                    f"total documents indexed so far: {docs_indexed}"
                 )
 
         total_chunks = self.db.retriever.retriever.size()
@@ -126,11 +132,30 @@ class NeuralDBV2(Model):
             f"Completed unsupervised training total_docs={docs_indexed} total_chunks={total_chunks}."
         )
 
+        upsert_doc_ids = [
+            file.doc_id
+            for file in files
+            if file.doc_id and file.options.get("upsert", False)
+        ]
+
+        self.logger.info(
+            f"Found {len(upsert_doc_ids)} docs to upsert, removing old versions"
+        )
+        for doc_id in upsert_doc_ids:
+            self.db.delete_doc(doc_id=doc_id, keep_latest_version=True)
+
+        total_chunks = self.db.retriever.retriever.size()
+        self.logger.info(f"After removing old doc versions total_chunks={total_chunks}")
+
     def rlhf_retraining(self, path: str):
         feedback_samples = defaultdict(int)
+        self.logger.info(f"Starting RLHF retraining using file: {path}")
         with open(path, "r") as file:
             for line in file:
                 feedback = FeedbackLog.model_validate_json(line)
+                if not feedback.perform_rlhf_later:
+                    continue
+
                 feedback_samples[feedback.event.action] += 1
                 if feedback.event.action == ActionType.upvote:
                     weight = 2  # Extra weighting for explicit upvotes
@@ -198,12 +223,10 @@ class NeuralDBV2(Model):
         start_time = time.time()
 
         if unsupervised_files:
-            self.logger.info(f"Found {len(unsupervised_files)} unsupervised files.")
             check_disk(self.db, self.config.model_bazaar_dir, unsupervised_files)
             self.unsupervised_train(unsupervised_files)
 
         if supervised_files:
-            self.logger.info(f"Found {len(supervised_files)} supervised files.")
             check_disk(self.db, self.config.model_bazaar_dir, supervised_files)
             self.supervised_train(supervised_files)
 

@@ -1,3 +1,4 @@
+import logging
 import os
 
 from backend.utils import get_nomad_job
@@ -28,7 +29,7 @@ async def sync_job_statuses() -> None:
                     model.get_train_job_name(), os.getenv("NOMAD_ENDPOINT")
                 )
                 if not model_data or model_data["Status"] == "dead":
-                    print(
+                    logging.warning(
                         f"Model {model.id} train status was starting or in_progress but the nomad"
                         "job is either dead or not found. Setting status to failed."
                     )
@@ -42,7 +43,7 @@ async def sync_job_statuses() -> None:
                 or model.deploy_status == schema.Status.in_progress
             ):
                 if not deployment_data or deployment_data["Status"] == "dead":
-                    print(
+                    logging.warning(
                         f"Model {model.id} deployment status was starting or in_progress but the nomad"
                         "job is either dead or not found. Setting status to failed."
                     )
@@ -50,7 +51,7 @@ async def sync_job_statuses() -> None:
 
             if model.deploy_status == schema.Status.complete:
                 if not deployment_data or deployment_data["Status"] == "dead":
-                    print(
+                    logging.warning(
                         f"Model {model.id} deployment status was complete but the nomad"
                         "job is either dead or not found. Setting status to stopped instead."
                     )

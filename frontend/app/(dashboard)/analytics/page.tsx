@@ -1,12 +1,11 @@
 'use client';
-
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import RecentSamples from './samples';
+import RecentFeedbacks from './recentFeedbacks';
 import UpdateButton from './updateButton';
+import UpdateButtonNDB from './updateButtonNDB';
+import UsageStats from './usageStats';
 import { UsageDurationChart, UsageFrequencyChart, ReformulatedQueriesChart } from './charts';
 import { useEffect, useState, Suspense } from 'react';
-import Link from 'next/link';
-import { Button } from '@mui/material';
 import { useSearchParams } from 'next/navigation';
 import { getWorkflowDetails, deploymentBaseUrl } from '@/lib/backend';
 import _ from 'lodash';
@@ -18,6 +17,7 @@ function AnalyticsContent() {
   const [deploymentUrl, setDeploymentUrl] = useState<string | undefined>();
   const [modelName, setModelName] = useState<string>('');
   const [username, setUsername] = useState<string>('');
+  const [workflowtype, setWorkflowType] = useState<string>('');
 
   useEffect(() => {
     setIsClient(true);
@@ -28,7 +28,20 @@ function AnalyticsContent() {
           const workflowDetails = await getWorkflowDetails(workflowid);
 
           console.log('workflowDetails', workflowDetails);
-          if (workflowDetails.data.type === 'udt') {
+          setWorkflowType(workflowDetails.data.type);
+          if (
+            workflowDetails.data.type === 'enterprise-search' &&
+            workflowDetails.data.dependencies?.length > 0
+          ) {
+            // For enterprise-search, use the first dependency's details
+            const firstDependency = workflowDetails.data.dependencies[0];
+            console.log('firstDependency', firstDependency);
+            console.log(`here is: ${deploymentBaseUrl}/${firstDependency.model_id}`);
+            setDeploymentUrl(`${deploymentBaseUrl}/${firstDependency.model_id}`);
+            setModelName(firstDependency.model_name);
+            setUsername(firstDependency.username);
+          } else {
+            // For other types, use the original logic
             console.log(`here is: ${deploymentBaseUrl}/${workflowDetails.data.model_id}`);
             setDeploymentUrl(`${deploymentBaseUrl}/${workflowDetails.data.model_id}`);
             setModelName(workflowDetails.data.model_name);
@@ -46,13 +59,23 @@ function AnalyticsContent() {
   if (!isClient) {
     return null; // Return null on the first render to avoid hydration mismatch
   }
-
-  return (
-    <div className="container mx-auto px-4 py-8">
-      {deploymentUrl && <RecentSamples deploymentUrl={deploymentUrl} />}
-      {modelName && <UpdateButton modelName={modelName} />}
-    </div>
-  );
+  if (workflowtype == 'udt')
+    return (
+      <div className="container mx-auto px-4 py-8">
+        {deploymentUrl && <RecentSamples deploymentUrl={deploymentUrl} />}
+        {modelName && <UpdateButton modelName={modelName} />}
+      </div>
+    );
+  else if (workflowtype == 'ndb' || workflowtype == 'enterprise-search') {
+    console.log('update button, ', modelName);
+    return (
+      <>
+        <UsageStats />
+        <RecentFeedbacks username={username} modelName={modelName} />
+        {modelName && <UpdateButtonNDB modelName={modelName} />}
+      </>
+    );
+  }
 }
 
 export default function AnalyticsPage() {

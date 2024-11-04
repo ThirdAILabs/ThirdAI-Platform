@@ -1,5 +1,6 @@
 import os
 import time
+from logging import Logger
 
 from deployment_job.models.classification_models import (
     ClassificationModel,
@@ -12,7 +13,6 @@ from deployment_job.pydantic_models.inputs import (
     TextAnalysisPredictParams,
 )
 from deployment_job.reporter import Reporter
-from deployment_job.utils import propagate_error
 from fastapi import APIRouter, Depends, Query, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from platform_common.ndb.ndbv1_parser import convert_to_ndb_file
@@ -27,14 +27,14 @@ from prometheus_client import Summary
 from reporter import Reporter
 from thirdai import neural_db as ndb
 from throughput import Throughput
-from utils import propagate_error, response
 
 udt_predict_metric = Summary("udt_predict", "UDT predictions")
 
 
 class UDTRouter:
-    def __init__(self, config: DeploymentConfig, reporter: Reporter):
-        self.model: ClassificationModel = UDTRouter.get_model(config)
+    def __init__(self, config: DeploymentConfig, reporter: Reporter, logger: Logger):
+        self.model: ClassificationModel = UDTRouter.get_model(config, logger)
+        self.logger = logger
 
         # TODO(Nicholas): move these metrics to prometheus
         self.start_time = time.time()
@@ -60,16 +60,18 @@ class UDTRouter:
             )
 
     @staticmethod
-    def get_model(config: DeploymentConfig) -> ClassificationModel:
+    def get_model(config: DeploymentConfig, logger: Logger) -> ClassificationModel:
         subtype = config.model_options.udt_sub_type
+        logger.info(f"Initializing model of subtype: {subtype}")
         if subtype == UDTSubType.text:
-            return TextClassificationModel(config=config)
+            return TextClassificationModel(config=config, logger=logger)
         elif subtype == UDTSubType.token:
-            return TokenClassificationModel(config=config)
+            return TokenClassificationModel(config=config, logger=logger)
         else:
-            raise ValueError(f"Unsupported UDT subtype '{subtype}'.")
+            error_message = f"Unsupported UDT subtype '{subtype}'."
+            logger.error(error_message)
+            raise ValueError(error_message)
 
-    @propagate_error
     def get_text(
         self,
         file: UploadFile,
@@ -85,6 +87,7 @@ class UDTRouter:
         Returns:
             A JSON response containing the extracted text content.
         """
+        self.logger.info(f"Processing text extraction for file: {file.filename}")
         # Define the path where the uploaded file will be temporarily saved
         destination_path = self.model.data_dir / file.filename
 
@@ -112,7 +115,6 @@ class UDTRouter:
             data=jsonable_encoder(display_list),
         )
 
-    @propagate_error
     @udt_predict_metric.time()
     def predict(
         self,
@@ -142,11 +144,16 @@ class UDTRouter:
 
         # TODO(pratik/geordie/yash): Add logging for search results text classification
         if isinstance(results, SearchResultsTokenClassification):
-            self.tokens_identified.log(
-                len([tags[0] for tags in results.predicted_tags if tags[0] != "O"])
+            identified_count = len(
+                [tags[0] for tags in results.predicted_tags if tags[0] != "O"]
             )
+            self.tokens_identified.log(identified_count)
             self.queries_ingested.log(1)
             self.queries_ingested_bytes.log(len(params.text))
+            self.logger.info(
+                f"Prediction complete with {identified_count} tokens identified",
+                extra={"text_length": len(params.text)},
+            )
 
         return response(
             status_code=status.HTTP_200_OK,
@@ -154,7 +161,6 @@ class UDTRouter:
             data=jsonable_encoder(results),
         )
 
-    @propagate_error
     def stats(self, token=Depends(Permissions.verify_permission("read"))):
         """
         Returns statistics about the deployment such as the number of tokens identified, number of
@@ -198,7 +204,6 @@ class UDTRouter:
             },
         )
 
-    @propagate_error
     def add_labels(
         self,
         labels: LabelCollection,
@@ -234,7 +239,6 @@ class UDTRouter:
         self.model.add_labels(labels)
         return response(status_code=status.HTTP_200_OK, message="Successful")
 
-    @propagate_error
     def insert_sample(
         self,
         sample: TokenClassificationData,
@@ -259,7 +263,6 @@ class UDTRouter:
         self.model.insert_sample(sample)
         return response(status_code=status.HTTP_200_OK, message="Successful")
 
-    @propagate_error
     def get_labels(self, token=Depends(Permissions.verify_permission("read"))):
         """
         Retrieves the labels from the model.
@@ -275,7 +278,6 @@ class UDTRouter:
             data=jsonable_encoder(labels),
         )
 
-    @propagate_error
     def get_recent_samples(
         self,
         num_samples: int = Query(

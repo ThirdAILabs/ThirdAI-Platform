@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 from pathlib import Path
@@ -52,6 +53,7 @@ async def restart_generate_job():
         python_path=get_python_path(),
         thirdai_platform_dir=thirdai_platform_dir(),
         app_dir="llm_dispatch_job",
+        share_dir=os.getenv("SHARE_DIR"),
     )
 
 
@@ -59,7 +61,7 @@ ON_PREM_GENERATE_JOB_ID = "on-prem-llm-generation"
 
 
 async def start_on_prem_generate_job(
-    model_name: str = "Llama-3.2-3B-Instruct-f16.gguf",
+    model_name: str = "Llama-3.2-1B-Instruct-f16.gguf",
     restart_if_exists: bool = True,
     autoscaling_enabled: bool = True,
     cores_per_allocation: Optional[int] = None,
@@ -86,10 +88,10 @@ async def start_on_prem_generate_job(
     model_size = int(os.path.getsize(model_path) / 1e6)
     # TODO(david) support configuration for multiple models
     job_memory_mb = model_size * 2  # give some leeway
-    if os.cpu_count() < 16:
-        raise ValueError("Can't run LLM job on less than 16 cores")
+    if os.cpu_count() < 8:
+        raise ValueError("Can't run LLM job on less than 8 cores")
     if cores_per_allocation is None:
-        cores_per_allocation = min(16, os.cpu_count() - 8)
+        cores_per_allocation = 7
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "on_prem_generation_job.hcl.j2"),
@@ -234,7 +236,7 @@ def create_promfile(promfile_path: str):
     with open(promfile_path, "w") as file:
         yaml.dump(prometheus_config, file, sort_keys=False)
 
-    print(f"Prometheus configuration has been written to {promfile_path}")
+    logging.info(f"Prometheus configuration has been written to {promfile_path}")
     return targets
 
 

@@ -107,18 +107,16 @@ export class ModelService {
   url: string;
   ragUrl: string | undefined;
   sessionId: string;
-  authToken: string | null;
 
   constructor(url: string, ragUrl: string | undefined, sessionId: string) {
     this.url = url;
     this.ragUrl = ragUrl;
     this.sessionId = sessionId;
-    this.authToken = window.localStorage.getItem('accessToken');
   }
 
   authHeader(): Record<string, string> {
     return {
-      Authorization: `Bearer ${this.authToken}`,
+      Authorization: `Bearer ${window.localStorage.getItem('accessToken')}`,
       'Cache-Control': 'no-cache',
     };
   }
@@ -179,13 +177,12 @@ export class ModelService {
       },
     })
       .then(this.handleInvalidAuth())
-      .then((response) => {
+      .then(async (response) => {
         if (response.ok) {
           return response.json();
         }
-        return response.json().then((json) => {
-          throw new Error(json.message);
-        });
+        const json = await response.json();
+        throw new Error(json.message);
       })
       .then((data) => {
         console.log('Model saved successfully:', data);
@@ -198,7 +195,10 @@ export class ModelService {
       });
   }
 
-  async addSources(files: File[], s3Urls: string[]): Promise<any> {
+  async addSources(
+    files: File[],
+    cloudUrls: { type: 's3' | 'azure' | 'gcp'; url: string }[]
+  ): Promise<any> {
     const formData = new FormData();
     const documents: object[] = [];
 
@@ -219,14 +219,24 @@ export class ModelService {
       });
     }
 
-    // Process S3 URLs
-    for (let i = 0; i < s3Urls.length; i++) {
-      const url = s3Urls[i];
+    // Process cloud URLs (S3, Azure, GCP)
+    for (let i = 0; i < cloudUrls.length; i++) {
+      const { type, url } = cloudUrls[i];
       const extension = url.split('.').pop();
+
+      let location = '';
+      if (type === 's3') {
+        location = 's3';
+      } else if (type === 'azure') {
+        location = 'azure';
+      } else if (type === 'gcp') {
+        location = 'gcp';
+      }
+
       documents.push({
         document_type: extension ? extension.toUpperCase() : 'URL',
         path: url,
-        location: 's3',
+        location: location,
         metadata: {},
         chunk_size: 100,
         stride: 40,
@@ -292,11 +302,16 @@ export class ModelService {
       });
   }
 
-  async predict(queryText: string, topK: number, queryId?: string): Promise<SearchResult | null> {
+  async predict(
+    queryText: string,
+    topK: number,
+    queryId?: string,
+    rerank: boolean = false
+  ): Promise<SearchResult | null> {
     const requestUrl = this.ragUrl || this.url;
     const url = new URL(requestUrl + '/search');
 
-    console.log('REQUST URL: ', url);
+    console.log('REQUEST URL: ', url);
 
     return fetch(url, {
       method: 'POST',
@@ -304,7 +319,12 @@ export class ModelService {
         ...this.authHeader(),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ query: queryText, top_k: topK, constraints: {} }),
+      body: JSON.stringify({
+        query: queryText,
+        top_k: topK,
+        constraints: {},
+        rerank: rerank,
+      }),
     })
       .then(this.handleInvalidAuth())
       .then((response) => {
@@ -476,7 +496,31 @@ export class ModelService {
   }
 
   openSource(source: string): void {
-    if (source.toLowerCase().endsWith('.pdf')) {
+    if (source.includes('amazonaws.com')) {
+      this.getSignedUrl(source, 's3').then((signedURL) => {
+        if (signedURL) {
+          this.openAWSReference(signedURL);
+        } else {
+          console.error('Failed to retrieve signed URL for S3 resource.');
+        }
+      });
+    } else if (source.includes('blob.core.windows.net')) {
+      this.getSignedUrl(source, 'azure').then((signedURL) => {
+        if (signedURL) {
+          this.openAWSReference(signedURL);
+        } else {
+          console.error('Failed to retrieve signed URL for Azure resource.');
+        }
+      });
+    } else if (source.includes('storage.googleapis.com')) {
+      this.getSignedUrl(source, 'gcp').then((signedURL) => {
+        if (signedURL) {
+          this.openAWSReference(signedURL);
+        } else {
+          console.error('Failed to retrieve signed URL for GCP resource.');
+        }
+      });
+    } else if (source.toLowerCase().endsWith('.pdf')) {
       this.openPDF(source);
     } else if (source.toLowerCase().endsWith('.docx')) {
       this.openDOCX(source);
@@ -485,11 +529,39 @@ export class ModelService {
     }
   }
 
-  openAWSReference(ref: ReferenceInfo): void {
-    const [start, end] = startAndEnd(ref.content);
-    const highlightedSourceURL =
-      'https://' + ref.sourceURL.replace(/^(https?:\/\/)?/, '') + '#:~:text=' + start + ',' + end;
+  openAWSReference(source: string): void {
+    const highlightedSourceURL = 'https://' + source.replace(/^(https?:\/\/)?/, '');
     window.open(highlightedSourceURL);
+  }
+
+  getSignedUrl(source: string, provider: 's3' | 'azure' | 'gcp'): Promise<string | null> {
+    const url = new URL(this.url + '/get-signed-url');
+
+    // Append source and provider as query parameters
+    url.searchParams.append('source', source);
+    url.searchParams.append('provider', provider);
+
+    return fetch(url.toString(), {
+      method: 'GET', // Set method to GET since we're passing query params
+      headers: {
+        ...this.authHeader(),
+      },
+    })
+      .then(this.handleInvalidAuth())
+      .then((response) => {
+        if (response.ok) {
+          return response.json();
+        } else {
+          throw new Error('Failed to get signed URL');
+        }
+      })
+      .then(({ data }) => {
+        return data.signed_url;
+      })
+      .catch((e) => {
+        console.error('Error in getSignedUrl:', e);
+        return null;
+      });
   }
 
   async upvote(
@@ -505,6 +577,7 @@ export class ModelService {
           {
             query_text: queryText,
             reference_id: referenceId,
+            reference_text: referenceText,
           },
         ],
       }),

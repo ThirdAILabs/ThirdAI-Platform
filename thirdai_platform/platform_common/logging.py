@@ -1,67 +1,49 @@
 import logging
+from pathlib import Path
 
 from colorlog import ColoredFormatter
 
 
-class LoggerConfig:
-    _is_configured = False
+def setup_logger(log_dir: Path, log_prefix: str, level=logging.INFO):
+    log_dir.mkdir(parents=True, exist_ok=True)
 
-    def __init__(self, log_file, level=logging.INFO):
-        self.log_file = log_file
-        self.level = level
-        self.setup_logging()
+    logger_file_path = log_dir / f"{log_prefix}.log"
 
-    def setup_logging(self):
-        """Set up the logging configuration if it hasn't been done yet."""
-        if LoggerConfig._is_configured:
-            return
+    # Define log format
+    log_format = "%(asctime)s - %(levelname)s - %(message)s"
+    date_format = "%Y-%m-%d %H:%M:%S"
 
-        # Define log format
-        log_format = "%(asctime)s - %(levelname)s - %(message)s"
-        date_format = "%Y-%m-%d %H:%M:%S"
+    # Formatter for file logs (no colors)
+    file_formatter = logging.Formatter(log_format, datefmt=date_format)
 
-        # Formatter for file logs (no colors)
-        file_formatter = logging.Formatter(log_format, datefmt=date_format)
+    # Colored Formatter for console output
+    colored_formatter = ColoredFormatter(
+        "%(log_color)s%(asctime)s - %(levelname)s - %(message)s",
+        datefmt=date_format,
+        log_colors={
+            "DEBUG": "cyan",
+            "INFO": "green",
+            "WARNING": "yellow",
+            "ERROR": "red",
+            "CRITICAL": "red,bg_white",
+        },
+    )
 
-        # Colored Formatter for console output
-        colored_formatter = ColoredFormatter(
-            "%(log_color)s%(asctime)s - %(levelname)s - %(message)s",
-            datefmt=date_format,
-            log_colors={
-                "DEBUG": "cyan",
-                "INFO": "green",
-                "WARNING": "yellow",
-                "ERROR": "red",
-                "CRITICAL": "red,bg_white",
-            },
-        )
+    # File handler setup
+    file_handler = logging.FileHandler(logger_file_path, mode="a+")
+    file_handler.setFormatter(file_formatter)
 
-        # File handler setup
-        file_handler = logging.FileHandler(self.log_file, mode="a+")
-        file_handler.setFormatter(file_formatter)
+    # Console handler setup
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(colored_formatter)
 
-        # Console handler setup
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(colored_formatter)
-
-        # Basic configuration with multiple handlers
-        logging.basicConfig(
-            level=self.level,
-            format=log_format,
-            datefmt=date_format,
-            handlers=[file_handler, console_handler],
-        )
-
-        LoggerConfig._is_configured = True
-
-    @staticmethod
-    def get_logger(name):
-        """Retrieve the logger with the given name."""
-        logger = logging.getLogger(name)
-        if not logger.hasHandlers():
-            logger.addHandler(logging.StreamHandler())
-        logger.info("Started logging service")
-        return logger
+    # Basic configuration with multiple handlers
+    logging.basicConfig(
+        level=level,
+        format=log_format,
+        datefmt=date_format,
+        handlers=[file_handler, console_handler],
+    )
 
 
 def get_default_logger():

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+  <style>
+    #main {
+      line-height: 400px;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    #login-form {
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 14px;
+    }
+  </style>
+  <script>
+    function login() {
+      var apikey = $("#apikey").val();
+
+      window.localStorage.setItem("apikey", apikey);
+      window.location.href = '/dashboard';
+    }
+
+  </script>
+</head>
+
+<body>
+  <div id="main">
+    <form id="login-form" onsubmit="login();return false">
+      <input type="password" id="apikey" required name="apikey" , placeholder="apikey">
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+</body>
+
+</html>

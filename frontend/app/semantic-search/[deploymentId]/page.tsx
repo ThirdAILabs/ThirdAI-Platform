@@ -33,6 +33,7 @@ import PillButton from './components/buttons/PillButton';
 import { useParams, useSearchParams } from 'next/navigation';
 import { CardTitle } from '@/components/ui/card';
 import { getWorkflowDetails, fetchCachedGeneration } from '@/lib/backend';
+import SidePanel from './components/SidePanel';
 
 const Frame = styled.section<{ $opacity: string }>`
   position: absolute;
@@ -44,10 +45,9 @@ const Frame = styled.section<{ $opacity: string }>`
 `;
 
 const Logo = styled.img`
-  position: fixed;
   object-fit: fill;
   height: 50px;
-  padding: 10px;
+  margin-right: 12px;
 
   &:hover {
     cursor: pointer;
@@ -55,13 +55,14 @@ const Logo = styled.img`
 `;
 
 const SearchContainer = styled.section<{ $center: boolean }>`
-  position: relative; /* Changed from fixed to relative */
+  position: relative;
   width: 70%;
   left: 10%;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  height: ${(props) => (props.$center ? '100%' : 'fit-content')};
+  justify-content: ${(props) => (props.$center ? 'flex-start' : 'flex-start')};
+  padding-top: ${(props) => (props.$center ? '35vh' : '100px')}; // Increased padding-top values
+  height: ${(props) => (props.$center ? 'fit-content' : 'fit-content')};
   z-index: 100;
 `;
 
@@ -99,6 +100,20 @@ const UpvoteModalWrapper = styled.section`
   height: fit-content;
   padding: ${padding.card};
   box-sizing: border-box;
+`;
+
+const LogoContainer = styled.div`
+  position: fixed;
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  z-index: 100;
+`;
+
+const WorkflowName = styled.div`
+  font-size: 18px;
+  font-weight: 500;
+  color: #333;
 `;
 
 const defaultPrompt =
@@ -157,6 +172,8 @@ function App() {
     setChatMode(isChatMode);
   }, []);
 
+  const [workflowName, setWorkflowName] = useState<string>('');
+
   useEffect(() => {
     const receievedWorkflowId = searchParams.get('workflowId');
     const generationOn = searchParams.get('ifGenerationOn') === 'true';
@@ -174,6 +191,9 @@ function App() {
       try {
         const details = await getWorkflowDetails(receievedWorkflowId as string);
         console.log('details', details);
+
+        // Set the workflow name
+        setWorkflowName(details.data.model_name);
 
         const data = details.data;
 
@@ -237,30 +257,6 @@ function App() {
     }
   }, []);
 
-  // Effect to periodically fetch sources every 3 seconds
-  useEffect(() => {
-    // Only set up the interval if modelService is available
-    if (!modelService) return;
-
-    const fetchSources = async () => {
-      try {
-        const fetchedSources = await modelService.sources();
-        setSources(fetchedSources);
-      } catch (error) {
-        console.error('Failed to fetch sources:', error);
-        // Optionally, handle the error (e.g., show a notification to the user)
-      }
-    };
-
-    // Fetch immediately before setting up the interval
-    fetchSources();
-
-    const intervalId = setInterval(fetchSources, 3000); // 3000ms = 3 seconds
-
-    // Cleanup function to clear the interval when the component unmounts or modelService changes
-    return () => clearInterval(intervalId);
-  }, [modelService]);
-
   useEffect(() => {
     if (modelService) {
       setOpacity('100%');
@@ -269,14 +265,22 @@ function App() {
 
   const websocketRef = useRef<WebSocket | null>(null);
 
+  const [reRankingEnabled, setReRankingEnabled] = useState(false);
+
   async function getResults(
     query: string,
     topK: number,
     queryId?: string
   ): Promise<SearchResult | null> {
+    console.log('reRankingEnabled', reRankingEnabled);
     setFailed(false);
     return modelService!
-      .predict(/* queryText= */ query, /* topK= */ topK, /* queryId= */ queryId)
+      .predict(
+        /* queryText= */ query,
+        /* topK= */ topK,
+        /* queryId= */ queryId,
+        /* rerank= */ reRankingEnabled
+      )
       .then((searchResults) => {
         console.log('searchResults', searchResults);
         if (searchResults) {
@@ -305,6 +309,10 @@ function App() {
   const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   async function submit(query: string, genaiPrompt: string, bypassCache = false) {
+    if (abortController) {
+      abortController.abort();
+    }
+
     if (websocketRef.current) {
       websocketRef.current.close();
     }
@@ -316,26 +324,69 @@ function App() {
     setNumReferences(c.numReferencesFirstLoad);
 
     if (query.trim().length > 0) {
-      // Case 1: Guardrail is ON
       const results = await getResults(
         query,
         c.numReferencesFirstLoad + 1 * c.numReferencesLoadMore
       );
 
       if (results && ifGenerationOn) {
-        if (abortController) {
-          abortController.abort();
+        const modelId = modelService?.getModelID();
+
+        // If we don't want to bypassCache AND cache generation is enabled
+        if (!bypassCache && cacheEnabled) {
+          try {
+            const cachedResult = await fetchCachedGeneration(modelId!, query);
+            console.log('cachedResult', cachedResult);
+
+            if (cachedResult && cachedResult.llm_res) {
+              console.log('cached query is', cachedResult.query);
+              console.log('cached generation is', cachedResult.llm_res);
+
+              // Set up an AbortController for cached generation
+              const cacheAbortController = new AbortController();
+              setAbortController(cacheAbortController);
+
+              const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+              setQueryInfo(null);
+              // Initialize the stopping index
+              let currentStoppingIndex = 0;
+              const tokens = cachedResult.llm_res.split(' ');
+
+              for (let i = 0; i < tokens.length; i++) {
+                if (cacheAbortController.signal.aborted) {
+                  console.log('Cached generation paused');
+                  // Set the answer up to the current stopping index
+                  setAnswer(tokens.slice(0, currentStoppingIndex).join(' '));
+                  break;
+                }
+
+                currentStoppingIndex = i + 1; // Update stopping index to current position
+                setAnswer(tokens.slice(0, currentStoppingIndex).join(' '));
+                await sleep(20); // Mimic streaming response with a delay
+              }
+
+              setAbortController(null);
+
+              // Set the query information including whether they differ
+              setQueryInfo({
+                cachedQuery: cachedResult.query,
+                userQuery: query,
+                isDifferent: cachedResult.query !== query,
+              });
+
+              return; // Stop further execution since the answer was found in cache
+            }
+          } catch (error) {
+            console.error('Failed to retrieve cached result:', error);
+            // Continue to generate a new answer if there's an error in fetching from the cache
+          }
         }
 
-        console.log('processedQuery:', results.query);
-        console.log('piiMap:', results.pii_entities);
-        console.log('processedReferences:');
-        results.references.forEach((reference) => {
-          console.log(reference.content);
-        });
+        // No cache hit or cache not used, proceed with generation
+        setQueryInfo(null); // Indicates no cached data was used
 
         const controller = new AbortController();
-        setAbortController(controller); // Store it in state
+        setAbortController(controller);
 
         modelService!
           .generateAnswer(
@@ -344,19 +395,16 @@ function App() {
             results.references,
             (next) => {
               setAnswer((prev) => {
-                // Concatenate previous answer and the new part
                 const fullAnswer = prev + next;
-                // Return the final processed answer to update the state
                 return fullAnswer;
               });
             },
-            genAiProvider || undefined, // Convert null to undefined
+            genAiProvider || undefined,
             workflowId || undefined,
             undefined,
             controller.signal
           )
           .finally(() => {
-            // Cleanup after generation completes or is aborted
             setAbortController(null);
           });
       }
@@ -385,7 +433,33 @@ function App() {
 
   function openSource(ref: ReferenceInfo) {
     if (ref.sourceURL.includes('amazonaws.com')) {
-      modelService!.openAWSReference(ref);
+      modelService!.getSignedUrl(ref.sourceURL, 's3').then((signedURL) => {
+        if (signedURL) {
+          modelService!.openAWSReference(signedURL);
+        } else {
+          console.error('Failed to retrieve signed URL for S3 resource.');
+        }
+      });
+      return;
+    }
+    if (ref.sourceURL.includes('blob.core.windows.net')) {
+      modelService!.getSignedUrl(ref.sourceURL, 'azure').then((signedURL) => {
+        if (signedURL) {
+          modelService!.openAWSReference(signedURL);
+        } else {
+          console.error('Failed to retrieve signed URL for Azure resource.');
+        }
+      });
+      return;
+    }
+    if (ref.sourceURL.includes('storage.googleapis.com')) {
+      modelService!.getSignedUrl(ref.sourceURL, 'gcp').then((signedURL) => {
+        if (signedURL) {
+          modelService!.openAWSReference(signedURL);
+        } else {
+          console.error('Failed to retrieve signed URL for GCP resource.');
+        }
+      });
       return;
     }
     if (!ref.sourceName.toLowerCase().endsWith('.pdf')) {
@@ -441,6 +515,17 @@ function App() {
     }
   }
 
+  // These states and handleSaveClick are used inside <SearchBar/> and <SidePanel/>
+  const [modalOpen, setModalOpen] = useState(false);
+  const [showModelNameInput, setShowModelNameInput] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSaveClick = () => {
+    setModalOpen(true);
+    setShowModelNameInput(false);
+    setError('');
+  };
+
   return (
     <ModelServiceContext.Provider value={modelService}>
       {modelService && (
@@ -479,7 +564,10 @@ function App() {
               </UpvoteModalWrapper>
             )}
             <a href="/">
-              <Logo src={LogoImg.src} alt="Logo" />
+              <LogoContainer>
+                <Logo src={LogoImg.src} alt="Logo" />
+                {workflowName && <WorkflowName>{workflowName}</WorkflowName>}
+              </LogoContainer>
             </a>
             <TopRightCorner>
               {chatEnabled && (
@@ -489,7 +577,6 @@ function App() {
                 />
               )}
               <Spacer $width="40px" />
-              <Teach />
             </TopRightCorner>
             {chatMode ? (
               <Chat
@@ -518,6 +605,12 @@ function App() {
                     abortController={abortController}
                     setAbortController={setAbortController}
                     setAnswer={setAnswer}
+                    modalOpen={modalOpen}
+                    setModalOpen={setModalOpen}
+                    showModelNameInput={showModelNameInput}
+                    setShowModelNameInput={setShowModelNameInput}
+                    error={error}
+                    setError={setError}
                   />
                   {failed && (
                     <Pad $top="100px">
@@ -570,6 +663,14 @@ function App() {
                 )}
               </>
             )}
+            <SidePanel
+              chatEnabled={chatEnabled}
+              cacheEnabled={cacheEnabled}
+              setCacheEnabled={setCacheEnabled}
+              reRankingEnabled={reRankingEnabled}
+              setReRankingEnabled={setReRankingEnabled}
+              onSaveClick={handleSaveClick}
+            />
           </div>
         </Frame>
       )}

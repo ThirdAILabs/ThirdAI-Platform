@@ -42,5 +42,5 @@ images_to_pull_from_private = [
     "llama.cpp",
     "keycloak",
     "traefik",
-    "nomad-autoscalar",
+    "nomad-autoscaler",
 ]

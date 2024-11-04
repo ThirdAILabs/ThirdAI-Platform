@@ -135,7 +135,7 @@ class SingleMach(NDBModel):
         Returns:
             ndb.NeuralDB: The initialized NeuralDB instance.
         """
-        self.logger.info("Initializing a new NeuralDB instance.")
+        self.logger.info("Initializing a new NeuralDB instance with mach options.")
         return ndb.NeuralDB(
             fhr=self.mach_options.fhr,
             embedding_dimension=self.mach_options.embedding_dim,

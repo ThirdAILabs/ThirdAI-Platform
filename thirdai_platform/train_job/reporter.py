@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from logging import Logger
 from typing import Dict, Optional
 from urllib.parse import urljoin
 
@@ -11,16 +12,17 @@ class Reporter(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def report_status(self, model_id: str, status: str, message: str = ""):
+    def report_status(self, model_id: str, status: str, message: Optional[str] = None):
         raise NotImplementedError
 
 
 class HttpReporter(Reporter):
-    def __init__(self, api_url: str):
+    def __init__(self, api_url: str, logger: Logger):
         """
         Initialize the Reporter with the given API URL.
         """
         self._api = api_url
+        self.logger = logger
 
     def _request(self, method: str, suffix: str, *args, **kwargs) -> Optional[Dict]:
         """
@@ -40,12 +42,20 @@ class HttpReporter(Reporter):
         kwargs["headers"].update({"User-Agent": "Train job"})
 
         url = urljoin(self._api, suffix)
+
+        self.logger.info(f"Making {method.upper()} request to {url}")
+        self.logger.debug(f"Request headers: {kwargs.get('headers')}")
+        if "json" in kwargs:
+            self.logger.debug(f"Request JSON payload: {kwargs['json']}")
+        if "params" in kwargs:
+            self.logger.debug(f"Request query parameters: {kwargs['params']}")
         try:
             response = requests.request(method, url, *args, **kwargs)
             response.raise_for_status()
+            self.logger.debug(f"Response content: {response.json()}")
             return response.json()
         except requests.exceptions.RequestException as exception:
-            print(exception)
+            self.logger.error(f"Request to {url} failed with error: {exception}")
             raise exception
 
     def report_complete(self, model_id: str, metadata: Dict[str, str]):
@@ -59,8 +69,7 @@ class HttpReporter(Reporter):
             "model_id": model_id,
             "metadata": metadata,
         }
-        content = self._request("post", "api/train/complete", json=json_data)
-        print(content)
+        self._request("post", "api/train/complete", json=json_data)
 
     def report_status(self, model_id: str, status: str, message: str = ""):
         """
@@ -70,9 +79,8 @@ class HttpReporter(Reporter):
             status (str): The status of the training job.
             message (str, optional): Additional message. Defaults to "".
         """
-        content = self._request(
+        self._request(
             "post",
             "api/train/update-status",
             params={"model_id": model_id, "new_status": status, "message": message},
         )
-        print(content)

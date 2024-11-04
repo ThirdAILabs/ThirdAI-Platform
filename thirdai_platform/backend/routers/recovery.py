@@ -1,3 +1,4 @@
+import logging
 import os
 import traceback
 from pathlib import Path
@@ -67,7 +68,7 @@ def backup(config: BackupConfig):
             db_uri=db_uri,
         )
     except Exception as err:
-        traceback.print_exc()
+        logging.error(traceback.print_exc())
         return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(err)
         )

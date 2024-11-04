@@ -1,18 +1,33 @@
+import os
+import shutil
+import tempfile
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from llm_dispatch_job.main import app
-
-client = TestClient(app)
-
 
 pytestmark = [pytest.mark.unit]
+
+
+@pytest.fixture(autouse=True)
+def setup_and_teardown():
+    # Setup: create a temporary directory for the model_bazaar_dir
+    temp_dir = tempfile.mkdtemp()
+    os.environ["MODEL_BAZAAR_DIR"] = temp_dir
+
+    yield  # This allows the test to run after the setup
+
+    # Teardown: remove the temporary directory after the test completes
+    shutil.rmtree(temp_dir)
 
 
 @pytest.mark.parametrize("references", [[], ["Text from doc A", "Text from doc B"]])
 @pytest.mark.parametrize("prompt", [None, "This is a custom prompt"])
 def test_generate_text_stream(references, prompt):
+    from llm_dispatch_job.main import app
+
+    client = TestClient(app)
+
     async def mock_stream(*args, **kwargs):
         yield "This "
         yield "is "
@@ -39,6 +54,9 @@ def test_generate_text_stream(references, prompt):
 
 
 def test_missing_api_key():
+    from llm_dispatch_job.main import app
+
+    client = TestClient(app)
     request_data = {
         "query": "test query",
         "provider": "openai",
@@ -50,6 +68,9 @@ def test_missing_api_key():
 
 
 def test_unsupported_provider():
+    from llm_dispatch_job.main import app
+
+    client = TestClient(app)
     request_data = {
         "query": "test query",
         "provider": "unknown_provider",
@@ -62,6 +83,9 @@ def test_unsupported_provider():
 
 
 def test_invalid_request_body():
+    from llm_dispatch_job.main import app
+
+    client = TestClient(app)
     request_data = {
         # missing 'query' which is required
         "provider": "openai",
@@ -73,6 +97,9 @@ def test_invalid_request_body():
 
 
 def test_health_check():
+    from llm_dispatch_job.main import app
+
+    client = TestClient(app)
     response = client.get("/llm-dispatch/health")
     assert response.status_code == 200
     assert response.json() == {"status": "healthy"}

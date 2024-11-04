@@ -1,9 +1,10 @@
 import time
+from logging import Logger
 from pathlib import Path
 from typing import List
 
 import thirdai
-from platform_common.file_handler import expand_s3_buckets_and_directories
+from platform_common.file_handler import expand_cloud_buckets_and_directories
 from platform_common.pydantic_models.training import FileInfo, NDBv1Options, TrainConfig
 from thirdai import neural_db as ndb
 from train_job.exceptional_handler import apply_exception_handler
@@ -21,11 +22,11 @@ from train_job.utils import (
 class NDBModel(Model):
     report_failure_method = "report_status"
 
-    def __init__(self, config: TrainConfig, reporter: Reporter):
+    def __init__(self, config: TrainConfig, reporter: Reporter, logger: Logger):
         """
         Initialize the NDBModel with general and NeuralDB-specific options.
         """
-        super().__init__(config=config, reporter=reporter)
+        super().__init__(config=config, reporter=reporter, logger=logger)
         self.ndb_options: NDBv1Options = self.config.model_options.ndb_options
         self.model_save_path: Path = self.model_dir / "model.ndb"
         self.logger.info("NDBModel initialized with NeuralDB options.")
@@ -41,16 +42,20 @@ class NDBModel(Model):
         self.logger.info(f"Supervised checkpoint config created")
 
     def unsupervised_files(self) -> List[FileInfo]:
-        return expand_s3_buckets_and_directories(self.config.data.unsupervised_files)
+        return expand_cloud_buckets_and_directories(self.config.data.unsupervised_files)
 
     def supervised_files(self) -> List[FileInfo]:
-        all_files = expand_s3_buckets_and_directories(self.config.data.supervised_files)
+        all_files = expand_cloud_buckets_and_directories(
+            self.config.data.supervised_files
+        )
+        self.logger.info(f"Found {len(all_files)} supervised files.")
         check_csv_only(all_files)
         check_local_nfs_only(all_files)
         return all_files
 
     def test_files(self) -> List[FileInfo]:
-        all_files = expand_s3_buckets_and_directories(self.config.data.test_files)
+        all_files = expand_cloud_buckets_and_directories(self.config.data.test_files)
+        self.logger.info(f"Found {len(all_files)} test files.")
         check_csv_only(all_files)
         check_local_nfs_only(all_files)
         return all_files
@@ -146,7 +151,7 @@ class NDBModel(Model):
         db.search("Checking for latency", top_k=5)
 
         latency = time.time() - start_time
-        self.logger.info(f"Latency measured: {latency} seconds.")
+        self.logger.info(f"Latency measured: {latency:.4f} seconds.")
         return latency
 
     def save(self, db: ndb.NeuralDB):

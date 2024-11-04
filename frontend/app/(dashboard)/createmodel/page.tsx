@@ -19,7 +19,6 @@ export default async function NewModelPage({
       <Card style={{ width: '100%', maxWidth: '700px' }}>
         <CardHeader>
           <CardTitle>Create App</CardTitle>
-          <CardDescription>Create a new application with a few simple steps.</CardDescription>
         </CardHeader>
         <CardContent>
           <ChooseProblem />

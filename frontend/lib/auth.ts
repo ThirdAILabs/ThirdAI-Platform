@@ -1,3 +1,4 @@
+import { access } from 'fs';
 import { AuthOptions, TokenSet } from 'next-auth';
 import { JWT } from 'next-auth/jwt';
 import KeycloakProvider from 'next-auth/providers/keycloak';
@@ -48,28 +49,26 @@ export const authOptions: AuthOptions = {
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at;
-        console.log('JWT token updated with access token:', token);
         return token;
       }
+
       if (Date.now() < token.expiresAt! * 1000 - 60 * 1000) {
         return token;
       } else {
         try {
           const response = await requestRefreshOfAccessToken(token);
-
           const tokens: TokenSet = await response.json();
 
           if (!response.ok) throw tokens;
 
           const updatedToken: JWT = {
-            ...token, // Keep the previous token properties
+            ...token,
             idToken: tokens.id_token,
             accessToken: tokens.access_token,
             expiresAt: Math.floor(Date.now() / 1000 + (tokens.expires_in as number)),
             refreshToken: tokens.refresh_token ?? token.refreshToken,
           };
-          console.log('JWT token without account:', token);
-
+          console.log('Refreshed JWT token:', updatedToken);
           return updatedToken;
         } catch (error) {
           console.error('Error refreshing access token', error);
@@ -80,6 +79,7 @@ export const authOptions: AuthOptions = {
     async session({ session, token }) {
       session.accessToken = token.accessToken;
       session.error = token.error;
+      session.expiresAt = token.expiresAt;
       return session;
     },
   },

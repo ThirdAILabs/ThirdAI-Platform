@@ -1,7 +1,7 @@
 // app/NERQuestions.js
 import Link from 'next/link';
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@mui/material';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -235,7 +235,7 @@ const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) =>
                 value={category.description}
                 onChange={(e) => handleCategoryChange(index, 'description', e.target.value)}
               />
-              <Button variant="destructive" onClick={() => handleRemoveCategory(index)}>
+              <Button variant="contained" color="error" onClick={() => handleRemoveCategory(index)}>
                 Remove
               </Button>
             </div>
@@ -243,14 +243,16 @@ const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) =>
           <Button
             style={{ marginTop: '10px', width: 'fit-content' }}
             onClick={handleAddAndReviewCategory}
+            variant="contained"
           >
             Add Category
           </Button>
           {categories.length > 0 && (
             <Button
-              variant={isDataGenerating ? 'secondary' : 'default'}
+              variant="contained"
               style={{ marginTop: '30px' }}
               onClick={generateData}
+              color={isDataGenerating ? 'success' : 'primary'}
             >
               {isDataGenerating ? 'Generating data...' : 'Generate data'}
             </Button>
@@ -301,13 +303,13 @@ const SCQQuestions = ({ question, answer, workflowNames }: SCQQuestionsProps) =>
             }}
           >
             <Button
-              variant="outline"
+              variant="outlined"
               style={{ width: '100%' }}
               onClick={() => setGeneratedData([])}
             >
               Redefine Tokens
             </Button>
-            <Button style={{ width: '100%' }} onClick={handleCreateSCModel}>
+            <Button style={{ width: '100%' }} onClick={handleCreateSCModel} variant="contained">
               Create
             </Button>
           </div>

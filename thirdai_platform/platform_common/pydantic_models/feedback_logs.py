@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from typing import List, Literal, Union
 
@@ -16,6 +17,7 @@ class UpvoteLog(BaseModel):
 
     chunk_ids: List[int]
     queries: List[str]
+    reference_texts: List[str]
 
 
 class AssociateLog(BaseModel):
@@ -38,6 +40,16 @@ class FeedbackLog(BaseModel):
     event: Union[UpvoteLog, AssociateLog, ImplicitUpvoteLog] = Field(
         ..., discriminator="action"
     )
+
+    timestamp: str = Field(
+        default_factory=lambda: str(datetime.now().strftime("%d %B %Y %H:%M:%S"))
+    )
+    perform_rlhf_later: bool = True
+
+    def __lt__(self, other):
+        return datetime.strptime(
+            self.timestamp, "%d %B %Y %H:%M:%S"
+        ) > datetime.strptime(other.timestamp, "%d %B %Y %H:%M:%S")
 
 
 class InsertLog(BaseModel):

@@ -67,7 +67,6 @@ jobs:
       run: |
         python -m venv ${{ github.workspace }}/venv
         source venv/bin/activate
-        pip install -r docs/requirements.txt
         pip install -r headless/requirements.txt
         sudo pip install -r thirdai_platform/requirements.txt
         pip install -r thirdai_platform/requirements.txt
@@ -133,6 +132,10 @@ jobs:
         echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_ENV
         echo "GENAI_KEY=${{ secrets.GENAI_KEY }}" >> $GITHUB_ENV
 
+    - name: Create Google Application credentials file
+      run: |
+        echo '${{ secrets.GCP_CREDENTIALS_FILE }}' > $HOME/nfs/dir/google_license.json
+
     - name: Write All Environment Variables to .env File
       run: |
         echo "LICENSE_PATH=${{ github.workspace }}/thirdai_platform/tests/ndb_enterprise_license.json" >> $GITHUB_WORKSPACE/.env
@@ -152,6 +155,12 @@ jobs:
         echo "HASHICORP_VAULT_TOKEN=00000000-0000-0000-0000-000000000000" >> $GITHUB_WORKSPACE/.env
         echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_WORKSPACE/.env
         echo "PYTHON_PATH=${{ github.workspace }}/venv/bin/python" >> $GITHUB_WORKSPACE/.env
+        echo "AZURE_ACCOUNT_NAME=${{ secrets.AZURE_ACCOUNT_NAME }}" >> $GITHUB_WORKSPACE/.env
+        echo "AZURE_ACCOUNT_KEY=${{ secrets.AZURE_ACCOUNT_KEY }}" >> $GITHUB_WORKSPACE/.env
+        echo "GCP_CREDENTIALS_FILE=$HOME/nfs/dir/google_license.json" >> $GITHUB_WORKSPACE/.env
+        echo "AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}" >> $GITHUB_WORKSPACE/.env
+        echo "AWS_ACCESS_SECRET=${{ secrets.AWS_ACCESS_SECRET }}" >> $GITHUB_WORKSPACE/.env
+        echo "AWS_REGION_NAME=us-east-2" >> $GITHUB_WORKSPACE/.env
 
     - name: Launch Backend
       run: |

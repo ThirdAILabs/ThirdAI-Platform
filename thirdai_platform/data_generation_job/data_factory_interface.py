@@ -1,6 +1,6 @@
 import random
-import traceback
 from abc import ABC, abstractmethod
+from logging import Logger
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -15,8 +15,9 @@ from tqdm import tqdm
 
 
 class DataFactory(ABC):
-    def __init__(self):
+    def __init__(self, logger: Logger):
         self.general_variables: GeneralVariables = GeneralVariables.load_from_env()
+        self.logger = logger
         self.save_dir = Path(self.general_variables.storage_dir)
         self.llm_model = llm_classes.get(self.general_variables.llm_provider.value)(
             api_key=self.general_variables.genai_key,
@@ -46,13 +47,19 @@ class DataFactory(ABC):
 
         if self.train_file_location.exists():
             self.train_sentences_generated = count_csv_lines(self.train_file_location)
+            self.logger.info(
+                f"Train sentences previously generated count={self.train_sentences_generated}"
+            )
         else:
             self.train_sentences_generated = 0
 
         if self.test_file_location.exists():
-            self.train_sentences_generated = count_csv_lines(self.test_file_location)
+            self.test_sentences_generated = count_csv_lines(self.test_file_location)
+            self.logger.info(
+                f"Test sentences previously generated count={self.test_sentences_generated}"
+            )
         else:
-            self.train_sentences_generated = 0
+            self.test_sentences_generated = 0
 
     # Override this function to generate the data from LLM
     @abstractmethod
@@ -67,13 +74,17 @@ class DataFactory(ABC):
     # ------------------------------------------------
     ## Function to get random vocab and prompt to improve variability and randomness in the dataset
     def get_random_vocab(self, k: int = 1):
-        return random.sample(population=vocab, k=k)
+        vocab_sample = random.sample(population=vocab, k=k)
+        self.logger.debug(f"Random vocab sample={vocab_sample}")
+        return vocab_sample
 
     def get_random_prompts(self, k: int = 1):
-        return [
+        prompts_sample = [
             ". ".join(random.sample(prompts, k=k))
             for prompts in random_prompts.values()
         ]
+        self.logger.debug(f"Random prompts sample={prompts_sample}")
+        return prompts_sample
 
     # ------------------------------------------------
 
@@ -83,18 +94,20 @@ class DataFactory(ABC):
         texts_of = self.llm_model.completion(prompt=prompt, system_prompt=system_prompt)
         return texts_of, kwargs
 
-    """
-    Function to process the prompts parallely
-    args: task_prompt: List of prompts to process, List[Dict[str, str]]
-        Format of each argument:
-            prompt: Generation prompt to the LLM.
-            system_prompt: system prompt to the LLM.
-            kwargs: It is being used to store additional info about the prompt. It is not passed to LLM and returned as it is. (visit text_data_factory to see how it is being used)
-    """
-
     def run_and_collect_results(
         self, tasks_prompt: List[Dict[str, str]], parallelize: bool = False
     ):
+        """
+        Function to process the prompts parallely
+        args: task_prompt: List of prompts to process, List[Dict[str, str]]
+            Format of each argument:
+                prompt: Generation prompt to the LLM.
+                system_prompt: system prompt to the LLM.
+                kwargs: It is being used to store additional info about the prompt. It is not passed to LLM and returned as it is. (visit text_data_factory to see how it is being used)
+        """
+        self.logger.info(
+            f"Running tasks parallelize={parallelize}, total_tasks={len(tasks_prompt)}"
+        )
         data_points = []
         if parallelize:
             from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -124,17 +137,26 @@ class DataFactory(ABC):
                         )
 
                     except Exception as e:
-                        with open(self.errored_file_location, mode="a") as errored_fp:
-                            traceback.print_exc(file=errored_fp)
-                            errored_fp.write("\n" + "=" * 100 + "\n")
+                        error_message = f"Error during parallel task execution: {e}"
+                        self.logger.error(
+                            f"Parallel task execution error={error_message}"
+                        )
+                        self.write_on_errorfile(error_message)
         else:
             for task in tqdm(tasks_prompt, desc="Progress: ", leave=False):
-                response_text, kwargs = self.process_prompt(
-                    task["prompt"],
-                    task.get("system_prompt"),
-                    **(task.get("kwargs") or {}),
-                )
-                data_points.append({"response_text": response_text, "kwargs": kwargs})
+                try:
+                    response_text, kwargs = self.process_prompt(
+                        task["prompt"],
+                        task.get("system_prompt"),
+                        **(task.get("kwargs") or {}),
+                    )
+                    data_points.append(
+                        {"response_text": response_text, "kwargs": kwargs}
+                    )
+                except Exception as e:
+                    error_message = f"Error during serial task execution: {e}"
+                    self.logger.error(f"Serial task execution error={error_message}")
+                    self.write_on_errorfile(error_message)
 
         return data_points
 

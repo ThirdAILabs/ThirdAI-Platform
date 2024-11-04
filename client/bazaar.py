@@ -35,7 +35,7 @@ class ModelBazaar:
         self._login_instance = Login(base_url=base_url)
         self._username = None
         self._access_token = None
-        self._doc_types = ["local", "nfs", "s3"]
+        self._doc_types = ["local", "nfs", "s3", "azure", "gcp"]
 
     def sign_up(self, email, password, username):
         json_data = {
@@ -162,7 +162,7 @@ class ModelBazaar:
             unsupervised_docs (Optional[List[str]]): A list of document paths for unsupervised training.
             supervised_docs (Optional[List[Tuple[str, str]]]): A list of document path and source id pairs.
             test_doc (Optional[str]): A path to a test file for evaluating the trained NeuralDB.
-            doc_type (str): Specifies document location type : "local"(default), "nfs" or "s3".
+            doc_type (str): Specifies document location type : "local"(default), "nfs" , "s3", "azure" or "gcp".
             sharded (bool): Whether NeuralDB training will be distributed over NeuralDB shards.
             is_async (bool): Whether training should be asynchronous (default is False).
             train_extra_options: (Optional[dict])
@@ -217,10 +217,14 @@ class ModelBazaar:
             + [x[0] for x in (supervised_docs or [])]
             + ([test_doc] if test_doc else [])
         )
-        if doc_type == "local":
-            files = [("files", open(file_path, "rb")) for file_path in all_file_paths]
-        else:
-            files = []
+        files = [
+            (
+                ("files", open(file_path, "rb"))
+                if doc_type == "local"
+                else ("files", (file_path, "don't care"))
+            )
+            for file_path in all_file_paths
+        ]
 
         if model_options:
             files.append(
@@ -605,6 +609,7 @@ class ModelBazaar:
     def deploy(
         self,
         model_identifier: str,
+        deployment_name: Optional[str] = None,
         memory: Optional[int] = None,
         is_async=False,
         autoscaling_enabled=False,
@@ -623,6 +628,7 @@ class ModelBazaar:
         url = urljoin(self._base_url, f"deploy/run")
         params = {
             "model_identifier": model_identifier,
+            "deployment_name": deployment_name,
             "memory": memory,
             "autoscaling_enabled": autoscaling_enabled,
         }

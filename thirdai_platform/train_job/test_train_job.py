@@ -3,6 +3,7 @@ import shutil
 from typing import Dict
 
 import pytest
+from platform_common.logging import get_default_logger
 from platform_common.pydantic_models.feedback_logs import (
     AssociateLog,
     FeedbackLog,
@@ -44,6 +45,8 @@ class DummyReporter(Reporter):
 MODEL_BAZAAR_DIR = "./model_bazaar_tmp"
 
 THIRDAI_LICENSE = "236C00-47457C-4641C5-52E3BB-3D1F34-V3"
+
+default_logger = get_default_logger()
 
 
 def file_dir():
@@ -112,7 +115,7 @@ def run_ndb_train_job(ndb_options, extra_supervised_files=[]):
         job_options=JobOptions(),
     )
 
-    model = get_model(config, DummyReporter())
+    model = get_model(config, DummyReporter(), default_logger)
 
     model.train()
 
@@ -134,7 +137,11 @@ def test_ndbv1_train(ndb_options):
 @pytest.fixture()
 def feedback_train_file():
     logs = [
-        UpvoteLog(chunk_ids=[10], queries=["some random query to upvote"]),
+        UpvoteLog(
+            chunk_ids=[10],
+            queries=["some random query to upvote"],
+            reference_texts=["Corresponding reference text"],
+        ),
         AssociateLog(
             sources=["premier league teams"], targets=["arsenal and manchester united"]
         ),
@@ -194,7 +201,7 @@ def test_udt_text_train():
         job_options=JobOptions(),
     )
 
-    model = get_model(config, DummyReporter())
+    model = get_model(config, DummyReporter(), default_logger)
 
     model.train()
 
@@ -255,7 +262,7 @@ def test_udt_token_train():
         ),
     )
 
-    model = get_model(config, DummyReporter())
+    model = get_model(config, DummyReporter(), default_logger)
 
     model.train()
 

@@ -1,16 +1,20 @@
+import logging
+import traceback
+from pathlib import Path
+
 from dotenv import load_dotenv
+from platform_common.logging import setup_logger
 
 load_dotenv()
 
 import asyncio
-import logging
 import os
 from urllib.parse import urljoin
 
 import requests
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from llm_dispatch_job.llms import LLMBase, default_keys, model_classes
 from llm_dispatch_job.utils import GenerateArgs
 
@@ -24,9 +28,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+model_bazaar_dir = os.getenv("MODEL_BAZAAR_DIR")
+log_dir: Path = Path(model_bazaar_dir) / "logs"
+
+setup_logger(log_dir=log_dir, log_prefix="llm_generation")
+logger = logging.getLogger("llm_generation")
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    response = await call_next(request)
+
+    logger.info(
+        f"Request: {request.method}; URl: {request.url} - {response.status_code}"
+    )
+
+    return response
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    # Log the traceback
+    error_trace = traceback.format_exc()
+    logger.error(f"Exception occurred: {error_trace}")
+
+    # Return the exact exception message in the response
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)},
+    )
 
 
 @app.post("/llm-dispatch/generate")
@@ -80,13 +110,15 @@ async def generate(generate_args: GenerateArgs):
 
     key = generate_args.key or default_keys.get(generate_args.provider.lower())
     if not key:
+        logger.error("No generative AI key provided")
         raise HTTPException(status_code=400, detail="No generative AI key provided")
 
     llm_class = model_classes.get(generate_args.provider.lower())
     if llm_class is None:
+        logger.error(f"Unsupported provider '{generate_args.provider.lower()}'")
         raise HTTPException(status_code=400, detail="Unsupported provider")
 
-    logging.info(
+    logger.info(
         f"Received request from workflow: '{generate_args.workflow_id}'. "
         f"Starting generation with provider '{generate_args.provider.lower()}':",
     )
@@ -106,11 +138,11 @@ async def generate(generate_args: GenerateArgs):
                 generated_response += next_word
                 yield next_word
                 await asyncio.sleep(0)
-            logging.info(
+            logger.info(
                 f"\nCompleted generation for workflow '{generate_args.workflow_id}'.",
             )
         except Exception as e:
-            logging.error(f"Error during generation: {e}")
+            logger.error(f"Error during generation: {e}")
             raise HTTPException(
                 status_code=500, detail=f"Error while generating content: {e}"
             )
@@ -140,9 +172,11 @@ async def insert_into_cache(
             },
         )
         if res.status_code != 200:
-            logging.error(f"LLM Cache Insertion failed: {res}")
+            logger.error(
+                f"LLM Cache Insertion failed with status {res.status_code}: {res.text}"
+            )
     except Exception as e:
-        logging.error("LLM Cache Insert Error", e)
+        logger.error("LLM Cache Insert Error", e)
 
 
 @app.get("/llm-dispatch/health")
@@ -156,4 +190,5 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="localhost", port=8000)
+    logger.info("Starting LLM generation service...")
+    uvicorn.run(app, host="localhost", port=8000, log_level="info")

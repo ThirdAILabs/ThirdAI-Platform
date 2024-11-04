@@ -385,3 +385,21 @@ class Catalog(SQLDeclarativeBase):
     task = Column(ENUM(UDT_Task), nullable=False)
     num_generated_samples = Column(Integer)
     target_labels = Column(ARRAY(String), nullable=False)
+
+
+class JobError(SQLDeclarativeBase):
+    __tablename__ = "job_errors"
+
+    id = Column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+
+    model_id = Column(
+        UUID(as_uuid=True), ForeignKey("models.id", ondelete="CASCADE"), index=True
+    )
+    timestamp = Column(
+        DateTime, nullable=False, default=lambda: datetime.utcnow().isoformat()
+    )
+    job_type = Column(String(100), nullable=False)
+    status = Column(ENUM(Status), nullable=False)
+    message = Column(String)

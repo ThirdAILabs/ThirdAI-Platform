@@ -22,7 +22,7 @@ from deployment_job.chat import llm_providers
 from deployment_job.models.model import Model
 from deployment_job.pydantic_models import inputs
 from deployment_job.utils import highlighted_pdf_bytes, new_pdf_chunks, old_pdf_chunks
-from platform_common.file_handler import FileInfo, expand_s3_buckets_and_directories
+from platform_common.file_handler import FileInfo, expand_cloud_buckets_and_directories
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from thirdai import neural_db as ndb
 from thirdai import neural_db_v2 as ndbv2
@@ -34,8 +34,8 @@ class NDBModel(Model):
     Base class for NeuralDB (NDB) models.
     """
 
-    def __init__(self, config: DeploymentConfig):
-        super().__init__(config=config)
+    def __init__(self, config: DeploymentConfig, logger: logging.Logger):
+        super().__init__(config=config, logger=logger)
         self.chat_instances = {}
         self.chat_instance_lock = Lock()
 
@@ -124,7 +124,9 @@ class NDBModel(Model):
         with self.chat_instance_lock:
             if provider in self.chat_instances and self.chat_instances[provider]:
                 # Chat instance for this provider already exists, do not recreate
-                print(f"Chat instance for provider '{provider}' is already set.")
+                self.logger.info(
+                    f"Chat instance for provider '{provider}' is already set."
+                )
                 return
             try:
                 sqlite_db_path = os.path.join(
@@ -152,7 +154,11 @@ class NDBModel(Model):
                     base_url=self.config.model_bazaar_endpoint,
                     **kwargs,
                 )
+                self.logger.info(f"Chat instance set for provider '{provider}'")
             except Exception:
+                self.logger.error(
+                    f"Error setting chat instance for provider '{provider}': {traceback.format_exc()}"
+                )
                 traceback.print_exc()
                 self.chat_instances[provider] = None
 
@@ -177,12 +183,16 @@ class NDBV1Model(NDBModel):
     Base class for NeuralDBV1 (NDB) models.
     """
 
-    def __init__(self, config: DeploymentConfig, write_mode: bool = False) -> None:
+    def __init__(
+        self, config: DeploymentConfig, logger: logging.Logger, write_mode: bool = False
+    ) -> None:
         """
         Initializes NDB model with paths and NeuralDB.
         """
-        super().__init__(config=config)
+        super().__init__(config=config, logger=logger)
+        self.db_lock = Lock()
         self.model_path: Path = self.model_dir / "model.ndb"
+        self.logger.info(f"Loading NDBV1 model from {self.model_path}")
         self.db: ndb.NeuralDB = self.load(write_mode=write_mode)
         self.set_chat(provider=self.config.model_options.llm_provider)
 
@@ -193,12 +203,13 @@ class NDBV1Model(NDBModel):
         Upvotes entries in the NDB model.
         """
 
-        self.db.text_to_result_batch(
-            text_id_pairs=[
-                (text_id_pair.query_text, text_id_pair.reference_id)
-                for text_id_pair in text_id_pairs
-            ]
-        )
+        with self.db_lock:
+            self.db.text_to_result_batch(
+                text_id_pairs=[
+                    (text_id_pair.query_text, text_id_pair.reference_id)
+                    for text_id_pair in text_id_pairs
+                ]
+            )
 
     def predict(
         self,
@@ -219,14 +230,28 @@ class NDBV1Model(NDBModel):
             )
             for key in constraints.keys()
         }
-        references = self.db.search(
-            query=query,
-            top_k=top_k,
-            constraints=ndb_constraints,
-            rerank=rerank,
-            top_k_rerank=2 * top_k,
-            top_k_threshold=top_k,
-        )
+
+        if self.config.autoscaling_enabled:
+            # No write operations with autoscaling, so no need for lock
+            references = self.db.search(
+                query=query,
+                top_k=top_k,
+                constraints=ndb_constraints,
+                rerank=rerank,
+                top_k_rerank=2 * top_k,
+                top_k_threshold=top_k,
+            )
+        else:
+            with self.db_lock:
+                references = self.db.search(
+                    query=query,
+                    top_k=top_k,
+                    constraints=ndb_constraints,
+                    rerank=rerank,
+                    top_k_rerank=2 * top_k,
+                    top_k_threshold=top_k,
+                )
+
         pydantic_references = [
             inputs.convert_reference_to_pydantic(ref, context_radius=context_radius)
             for ref in references
@@ -243,23 +268,27 @@ class NDBV1Model(NDBModel):
         """
         Associates entries in the NDB model.
         """
-        self.db.associate_batch(
-            text_pairs=[
-                (text_pair.source, text_pair.target) for text_pair in text_pairs
-            ]
-        )
+        with self.db_lock:
+            self.db.associate_batch(
+                text_pairs=[
+                    (text_pair.source, text_pair.target) for text_pair in text_pairs
+                ]
+            )
 
     def sources(self) -> List[Dict[str, str]]:
         """
         Retrieves sources from the NDB model.
         """
+        with self.db_lock:
+            docs = self.db._savable_state.documents.registry.values()
+
         return sorted(
             [
                 {
                     "source": doc.source,
                     "source_id": doc.hash,
                 }
-                for doc, _ in self.db._savable_state.documents.registry.values()
+                for doc, _ in docs
             ],
             key=lambda source: source["source"],
         )
@@ -268,7 +297,8 @@ class NDBV1Model(NDBModel):
         """
         Deletes entries from the NDB model.
         """
-        self.db.delete(source_ids=source_ids)
+        with self.db_lock:
+            self.db.delete(source_ids=source_ids)
 
     def insert(self, documents: List[FileInfo], **kwargs: Any) -> List[Dict[str, str]]:
         """
@@ -276,10 +306,11 @@ class NDBV1Model(NDBModel):
         """
         ndb_docs = [
             ndbv1_parser.parse_doc(doc, self.data_dir)
-            for doc in expand_s3_buckets_and_directories(documents)
+            for doc in expand_cloud_buckets_and_directories(documents)
         ]
 
-        self.db.insert(ndb_docs)
+        with self.db_lock:
+            self.db.insert(ndb_docs)
 
         return [
             {
@@ -290,12 +321,14 @@ class NDBV1Model(NDBModel):
         ]
 
     def highlight_pdf(self, reference_id: int) -> Tuple[str, Optional[bytes]]:
-        reference = self.db._savable_state.documents.reference(reference_id)
+        with self.db_lock:
+            reference = self.db._savable_state.documents.reference(reference_id)
         return reference.source, highlighted_pdf_bytes(reference)
 
     def chunks(self, reference_id: int) -> Optional[Dict[str, Any]]:
-        reference = self.db.reference(reference_id)
-        chunks = new_pdf_chunks(self.db, reference)
+        with self.db_lock:
+            reference = self.db.reference(reference_id)
+            chunks = new_pdf_chunks(self.db, reference)
         if chunks:
             return chunks
         return old_pdf_chunks(self.db, reference)
@@ -320,7 +353,7 @@ class NDBV1Model(NDBModel):
                 if model_path.exists():
                     backup_id = str(uuid.uuid4())
                     backup_path = self.get_ndb_path(backup_id)
-                    print(f"Creating backup: {backup_id}")
+                    self.logger.info(f"Creating backup: {backup_id}")
                     shutil.copytree(model_path, backup_path)
 
                 if model_path.exists():
@@ -344,9 +377,13 @@ class NDBV1Model(NDBModel):
 
 
 class NDBV2Model(NDBModel):
-    def __init__(self, config: DeploymentConfig, write_mode: bool = False):
-        super().__init__(config=config)
+    def __init__(
+        self, config: DeploymentConfig, logger: logging.Logger, write_mode: bool = False
+    ):
+        super().__init__(config=config, logger=logger)
 
+        self.db_lock = Lock()
+        self.logger.info(f"Loading NDBV2 model from {self.ndb_save_path()}")
         self.db = self.load(write_mode=write_mode)
         self.set_chat(provider=self.config.model_options.llm_provider)
 
@@ -385,9 +422,15 @@ class NDBV2Model(NDBModel):
             for key, constraint in constraints.items()
         }
 
-        results = self.db.search(
-            query=query, top_k=top_k, constraints=constraints, rerank=rerank
-        )
+        if self.config.autoscaling_enabled:
+            results = self.db.search(
+                query=query, top_k=top_k, constraints=constraints, rerank=rerank
+            )
+        else:
+            with self.db_lock:
+                results = self.db.search(
+                    query=query, top_k=top_k, constraints=constraints, rerank=rerank
+                )
 
         results = [self.chunk_to_pydantic_ref(chunk, score) for chunk, score in results]
 
@@ -400,10 +443,19 @@ class NDBV2Model(NDBModel):
             ndbv2_parser.parse_doc(
                 doc, doc_save_dir=self.doc_save_path(), tmp_dir=self.data_dir
             )
-            for doc in expand_s3_buckets_and_directories(documents)
+            for doc in expand_cloud_buckets_and_directories(documents)
         ]
 
-        self.db.insert(ndb_docs)
+        with self.db_lock:
+            self.db.insert(ndb_docs)
+
+            upsert_doc_ids = [
+                doc.doc_id
+                for doc in documents
+                if doc.doc_id and doc.options.get("upsert", False)
+            ]
+            for doc_id in upsert_doc_ids:
+                self.db.delete_doc(doc_id, keep_latest_version=True)
 
         return [
             {
@@ -418,20 +470,25 @@ class NDBV2Model(NDBModel):
     ) -> None:
         queries = [t.query_text for t in text_id_pairs]
         chunk_ids = [t.reference_id for t in text_id_pairs]
-        self.db.upvote(queries=queries, chunk_ids=chunk_ids, **kwargs)
+        with self.db_lock:
+            self.db.upvote(queries=queries, chunk_ids=chunk_ids, **kwargs)
 
     def associate(
         self, text_pairs: List[inputs.AssociateInputSingle], **kwargs: Any
     ) -> None:
         sources = [t.source for t in text_pairs]
         targets = [t.target for t in text_pairs]
-        self.db.associate(sources=sources, targets=targets, **kwargs)
+        with self.db_lock:
+            self.db.associate(sources=sources, targets=targets, **kwargs)
 
     def delete(self, source_ids: List[str], **kwargs: Any) -> None:
-        for id in source_ids:
-            self.db.delete_doc(doc_id=id)
+        with self.db_lock:
+            for id in source_ids:
+                self.db.delete_doc(doc_id=id)
 
     def sources(self) -> List[Dict[str, str]]:
+        with self.db_lock:
+            docs = self.db.documents()
         return sorted(
             [
                 {
@@ -439,7 +496,7 @@ class NDBV2Model(NDBModel):
                     "source_id": doc["doc_id"],
                     "version": doc["doc_version"],
                 }
-                for doc in self.db.documents()
+                for doc in docs
             ],
             key=lambda x: x["source"],
         )
@@ -470,7 +527,8 @@ class NDBV2Model(NDBModel):
         return source, doc.tobytes()
 
     def highlight_pdf(self, chunk_id: int) -> Tuple[str, Optional[bytes]]:
-        chunk = self.db.chunk_store.get_chunks([chunk_id])
+        with self.db_lock:
+            chunk = self.db.chunk_store.get_chunks([chunk_id])
         if not chunk:
             raise ValueError(f"{chunk_id} is not a valid chunk_id")
         chunk = chunk[0]
@@ -483,15 +541,16 @@ class NDBV2Model(NDBModel):
             return self.full_source_path(chunk.document), None
 
     def chunks(self, chunk_id: int) -> Optional[Dict[str, Any]]:
-        chunk = self.db.chunk_store.get_chunks([chunk_id])
-        if not chunk:
-            raise ValueError(f"{chunk_id} is not a valid chunk_id")
-        chunk = chunk[0]
+        with self.db_lock:
+            chunk = self.db.chunk_store.get_chunks([chunk_id])
+            if not chunk:
+                raise ValueError(f"{chunk_id} is not a valid chunk_id")
+            chunk = chunk[0]
 
-        chunk_ids = self.db.chunk_store.get_doc_chunks(
-            doc_id=chunk.doc_id, before_version=chunk.doc_version + 1
-        )
-        chunks = self.db.chunk_store.get_chunks(chunk_ids)
+            chunk_ids = self.db.chunk_store.get_doc_chunks(
+                doc_id=chunk.doc_id, before_version=chunk.doc_version + 1
+            )
+            chunks = self.db.chunk_store.get_chunks(chunk_ids)
 
         chunks = list(filter(lambda c: c.doc_version == chunk.doc_version, chunks))
 
@@ -537,7 +596,7 @@ class NDBV2Model(NDBModel):
                 if model_path.exists():
                     backup_id = str(uuid.uuid4())
                     backup_path = self.get_ndb_path(backup_id)
-                    print(f"Creating backup: {backup_id}")
+                    self.logger.info(f"Creating backup: {backup_id}")
                     shutil.copytree(model_path, backup_path)
 
                 if model_path.exists():
@@ -548,7 +607,7 @@ class NDBV2Model(NDBModel):
                     shutil.rmtree(backup_path.parent)
 
         except Exception as err:
-            logging.error(f"Failed while saving with error: {err}")
+            self.logger.error(f"Failed while saving with error: {err}")
             traceback.print_exc()
 
             if backup_path is not None and backup_path.exists():

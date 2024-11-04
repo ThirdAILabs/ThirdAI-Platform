@@ -48,7 +48,15 @@ def test_ndb_retraining_log_feedback_from_read_only_users():
     ndb_client.login_instance = user_client._login_instance
 
     ndb_client.associate([{"source": "my source query", "target": "my target query"}])
-    ndb_client.upvote([{"query_text": "a query to upvote", "reference_id": 0}])
+    ndb_client.upvote(
+        [
+            {
+                "query_text": "a query to upvote",
+                "reference_id": 0,
+                "reference_text": "This is the corresponding reference text",
+            }
+        ]
+    )
 
     res = requests.post(
         urljoin(ndb_client.base_url, "implicit-feedback"),
@@ -109,7 +117,15 @@ def test_ndb_retraining_autoscaling_mode():
     admin_client.await_deploy(ndb_client)
 
     ndb_client.associate([{"source": "my source query", "target": "my target query"}])
-    ndb_client.upvote([{"query_text": "a query to upvote", "reference_id": 0}])
+    ndb_client.upvote(
+        [
+            {
+                "query_text": "a query to upvote",
+                "reference_id": 0,
+                "reference_text": "This is the corresponding reference text",
+            }
+        ]
+    )
 
     ndb_client.insert(
         [

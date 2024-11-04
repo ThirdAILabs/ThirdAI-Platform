@@ -40,8 +40,15 @@ job "deployment-{{ model_id }}" {
 
       tags = [
         "traefik.enable=true",
+        "traefik.http.routers.{{ model_id }}-http.middlewares={{ model_id }}-stripprefix",
+        {% if deployment_name %}
+        "traefik.http.routers.{{ model_id }}-http.rule=(PathPrefix(`/{{ model_id }}/`) || PathPrefix(`/{{ deployment_name }}/`))",
+        "traefik.http.middlewares.{{ model_id }}-stripprefix.stripprefix.prefixes=/{{ model_id }},/{{ deployment_name }}",
+        {% else %}
         "traefik.http.routers.{{ model_id }}-http.rule=PathPrefix(`/{{ model_id }}/`)",
-        "traefik.http.routers.{{ model_id }}-http.priority=10"
+        "traefik.http.middlewares.{{ model_id }}-stripprefix.stripprefix.prefixes=/{{ model_id }}",
+        {% endif %}
+        "traefik.http.routers.{{ model_id }}-http.priority=10",
       ]
     }
 
@@ -70,7 +77,11 @@ EOF
         CONFIG_PATH = "{{ config_path }}"
         AWS_ACCESS_KEY = "{{ aws_access_key }}"
         AWS_ACCESS_SECRET = "{{ aws_access_secret }}"
+        AWS_REGION_NAME = "{{ aws_region_name }}"
         TASK_RUNNER_TOKEN = "${TASK_RUNNER_TOKEN}"
+        AZURE_ACCOUNT_NAME = "{{ azure_account_name }}"
+        AZURE_ACCOUNT_KEY = "{{ azure_account_key }}"
+        GCP_CREDENTIALS_FILE = "{{ gcp_credentials_file }}"
       }
 
       config {

@@ -15,7 +15,6 @@ def exception_handler(report_method, logger):
                 result = func(*args, **kwargs)
                 return result
             except Exception as e:
-                print(f"Exception caught in {func.__name__}: {e}")
                 logger.error(f"Exception in {func.__name__}: {e}", exc_info=True)
                 instance = args[0]
                 if hasattr(instance, "reporter") and hasattr(
@@ -25,7 +24,7 @@ def exception_handler(report_method, logger):
                     general_variables = instance.general_variables
                     report_func = getattr(reporter, report_method, None)
                     if report_func:
-                        print(f"Reporting error using {report_method}")
+                        logger.info(f"Reporting error using {report_method}")
                         if report_method == "report_shard_train_status":
                             shard_variables = instance.shard_variables
                             report_func(
@@ -41,7 +40,7 @@ def exception_handler(report_method, logger):
                                 message=str(e),
                             )
                 else:
-                    print("No reporter or general_variables found in instance")
+                    logger.error("No reporter or general_variables found in instance")
 
                 sys.exit(0)
 

@@ -22,22 +22,7 @@ export default function Page() {
       </header>
 
       <main className="pt-24">
-        {' '}
-        {/* Adjust padding-top to account for fixed header */}
-        <Tabs defaultValue="interact" className="w-full">
-          <div className="flex justify-center mb-4">
-            <TabsList style={{ backgroundColor: 'rgba(0,0,0,0.05)' }}>
-              <TabsTrigger value="interact">Interact</TabsTrigger>
-              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            </TabsList>
-          </div>
-          <TabsContent value="interact">
-            <Interact />
-          </TabsContent>
-          <TabsContent value="dashboard">
-            <Dashboard />
-          </TabsContent>
-        </Tabs>
+        <Interact />
       </main>
     </div>
   );
