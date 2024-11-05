@@ -303,12 +303,18 @@ def get_model_from_identifier(model_identifier, session):
     try:
         model_username, model_name = parse_model_identifier(model_identifier)
     except Exception as error:
-        raise ValueError(str(error))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unable to parse model identifier: {error}",
+        )
     model: schema.Model = get_model(
         session, username=model_username, model_name=model_name
     )
     if not model:
-        raise ValueError("There is no model with the given name.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"There is no model with name {model_identifier}.",
+        )
     return model
 
 
