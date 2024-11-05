@@ -36,7 +36,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, StreamingResponse
 from platform_common.utils import response
 from pydantic import BaseModel
-from sqlalchemy import and_, or_, desc
+from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 from storage import interface, local
 
