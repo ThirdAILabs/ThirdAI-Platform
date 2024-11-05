@@ -36,7 +36,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, StreamingResponse
 from platform_common.utils import response
 from pydantic import BaseModel
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, desc
 from sqlalchemy.orm import Session, joinedload, selectinload
 from storage import interface, local
 
@@ -88,11 +88,15 @@ def list_models(
     user: schema.User = authenticated_user.user
     user_teams = [ut.team_id for ut in user.teams]
 
-    query = session.query(schema.Model).options(
-        joinedload(schema.Model.user),
-        selectinload(schema.Model.attributes),
-        selectinload(schema.Model.dependencies),
-        selectinload(schema.Model.used_by),
+    query = (
+        session.query(schema.Model)
+        .options(
+            joinedload(schema.Model.user),
+            selectinload(schema.Model.attributes),
+            selectinload(schema.Model.dependencies),
+            selectinload(schema.Model.used_by),
+        )
+        .order_by(desc(schema.Model.published_date))
     )
 
     if name:
