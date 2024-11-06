@@ -445,6 +445,9 @@ class NDBV2Model(NDBModel):
             )
             for doc in expand_cloud_buckets_and_directories(documents)
         ]
+        ndb_docs = [doc for doc in ndb_docs if doc is not None]
+        if not ndb_docs:
+            return []
 
         with self.db_lock:
             self.db.insert(ndb_docs)

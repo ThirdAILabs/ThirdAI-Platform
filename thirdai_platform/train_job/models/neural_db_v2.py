@@ -112,6 +112,7 @@ class NeuralDBV2(Model):
                     next_batch = None
 
                 index_start = time.perf_counter()
+                curr_batch = [doc for doc in curr_batch if doc is not None]
                 self.db.insert(curr_batch)
                 index_end = time.perf_counter()
 
