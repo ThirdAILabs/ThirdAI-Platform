@@ -1,0 +1,74 @@
+name: Deploy ThirdAI on CI Machine
+
+on:
+  push:
+    branches: ["packaging-tests"]
+
+jobs:
+  deploy:
+    runs-on: packaging-linux
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update
+          sudo snap install aws-cli --classic
+
+      - name: Configure AWS credentials
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set region us-east-1
+
+      - name: Verify AWS CLI Setup
+        run: |
+          aws --version
+          aws sts get-caller-identity
+
+      - name: Set Environment Variables
+        run: |
+          echo "Setting up environment variables"
+          echo "MACHINE_IP=52.53.214.104" >> $GITHUB_ENV
+          echo "PACKAGE_AWS_S3_PATH=https://thirdai-corp-public.s3.us-east-2.amazonaws.com/ThirdAI-Platform-latest-release/thirdai-platform-package-release-test-main-v0.0.80.tar.gz" >> $GITHUB_ENV
+          echo "BRANCH_NAME=packaging-tests" >> $GITHUB_ENV
+
+      - name: Download and Extract the Package
+        run: |
+          mkdir -p unzip_thirdai_platform
+          wget $PACKAGE_AWS_S3_PATH
+          mv thirdai-platform-package-release-test-main-v0.0.80.tar.gz ./thirdai-platform-package.tar.gz
+
+          tar -xzvf thirdai-platform-package.tar.gz -C unzip_thirdai_platform
+
+      - name: Install yq for YAML parsing
+        run: |
+          sudo add-apt-repository ppa:rmescandon/yq
+          sudo apt update
+          sudo apt install yq -y
+
+      - name: Update config.yml with Public IP
+        run: |
+          yq e ".nodes[0].public_ip = \"$MACHINE_IP\"" -i ./packaging/ci-tests/config.yml
+
+      - name: Use updated driver.sh
+        run: |
+          cp ./packaging/driver.sh ./unzip_thirdai_platform/driver.sh
+
+      - name: Make driver.sh Executable
+        run: chmod +x unzip_thirdai_platform/driver.sh
+
+      - name: Change platform branch
+        run: |
+          cd unzip_thirdai_platform/platform
+          git checkout cleanup
+
+      - name: Run Deployment Script
+        run: |
+          unzip_thirdai_platform/driver.sh --branch "$BRANCH_NAME" ./packaging/ci-tests/config.yml -v
+
+      - name: Verify Deployment
+        run: |
+          echo "Deployment completed for machine with IP: $MACHINE_IP"

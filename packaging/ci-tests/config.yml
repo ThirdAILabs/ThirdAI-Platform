@@ -1,0 +1,30 @@
+license_path: "/home/ubuntu/ndb_enterprise_license.json"
+jwt_secret: "your-secure-jwt-secret"
+admin_mail: "admin@mail.com"
+admin_username: "admin"
+admin_password: "password"
+genai_key: "your-openai-api-key"
+thirdai_platform_version: "latest"
+autoscaling_enabled: true
+autoscaler_max_count: 3
+self_hosted_sql_server: true
+create_nfs_server: true
+restore_path: ""
+login_method: "keycloak"
+nodes:
+  - name: "node1"
+    public_ip: "52.53.214.104"
+    private_ip: "172.31.4.51"
+    ssh_username: "ubuntu"
+    connection_type: "local"
+    private_key: ""
+    ssh_common_args: ""
+    roles:
+      nomad_server: true
+      web_ingress:
+        run_jobs: true
+      sql_server:
+        database_dir: "/opt/thirdai_platform/database"
+        database_password: "S123kP923wX311TqZ523v"
+      shared_file_system:
+        shared_dir: "/opt/thirdai_platform/model_bazaar"
