@@ -2,6 +2,7 @@ import heapq
 import json
 import logging
 import os
+import pathlib
 import traceback
 from collections import defaultdict
 from pathlib import Path
@@ -42,10 +43,17 @@ from platform_common.pydantic_models.deployment import (
 )
 from platform_common.pydantic_models.feedback_logs import ActionType, FeedbackLog
 from platform_common.pydantic_models.training import ModelType
-from platform_common.utils import response
+from platform_common.utils import get_section, response
 from sqlalchemy.orm import Session
 
 deploy_router = APIRouter()
+
+root_folder = pathlib.Path(__file__).parent
+
+docs_file = root_folder.joinpath("../../docs/deploy_endpoints.txt")
+
+with open(docs_file) as f:
+    docs = f.read()
 
 
 def model_read_write_permissions(
@@ -107,7 +115,11 @@ def model_owner_permissions(
     return model.get_owner_permission(authenticated_user.user)
 
 
-@deploy_router.get("/permissions/{model_id}")
+@deploy_router.get(
+    "/permissions/{model_id}",
+    summary="Get Model Permissions",
+    description=get_section(docs, "Get Model Permissions"),
+)
 def get_model_permissions(
     model_id: str,
     session: Session = Depends(get_session),
@@ -115,21 +127,6 @@ def get_model_permissions(
         verify_access_token_no_throw
     ),
 ):
-    """
-    Get the permissions for a model.
-
-    Parameters:
-    - model_id: The ID of the model.
-    - session: The database session (dependency).
-    - authenticated_user: The authenticated user (dependency).
-
-    Example Usage:
-    ```json
-    {
-       "model_id" : "model_id",
-    }
-    ```
-    """
     read, write = model_read_write_permissions(model_id, session, authenticated_user)
     override = model_owner_permissions(model_id, session, authenticated_user)
     exp = (
@@ -296,7 +293,12 @@ async def deploy_single_model(
         )
 
 
-@deploy_router.post("/run", dependencies=[Depends(is_model_owner)])
+@deploy_router.post(
+    "/run",
+    dependencies=[Depends(is_model_owner)],
+    summary="Deploy Model",
+    description=get_section(docs, "Deploy Model"),
+)
 async def deploy_model(
     model_identifier: str,
     deployment_name: Optional[str] = None,
@@ -307,33 +309,6 @@ async def deploy_model(
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
-    """
-    Deploy a model.
-
-    Parameters:
-    - model_identifier: The identifier of the model to deploy.
-    - deployment_name: Optional name to use as a prefix for the deployment. If specified
-      the deployment endpoints will be accessible via /{deployment_name}/{endpoint} in
-      addition to the default deployment url.
-    - memory: Optional memory allocation for the deployment.
-    - autoscaling_enabled: Whether autoscaling is enabled.
-    - autoscaler_max_count: The maximum count for the autoscaler.
-    - genai_key: Optional GenAI key.
-    - session: The database session (dependency).
-    - authenticated_user: The authenticated user (dependency).
-
-    Example Usage:
-    ```json
-    {
-        "deployment_name": "my_deployment",
-        "model_identifier": "model_123",
-        "memory": 2048,
-        "autoscaling_enabled": true,
-        "autoscaler_max_count": 5,
-        "genai_key": "your_genai_key"
-    }
-    ```
-    """
     user = authenticated_user.user
 
     try:
@@ -374,49 +349,17 @@ async def deploy_model(
     )
 
 
-@deploy_router.get("/feedbacks", dependencies=[Depends(is_model_owner)])
+@deploy_router.get(
+    "/feedbacks",
+    dependencies=[Depends(is_model_owner)],
+    summary="Get Feedbacks",
+    description=get_section(docs, "Get Feedbacks"),
+)
 def get_feedback(
     model_identifier: str,
     per_event_count: Annotated[int, Query(gt=0)] = 5,
     session: Session = Depends(get_session),
 ):
-    """
-    Get the recent feedback of the model
-
-    Parameters:
-    - model_identifier: The identifier of the model to deploy.
-    - session: The database session (dependency).
-
-    Example Usage:
-    ```json
-    {
-        "model_identifier": "user/model_123",
-    }
-    ```
-
-    response:
-    ```json
-    {
-        "upvote": [
-            {
-                "query": "This is the query",
-                "reference_text": "This is the result upvoted",
-                "reference_id": 15
-                "timestamp": "17 October 2024 17:54:11",
-            },
-            ..
-        ],
-        "associate": [
-            {
-                "source": "This is the source text",
-                "target": "This is the target text",
-                "timestamp": "18 October 2024 17:49:43",
-            },
-            ..
-        ]
-    }
-    ```
-    """
     try:
         model: schema.Model = get_model_from_identifier(model_identifier, session)
     except Exception as error:
@@ -521,25 +464,16 @@ def get_feedback(
     )
 
 
-@deploy_router.get("/status", dependencies=[Depends(verify_model_read_access)])
+@deploy_router.get(
+    "/status",
+    dependencies=[Depends(verify_model_read_access)],
+    summary="Deployment Status",
+    description=get_section(docs, "Deployment Status"),
+)
 def deployment_status(
     model_identifier: str,
     session: Session = Depends(get_session),
 ):
-    """
-    Get the status of a deployment.
-
-    Parameters:
-    - model_identifier: The identifier of the model.
-    - session: The database session (dependency).
-
-    Example Usage:
-    ```json
-    {
-        "model_identifier": "user123/model_name"
-    }
-    ```
-    """
     try:
         model: schema.Model = get_model_from_identifier(model_identifier, session)
     except Exception as error:
@@ -563,29 +497,17 @@ def deployment_status(
     )
 
 
-@deploy_router.post("/update-status")
+@deploy_router.post(
+    "/update-status",
+    summary="Update Deployment Status",
+    description=get_section(docs, "Update Deployment Status"),
+)
 def update_deployment_status(
     model_id: str,
     new_status: schema.Status,
     message: Optional[str] = None,
     session: Session = Depends(get_session),
 ):
-    """
-    Update the status of a deployment.
-
-    Parameters:
-    - model_id: The ID of the model.
-    - status: The new status for the deployment.
-    - session: The database session (dependency).
-
-    Example Usage:
-    ```json
-    {
-        "model_id": "model_id",
-        "status": "in_progress"
-    }
-    ```
-    """
     model: schema.Model = (
         session.query(schema.Model).filter(schema.Model.id == model_id).first()
     )
@@ -633,25 +555,16 @@ def active_deployments_using_model(model_id: str, session: Session):
     )
 
 
-@deploy_router.post("/stop", dependencies=[Depends(is_model_owner)])
+@deploy_router.post(
+    "/stop",
+    dependencies=[Depends(is_model_owner)],
+    summary="Stop Deployment",
+    description=get_section(docs, "Stop Deployment"),
+)
 def undeploy_model(
     model_identifier: str,
     session: Session = Depends(get_session),
 ):
-    """
-    Stop a running deployment.
-
-    Parameters:
-    - model_identifier: The identifier of the model to stop.
-    - session: The database session (dependency).
-
-    Example Usage:
-    ```json
-    {
-        "model_identifier": "user123/model123"
-    }
-    ```
-    """
     try:
         model: schema.Model = get_model_from_identifier(model_identifier, session)
     except Exception as error:
@@ -691,7 +604,11 @@ def undeploy_model(
     )
 
 
-@deploy_router.get("/active-deployment-count")
+@deploy_router.get(
+    "/active-deployment-count",
+    summary="Active Deployment Count",
+    description=get_section(docs, "Active Deployment Count"),
+)
 def active_deployment_count(model_id: str, session: Session = Depends(get_session)):
     return response(
         status_code=status.HTTP_200_OK,
@@ -704,7 +621,7 @@ def active_deployment_count(model_id: str, session: Session = Depends(get_sessio
     )
 
 
-@deploy_router.post("/start-on-prem")
+@deploy_router.post("/start-on-prem", include_in_schema=False)
 async def start_on_prem_job(
     model_name: str = "Llama-3.2-1B-Instruct-f16.gguf",
     restart_if_exists: bool = True,
@@ -730,7 +647,12 @@ async def start_on_prem_job(
     )
 
 
-@deploy_router.get("/logs", dependencies=[Depends(verify_model_read_access)])
+@deploy_router.get(
+    "/logs",
+    dependencies=[Depends(verify_model_read_access)],
+    summary="Get Logs",
+    description=get_section(docs, "Get Logs"),
+)
 def train_logs(
     model_identifier: str,
     session: Session = Depends(get_session),

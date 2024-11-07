@@ -1,0 +1,435 @@
+## Get Model Details
+
+**Description**: Retrieve details for a specific model.
+
+**Dependencies**:
+- **verify_model_read_access_from_id**: Ensures read access to the model.
+
+**Sample Request**:
+GET /details?model_id=12345
+
+**Sample Responses**:
+
+- `200 OK`: Successfully retrieved model details.
+```json
+{
+    "status_code": 200,
+    "message": "Successfully retrieved model details.",
+    "data": {
+        "model_name": "example_model",
+        "publish_date": "2023-07-01",
+        "username": "user_example",
+        ...
+    }
+}
+```
+
+---
+
+## List Models
+
+**Description**: List models based on optional filters such as name, domain, username, type, sub-type, and access level.
+
+**Dependencies**:
+- **verify_access_token**: Ensures user authentication.
+
+**Sample Request**:
+```json
+{
+  "name": "model_name",
+  "domain": "domain_value",
+  "username": "username_value",
+  "type": "model_type",
+  "sub_type": "subtype_value",
+  "access_level": ["public", "protected"]
+}
+```
+
+**Sample Responses**:
+
+- `200 OK`: Successfully retrieved model list.
+```json
+{
+    "status_code": 200,
+    "message": "Successfully retrieved model list",
+    "data": [ 
+        {
+        "model_name": "example_model",
+        "domain": "example_domain",
+        ...
+        },
+        ...
+    ]
+}
+```
+
+---
+
+## Check Model Name
+
+**Description**: Check if a model with the specified name already exists for the authenticated user.
+
+**Dependencies**:
+- **verify_access_token**: Ensures user authentication.
+
+**Sample Request**:
+```json
+{
+  "name": "model_name_value"
+}
+```
+
+**Sample Responses**:
+
+- `200 OK`: Successfully checked for model name.
+```json
+{
+    "status_code": 200,
+    "message": "Successfully checked for model name",
+    "data": {"model_present": true }
+}
+```
+
+---
+
+## Save Deployed Model
+
+**Description**: Save a deployed model with specific metadata.
+
+**Dependencies**:
+- **verify_access_token**: Ensures user authentication.
+
+**Sample Request**:
+```json
+{
+    "model_id": "new_model_id",
+    "base_model_id": "base_model_id",
+    "model_name": "new_model_name",
+    "metadata": {"key": "value"}
+}
+```
+
+**Sample Responses**:
+
+- `200 OK`: Successfully saved the model.
+
+---
+
+## Generate Upload Token
+
+**Description**: Generate a token for uploading a model to the platform.
+
+**Dependencies**:
+- **verify_access_token**: Ensures user authentication.
+
+**Sample Request**:
+GET /upload-token?model_name=my_model&size=150
+
+**Sample Responses**:
+
+- `200 OK`: Successfully generated upload token.
+```json
+{
+    "status_code": 200,
+    "message": "Successfully got the upload token",
+    "data": {"token": "<upload_token>"}
+}
+```
+
+---
+
+## Upload Model Chunk
+
+**Description**: Upload a chunk of the model using an upload token.
+
+**Dependencies**:
+- **Authorization header**: Requires a Bearer token generated from `/upload-token`.
+
+**Sample Request**:
+Headers: `Authorization: Bearer <token>`
+```json
+{
+    "chunk": /* file data */,
+    "chunk_number": 1,
+    "model_type": "ndb",
+    "compressed": true
+}
+```
+
+**Sample Responses**:
+
+- `200 OK`: Successfully uploaded chunk.
+```json
+{
+    "status_code": 200,
+    "message": "Uploaded chunk"
+}
+```
+
+---
+
+## Commit Upload
+
+**Description**: Commit the model upload after all chunks are uploaded.
+
+**Dependencies**:
+- **Authorization header**: Requires a Bearer token generated from `/upload-token`.
+
+**Sample Request**:
+```json
+Headers: `Authorization: Bearer <token>`
+{
+    "total_chunks": 10,
+    "body": {
+        "type": "ndb",
+        "sub_type": "subtype_example",
+        "access_level": "public",
+        "metadata": {"key1": "value1"}
+    }
+}
+```
+
+**Sample Responses**:
+
+- `200 OK`: Model upload successfully committed.
+```json
+{
+    "status_code": 200,
+    "message": "Committed model",
+    "data": {"model_id": "new_model_id"}
+}
+```
+
+---
+
+## Download Public Model
+
+**Description**: Download a specified public model. No login required.
+
+**Sample Request**:
+GET /public-download?model_identifier=user/model_name
+
+**Sample Responses**:
+
+- StreamingResponse: Download stream of the model.
+
+---
+
+## Download Model
+
+**Description**: Download a model with login required.
+
+**Dependencies**:
+- **verify_model_read_access**: Ensures read access to the model.
+
+**Sample Request**:
+GET /download?model_identifier=user/model_name
+
+**Sample Responses**:
+
+- StreamingResponse: Download stream of the model.
+
+---
+
+## List Team Models
+
+**Description**: List all models associated with a specific team.
+
+**Dependencies**:
+- **team_admin_or_global_admin**: Only accessible by team admins or global admins.
+
+**Sample Request**:
+GET /team-models?team_id=team123
+
+**Sample Responses**:
+
+- `200 OK`: Successfully retrieved list of team models.
+```json
+{
+    "status_code": 200,
+    "message": "Successfully got the team models list",
+    "data": [ 
+        {
+        "model_name": "example_model",
+        "domain": "example_domain",
+        ...
+        },
+        ...
+    ]
+}
+```
+
+---
+
+## Update Model Permission
+
+**Description**: Update a user's permission for a specific model.
+
+**Dependencies**:
+- **is_model_owner**: Ensures only the model owner can update permissions.
+
+**Sample Request**:
+```json
+{
+    "model_identifier": "user/model_name",
+    "email": "user@example.com",
+    "permission": "write"
+}
+```
+
+**Sample Responses**:
+
+- `200 OK`: Permission successfully updated.
+```json
+{
+    "status_code": 200,
+    "message": "Permission updated to 'write' for user 'user@example.com' on model 'user/model_name'.",
+    "data": {"model_id": "model_id", "user_id": "user_id"}
+}
+```
+
+---
+
+## List All Models
+
+**Description**: List all models in the system.
+
+**Dependencies**:
+- **global_admin_only**: Only accessible by global admins.
+
+**Sample Request**:
+GET /all-models
+
+**Sample Responses**:
+
+- `200 OK`: Successfully retrieved all models.
+```json
+{
+    "status_code": 200,
+    "message": "Successfully got the list of all models",
+    "data": [ 
+        {
+        "model_name": "example_model",
+        "domain": "example_domain",
+        ...
+        },
+        ...
+    ]
+}
+```
+
+---
+
+## Get Model Permissions
+
+**Description**: Retrieve detailed information about users' permissions on a model.
+
+**Dependencies**:
+- **is_model_owner**: Ensures only the model owner can retrieve permissions.
+
+**Sample Request**:
+GET /permissions?model_identifier=user/model_name
+
+**Sample Responses**:
+
+- `200 OK`: Successfully retrieved model permissions.
+```json
+{
+    "status_code": 200,
+    "message": "Successfully retrieved model permissions",
+    "data": {"owner": [/* Owner details */], "write": [/* Write permissions */], "read": [/* Read permissions */]}
+}
+```
+
+---
+
+## Update Access Level
+
+**Description**: Update the access level of a model.
+
+**Dependencies**:
+- **is_model_owner**: Ensures only the model owner can update access levels.
+
+**Sample Request**:
+```json
+{
+    "model_identifier": "user/model_name",
+    "access_level": "protected",
+    "team_id": "team123"
+}
+```
+
+**Sample Responses**:
+
+- `200 OK`: Successfully updated access level.
+```json
+{
+    "status_code": 200,
+    "message": "Access level updated to 'protected' for model 'user/model_name'.",
+    "data": {"model_id": "model_id", "access_level": "protected"}
+}
+```
+
+---
+
+## Update Default Permission
+
+**Description**: Update the default permission of a model.
+
+**Dependencies**:
+- **is_model_owner**: Ensures only the model owner can update default permissions.
+
+**Sample Request**:
+```json
+{
+    "model_identifier": "user/model_name",
+    "new_permission": "read"
+}
+```
+
+**Sample Responses**:
+
+- `200 OK`: Successfully updated default permission.
+```json
+{
+    "status_code": 200,
+    "message": "Default permission updated to 'read' for model 'user/model_name'.",
+    "data": {"model_id": "model_id", "default_permission": "read"}
+}
+```
+
+---
+
+## Delete Model
+
+**Description**: Delete a specified model.
+
+**Dependencies**:
+- **is_model_owner**: Ensures only the model owner can delete the model.
+
+**Sample Request**:
+```json
+{
+    "model_identifier": "user/model_name"
+}
+```
+
+**Sample Responses**:
+
+- `200 OK`: Model successfully deleted.
+
+---
+
+## Get Model Logs
+
+**Description**: Retrieve logs for a specified model as a downloadable zip file.
+
+**Dependencies**:
+- **is_model_owner**: Ensures only the model owner can retrieve logs.
+
+**Sample Request**:
+GET /logs?model_identifier=user/model_name
+
+**Sample Responses**:
+
+- FileResponse: A downloadable zip file containing the model logs.

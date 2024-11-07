@@ -1,0 +1,235 @@
+## Get Model Permissions
+
+**Description**: Fetch permissions for a specific model, including read, write, and owner permissions.
+
+**Dependencies**:
+- **verify_access_token_no_throw**: Validates user authentication without raising exceptions if token verification fails.
+
+**Sample Request**:
+/permissions/model_123
+
+**Sample Responses**:
+
+- `200 OK`: Successfully fetched model permissions.
+```json
+{
+    "status_code": 200,
+    "message": "Successfully fetched user permissions for model with ID model_123",
+    "data": {
+        "read": true,
+        "write": false,
+        "exp": "2024-10-18T17:00:00Z",
+        "override": true
+    }
+}
+```
+
+---
+
+## Deploy Model
+
+**Description**: Deploy a specified model to interact with the model.
+
+**Dependencies**:
+- **is_model_owner**: Only users with owner access can directly deploy the model.
+
+**Sample Request**:
+```json
+{
+    "model_identifier": "user/model_123",
+    "memory": 2048,
+    "autoscaling_enabled": true,
+    "autoscaler_max_count": 5,
+    "genai_key": "your_genai_key"
+}
+```
+
+**Sample Responses**:
+
+- `202 Accepted`: Deployment is in progress.
+```json
+{
+    "status_code": 202,
+    "message": "Deployment is in-progress",
+    "data": {
+        "status": "queued",
+        "model_identifier": "user/model_123",
+        "model_id": "model_id_123"
+    }
+}
+```
+
+---
+
+## Get Feedbacks
+
+**Description**: Retrieve recent feedback for a specific model.
+
+**Dependencies**:
+- **is_model_owner**: Ensures only the model owner can access feedback.
+
+**Sample Request**:
+GET /feedbacks?model_identifier=user/model_123&per_event_count=5
+
+**Sample Responses**:
+
+- `200 OK`: Successfully retrieved feedbacks.
+```json
+{
+    "status_code": 200,
+    "message": "Successfully retrieved the feedbacks",
+    "data": {
+        "upvote": [
+            {
+                "query": "Sample query",
+                "reference_text": "Sample result upvoted",
+                "reference_id": 15,
+                "timestamp": "2024-10-17T17:54:11"
+            }
+        ],
+        "associate": [
+            {
+                "source": "Sample source text",
+                "target": "Sample target text",
+                "timestamp": "2024-10-18T17:49:43"
+            }
+        ]
+    }
+}
+```
+
+---
+
+## Deployment Status
+
+**Description**: Get the status of a model deployment.
+
+**Dependencies**:
+- **verify_model_read_access**: Validates if the user has access to read the model's deployment status.
+
+**Sample Request**:
+GET /status?model_identifier=user/model_123
+
+**Sample Responses**:
+
+- `200 OK`: Successfully retrieved deployment status.
+```json
+{
+    "status_code": 200,
+    "message": "Successfully got the deployment status",
+    "data": {
+        "deploy_status": "in_progress",
+        "messages": ["Model is being deployed."],
+        "model_id": "model_id_123"
+    }
+}
+```
+
+---
+
+## Update Deployment Status
+
+**Description**: Update the deployment status for a model.
+
+**Sample Request**:
+POST /update-status
+```json
+{
+    "model_id": "model_id_123",
+    "new_status": "in_progress",
+    "message": "Deployment started"
+}
+```
+
+**Sample Responses**:
+
+- `200 OK`: Status updated successfully.
+```json
+{
+    "message": "successfully updated"
+}
+```
+
+---
+
+## Stop Deployment
+
+**Description**: Stop a running deployment for a model.
+
+**Dependencies**:
+- **is_model_owner**: Ensures only the model owner can stop the deployment.
+
+**Sample Request**:
+POST /stop
+```json
+{
+    "model_identifier": "user/model_123"
+}
+```
+
+**Sample Responses**:
+
+- `202 Accepted`: Service is shutting down.
+```json
+{
+    "status_code": 202,
+    "message": "Service is shutting down",
+    "data": {
+        "status": "queued",
+        "model_id": "model_id_123"
+    }
+}
+```
+
+- `400 Bad Request`: Model is used by other active workflows.
+```json
+{
+    "status_code": 400,
+    "message": "Unable to stop deployment for model user/model_123 since it is used by other active workflows."
+}
+```
+
+---
+
+## Active Deployment Count
+
+**Description**: Retrieve the count of active deployments using a specific model.
+
+**Sample Request**:
+GET /active-deployment-count?model_id=model_id_123
+
+**Sample Responses**:
+
+- `200 OK`: Successfully retrieved deployment count.
+```json
+{
+    "status_code": 200,
+    "message": "Successfully retrieved number of deployments using model.",
+    "data": {
+        "deployment_count": 3
+    }
+}
+```
+
+---
+
+## Get Logs
+
+**Description**: Retrieve logs for a model.
+
+**Dependencies**:
+- **verify_model_read_access**: Ensures the user has access to view the model's logs.
+
+**Sample Request**:
+GET /logs?model_identifier=user/model_123
+
+**Sample Responses**:
+
+- `200 OK`: Successfully retrieved logs.
+```json
+{
+    "status_code": 200,
+    "message": "Successfully got the train logs.",
+    "data": [{"stdout":"stdout_log","stderr":"stderr_log"}]
+}
+```

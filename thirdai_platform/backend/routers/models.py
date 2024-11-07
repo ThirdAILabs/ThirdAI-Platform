@@ -1,5 +1,6 @@
 import json
 import os
+import pathlib
 import uuid
 from typing import Annotated, Dict, Optional, Union
 
@@ -34,7 +35,7 @@ from fastapi import (
 )
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, StreamingResponse
-from platform_common.utils import response
+from platform_common.utils import get_section, response
 from pydantic import BaseModel
 from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -44,8 +45,19 @@ model_router = APIRouter()
 
 storage: interface.StorageInterface = local.LocalStorage(model_bazaar_path())
 
+root_folder = pathlib.Path(__file__).parent
 
-@model_router.get("/details")
+docs_file = root_folder.joinpath("../../docs/models_endpoints.txt")
+
+with open(docs_file) as f:
+    docs = f.read()
+
+
+@model_router.get(
+    "/details",
+    summary="Get Model Details",
+    description=get_section(docs, "Get Model Details"),
+)
 def get_model_details(
     model_id: str,
     model: schema.Model = Depends(verify_model_read_access_from_id),
@@ -58,7 +70,9 @@ def get_model_details(
     )
 
 
-@model_router.get("/list")
+@model_router.get(
+    "/list", summary="List Models", description=get_section(docs, "List Models")
+)
 def list_models(
     name: Optional[str] = None,
     domain: Optional[str] = None,
@@ -69,22 +83,6 @@ def list_models(
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
-    """
-    List models based on the given name, domain, username, type, sub-type, and access level.
-
-    Parameters:
-    - name: str - The name to filter models.
-    - domain: Optional[str] - Optional domain to filter models.
-    - username: Optional[str] - Optional username to filter models.
-    - type: Optional[str] - Optional type to filter models.
-    - sub_type: Optional[str] - Optional sub-type to filter models.
-    - access_level: Annotated[Union[list[str], None], Query()] - Optional access level to filter models.
-    - session: Session - The database session (dependency).
-    - authenticated_user: AuthenticatedUser - The authenticated user (dependency).
-
-    Returns:
-    - JSONResponse - A JSON response with the list of models.
-    """
     user: schema.User = authenticated_user.user
     user_teams = [ut.team_id for ut in user.teams]
 
@@ -160,23 +158,16 @@ def list_models(
     )
 
 
-@model_router.get("/name-check")
+@model_router.get(
+    "/name-check",
+    summary="Check Model Name",
+    description=get_section(docs, "Check Model Name"),
+)
 def check_model(
     name: str,
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
-    """
-    Check if a model with the given name exists for the authenticated user.
-
-    Parameters:
-    - name: The name of the model to check.
-    - session: The database session (dependency).
-    - authenticated_user: The authenticated user (dependency).
-
-    Returns:
-    - A JSON response indicating if the model is present.
-    """
     user: schema.User = authenticated_user.user
     model_exists = (
         session.query(schema.Model)
@@ -201,23 +192,16 @@ class SaveNDBDeployedModel(BaseModel):
         protected_namespaces = ()
 
 
-@model_router.post("/save-deployed")
+@model_router.post(
+    "/save-deployed",
+    summary="Save Deployed Model",
+    description=get_section(docs, "Save Deployed Model"),
+)
 def save_deployed_model(
     body: SaveNDBDeployedModel,
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
-    """
-    Save a deployed model.
-
-    Parameters:
-    - body: The body of the request containing deployment details.
-    - session: The database session (dependency).
-    - authenticated_user: The authenticated user (dependency).
-
-    Returns:
-    - A JSON response indicating the status of saving the model.
-    """
     user: schema.User = authenticated_user.user
     base_model: schema.Model = session.query(schema.Model).get(body.base_model_id)
 
@@ -270,25 +254,17 @@ class ModelInfo(BaseModel):
     metadata: Optional[Dict[str, str]] = None
 
 
-@model_router.get("/upload-token")
+@model_router.get(
+    "/upload-token",
+    summary="Generate Upload Token",
+    description=get_section(docs, "Generate Upload Token"),
+)
 def upload_token(
     model_name: str,
     size: int,
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
-    """
-    Generates a token for uploading a model to the platform.
-
-    Parameters:
-    - model_name: str - The name that the uploaded model will take in the platform.
-        Example: "my_new_model"
-    - size: int - The size of the model to be uploaded.
-        Example: 150
-
-    Returns:
-    - JSONResponse: A token, which is used to upload chunks of a model.
-    """
     user: schema.User = authenticated_user.user
     try:
         validate_name(model_name)
@@ -322,7 +298,11 @@ def upload_token(
     )
 
 
-@model_router.post("/upload-chunk")
+@model_router.post(
+    "/upload-chunk",
+    summary="Upload Model Chunk",
+    description=get_section(docs, "Upload Model Chunk"),
+)
 def upload_chunk(
     chunk: UploadFile,
     chunk_number: int,
@@ -330,24 +310,6 @@ def upload_chunk(
     compressed: bool = True,
     authorization: str = Header(None),
 ):
-    """
-    Uploads a chunk of a model.
-
-    Parameters:
-    - chunk: UploadFile - The raw bytes of the chunk.
-        Example: UploadFile(file=BytesIO(b"chunk data"), filename="chunk1.zip")
-    - chunk_number: int - The position of the chunk of the model that is being uploaded.
-        Example: 1
-    - model_type: str - The type of model being uploaded (default: "ndb").
-        Example: "ndb"
-    - compressed: bool - Whether the chunk is compressed (default: True).
-        Example: True
-    - authorization: str - Bearer token that contains the token generated from /upload-token.
-        Example: "Bearer <token>"
-
-    Returns:
-    - JSONResponse: Success message if the chunk is uploaded successfully.
-    """
     if authorization is None:
         return response(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -402,7 +364,11 @@ def upload_chunk(
     )
 
 
-@model_router.post("/upload-commit")
+@model_router.post(
+    "/upload-commit",
+    summary="Commit Upload",
+    description=get_section(docs, "Commit Upload"),
+)
 def upload_commit(
     total_chunks: int,
     body: ModelInfo,
@@ -410,31 +376,6 @@ def upload_commit(
     authorization: str = Header(None),
     session: Session = Depends(get_session),
 ):
-    """
-    Commits the upload of a model after all chunks have been uploaded.
-
-    Parameters:
-    - total_chunks: int - The total number of chunks uploaded.
-        Example: 10
-    - body: ModelInfo - The information about the model being uploaded.
-        Example:
-        ```
-        {
-            "type": "ndb",
-            "sub_type": "subtype_example",
-            "access_level": "public",
-            "metadata": {
-                "key1": "value1",
-                "key2": "value2"
-            }
-        }
-        ```
-    - authorization: str - Bearer token that contains the token generated from /upload-token.
-        Example: "Bearer <token>"
-
-    Returns:
-    - JSONResponse: Success message if the model upload is committed successfully.
-    """
     if authorization is None:
         return response(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -535,21 +476,15 @@ def upload_commit(
     )
 
 
-@model_router.get("/public-download")
+@model_router.get(
+    "/public-download",
+    summary="Download Public Model",
+    description=get_section(docs, "Download Public Model"),
+)
 def download_public_model(
     model_identifier: str,
     session: Session = Depends(get_session),
 ):
-    """
-    Downloads specified public model. No login required.
-
-    Parameters:
-    - model_identifier: str - The model identifier of the model to be downloaded.
-        Example: "user123/my_model"
-
-    Returns:
-    - StreamingResponse: Streams the download of the model to the caller.
-    """
     try:
         model: schema.Model = get_model_from_identifier(model_identifier, session)
     except Exception as error:
@@ -590,21 +525,16 @@ def download_public_model(
     return StreamingResponse(iterfile(), headers=headers, media_type=media_type)
 
 
-@model_router.get("/download", dependencies=[Depends(verify_model_read_access)])
+@model_router.get(
+    "/download",
+    dependencies=[Depends(verify_model_read_access)],
+    summary="Download Model",
+    description=get_section(docs, "Download Model"),
+)
 def download_model(
     model_identifier: str,
     session: Session = Depends(get_session),
 ):
-    """
-    Downloads specified model.
-
-    Parameters:
-    - model_identifier: str - The model identifier of the model to be downloaded.
-        Example: "user123/my_model"
-
-    Returns:
-    - StreamingResponse: Streams the download of the model to the caller.
-    """
     try:
         model: schema.Model = get_model_from_identifier(model_identifier, session)
     except Exception as error:
@@ -639,7 +569,12 @@ def download_model(
     return StreamingResponse(iterfile(), headers=headers, media_type=media_type)
 
 
-@model_router.get("/team-models", dependencies=[Depends(team_admin_or_global_admin)])
+@model_router.get(
+    "/team-models",
+    dependencies=[Depends(team_admin_or_global_admin)],
+    summary="List Team Models",
+    description=get_section(docs, "List Team Models"),
+)
 def list_team_models(
     team_id: str,
     session: Session = Depends(get_session),
@@ -681,25 +616,18 @@ def list_team_models(
     )
 
 
-@model_router.post("/update-model-permission", dependencies=[Depends(is_model_owner)])
+@model_router.post(
+    "/update-model-permission",
+    dependencies=[Depends(is_model_owner)],
+    summary="Update Model Permission",
+    description=get_section(docs, "Update Model Permission"),
+)
 def update_model_permission(
     model_identifier: str,
     email: str,
     permission: schema.Permission,
     session: Session = Depends(get_session),
 ):
-    """
-    Update a user's permission for a specific model.
-
-    Parameters:
-    - model_identifier: The identifier of the model.
-    - email: The email of the user whose permission is being updated.
-    - permission: The new permission to assign to the user.
-    - session: The database session (dependency).
-
-    Returns:
-    - A JSON response indicating the success of the operation.
-    """
     model = get_model_from_identifier(model_identifier, session)
     if not model:
         raise HTTPException(
@@ -742,19 +670,15 @@ def update_model_permission(
     )
 
 
-@model_router.get("/all-models", dependencies=[Depends(global_admin_only)])
+@model_router.get(
+    "/all-models",
+    dependencies=[Depends(global_admin_only)],
+    summary="List All Models",
+    description=get_section(docs, "List All Models"),
+)
 def list_all_models(
     session: Session = Depends(get_session),
 ):
-    """
-    List all models in the system.
-
-    Parameters:
-    - session: The database session (dependency).
-
-    Returns:
-    - A JSON response with the list of all models.
-    """
     results = session.query(schema.Model).all()
 
     results = [get_high_level_model_info(result) for result in results]
@@ -773,21 +697,16 @@ def deduplicate_permissions(permissions_list: list[dict]) -> list[dict]:
     return [dict(t) for t in {tuple(d.items()) for d in permissions_list}]
 
 
-@model_router.get("/permissions", dependencies=[Depends(is_model_owner)])
+@model_router.get(
+    "/permissions",
+    dependencies=[Depends(is_model_owner)],
+    summary="Get Model Permissions",
+    description=get_section(docs, "Get Model Permissions"),
+)
 def get_model_permissions(
     model_identifier: str,
     session: Session = Depends(get_session),
 ):
-    """
-    Get detailed information about users' permissions on a specific model.
-
-    Parameters:
-    - model_identifier: The identifier of the model to retrieve permissions for.
-    - session: The database session (dependency).
-
-    Returns:
-    - A JSON response with the list of users and their permissions on the model.
-    """
     model = get_model_from_identifier(model_identifier, session)
 
     if not model:
@@ -875,23 +794,18 @@ def get_model_permissions(
     )
 
 
-@model_router.post("/update-access-level", dependencies=[Depends(is_model_owner)])
+@model_router.post(
+    "/update-access-level",
+    dependencies=[Depends(is_model_owner)],
+    summary="Update Access Level",
+    description=get_section(docs, "Update Access Level"),
+)
 def update_access_level(
     model_identifier: str,
     access_level: schema.Access,
     team_id: Optional[str] = None,
     session: Session = Depends(get_session),
 ):
-    """
-    Update the access level of a model.
-
-    Parameters:
-    - model_identifier: The identifier of the model to update.
-    - access_level: The new access level to set for the model.
-
-    Returns:
-    - A JSON response indicating the success of the operation, including the model ID and the updated access level.
-    """
     model = get_model_from_identifier(model_identifier, session)
     if not model:
         raise HTTPException(
@@ -927,22 +841,17 @@ def update_access_level(
     )
 
 
-@model_router.post("/update-default-permission", dependencies=[Depends(is_model_owner)])
+@model_router.post(
+    "/update-default-permission",
+    dependencies=[Depends(is_model_owner)],
+    summary="Update Default Permission",
+    description=get_section(docs, "Update Default Permission"),
+)
 def update_default_permission(
     model_identifier: str,
     new_permission: schema.Permission,
     session: Session = Depends(get_session),
 ):
-    """
-    Update the default permission of a model.
-
-    Parameters:
-    - model_identifier: The identifier of the model to update.
-    - new_permission: The new default permission to set.
-
-    Returns:
-    - A JSON response indicating the success of the operation, including the model ID and the updated default permission.
-    """
     model = get_model_from_identifier(model_identifier, session)
     if not model:
         raise HTTPException(
@@ -964,17 +873,16 @@ def update_default_permission(
     )
 
 
-@model_router.post("/delete", dependencies=[Depends(is_model_owner)])
+@model_router.post(
+    "/delete",
+    dependencies=[Depends(is_model_owner)],
+    summary="Delete Model",
+    description=get_section(docs, "Delete Model"),
+)
 def delete_model(
     model_identifier: str,
     session: Session = Depends(get_session),
 ):
-    """
-    Deletes a specified model.
-
-    - **model_identifier**: The model identifier of the model to delete
-    """
-
     try:
         model: schema.Model = get_model_from_identifier(model_identifier, session)
     except Exception as error:
@@ -1023,22 +931,17 @@ def delete_model(
     )
 
 
-@model_router.get("/logs", dependencies=[Depends(is_model_owner)])
+@model_router.get(
+    "/logs",
+    dependencies=[Depends(is_model_owner)],
+    summary="Get Model Logs",
+    description=get_section(docs, "Get Model Logs"),
+)
 def get_model_logs(
     model_identifier: str,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
 ):
-    """
-    Get the logs for a specified model and provide them as a downloadable zip file.
-    The zip file will be deleted after being sent to the client.
-
-    Parameters:
-    - model_identifier: str - The identifier of the model to retrieve logs for.
-
-    Returns:
-    - FileResponse: A zip file containing the model logs, which will be deleted after sending.
-    """
     try:
         # Retrieve the model from the database
         model: schema.Model = get_model_from_identifier(model_identifier, session)

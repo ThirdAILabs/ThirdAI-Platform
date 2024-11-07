@@ -1,0 +1,256 @@
+### Train NDB Model
+**Description**: Train a new NDB model with the provided files and configuration options.
+
+**Parameters**:
+- `model_name` (str): Name of the model.
+- `files` (List[UploadFile]): Files used for training.
+- `file_info` (Optional[str], default="{}"): JSON array of `FileInfo` objects containing:
+  - `path` (str): File path or URL.
+  - `location` (FileLocation): One of `local`, `nfs`, `s3`, `azure`, `gcp`.
+  - `doc_id` (Optional[str]): Document ID.
+  - `options` (Dict[str, Any]): Additional file options.
+  - `metadata` (Optional[Dict[str, Any]]): Metadata associated with the file.
+- `base_model_identifier` (Optional[str]): ID of the base model, if any.
+- `model_options` (str, default="{}"): JSON with NDB model configuration options.
+- `job_options` (str, default="{}"): JSON specifying `allocation_cores` and `allocation_memory`.
+
+**Sample Request**:
+```json
+{
+  "model_name": "example_ndb_model",
+  "file_info": "[{\"path\": \"s3://bucket/file\", \"location\": \"s3\"}]",
+  "model_options": "{\"ndb_sub_type\": \"v1\", \"retriever\": \"finetunable_retriever\"}",
+  "job_options": "{\"allocation_cores\": 2, \"allocation_memory\": 8000}"
+}
+```
+
+**Possible Responses**:
+- **200 OK**:
+```json
+{
+  "status_code": 200,
+  "message": "Successfully submitted the job",
+  "data": {
+    "model_id": "123e4567-e89b-12d3-a456-426614174000",
+    "user_id": "user123"
+  }
+}
+```
+- **400 Bad Request**:
+```json
+{
+  "status_code": 400,
+  "message": "Invalid model name."
+}
+```
+
+---
+
+### Retrain NDB Model 
+**Description**: Retrain an existing NDB model using additional data and feedback.
+
+**Parameters**:
+- `model_name` (str): Name of the model.
+- `base_model_identifier` (str): ID of the base model.
+- `job_options` (JobOptions, default=JobOptions()): JSON with:
+  - `allocation_cores` (int): Number of cores for the job.
+  - `allocation_memory` (int): Memory allocation for the job.
+
+**Sample Request**:
+```json
+{
+  "model_name": "retrain_ndb_model",
+  "base_model_identifier": "123e4567-e89b-12d3-a456-426614174000",
+  "job_options": "{\"allocation_cores\": 4, \"allocation_memory\": 12000}"
+}
+```
+
+**Possible Responses**:
+- **200 OK**:
+```json
+{
+  "status_code": 200,
+  "message": "Successfully submitted the retraining job",
+  "data": {
+    "model_id": "123e4567-e89b-12d3-a456-426614174000",
+    "user_id": "user123"
+  }
+}
+```
+- **400 Bad Request**:
+```json
+{
+  "status_code": 400,
+  "message": "Base model not found."
+}
+```
+
+---
+
+### NLP Data Generation
+**Description**: Generate data for training an NLP model and use it for training a udt model
+
+**Parameters**:
+- `model_name` (str): Name of the model.
+- `base_model_identifier` (Optional[str]): ID of the base model.
+- `datagen_options` (str, default="{}"): JSON with datagen options like `samples_per_label`, `tags`, and `samples`.
+- `datagen_job_options` (str, default="{}"): Job options for data generation.
+- `train_job_options` (str, default="{}"): Job options for training.
+
+**Sample Request**:
+```json
+{
+  "model_name": "nlp_data_model",
+  "datagen_options": "{\"task_prompt\": \"classification\", \"llm_provider\": \"openai\"}",
+  "datagen_job_options": "{\"allocation_cores\": 2, \"allocation_memory\": 8000}"
+}
+```
+
+**Possible Responses**:
+- **200 OK**:
+```json
+{
+  "status_code": 200,
+  "message": "Successfully submitted the data generation job",
+  "data": {
+    "model_id": "123e4567-e89b-12d3-a456-426614174000",
+    "user_id": "user123"
+  }
+}
+```
+- **400 Bad Request**:
+```json
+{
+  "status_code": 400,
+  "message": "Invalid datagen options."
+}
+```
+
+---
+
+## Retrain UDT Model
+
+**Description**: Retrain a UDT model with new or existing data and configuration.
+
+**Sample Request**:
+```json
+{
+  "model_name": "udt_model_name",
+  "llm_provider": "llm_provider_value",
+  "base_model_identifier": "base_model_id"
+}
+```
+
+**Sample Responses**:
+
+- `200 OK`
+```json
+{
+  "message": "Successfully submitted the job",
+  "data": {
+    "model_id": "new_model_id",
+    "user_id": "user_id_value"
+  }
+}
+```
+
+
+---
+
+### 5. Train UDT Model 
+**Description**: Train a UDT model with specified files and options.
+
+**Parameters**:
+- `model_name` (str): Name of the model.
+- `files` (List[UploadFile]): Files used for training.
+- `file_info` (Optional[str], default="{}"): JSON list of `FileInfo` objects:
+  - `path` (str): File path or URL.
+  - `location` (FileLocation): One of `local`, `nfs`, `s3`, `azure`, `gcp`.
+- `base_model_identifier` (Optional[str]): ID of the base model.
+- `model_options` (str, default="{}"): JSON with options for UDT, such as `target_labels` for classification models.
+- `job_options` (str, default="{}"): Job options for training.
+
+**Sample Request**:
+```json
+{
+  "model_name": "example_udt_model",
+  "file_info": "[{\"path\": \"s3://bucket/file\", \"location\": \"s3\"}]",
+  "model_options": "{\"udt_sub_type\": \"text\", \"text_column\": \"content\", \"label_column\": \"label\", \"n_target_classes\": 10}",
+  "job_options": "{\"allocation_cores\": 2, \"allocation_memory\": 10000}"
+}
+```
+
+**Possible Responses**:
+- **200 OK**:
+```json
+{
+  "status_code": 200,
+  "message": "Successfully submitted the UDT model training job",
+  "data": {
+    "model_id": "123e4567-e89b-12d3-a456-426614174000",
+    "user_id": "user123"
+  }
+}
+```
+- **400 Bad Request**:
+```json
+{
+  "status_code": 400,
+  "message": "Invalid model options."
+}
+```
+
+---
+
+## Get Training Status
+
+**Description**: Retrieve the current training status of a specified model.
+
+**Sample Request**:
+```json
+{
+  "model_identifier": "user/model_name"
+}
+```
+
+**Sample Responses**:
+
+- `200 OK`: Training status retrieved.
+```json
+{
+  "message": "Successfully got the train status.",
+  "data": {
+    "model_identifier": "user/model_name",
+    "train_status": "in_progress",
+    "messages": ["Reason 1", "Reason 2"]
+  }
+}
+```
+
+---
+
+## Get Training Logs
+
+**Description**: Retrieve the training logs of a specified model.
+
+**Sample Request**:
+```json
+{
+  "model_identifier": "user/model_name"
+}
+```
+
+**Sample Responses**:
+
+- `200 OK`: Training logs retrieved.
+```json
+{
+  "message": "Successfully got the train logs.",
+  "data": [
+    {
+      "stdout": "Log content here",
+      "stderr": "Error log content here"
+    }
+  ]
+}
+```
