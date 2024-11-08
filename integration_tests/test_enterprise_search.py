@@ -49,9 +49,18 @@ def test_enterprise_search_with_guardrails():
     guardrail_name, guardrail_id = upload_guardrail_model(admin_client)
 
     model_name = f"basic_ndb_{uuid.uuid4()}"
+
+    # Prepare FileInfo structure for the unsupervised document
+    unsupervised_doc = {
+        "path": os.path.join(doc_dir(), "articles.csv"),
+        "location": "local",
+        "options": {},  # Customize options if needed
+        "metadata": None,
+    }
+
     model = admin_client.train(
-        model_name,
-        unsupervised_docs=[os.path.join(doc_dir(), "articles.csv")],
+        model_name=model_name,
+        unsupervised_docs=[unsupervised_doc],
         model_options={"ndb_options": {"ndb_sub_type": "v2"}},
         supervised_docs=[],
     )
@@ -69,10 +78,11 @@ def test_enterprise_search_with_guardrails():
 
     es_deps = admin_client.model_details(client.model_id)["dependencies"]
     assert len(es_deps) == 2
-    assert set(m["model_id"] for m in es_deps) == set([guardrail_id, model.model_id])
-    assert set(m["model_name"] for m in es_deps) == set(
-        [guardrail_name, model.model_identifier.split("/")[1]]
-    )
+    assert set(m["model_id"] for m in es_deps) == {guardrail_id, model.model_id}
+    assert set(m["model_name"] for m in es_deps) == {
+        guardrail_name,
+        model.model_identifier.split("/")[1],
+    }
 
     ndb_used_by = admin_client.model_details(model.model_id)["used_by"]
     assert len(ndb_used_by) == 1
@@ -95,13 +105,13 @@ def test_enterprise_search_with_guardrails():
     admin_client.undeploy(client)
 
     http_post_with_error(
-        urljoin(admin_client._base_url, f"deploy/stop"),
+        urljoin(admin_client._base_url, "deploy/stop"),
         params={"model_identifier": model.model_identifier},
         headers=auth_header(admin_client._access_token),
     )
 
     http_post_with_error(
-        urljoin(admin_client._base_url, f"deploy/stop"),
+        urljoin(admin_client._base_url, "deploy/stop"),
         params={"model_identifier": f"admin/{guardrail_name}"},
         headers=auth_header(admin_client._access_token),
     )

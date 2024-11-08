@@ -18,9 +18,18 @@ def test_ndb_retraining_log_feedback_from_read_only_users():
     admin_client.log_in("admin@mail.com", "password")
 
     base_model_name = f"basic_ndb_{uuid.uuid4()}"
+
+    # Prepare FileInfo for the unsupervised document
+    unsupervised_doc = {
+        "path": os.path.join(doc_dir(), "articles.csv"),
+        "location": "local",
+        "options": {},
+        "metadata": None,
+    }
+
     base_model = admin_client.train(
         base_model_name,
-        unsupervised_docs=[os.path.join(doc_dir(), "articles.csv")],
+        unsupervised_docs=[unsupervised_doc],
         model_options={"ndb_options": {"ndb_sub_type": "v2"}},
         supervised_docs=[],
     )
@@ -100,12 +109,26 @@ def test_ndb_retraining_autoscaling_mode():
     admin_client.log_in("admin@mail.com", "password")
 
     base_model_name = f"basic_ndb_{uuid.uuid4()}"
+
+    # Prepare FileInfo for unsupervised documents
+    unsupervised_docs = [
+        {
+            "path": os.path.join(doc_dir(), "articles.csv"),
+            "location": "local",
+            "options": {},
+            "metadata": None,
+        },
+        {
+            "path": os.path.join(doc_dir(), "supervised.csv"),
+            "location": "local",
+            "options": {},
+            "metadata": None,
+        },
+    ]
+
     base_model = admin_client.train(
         base_model_name,
-        unsupervised_docs=[
-            os.path.join(doc_dir(), "articles.csv"),
-            os.path.join(doc_dir(), "supervised.csv"),
-        ],
+        unsupervised_docs=unsupervised_docs,
         model_options={"ndb_options": {"ndb_sub_type": "v2"}},
         supervised_docs=[],
     )
@@ -127,18 +150,23 @@ def test_ndb_retraining_autoscaling_mode():
         ]
     )
 
-    ndb_client.insert(
-        [
-            {
-                "path": os.path.join(doc_dir(), "mutual_nda.pdf"),
-                "location": "local",
-            },
-            {
-                "path": os.path.join(doc_dir(), "four_english_words.docx"),
-                "location": "local",
-            },
-        ]
-    )
+    # Prepare FileInfo for additional documents to insert
+    insert_files = [
+        {
+            "path": os.path.join(doc_dir(), "mutual_nda.pdf"),
+            "location": "local",
+            "options": {},
+            "metadata": None,
+        },
+        {
+            "path": os.path.join(doc_dir(), "four_english_words.docx"),
+            "location": "local",
+            "options": {},
+            "metadata": None,
+        },
+    ]
+
+    ndb_client.insert(insert_files)
 
     res = ndb_client.search("a query to upvote", top_k=1)
     assert res["references"][0]["id"] != 0

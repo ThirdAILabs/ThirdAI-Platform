@@ -15,9 +15,19 @@ def test_train_error_handling():
     admin_client.log_in("admin@mail.com", "password")
 
     model_name = f"basic_ndb_{uuid.uuid4()}"
+
+    # Prepare FileInfo-style dictionary for the unsupported file type
+    unsupervised_doc = {
+        "path": __file__,
+        "location": "local",
+        "options": {},
+        "metadata": None,
+    }
+
+    # Attempt to train with an unsupported file type
     model = admin_client.train(
         model_name,
-        unsupervised_docs=[__file__],
+        unsupervised_docs=[unsupervised_doc],
         model_options={
             "ndb_options": {"ndb_sub_type": "v2"},
         },
@@ -25,6 +35,7 @@ def test_train_error_handling():
         is_async=True,
     )
 
+    # Expecting a ValueError due to unsupported document type
     with pytest.raises(ValueError, match=f"Training Failed for admin/{model_name}"):
         admin_client.await_train(model)
 
@@ -33,6 +44,7 @@ def test_train_error_handling():
     error = ".py Document type isn't supported"
     assert error in status_info["messages"][0]
 
+    # Retrieve and check logs for the specific error message
     res = http_get_with_error(
         urljoin(admin_client._base_url, "train/logs"),
         params={"model_identifier": model.model_identifier},

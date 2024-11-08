@@ -266,12 +266,6 @@ async def deploy_single_model(
             python_path=get_python_path(),
             thirdai_platform_dir=thirdai_platform_dir(),
             app_dir="deployment_job",
-            aws_access_key=(os.getenv("AWS_ACCESS_KEY", "")),
-            aws_access_secret=(os.getenv("AWS_ACCESS_SECRET", "")),
-            aws_region_name=(os.getenv("AWS_REGION_NAME", "")),
-            azure_account_name=(os.getenv("AZURE_ACCOUNT_NAME", "")),
-            azure_account_key=(os.getenv("AZURE_ACCOUNT_KEY", "")),
-            gcp_credentials_file=(os.getenv("GCP_CREDENTIALS_FILE", "")),
         )
 
         model.deploy_status = schema.Status.starting

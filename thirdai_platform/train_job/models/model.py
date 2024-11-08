@@ -52,6 +52,16 @@ class Model(ABC):
             self.model_dir / "checkpoints" / "supervised"
         )
 
+        credentials_registry_path = (
+            Path(self.config.model_bazaar_dir) / "credentials.json"
+        )
+
+        self.config.populate_credential_registry_and_save(
+            registry_path=credentials_registry_path
+        )
+
+        self.logger.info(f"Saved credentials at {credentials_registry_path}")
+
         self.logger.info("Model initialization complete.")
 
     @abstractmethod

@@ -11,6 +11,7 @@ from botocore.client import Config
 from botocore.exceptions import ClientError
 from fastapi import HTTPException, UploadFile, status
 
+from .pydantic_models.cloud_credentials import CloudCredentials
 from .pydantic_models.training import FileInfo, FileLocation
 
 
@@ -67,6 +68,7 @@ def expand_file_info(paths: List[str], file_info: FileInfo):
             doc_id=file_info.doc_id if len(paths) == 1 else None,
             options=file_info.options,
             metadata=file_info.metadata,
+            cloud_credentials=file_info.cloud_credentials,
         )
         for path in paths
     ]
@@ -97,7 +99,9 @@ def expand_cloud_buckets_and_directories(file_infos: List[FileInfo]) -> List[Fil
         if file_info.location == FileLocation.local:
             expanded_files.append(file_info)
         elif file_info.location == FileLocation.s3:
-            s3_client = get_cloud_client(provider="s3")
+            s3_client = get_cloud_client(
+                provider="s3", cloud_credentials=file_info.cloud_credentials
+            )
             bucket_name, source_path = file_info.parse_s3_url()
             s3_objects = s3_client.list_files(
                 bucket_name=bucket_name, source_path=source_path
@@ -106,7 +110,9 @@ def expand_cloud_buckets_and_directories(file_infos: List[FileInfo]) -> List[Fil
                 expand_file_info(paths=s3_objects, file_info=file_info)
             )
         elif file_info.location == FileLocation.azure:
-            azure_client = get_cloud_client(provider="azure")
+            azure_client = get_cloud_client(
+                provider="azure", cloud_credentials=file_info.cloud_credentials
+            )
             container_name, blob_path = file_info.parse_azure_url()
             azure_objects = azure_client.list_files(
                 bucket_name=container_name, source_path=blob_path
@@ -123,7 +129,9 @@ def expand_cloud_buckets_and_directories(file_infos: List[FileInfo]) -> List[Fil
                 )
             )
         elif file_info.location == FileLocation.gcp:
-            gcp_client = get_cloud_client(provider="gcp")
+            gcp_client = get_cloud_client(
+                provider="gcp", cloud_credentials=file_info.cloud_credentials
+            )
             bucket_name, source_path = file_info.parse_gcp_url()
             gcp_objects = gcp_client.list_files(bucket_name, source_path)
             expanded_files.extend(
@@ -377,6 +385,18 @@ class S3StorageHandler(CloudStorageHandler):
             )
         return response
 
+    @staticmethod
+    @handle_exceptions
+    def split_source(source: str):
+        if source.startswith("/"):
+            source = source[1:]
+        parts = source.split(".s3.amazonaws.com/", 1)
+
+        if len(parts) != 2:
+            raise ValueError(f"Invalid S3 source: {source}")
+
+        return parts
+
     @handle_exceptions
     def generate_url_from_source(self, source: str, expiry_mins: int = 15):
         """
@@ -384,12 +404,7 @@ class S3StorageHandler(CloudStorageHandler):
         to get the bucket name and the object key for downloading.
         """
         # Remove leading slash and split on '.s3.amazonaws.com/'
-        if source.startswith("/"):
-            source = source[1:]
-        parts = source.split(".s3.amazonaws.com/", 1)
-
-        if len(parts) != 2:
-            raise ValueError(f"Invalid S3 source: {source}")
+        parts = S3StorageHandler.split_source(source=source)
 
         bucket_name = parts[0]  # bucket_name
         object_key = parts[1]  # object_key (prefix)
@@ -533,12 +548,9 @@ class AzureStorageHandler(CloudStorageHandler):
 
         return f"{blob_client.url}?{sas_token}"
 
+    @staticmethod
     @handle_exceptions
-    def generate_url_from_source(self, source: str, expiry_mins: int = 15):
-        """
-        Parse the display path stored in the format '/{account_name}.blob.core.windows.net/{container_name}/{blob_name}'
-        to get the container name and blob name for downloading.
-        """
+    def split_source(source: str):
         # Remove leading slash and split on '.blob.core.windows.net/'
         if source.startswith("/"):
             source = source[1:]
@@ -547,7 +559,15 @@ class AzureStorageHandler(CloudStorageHandler):
         if len(parts) != 2:
             raise ValueError(f"Invalid Azure Blob display path: {source}")
 
-        container_name, blob_name = parts[1].split("/", 1)
+        return parts[1].split("/", 1)
+
+    @handle_exceptions
+    def generate_url_from_source(self, source: str, expiry_mins: int = 15):
+        """
+        Parse the display path stored in the format '/{account_name}.blob.core.windows.net/{container_name}/{blob_name}'
+        to get the container name and blob name for downloading.
+        """
+        container_name, blob_name = AzureStorageHandler.split_source(source=source)
         return self.generate_signed_url(
             bucket_name=container_name, source_path=blob_name, expiry_mins=expiry_mins
         )
@@ -677,12 +697,9 @@ class GCPStorageHandler(CloudStorageHandler):
 
         return url
 
+    @staticmethod
     @handle_exceptions
-    def generate_url_from_source(self, source: str, expiry_mins: int = 15):
-        """
-        Parse the display path stored in the format '/storage.googleapis.com/{bucket_name}/{blob_name}'
-        to get the bucket name and blob name for downloading.
-        """
+    def split_source(source: str):
         # Remove leading slash and split on 'storage.googleapis.com/'
         if source.startswith("/"):
             source = source[1:]
@@ -691,31 +708,50 @@ class GCPStorageHandler(CloudStorageHandler):
         if len(parts) != 2:
             raise ValueError(f"Invalid GCP display path: {source}")
 
-        bucket_name, blob_name = parts[1].split("/", 1)
+        return parts[1].split("/", 1)
+
+    @handle_exceptions
+    def generate_url_from_source(self, source: str, expiry_mins: int = 15):
+        """
+        Parse the display path stored in the format '/storage.googleapis.com/{bucket_name}/{blob_name}'
+        to get the bucket name and blob name for downloading.
+        """
+        bucket_name, blob_name = GCPStorageHandler.split_source(source=source)
         return self.generate_signed_url(
             bucket_name=bucket_name, source_path=blob_name, expiry_mins=expiry_mins
         )
 
 
-# TODO( YASH): Configure these variables through api endpoints, so that users can change through course of time.
-def get_cloud_client(provider: str):
+def get_cloud_client(provider: str, cloud_credentials: CloudCredentials):
     if provider == "s3":
-        aws_access_key = os.getenv("AWS_ACCESS_KEY", None)
-        aws_secret_access_key = os.getenv("AWS_ACCESS_SECRET", None)
-        region_name = os.getenv("AWS_REGION_NAME", None) or None
         return S3StorageHandler(
-            aws_access_key=aws_access_key,
-            aws_secret_access_key=aws_secret_access_key,
-            region_name=region_name,
+            aws_access_key=cloud_credentials.aws.access_key,
+            aws_secret_access_key=cloud_credentials.aws.secret_key,
+            region_name=cloud_credentials.aws.region_name,
         )
     elif provider == "azure":
-        account_name = os.getenv("AZURE_ACCOUNT_NAME", None)
-        account_key = os.getenv("AZURE_ACCOUNT_KEY", None)
-        return AzureStorageHandler(account_name=account_name, account_key=account_key)
+        return AzureStorageHandler(
+            account_name=cloud_credentials.azure.account_name,
+            account_key=cloud_credentials.azure.account_key,
+        )
     elif provider == "gcp":
-        gcp_credentials_file = os.getenv("GCP_CREDENTIALS_FILE", None)
-        return GCPStorageHandler(credentials_file_path=gcp_credentials_file)
+        return GCPStorageHandler(
+            credentials_file_path=cloud_credentials.gcp.credentials_file
+        )
     else:
         raise ValueError(
             f"Currently supports s3,azure and gcp, but received {provider}"
         )
+
+
+def get_bucket_name(provider: str, source: str) -> str:
+    if provider == FileLocation.s3.value:
+        bucket_name, _ = S3StorageHandler.split_source(source)
+    elif provider == FileLocation.azure.value:
+        bucket_name, _ = AzureStorageHandler.split_source(source)
+    elif provider == FileLocation.gcp.value:
+        bucket_name, _ = GCPStorageHandler.split_source(source)
+    else:
+        raise ValueError(f"Unsupported provider: {provider}")
+
+    return bucket_name

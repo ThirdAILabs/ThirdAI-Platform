@@ -143,15 +143,12 @@ class ModelBazaar:
     def train(
         self,
         model_name: str,
-        unsupervised_docs: Optional[List[str]] = None,
-        supervised_docs: Optional[List[Tuple[str, str]]] = None,
-        test_doc: Optional[str] = None,
-        doc_type: str = "local",
+        unsupervised_docs: List[Dict[str, Any]] = None,
+        supervised_docs: List[Dict[str, Any]] = None,
+        test_doc: Optional[Dict[str, Any]] = None,
         is_async: bool = False,
         base_model_identifier: Optional[str] = None,
         model_options: Optional[dict] = None,
-        metadata: Optional[List[Dict[str, str]]] = None,
-        doc_options: Dict[str, Dict[str, Any]] = {},
         job_options: Optional[dict] = None,
     ):
         """
@@ -159,71 +156,43 @@ class ModelBazaar:
 
         Args:
             model_name (str): The name of the model.
-            unsupervised_docs (Optional[List[str]]): A list of document paths for unsupervised training.
-            supervised_docs (Optional[List[Tuple[str, str]]]): A list of document path and source id pairs.
-            test_doc (Optional[str]): A path to a test file for evaluating the trained NeuralDB.
-            doc_type (str): Specifies document location type : "local"(default), "nfs" , "s3", "azure" or "gcp".
-            sharded (bool): Whether NeuralDB training will be distributed over NeuralDB shards.
+            unsupervised_docs (List[Dict[str, Any]]): List of FileInfo objects for unsupervised files.
+            supervised_docs (List[Dict[str, Any]]): List of FileInfo objects for supervised files.
+            test_doc (Optional[Dict[str, Any]]): FileInfo object for test file.
             is_async (bool): Whether training should be asynchronous (default is False).
-            train_extra_options: (Optional[dict])
             base_model_identifier (Optional[str]): The identifier of the base model.
-            metadata (Optional[List[Dict[str, str]]]): A list metadata dicts. Each dict corresponds to an unsupervised file.
+            model_options (Optional[dict]): Model configuration options.
+            job_options (Optional[dict]): Resource allocation options for the job.
 
         Returns:
             Model: A Model instance.
         """
-        if doc_type not in self._doc_types:
-            raise ValueError(
-                f"Invalid doc_type value. Supported doc_type are {self._doc_types}"
-            )
 
         if not unsupervised_docs and not supervised_docs:
             raise ValueError("Both the unsupervised and supervised docs are empty.")
 
         unsupervised_docs = unsupervised_docs or []
 
-        if metadata and unsupervised_docs:
-            if len(metadata) != len(unsupervised_docs):
-                raise ValueError("Metadata is not provided for all unsupervised files.")
-
         file_info = {
-            "unsupervised_files": [
-                {
-                    "path": doc,
-                    "location": doc_type,
-                    "metadata": metadata[i] if metadata else None,
-                    "options": doc_options.get(doc, {}),
-                }
-                for i, doc in enumerate(unsupervised_docs)
-            ],
-            "supervised_files": [
-                {
-                    "path": sup_file,
-                    "doc_id": source_id,
-                    "location": doc_type,
-                    "options": doc_options.get(sup_file, {}),
-                }
-                for sup_file, source_id in supervised_docs
-            ],
-            "test_files": (
-                [{"path": test_doc, "location": doc_type}] if test_doc else []
-            ),
+            "unsupervised_files": unsupervised_docs,
+            "supervised_files": supervised_docs,
+            "test_files": ([test_doc] if test_doc else []),
         }
 
         url = urljoin(self._base_url, f"train/ndb")
 
-        all_file_paths = (
-            unsupervised_docs
-            + [x[0] for x in (supervised_docs or [])]
-            + ([test_doc] if test_doc else [])
-        )
+        # Collect local file paths for upload if necessary
         files = [
             (
-                ("files", open(file_path, "rb"))
-                if doc_type == "local"
-                else ("files", (file_path, "don't care"))
+                "files",
+                (
+                    open(file["path"], "rb")
+                    if file["location"] == "local"
+                    else (file["path"], "don't care")
+                ),
             )
-            for file_path in all_file_paths
+            for file_list in file_info.values()
+            for file in file_list
         ]
 
         if model_options:

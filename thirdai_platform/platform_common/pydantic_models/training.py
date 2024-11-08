@@ -1,7 +1,15 @@
 import os
 from enum import Enum
+from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Union
 
+from platform_common.pydantic_models.cloud_credentials import (
+    AWSCredentials,
+    AzureCredentials,
+    CloudCredentials,
+    CredentialRegistry,
+    GCPCredentials,
+)
 from platform_common.thirdai_storage.data_types import (
     LabelEntity,
     TokenClassificationData,
@@ -35,10 +43,38 @@ class FileInfo(BaseModel):
     doc_id: Optional[str] = None
     options: Dict[str, Any] = {}
     metadata: Optional[Dict[str, Any]] = None
+    cloud_credentials: Optional[CloudCredentials] = None
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        if not self.cloud_credentials:
+            self.cloud_credentials = self.get_relevant_credentials(
+                location=self.location
+            )
+
+    def get_relevant_credentials(self, location: str) -> Optional[CloudCredentials]:
+        """Initialize only the relevant credentials based on the location."""
+        if location == FileLocation.s3.value:
+            return CloudCredentials(aws=AWSCredentials())
+        elif location == FileLocation.azure.value:
+            return CloudCredentials(azure=AzureCredentials())
+        elif location == FileLocation.gcp.value:
+            return CloudCredentials(gcp=GCPCredentials())
+        return None  # No credentials needed for local or nfs locations
 
     def ext(self) -> str:
         _, ext = os.path.splitext(self.path)
         return ext
+
+    def extract_bucket_name(self) -> Optional[str]:
+        """Extracts the bucket name based on the storage location."""
+        if self.location == FileLocation.s3:
+            return self.parse_s3_url()[0]
+        elif self.location == FileLocation.azure:
+            return self.parse_azure_url()[0]
+        elif self.location == FileLocation.gcp:
+            return self.parse_gcp_url()[0]
+        return None
 
     def parse_s3_url(self):
         """
@@ -199,6 +235,9 @@ class NDBData(BaseModel):
             )
         return self
 
+    def get_files(self):
+        return self.unsupervised_files + self.supervised_files + self.test_files
+
 
 class UDTSubType(str, Enum):
     text = "text"
@@ -255,6 +294,9 @@ class UDTData(BaseModel):
     class Config:
         protected_namespaces = ()
 
+    def get_files(self):
+        return self.supervised_files + self.test_files
+
 
 class UDTGeneratedData(BaseModel):
     model_data_type: Literal[ModelDataType.UDT_DATAGEN] = ModelDataType.UDT_DATAGEN
@@ -262,6 +304,9 @@ class UDTGeneratedData(BaseModel):
 
     class Config:
         protected_namespaces = ()
+
+    def get_files(self):
+        return []
 
 
 class LLMProvider(str, Enum):
@@ -361,3 +406,18 @@ class TrainConfig(BaseModel):
             file.write(self.model_dump_json(indent=4))
 
         return config_path
+
+    def populate_credential_registry_and_save(self, registry_path: Path):
+        """
+        Populate the credential registry with credentials for each bucket.
+        """
+        registry = CredentialRegistry()
+
+        all_files = self.data.get_files()
+
+        for file_info in all_files:
+            bucket_name = file_info.extract_bucket_name()
+            if bucket_name and file_info.cloud_credentials:
+                registry.save_credentials(bucket_name, file_info.cloud_credentials)
+
+        registry.save_to_disk(registry_path=registry_path)

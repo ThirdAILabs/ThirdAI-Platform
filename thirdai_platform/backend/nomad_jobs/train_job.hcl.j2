@@ -15,15 +15,6 @@ job "{{ train_job_name }}" {
         driver = "raw_exec"
       {% endif %}
 
-      env {
-        AWS_ACCESS_KEY = "{{ aws_access_key }}"
-        AWS_ACCESS_SECRET = "{{ aws_access_secret }}"
-        AWS_REGION_NAME = "{{ aws_region_name }}"
-        AZURE_ACCOUNT_NAME = "{{ azure_account_name }}"
-        AZURE_ACCOUNT_KEY = "{{ azure_account_key }}"
-        GCP_CREDENTIALS_FILE = "{{ gcp_credentials_file }}"
-      }
-
       config {
         {% if platform == "docker" %}
           image = "{{ registry }}/{{ image_name }}:{{ tag }}"

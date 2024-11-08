@@ -159,7 +159,7 @@ jobs:
         echo "AZURE_ACCOUNT_KEY=${{ secrets.AZURE_ACCOUNT_KEY }}" >> $GITHUB_WORKSPACE/.env
         echo "GCP_CREDENTIALS_FILE=$HOME/nfs/dir/google_license.json" >> $GITHUB_WORKSPACE/.env
         echo "AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}" >> $GITHUB_WORKSPACE/.env
-        echo "AWS_ACCESS_SECRET=${{ secrets.AWS_ACCESS_SECRET }}" >> $GITHUB_WORKSPACE/.env
+        echo "AWS_SECRET_KEY=${{ secrets.AWS_ACCESS_SECRET }}" >> $GITHUB_WORKSPACE/.env
         echo "AWS_REGION_NAME=us-east-2" >> $GITHUB_WORKSPACE/.env
 
     - name: Launch Backend

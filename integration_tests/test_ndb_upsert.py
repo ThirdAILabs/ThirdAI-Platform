@@ -9,9 +9,18 @@ from client.bazaar import ModelBazaar
 
 def create_and_deploy_ndb(admin_client, base_model_name, autoscaling):
     doc_path = os.path.join(doc_dir(), "articles.csv")
+
+    # Prepare FileInfo-style dictionary for the unsupervised document
+    unsupervised_doc = {
+        "path": doc_path,
+        "location": "local",
+        "options": {},
+        "metadata": None,
+    }
+
     base_model = admin_client.train(
         base_model_name,
-        unsupervised_docs=[doc_path],
+        unsupervised_docs=[unsupervised_doc],
         model_options={"ndb_options": {"ndb_sub_type": "v2"}},
         supervised_docs=[],
     )
@@ -23,6 +32,7 @@ def create_and_deploy_ndb(admin_client, base_model_name, autoscaling):
 
     old_sources = ndb_client.sources()
 
+    # Use the upsert option in the FileInfo-style structure for insertion
     ndb_client.insert(
         [
             {

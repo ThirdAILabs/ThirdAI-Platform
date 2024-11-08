@@ -5,7 +5,6 @@ from urllib.parse import urljoin
 import pytest
 from utils import doc_dir
 
-pass
 from client.bazaar import ModelBazaar
 from client.utils import auth_header, http_get_with_error, http_post_with_error
 
@@ -17,9 +16,23 @@ def test_deployment_name():
     admin_client = ModelBazaar(base_url)
     admin_client.log_in("admin@mail.com", "password")
 
+    # Prepare FileInfo structures for unsupervised_docs
+    unsupervised_doc1 = {
+        "path": os.path.join(doc_dir(), "articles.csv"),
+        "location": "local",
+        "options": {},  # Add specific options if needed
+        "metadata": None,
+    }
+    unsupervised_doc2 = {
+        "path": os.path.join(doc_dir(), "mutual_nda.pdf"),
+        "location": "local",
+        "options": {},
+        "metadata": None,
+    }
+
     model1 = admin_client.train(
         f"basic_ndb_{uuid.uuid4()}",
-        unsupervised_docs=[os.path.join(doc_dir(), "articles.csv")],
+        unsupervised_docs=[unsupervised_doc1],
         model_options={"ndb_options": {"ndb_sub_type": "v2"}},
         supervised_docs=[],
         is_async=True,
@@ -28,7 +41,7 @@ def test_deployment_name():
 
     model2 = admin_client.train(
         f"basic_ndb_{uuid.uuid4()}",
-        unsupervised_docs=[os.path.join(doc_dir(), "mutual_nda.pdf")],
+        unsupervised_docs=[unsupervised_doc2],
         model_options={"ndb_options": {"ndb_sub_type": "v2"}},
         supervised_docs=[],
         is_async=True,
@@ -43,12 +56,15 @@ def test_deployment_name():
 
     def test_deployment(model_identifier, expected_doc):
         client = admin_client.deploy(model_identifier, deployment_name=deployment_name)
+
+        # Perform search and verify deployment via a custom deployment name endpoint
         client.search(query)
         http_post_with_error(
             urljoin(base_url[:-4], f"{deployment_name}/search"),
             json={"query": query},
             headers=auth_header(admin_client._access_token),
         )
+
         source1 = http_get_with_error(
             urljoin(base_url[:-4], f"{deployment_name}/sources"),
             headers=auth_header(admin_client._access_token),

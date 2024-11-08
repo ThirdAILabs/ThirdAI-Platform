@@ -304,10 +304,19 @@ class NDBV1Model(NDBModel):
         """
         Inserts documents into the NDB model.
         """
-        ndb_docs = [
-            ndbv1_parser.parse_doc(doc, self.data_dir)
-            for doc in expand_cloud_buckets_and_directories(documents)
-        ]
+        docs = expand_cloud_buckets_and_directories(documents)
+        ndb_docs = [ndbv1_parser.parse_doc(doc, self.data_dir) for doc in docs]
+
+        for doc in docs:
+            bucket_name = doc.extract_bucket_name()
+            if bucket_name and doc.cloud_credentials:
+                self.credentials_registry.save_credentials(
+                    bucket_name=bucket_name, credentials=doc.cloud_credentials
+                )
+
+        self.credentials_registry.save_to_disk(
+            registry_path=self.credentials_registry_path
+        )
 
         with self.db_lock:
             self.db.insert(ndb_docs)
@@ -437,15 +446,24 @@ class NDBV2Model(NDBModel):
         return inputs.SearchResultsNDB(query_text=query, references=results)
 
     def insert(self, documents: List[FileInfo], **kwargs: Any) -> List[Dict[str, str]]:
-        # TODO(V2 Support): add flag for upsert
-
+        docs = expand_cloud_buckets_and_directories(documents)
         ndb_docs = [
             ndbv2_parser.parse_doc(
                 doc, doc_save_dir=self.doc_save_path(), tmp_dir=self.data_dir
             )
-            for doc in expand_cloud_buckets_and_directories(documents)
+            for doc in docs
         ]
 
+        for doc in docs:
+            bucket_name = doc.extract_bucket_name()
+            if bucket_name and doc.cloud_credentials:
+                self.credentials_registry.save_credentials(
+                    bucket_name=bucket_name, credentials=doc.cloud_credentials
+                )
+
+        self.credentials_registry.save_to_disk(
+            registry_path=self.credentials_registry_path
+        )
         with self.db_lock:
             self.db.insert(ndb_docs)
 

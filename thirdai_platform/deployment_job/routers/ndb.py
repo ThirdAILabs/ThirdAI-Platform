@@ -28,7 +28,11 @@ from deployment_job.utils import validate_name
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
-from platform_common.file_handler import download_local_files, get_cloud_client
+from platform_common.file_handler import (
+    download_local_files,
+    get_bucket_name,
+    get_cloud_client,
+)
 from platform_common.pydantic_models.deployment import DeploymentConfig, NDBSubType
 from platform_common.pydantic_models.feedback_logs import (
     AssociateLog,
@@ -677,7 +681,13 @@ class NDBRouter:
         provider: str,
         token=Depends(Permissions.verify_permission("read")),
     ):
-        cloud_client = get_cloud_client(provider=provider)
+        bucket_name = get_bucket_name(provider=provider, source=source)
+        cloud_credentials = self.model.credentials_registry.get_credentials(
+            bucket_name=bucket_name
+        )
+        cloud_client = get_cloud_client(
+            provider=provider, cloud_credentials=cloud_credentials
+        )
 
         signed_url = cloud_client.generate_url_from_source(source=source)
 

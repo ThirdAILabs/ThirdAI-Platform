@@ -105,7 +105,9 @@ def parse_doc(
     if doc.location == FileLocation.s3:
         try:
             # TODO (YASH): calling get_cloud_client for every document will be a problem, we have to come up with a way to reuse client.
-            s3_client = get_cloud_client(provider="s3")
+            s3_client = get_cloud_client(
+                provider="s3", cloud_credentials=doc.cloud_credentials
+            )
             bucket_name, prefix = doc.parse_s3_url()
             local_file_path = os.path.join(tmp_dir, os.path.basename(prefix))
 
@@ -128,8 +130,10 @@ def parse_doc(
     # Azure handling
     elif doc.location == FileLocation.azure:
         try:
-            account_name = os.getenv("AZURE_ACCOUNT_NAME")
-            azure_client = get_cloud_client(provider="azure")
+            account_name = doc.cloud_credentials.azure.account_name
+            azure_client = get_cloud_client(
+                provider="azure", cloud_credentials=doc.cloud_credentials
+            )
             container_name, blob_name = doc.parse_azure_url()
             local_file_path = os.path.join(tmp_dir, os.path.basename(blob_name))
 
@@ -152,7 +156,9 @@ def parse_doc(
     # GCP handling
     elif doc.location == FileLocation.gcp:
         try:
-            gcp_client = get_cloud_client(provider="gcp")
+            gcp_client = get_cloud_client(
+                provider="gcp", cloud_credentials=doc.cloud_credentials
+            )
             bucket_name, blob_name = doc.parse_gcp_url()
             local_file_path = os.path.join(tmp_dir, os.path.basename(blob_name))
 
