@@ -43,6 +43,9 @@ class DummyReporter(Reporter):
     def report_status(self, model_id: str, status: str, message: str = ""):
         pass
 
+    def report_warning(self, model_id: str, message: str):
+        pass
+
 
 MODEL_BAZAAR_DIR = "./model_bazaar_tmp"
 

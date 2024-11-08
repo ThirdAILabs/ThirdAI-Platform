@@ -17,12 +17,12 @@ from backend.auth_dependencies import is_model_owner, verify_model_read_access
 from backend.startup_jobs import start_on_prem_generate_job
 from backend.utils import (
     delete_nomad_job,
-    get_detailed_reasons,
     get_job_logs,
     get_model_from_identifier,
     get_model_status,
     get_platform,
     get_python_path,
+    get_warnings_and_errors,
     list_all_dependencies,
     model_accessible,
     model_bazaar_path,
@@ -549,15 +549,15 @@ def deployment_status(
         )
 
     deploy_status, reasons = get_model_status(model, train_status=False)
-    reasons = get_detailed_reasons(
-        session=session, job_type="deploy", status=deploy_status, reasons=reasons
-    )
+    warnings, errors = get_warnings_and_errors(session, model, job_type="deploy")
     return response(
         status_code=status.HTTP_200_OK,
         message="Successfully got the deployment status",
         data={
             "deploy_status": deploy_status,
             "messages": reasons,
+            "warnings": warnings,
+            "errors": errors,
             "model_id": str(model.id),
         },
     )
@@ -597,12 +597,12 @@ def update_deployment_status(
         )
 
     model.deploy_status = new_status
-    if message:
+    if new_status == schema.Status.failed and message:
         session.add(
-            schema.JobError(
+            schema.JobMessage(
                 model_id=model.id,
                 job_type="deploy",
-                status=status,
+                level=schema.Level.error,
                 message=message,
             )
         )
@@ -610,6 +610,31 @@ def update_deployment_status(
     session.commit()
 
     return {"message": "successfully updated"}
+
+
+@deploy_router.post("/warning")
+def train_warning(model_id: str, message: str, session: Session = Depends(get_session)):
+    trained_model: schema.Model = (
+        session.query(schema.Model).filter(schema.Model.id == model_id).first()
+    )
+
+    if not trained_model:
+        return response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=f"No model with id {model_id}.",
+        )
+
+    session.add(
+        schema.JobMessage(
+            model_id=trained_model.id,
+            job_type="deploy",
+            level=schema.Level.warning,
+            message=message,
+        )
+    )
+    session.commit()
+
+    return {"message": "successfully logged the message"}
 
 
 def active_deployments_using_model(model_id: str, session: Session):

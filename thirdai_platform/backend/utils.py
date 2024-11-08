@@ -7,6 +7,8 @@ import shutil
 from collections import defaultdict, deque
 from functools import wraps
 from pathlib import Path
+
+pass
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urljoin
 
@@ -62,46 +64,45 @@ def list_all_dependencies(model: schema.Model) -> List[schema.Model]:
     return all_models
 
 
-def get_job_error(
-    session: Session, model_id: str, job_type: str, status: schema.Status
-) -> Optional[str]:
+def get_job_messages(
+    session: Session, model_id: str, job_type: str, level: schema.Level, limit: int
+) -> List[str]:
     # Return the first error since often later errors may be indirectly caused by
     # the first.
-    error = (
-        session.query(schema.JobError)
+    messages = (
+        session.query(schema.JobMessage)
         .filter(
-            schema.JobError.model_id == model_id,
-            schema.JobError.job_type == job_type,
-            schema.JobError.status == status,
+            schema.JobMessage.model_id == model_id,
+            schema.JobMessage.job_type == job_type,
+            schema.JobMessage.level == level,
         )
-        .order_by(sa.asc(schema.JobError.timestamp))
-        .first()
+        .order_by(sa.asc(schema.JobMessage.timestamp))
+        .limit(limit)
     )
-    if not error:
-        return None
-    return error.message
+    if not messages:
+        return []
+    return [msg.message for msg in messages]
 
 
-def get_detailed_reasons(
-    session: Session,
-    job_type: str,
-    status: schema.Status,
-    reasons: List[Dict[str, str]],
-) -> List[str]:
-    detailed = []
-    for reason in reasons:
-        error = get_job_error(
-            session=session,
-            model_id=reason["model_id"],
-            job_type=job_type,
-            status=status,
+def get_warnings_and_errors(
+    session: Session, model: schema.Model, job_type: str
+) -> Tuple[List[str], List[str]]:
+    warnings = []
+    errors = []
+
+    for m in list_all_dependencies(model):
+        warnings.extend(
+            get_job_messages(
+                session, m.id, job_type=job_type, level=schema.Level.warning, limit=5
+            )
         )
-        message = reason["message"]
-        if error:
-            message += " The following error was detected: " + error
+        errors.extend(
+            get_job_messages(
+                session, m.id, job_type=job_type, level=schema.Level.error, limit=1
+            )
+        )
 
-        detailed.append(message)
-    return detailed
+    return warnings, errors
 
 
 def get_model_status(
@@ -115,30 +116,17 @@ def get_model_status(
         schema.Status.stopped,
         schema.Status.failed,
     ]:
-        return status, [
-            {
-                "model_id": model.id,
-                "message": f"Workflow {model.name} has status {status.value}.",
-            }
-        ]
+        return status, [f"Workflow {model.name} has status {status.value}."]
 
     statuses = defaultdict(list)
     for m in list_all_dependencies(model):
         status = m.train_status if train_status else m.deploy_status
         if m.id == model.id:
-            statuses[status].append(
-                {
-                    "model_id": m.id,
-                    "message": f"Workflow {model.name} has status {status.value}.",
-                }
-            )
+            statuses[status].append(f"Workflow {model.name} has status {status.value}.")
 
         else:
             statuses[status].append(
-                {
-                    "model_id": m.id,
-                    "message": f"The workflow depends on workflow {model.name} which has status {status.value}.",
-                }
+                f"The workflow depends on workflow {model.name} which has status {status.value}."
             )
 
     status_priority_order = [

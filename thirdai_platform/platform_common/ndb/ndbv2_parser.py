@@ -16,7 +16,7 @@ def convert_to_ndb_doc(
     doc_id: Optional[str],
     metadata: Optional[Dict[str, Any]],
     options: Dict[str, Any],
-) -> ndbv2.Document:
+) -> Optional[ndbv2.Document]:
     filename, ext = os.path.splitext(resource_path)
     ext = ext.lower()
     if ext == ".pdf":
@@ -74,7 +74,8 @@ def convert_to_ndb_doc(
             doc_id=doc_id,
         )
     else:
-        raise TypeError(f"{ext} Document type isn't supported yet.")
+        logging.warning("{ext} Document type isn't supported yet.")
+        return None
 
 
 def preload_chunks(
@@ -83,7 +84,7 @@ def preload_chunks(
     doc_id: Optional[str],
     metadata: Optional[Dict[str, Any]],
     options: Dict[str, Any],
-) -> Tuple[ndbv2.Document, str]:
+) -> Optional[Tuple[ndbv2.Document, str]]:
     doc = convert_to_ndb_doc(
         resource_path=resource_path,
         display_path=display_path,
@@ -91,12 +92,14 @@ def preload_chunks(
         metadata=metadata,
         options=options,
     )
+    if not doc:
+        return None
     return ndbv2.documents.PrebatchedDoc(list(doc.chunks()), doc_id=doc.doc_id())
 
 
 def parse_doc(
     doc: FileInfo, doc_save_dir: str, tmp_dir: str
-) -> Tuple[ndbv2.Document, str]:
+) -> Optional[Tuple[ndbv2.Document, str]]:
     """
     Process a file, downloading it from S3, Azure, or GCP if necessary,
     and convert it to an NDB file.

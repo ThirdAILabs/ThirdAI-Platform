@@ -15,6 +15,10 @@ class Reporter(ABC):
     def report_status(self, model_id: str, status: str, message: Optional[str] = None):
         raise NotImplementedError
 
+    @abstractmethod
+    def report_warning(self, model_id: str, message: str):
+        raise NotImplementedError
+
 
 class HttpReporter(Reporter):
     def __init__(self, api_url: str, logger: Logger):
@@ -83,4 +87,11 @@ class HttpReporter(Reporter):
             "post",
             "api/train/update-status",
             params={"model_id": model_id, "new_status": status, "message": message},
+        )
+
+    def report_warning(self, model_id: str, message: str):
+        self._request(
+            "post",
+            "api/train/warning",
+            params={"model_id": model_id, "message": message},
         )

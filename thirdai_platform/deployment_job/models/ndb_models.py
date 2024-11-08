@@ -22,6 +22,7 @@ from deployment_job.chat import llm_providers
 from deployment_job.models.model import Model
 from deployment_job.pydantic_models import inputs
 from deployment_job.utils import highlighted_pdf_bytes, new_pdf_chunks, old_pdf_chunks
+from fastapi import HTTPException, status
 from platform_common.file_handler import FileInfo, expand_cloud_buckets_and_directories
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from thirdai import neural_db as ndb
@@ -439,12 +440,20 @@ class NDBV2Model(NDBModel):
     def insert(self, documents: List[FileInfo], **kwargs: Any) -> List[Dict[str, str]]:
         # TODO(V2 Support): add flag for upsert
 
+        documents = expand_cloud_buckets_and_directories(documents)
         ndb_docs = [
             ndbv2_parser.parse_doc(
                 doc, doc_save_dir=self.doc_save_path(), tmp_dir=self.data_dir
             )
-            for doc in expand_cloud_buckets_and_directories(documents)
+            for doc in documents
         ]
+
+        for i, doc in enumerate(ndb_docs):
+            if not doc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unable to parse {documents[i].path}. Unsupported file type.",
+                )
 
         with self.db_lock:
             self.db.insert(ndb_docs)

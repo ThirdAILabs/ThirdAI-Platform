@@ -60,14 +60,23 @@ export async function listDeployments(deployment_id: string): Promise<Deployment
   }
 }
 
+// Update the base interface to match the API response structure
+
 interface BaseStatusResponse {
+  data: {
+    model_identifier: string; // Changed from model_id to model_identifier
+    messages: string[];
+  };
+}
+
+interface BaseDeployStatusResponse {
   data: {
     model_id: string;
     messages: string[];
   };
 }
 
-interface DeployStatusResponse extends BaseStatusResponse {
+interface DeployStatusResponse extends BaseDeployStatusResponse {
   data: {
     model_id: string;
     messages: string[];
@@ -77,9 +86,11 @@ interface DeployStatusResponse extends BaseStatusResponse {
 
 interface TrainStatusResponse extends BaseStatusResponse {
   data: {
-    model_id: string;
+    model_identifier: string;
     messages: string[];
     train_status: string;
+    warnings: string[];
+    errors: string[];
   };
 }
 
