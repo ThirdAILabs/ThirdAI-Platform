@@ -8,7 +8,6 @@ import time
 import typing
 from abc import abstractmethod
 from collections import defaultdict
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from logging import Logger
 from pathlib import Path
@@ -21,6 +20,11 @@ from platform_common.file_handler import (
     get_local_file_infos,
 )
 from platform_common.pii.udt_common_patterns import find_common_pattern
+from platform_common.pydantic_models.pii_models import (
+    ModelMetrics,
+    PerTagMetrics,
+    Throughput,
+)
 from platform_common.pydantic_models.training import (
     TextClassificationOptions,
     TokenClassificationOptions,
@@ -275,15 +279,6 @@ class TextClassificationModel(ClassificationModel):
         return latency
 
 
-@dataclass
-class PerTagMetrics:
-    metrics: Dict[str, Dict[str, float]]
-
-    true_positives: List[Dict[str, Any]]
-    false_positives: List[Dict[str, Any]]
-    false_negatives: List[Dict[str, Any]]
-
-
 class TokenClassificationModel(ClassificationModel):
     def __init__(self, config: TrainConfig, reporter: Reporter, logger: Logger):
         super().__init__(config, reporter, logger)
@@ -467,10 +462,18 @@ class TokenClassificationModel(ClassificationModel):
             for file in train_files + test_files:
                 self.verify_file(model, file)
 
-            if len(test_files):
-                before_train_metrics = self.per_tag_metrics(
-                    model=model, test_files=test_files, samples_to_collect=0
-                )
+            before_train_metrics = ModelMetrics(
+                per_tag_metrics=(
+                    None
+                    if len(test_files) == 0
+                    else self.per_tag_metrics(
+                        model=model,
+                        test_files=test_files,
+                        samples_to_collect=0,
+                    )
+                ),
+                throughput=self.measure_throughput(model, train_files + test_files),
+            )
 
             start_time = time.time()
 
@@ -536,15 +539,23 @@ class TokenClassificationModel(ClassificationModel):
             training_time = time.time() - start_time
             self.logger.info(f"Training completed in {training_time:.2f} seconds.")
 
-            if len(test_files):
-                after_train_metrics = self.per_tag_metrics(
-                    model=model, test_files=test_files, samples_to_collect=5
-                )
+            after_train_metrics = ModelMetrics(
+                per_tag_metrics=(
+                    None
+                    if len(test_files) == 0
+                    else self.per_tag_metrics(
+                        model=model,
+                        test_files=test_files,
+                        samples_to_collect=5,
+                    )
+                ),
+                throughput=self.measure_throughput(model, train_files + test_files),
+            )
 
-                self.save_train_report(
-                    before_train_metrics=before_train_metrics,
-                    after_train_metrics=after_train_metrics,
-                )
+            self.save_train_report(
+                before_train_metrics=before_train_metrics,
+                after_train_metrics=after_train_metrics,
+            )
 
             # converts the status of all tags to trained and update in the storage
             for tag in tags.tag_status:
@@ -581,7 +592,56 @@ class TokenClassificationModel(ClassificationModel):
             # Ensure cleanup of temporary directories after training, even on failure
             self.cleanup_temp_dirs()
 
-    def per_tag_metrics(self, model, test_files: List[str], samples_to_collect: int):
+    def measure_throughput(self, model, files: List[str]):
+        source_col, _ = model.source_target_columns()
+
+        number_samples_for_throughput_measurement = 2000
+        samples = []
+        for file in files:
+            df = pd.read_csv(file)
+            for row in df.itertuples():
+                if len(samples) < number_samples_for_throughput_measurement:
+                    samples.append({source_col: getattr(row, source_col)})
+
+        if len(samples) > 500:
+            # to get any meaningful throughput measurements we need to run inference on a
+            # sufficiently large number of samples
+            batch_inference_start_time = time.time()
+            model.predict(samples, top_k=1)
+            batch_inference_time = max(time.time() - batch_inference_start_time, 1e-6)
+            self.logger.info(
+                f"Batch inference time: {batch_inference_time:.2f} seconds."
+            )
+
+            number_tokens = 0
+            for sample in samples:
+                number_tokens += len(sample[source_col].split())
+
+            token_throughput = number_tokens / batch_inference_time
+            sample_throughput = len(samples) / batch_inference_time
+            self.logger.info(
+                f"Token throughput: {token_throughput:.2f} tokens per second."
+            )
+            self.logger.info(
+                f"Sample throughput: {sample_throughput:.2f} samples per second."
+            )
+
+            return Throughput(
+                token_throughput=token_throughput,
+                sample_throughput=sample_throughput,
+            )
+
+        self.logger.warning(
+            "Not enough samples to measure throughput. Skipping throughput measurement."
+        )
+        return Throughput(token_throughput=None, sample_throughput=None)
+
+    def per_tag_metrics(
+        self,
+        model,
+        test_files: List[str],
+        samples_to_collect: int,
+    ):
         true_positives = defaultdict(int)
         false_positives = defaultdict(int)
         false_negatives = defaultdict(int)
@@ -599,6 +659,7 @@ class TokenClassificationModel(ClassificationModel):
                 target = getattr(row, target_col)
 
                 preds = model.predict({source_col: source}, top_k=1)
+
                 predictions = " ".join(p[0][0] for p in preds)
                 labels = target.split()
                 for i, (pred, label) in enumerate(zip(preds, labels)):
@@ -675,16 +736,11 @@ class TokenClassificationModel(ClassificationModel):
         )
 
     def save_train_report(
-        self, before_train_metrics: PerTagMetrics, after_train_metrics: PerTagMetrics
+        self, before_train_metrics: ModelMetrics, after_train_metrics: ModelMetrics
     ):
         train_report = {
-            "before_train_metrics": before_train_metrics.metrics,
-            "after_train_metrics": after_train_metrics.metrics,
-            "after_train_examples": {
-                "true_positives": after_train_metrics.true_positives,
-                "false_positives": after_train_metrics.false_positives,
-                "false_negatives": after_train_metrics.false_negatives,
-            },
+            "before_train_metrics": before_train_metrics.model_dump_json(),
+            "after_train_metrics": after_train_metrics.model_dump_json(),
         }
 
         timestamp = int(datetime.now(timezone.utc).timestamp())
