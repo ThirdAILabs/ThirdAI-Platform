@@ -153,6 +153,7 @@ class ModelBazaar:
         metadata: Optional[List[Dict[str, str]]] = None,
         doc_options: Dict[str, Dict[str, Any]] = {},
         job_options: Optional[dict] = None,
+        hidden: bool = False,
     ):
         """
         Initiates training for a model and returns a Model instance.
@@ -243,6 +244,7 @@ class ModelBazaar:
             params={
                 "model_name": model_name,
                 "base_model_identifier": base_model_identifier,
+                "hidden": hidden,
             },
             files=files,
             headers=auth_header(self._access_token),
@@ -678,6 +680,26 @@ class ModelBazaar:
         self.await_deploy(udt_client)
         return udt_client
 
+    def deploy_status(self, model_identifier: str):
+        """
+        Checks for the status of the model training
+
+        Args:
+            model (Model): The Model instance.
+        """
+
+        url = urljoin(self._base_url, f"deploy/status")
+
+        response = http_get_with_error(
+            url,
+            params={"model_identifier": model_identifier},
+            headers=auth_header(self._access_token),
+        )
+
+        response_data = json.loads(response.content)["data"]
+
+        return response_data
+
     def await_deploy(self, ndb_client: BaseClient):
         """
         Waits for the deployment of a model to complete.
@@ -685,14 +707,8 @@ class ModelBazaar:
         Args:
             ndb_client (NeuralDBClient): The NeuralDBClient instance.
         """
-        url = urljoin(self._base_url, f"deploy/status")
-
-        params = {"model_identifier": ndb_client.model_identifier}
         while True:
-            response = http_get_with_error(
-                url, params=params, headers=auth_header(self._access_token)
-            )
-            response_data = json.loads(response.content)["data"]
+            response_data = self.deploy_status(ndb_client.model_identifier)
 
             if response_data["deploy_status"] == "complete":
                 print("\nDeployment completed")
@@ -741,6 +757,15 @@ class ModelBazaar:
         )
 
         print(f"Successfully deleted the model {model_identifier}")
+
+    def list_models(self, ignore_hidden: bool = False):
+        response = http_get_with_error(
+            urljoin(self._base_url, "model/list"),
+            headers=auth_header(self._access_token),
+            params={"ignore_hidden": ignore_hidden},
+        )
+
+        return response.json()["data"]
 
     def upload_model(
         self,

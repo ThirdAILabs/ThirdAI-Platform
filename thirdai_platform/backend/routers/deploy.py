@@ -660,6 +660,23 @@ def active_deployments_using_model(model_id: str, session: Session):
     )
 
 
+def stop_deployment(model: schema.Model, session: Session):
+    logging.info(f"stopping deployment for model: {model.id}")
+    try:
+        delete_nomad_job(
+            job_id=f"deployment-{str(model.id)}",
+            nomad_endpoint=os.getenv("NOMAD_ENDPOINT"),
+        )
+        model.deploy_status = schema.Status.stopped
+        session.flush()
+
+    except Exception as err:
+        logging.error(str(err))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(err)
+        )
+
+
 @deploy_router.post("/stop", dependencies=[Depends(is_model_owner)])
 def undeploy_model(
     model_identifier: str,
@@ -693,20 +710,23 @@ def undeploy_model(
             message=f"Unable to stop deployment for model {model_identifier} since it is used by other active workflows.",
         )
 
-    try:
-        delete_nomad_job(
-            job_id=f"deployment-{str(model.id)}",
-            nomad_endpoint=os.getenv("NOMAD_ENDPOINT"),
-        )
-        model.deploy_status = schema.Status.stopped
-        session.commit()
+    stop_deployment(model, session)
 
-    except Exception as err:
-        logging.error(str(err))
-        return response(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message=str(err),
+    for dep in list_all_dependencies(model):
+        logging.info(f"found dependency {dep.id} of model {model.id}")
+        if dep.id == model.id and not dep.hidden:
+            continue
+
+        active_deployments_using_dep = active_deployments_using_model(
+            model_id=dep.id, session=session
         )
+        logging.info(
+            f"dependency {dep.id} has {active_deployments_using_dep} active dependencies"
+        )
+        if active_deployments_using_dep == 0:
+            stop_deployment(dep, session)
+
+    session.commit()
 
     return response(
         status_code=status.HTTP_202_ACCEPTED,

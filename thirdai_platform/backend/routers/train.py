@@ -87,6 +87,7 @@ def train_ndb(
     base_model_identifier: Optional[str] = None,
     model_options: str = Form(default="{}"),
     job_options: str = Form(default="{}"),
+    hidden: bool = False,
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
@@ -176,6 +177,7 @@ def train_ndb(
             domain=user.domain,
             access_level=schema.Access.private,
             parent_id=base_model.id if base_model else None,
+            hidden=hidden,
         )
 
         session.add(new_model)
@@ -415,6 +417,7 @@ def nlp_datagen(
     datagen_options: str = Form(default="{}"),
     datagen_job_options: str = Form(default="{}"),
     train_job_options: str = Form(default="{}"),
+    hidden: bool = False,
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
@@ -502,6 +505,7 @@ def nlp_datagen(
             domain=user.email.split("@")[1],
             access_level=schema.Access.private,
             parent_id=base_model.id if base_model else None,
+            hidden=hidden,
         )
 
         session.add(new_model)

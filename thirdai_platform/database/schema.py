@@ -199,6 +199,8 @@ class Model(SQLDeclarativeBase):
     )
     team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id"), nullable=True)
 
+    hidden = Column(Boolean, default=False)
+
     user = relationship("User", back_populates="models")
     team = relationship("Team", back_populates="models")
 

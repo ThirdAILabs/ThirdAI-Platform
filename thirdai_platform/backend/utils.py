@@ -4,7 +4,7 @@ import math
 import os
 import re
 import shutil
-from collections import defaultdict, deque
+from collections import defaultdict
 from functools import wraps
 from pathlib import Path
 
@@ -44,23 +44,23 @@ def hash_password(password: str):
 
 
 def list_all_dependencies(model: schema.Model) -> List[schema.Model]:
-    queue = deque()
-    queue.append(model)
     visited = set()
-
     all_models = []
 
-    while len(queue) > 0:
-        m: schema.Model = queue.popleft()
+    def traverse(m: schema.Model):
         if m.id in visited:
-            continue
+            return
 
         visited.add(m.id)
 
+        for dep in m.dependencies:
+            traverse(dep.dependency)
+
         all_models.append(m)
 
-        queue.extend(dep.dependency for dep in m.dependencies)
+    traverse(model)
 
+    all_models.reverse()
     return all_models
 
 

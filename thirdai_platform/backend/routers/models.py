@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import uuid
 from typing import Annotated, Dict, Optional, Union
@@ -17,6 +18,7 @@ from backend.utils import (
     get_high_level_model_info,
     get_model,
     get_model_from_identifier,
+    list_all_dependencies,
     model_bazaar_path,
     validate_name,
 )
@@ -66,6 +68,7 @@ def list_models(
     type: Optional[str] = None,
     sub_type: Optional[str] = None,
     access_level: Annotated[Union[list[str], None], Query()] = None,
+    ignore_hidden: bool = False,
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
 ):
@@ -150,6 +153,9 @@ def list_models(
 
     if sub_type:
         query = query.filter(schema.Model.sub_type == sub_type)
+
+    if ignore_hidden:
+        query = query.filter(schema.Model.hidden == False)
 
     results = [get_high_level_model_info(result) for result in query]
 
@@ -964,6 +970,37 @@ def update_default_permission(
     )
 
 
+def delete_single_model(model: schema.Model, session: Session):
+    logging.info(f"deleting model {model.id}")
+    errors = []
+    # Step 1: Delete model storage
+    try:
+        storage.delete(model.id)
+    except Exception as storage_error:
+        msg = f"Failed to delete model from storage: {str(storage_error)}"
+        logging.error(msg)
+        errors.append(msg)
+
+    # Step 2: Delete Nomad job
+    try:
+        delete_nomad_job(f"deployment-{model.id}", os.getenv("NOMAD_ENDPOINT"))
+    except Exception as nomad_error:
+        msg = f"Failed to delete Nomad job: {str(nomad_error)}"
+        logging.error(msg)
+        errors.append(msg)
+
+    # Step 3: Delete model from the database
+    try:
+        session.delete(model)
+        session.flush()
+    except Exception as db_error:
+        msg = f"Failed to delete model from database: {str(db_error)}"
+        logging.error(msg)
+        errors.append(msg)
+
+    return errors
+
+
 @model_router.post("/delete", dependencies=[Depends(is_model_owner)])
 def delete_model(
     model_identifier: str,
@@ -989,26 +1026,25 @@ def delete_model(
             message=f"Cannot delete model '{model_identifier}' since it is used in other workflows.",
         )
 
-    errors = []
+    dependencies = list_all_dependencies(model)
 
-    # Step 1: Delete model storage
-    try:
-        storage.delete(model.id)
-    except Exception as storage_error:
-        errors.append(f"Failed to delete model from storage: {str(storage_error)}")
+    errors = delete_single_model(model, session)
 
-    # Step 2: Delete Nomad job
-    try:
-        delete_nomad_job(f"deployment-{model.id}", os.getenv("NOMAD_ENDPOINT"))
-    except Exception as nomad_error:
-        errors.append(f"Failed to delete Nomad job: {str(nomad_error)}")
+    for dep in dependencies:
+        logging.info(f"found dependency {dep.id} of model {model.id}")
+        if dep.id == model.id or not dep.hidden:
+            continue
 
-    # Step 3: Delete model from the database
-    try:
-        session.delete(model)
-        session.commit()
-    except Exception as db_error:
-        errors.append(f"Failed to delete model from database: {str(db_error)}")
+        dep_used_by = len(dep.used_by)
+        logging.info(f"dependency {dep.id} is used by {dep_used_by} other models")
+        if dep_used_by == 0:
+            dep_errors = delete_single_model(dep, session)
+            dep_errors = [
+                "Error deleting model dependency: " + err for err in dep_errors
+            ]
+            errors.extend(dep_errors)
+
+    session.commit()
 
     # If any errors occurred, return them in the response
     if errors:
