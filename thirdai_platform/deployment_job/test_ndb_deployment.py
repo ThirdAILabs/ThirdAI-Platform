@@ -46,7 +46,7 @@ def create_ndbv2_model(tmp_dir):
         [ndbv2.CSV(os.path.join(doc_dir(), "articles.csv"), text_columns=["text"])]
     )
 
-    db.save(os.path.join(tmp_dir, "models", f"{MODEL_ID}_v2", "model.ndb"))
+    db.save(os.path.join(tmp_dir, "models", f"{MODEL_ID}", "model.ndb"))
 
 
 def mock_verify_permission(permission_type: str = "read"):

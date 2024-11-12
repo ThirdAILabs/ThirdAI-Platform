@@ -10,7 +10,7 @@ import thirdai
 from platform_common.file_handler import expand_cloud_buckets_and_directories
 from platform_common.ndb.ndbv2_parser import parse_doc
 from platform_common.pydantic_models.feedback_logs import ActionType, FeedbackLog
-from platform_common.pydantic_models.training import FileInfo, NDBv2Options, TrainConfig
+from platform_common.pydantic_models.training import FileInfo, NDBOptions, TrainConfig
 from thirdai import neural_db_v2 as ndbv2
 from train_job.models.model import Model
 from train_job.reporter import Reporter
@@ -21,7 +21,7 @@ class NeuralDBV2(Model):
     def __init__(self, config: TrainConfig, reporter: Reporter, logger: Logger):
         super().__init__(config=config, reporter=reporter, logger=logger)
 
-        self.ndb_options: NDBv2Options = self.config.model_options
+        self.ndb_options: NDBOptions = self.config.model_options
 
         splade = self.ndb_options.advanced_search
 
