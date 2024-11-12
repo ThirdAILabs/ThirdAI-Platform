@@ -1,14 +1,12 @@
 import os
 from typing import Literal, Optional, Union
 
-from platform_common.pydantic_models.training import ModelType, NDBSubType, UDTSubType
+from platform_common.pydantic_models.training import ModelType, UDTSubType
 from pydantic import BaseModel, Field
 
 
 class NDBDeploymentOptions(BaseModel):
     model_type: Literal[ModelType.NDB] = ModelType.NDB
-
-    ndb_sub_type: NDBSubType = NDBSubType.v2
 
     llm_provider: str = "openai"
     genai_key: Optional[str] = None

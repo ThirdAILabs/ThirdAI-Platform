@@ -457,7 +457,7 @@ class NDBFunctions:
         return flow.bazaar_client.deploy(model.model_identifier)
 
     def build_model_options(config: Config) -> Dict[str, Any]:
-        return {"ndb_options": {"ndb_sub_type": "v2"}}
+        return {}
 
     def build_doc_options(config: Config) -> Dict[str, Any]:
         return {

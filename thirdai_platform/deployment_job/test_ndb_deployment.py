@@ -66,7 +66,7 @@ def create_config(tmp_dir: str, autoscaling: bool):
         model_bazaar_dir=tmp_dir,
         license_key=LICENSE_KEY,
         autoscaling_enabled=autoscaling,
-        model_options=NDBDeploymentOptions(ndb_sub_type="v2"),
+        model_options=NDBDeploymentOptions(),
     )
 
 

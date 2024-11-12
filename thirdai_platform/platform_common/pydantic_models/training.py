@@ -116,27 +116,11 @@ class FileInfo(BaseModel):
         return bucket_name, key
 
 
-class NDBSubType(str, Enum):
-    v2 = "v2"
-
-
-class RetrieverType(str, Enum):
-    mach = "mach"
-    hybrid = "hybrid"
-    finetunable_retriever = "finetunable_retriever"
-
-
-class NDBv2Options(BaseModel):
-    ndb_sub_type: Literal[NDBSubType.v2] = NDBSubType.v2
-
-    on_disk: bool = True
-    advanced_search: bool = False
-
-
 class NDBOptions(BaseModel):
     model_type: Literal[ModelType.NDB] = ModelType.NDB
 
-    ndb_options: NDBv2Options = NDBv2Options()
+    on_disk: bool = True
+    advanced_search: bool = False
 
     class Config:
         protected_namespaces = ()

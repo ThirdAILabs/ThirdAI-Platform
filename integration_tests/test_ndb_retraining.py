@@ -21,7 +21,7 @@ def test_ndb_retraining_log_feedback_from_read_only_users():
     base_model = admin_client.train(
         base_model_name,
         unsupervised_docs=[os.path.join(doc_dir(), "articles.csv")],
-        model_options={"ndb_options": {"ndb_sub_type": "v2"}},
+        model_options={},
         supervised_docs=[],
     )
     admin_client.await_train(base_model)
@@ -106,7 +106,7 @@ def test_ndb_retraining_autoscaling_mode():
             os.path.join(doc_dir(), "articles.csv"),
             os.path.join(doc_dir(), "supervised.csv"),
         ],
-        model_options={"ndb_options": {"ndb_sub_type": "v2"}},
+        model_options={},
         supervised_docs=[],
     )
     admin_client.await_train(base_model)

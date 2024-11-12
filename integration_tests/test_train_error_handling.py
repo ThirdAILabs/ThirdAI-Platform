@@ -27,9 +27,7 @@ def test_train_error_handling(malformed_file):
     model_name = f"basic_ndb_{uuid.uuid4()}"
     model = admin_client.train(
         model_name,
-        model_options={
-            "ndb_options": {"ndb_sub_type": "v2"},
-        },
+        model_options={},
         unsupervised_docs=[__file__],
         supervised_docs=[(malformed_file, "0")],
         is_async=True,

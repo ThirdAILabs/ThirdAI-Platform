@@ -12,7 +12,7 @@ def create_and_deploy_ndb(admin_client, base_model_name, autoscaling):
     base_model = admin_client.train(
         base_model_name,
         unsupervised_docs=[doc_path],
-        model_options={"ndb_options": {"ndb_sub_type": "v2"}},
+        model_options={},
         supervised_docs=[],
     )
     admin_client.await_train(base_model)

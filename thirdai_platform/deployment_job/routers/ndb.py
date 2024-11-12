@@ -37,7 +37,7 @@ from fastapi import (
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 from platform_common.file_handler import download_local_files, get_cloud_client
-from platform_common.pydantic_models.deployment import DeploymentConfig, NDBSubType
+from platform_common.pydantic_models.deployment import DeploymentConfig
 from platform_common.pydantic_models.feedback_logs import (
     AssociateLog,
     DeleteLog,
@@ -107,16 +107,10 @@ class NDBRouter:
 
     @staticmethod
     def get_model(config: DeploymentConfig, logger: Logger) -> NDBModel:
-        subtype = config.model_options.ndb_sub_type
-        logger.info(f"Initializing model subtype: {subtype}")
-        if subtype == NDBSubType.v2:
-            return NDBV2Model(
-                config=config, logger=logger, write_mode=not config.autoscaling_enabled
-            )
-        else:
-            error_message = f"Unsupported NDB subtype '{subtype}'."
-            logger.error(error_message)
-            raise ValueError(error_message)
+        logger.info(f"Initializing ndb model")
+        return NDBV2Model(
+            config=config, logger=logger, write_mode=not config.autoscaling_enabled
+        )
 
     @ndb_query_metric.time()
     def search(

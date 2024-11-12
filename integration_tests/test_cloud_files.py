@@ -60,7 +60,7 @@ def test_cloud_training(model_name_prefix, doc_url, provider, expected_query):
     model = admin_client.train(
         model_name,
         unsupervised_docs=[doc_url],
-        model_options={"ndb_options": {"ndb_sub_type": "v2"}},
+        model_options={},
         supervised_docs=[],
         doc_type=provider,
     )

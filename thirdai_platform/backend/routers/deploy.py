@@ -212,7 +212,6 @@ async def deploy_single_model(
     requires_on_prem_llm = False
     if model.type == ModelType.NDB:
         model_options = NDBDeploymentOptions(
-            ndb_sub_type=model.sub_type,
             llm_provider=(
                 model.get_attributes().get("llm_provider")
                 or os.getenv("LLM_PROVIDER", "openai")

@@ -47,7 +47,6 @@ from platform_common.pydantic_models.training import (
     ModelType,
     NDBData,
     NDBOptions,
-    NDBSubType,
     NDBv2Options,
     TextClassificationOptions,
     TokenClassificationDatagenOptions,
@@ -172,7 +171,7 @@ def train_ndb(
             deploy_status=schema.Status.not_started,
             name=model_name,
             type=config.model_options.model_type.value,
-            sub_type=config.model_options.ndb_options.ndb_sub_type.value,
+            sub_type="v2",
             domain=user.domain,
             access_level=schema.Access.private,
             parent_id=base_model.id if base_model else None,
@@ -290,7 +289,7 @@ def retrain_ndb(
 
     base_model = get_base_model(base_model_identifier, user=user, session=session)
 
-    if base_model.type != ModelType.NDB or base_model.sub_type != NDBSubType.v2:
+    if base_model.type != ModelType.NDB:
         return response(
             status_code=status.HTTP_400_BAD_REQUEST,
             message=f"NDB retraining can only be performed on NDBv2 base models.",
@@ -344,7 +343,7 @@ def retrain_ndb(
             deploy_status=schema.Status.not_started,
             name=model_name,
             type=config.model_options.model_type.value,
-            sub_type=config.model_options.ndb_options.ndb_sub_type.value,
+            sub_type="v2",
             domain=user.domain,
             access_level=schema.Access.private,
             parent_id=base_model.id,
