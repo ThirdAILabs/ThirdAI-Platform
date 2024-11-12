@@ -116,20 +116,7 @@ class FileInfo(BaseModel):
         return bucket_name, key
 
 
-class MachOptions(BaseModel):
-    fhr: int = 50_000
-    embedding_dim: int = 2048
-    output_dim: int = 10_000
-    extreme_num_hashes: int = 1
-    hidden_bias: bool = False
-    tokenizer: str = "char-4"
-    unsupervised_epochs: int = 5
-    supervised_epochs: int = 3
-    metrics: List[str] = ["hash_precision@1", "loss"]
-
-
 class NDBSubType(str, Enum):
-    v1 = "v1"
     v2 = "v2"
 
 
@@ -137,28 +124,6 @@ class RetrieverType(str, Enum):
     mach = "mach"
     hybrid = "hybrid"
     finetunable_retriever = "finetunable_retriever"
-
-
-class NDBv1Options(BaseModel):
-    ndb_sub_type: Literal[NDBSubType.v1] = NDBSubType.v1
-
-    retriever: RetrieverType = RetrieverType.finetunable_retriever
-
-    mach_options: Optional[MachOptions] = None
-    checkpoint_interval: Optional[int] = None
-
-    @model_validator(mode="after")
-    def check_mach_options(self):
-        if (
-            self.retriever != RetrieverType.finetunable_retriever
-            and not self.mach_options
-        ) or (
-            self.retriever == RetrieverType.finetunable_retriever and self.mach_options
-        ):
-            raise ValueError(
-                "mach_options must be provided if using mach or hybrid, and must not be provided if using finetunable_retriever"
-            )
-        return self
 
 
 class NDBv2Options(BaseModel):
@@ -171,9 +136,7 @@ class NDBv2Options(BaseModel):
 class NDBOptions(BaseModel):
     model_type: Literal[ModelType.NDB] = ModelType.NDB
 
-    ndb_options: Union[NDBv1Options, NDBv2Options] = Field(
-        NDBv2Options(), discriminator="ndb_sub_type"
-    )
+    ndb_options: NDBv2Options = NDBv2Options()
 
     class Config:
         protected_namespaces = ()

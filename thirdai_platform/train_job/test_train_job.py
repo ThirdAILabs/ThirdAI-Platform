@@ -17,7 +17,6 @@ from platform_common.pydantic_models.training import (
     JobOptions,
     NDBData,
     NDBOptions,
-    NDBv1Options,
     NDBv2Options,
     TextClassificationOptions,
     TokenClassificationDatagenOptions,
@@ -137,18 +136,6 @@ def run_ndb_train_job(ndb_options, extra_supervised_files=[]):
     model.train()
 
     return os.path.join(MODEL_BAZAAR_DIR, "models", "ndb_123", "model.ndb")
-
-
-@pytest.mark.parametrize(
-    "ndb_options",
-    [NDBv1Options(), NDBv1Options(retriever="mach", mach_options={})],
-)
-def test_ndbv1_train(ndb_options):
-    db_path = run_ndb_train_job(ndb_options)
-
-    db = ndb.NeuralDB.from_checkpoint(db_path)
-
-    assert len(db.sources()) == 3
 
 
 @pytest.fixture()

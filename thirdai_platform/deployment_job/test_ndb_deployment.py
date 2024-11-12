@@ -13,7 +13,7 @@ from platform_common.pydantic_models.deployment import (
     NDBDeploymentOptions,
 )
 from platform_common.pydantic_models.training import NDBSubType
-from thirdai import neural_db as ndbv1
+
 from thirdai import neural_db_v2 as ndbv2
 
 MODEL_ID = "xyz"
@@ -36,18 +36,6 @@ def tmp_dir():
     shutil.rmtree(path)
 
 
-def create_ndbv1_model(tmp_dir):
-    thirdai.licensing.activate(LICENSE_KEY)
-
-    db = ndbv1.NeuralDB()
-
-    db.insert(
-        [ndbv1.CSV(os.path.join(doc_dir(), "articles.csv"), weak_columns=["text"])]
-    )
-
-    db.save(os.path.join(tmp_dir, "models", f"{MODEL_ID}_v1", "model.ndb"))
-
-
 def create_ndbv2_model(tmp_dir):
     thirdai.licensing.activate(LICENSE_KEY)
 
@@ -68,21 +56,16 @@ def mock_check_permission(token: str, permission_type: str = "read"):
     return True
 
 
-def create_config(tmp_dir: str, sub_type: NDBSubType, autoscaling: bool):
-    if sub_type == NDBSubType.v1:
-        create_ndbv1_model(tmp_dir)
-    elif sub_type == NDBSubType.v2:
-        create_ndbv2_model(tmp_dir)
-    else:
-        raise ValueError(f"Invalid subtype '{sub_type}'")
+def create_config(tmp_dir: str, autoscaling: bool):
+    create_ndbv2_model(tmp_dir)
 
     return DeploymentConfig(
-        model_id=f"{MODEL_ID}_{sub_type}",
+        model_id=f"{MODEL_ID}",
         model_bazaar_endpoint="",
         model_bazaar_dir=tmp_dir,
         license_key=LICENSE_KEY,
         autoscaling_enabled=autoscaling,
-        model_options=NDBDeploymentOptions(ndb_sub_type=sub_type),
+        model_options=NDBDeploymentOptions(ndb_sub_type="v2"),
     )
 
 
@@ -188,13 +171,12 @@ def check_deletion_dev_mode(client: TestClient):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("sub_type", ["v1", "v2"])
 @patch.object(Permissions, "verify_permission", mock_verify_permission)
 @patch.object(Permissions, "check_permission", mock_check_permission)
-def test_deploy_ndb_dev_mode(tmp_dir, sub_type):
+def test_deploy_ndb_dev_mode(tmp_dir):
     from deployment_job.routers.ndb import NDBRouter
 
-    config = create_config(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=False)
+    config = create_config(tmp_dir=tmp_dir, autoscaling=False)
 
     router = NDBRouter(config, None, logger)
     client = TestClient(router.router)
@@ -304,13 +286,12 @@ def check_log_lines(logdir, expected_lines):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("sub_type", ["v1", "v2"])
 @patch.object(Permissions, "verify_permission", mock_verify_permission)
 @patch.object(Permissions, "check_permission", mock_check_permission)
-def test_deploy_ndb_prod_mode(tmp_dir, sub_type):
+def test_deploy_ndb_prod_mode(tmp_dir):
     from deployment_job.routers.ndb import NDBRouter
 
-    config = create_config(tmp_dir=tmp_dir, sub_type=sub_type, autoscaling=True)
+    config = create_config(tmp_dir=tmp_dir, autoscaling=True)
 
     router = NDBRouter(config, None, logger)
     client = TestClient(router.router)

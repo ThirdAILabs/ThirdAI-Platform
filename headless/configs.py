@@ -72,9 +72,6 @@ class Config(ABC):
 
     epochs: int = 3
 
-    ndb_version: str = "v2"
-    retriever: str = "finetunable_retriever"
-
     sub_type: str = "text"
     n_classes: Optional[int] = None
     target_labels: list[str] = None
