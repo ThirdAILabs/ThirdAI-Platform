@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 from typing import List
 
-
 from platform_common.pydantic_models.training import FileInfo, FileLocation
 from thirdai import neural_db as ndb
 

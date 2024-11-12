@@ -12,7 +12,8 @@ from platform_common.pydantic_models.deployment import (
     DeploymentConfig,
     NDBDeploymentOptions,
 )
-from platform_common.pydantic_models.training import NDBSubType
+
+pass
 
 from thirdai import neural_db_v2 as ndbv2
 

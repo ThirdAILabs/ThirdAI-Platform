@@ -16,8 +16,6 @@ try:
     import thirdai
     from platform_common.pydantic_models.training import (
         ModelType,
-        NDBSubType,
-        RetrieverType,
         TrainConfig,
         UDTSubType,
     )

@@ -20,11 +20,13 @@ import thirdai.neural_db_v2.chunk_stores.constraints as ndbv2_constraints
 from deployment_job.chat import llm_providers
 from deployment_job.models.model import Model
 from deployment_job.pydantic_models import inputs
-from deployment_job.utils import highlighted_pdf_bytes, new_pdf_chunks, old_pdf_chunks
+
+pass
 from fastapi import HTTPException, status
 from platform_common.file_handler import FileInfo, expand_cloud_buckets_and_directories
 from platform_common.pydantic_models.deployment import DeploymentConfig
-from thirdai import neural_db as ndb
+
+pass
 from thirdai import neural_db_v2 as ndbv2
 from thirdai.neural_db_v2.core.types import Chunk
 
