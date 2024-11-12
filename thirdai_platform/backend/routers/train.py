@@ -47,7 +47,6 @@ from platform_common.pydantic_models.training import (
     ModelType,
     NDBData,
     NDBOptions,
-    NDBv2Options,
     TextClassificationOptions,
     TokenClassificationDatagenOptions,
     TokenClassificationOptions,
@@ -324,7 +323,7 @@ def retrain_ndb(
         model_id=str(model_id),
         data_id=data_id,
         base_model_id=(None if not base_model_identifier else str(base_model.id)),
-        model_options=NDBOptions(ndb_options=NDBv2Options()),
+        model_options=NDBOptions(),
         data=NDBData(
             unsupervised_files=unsupervised_files,
             supervised_files=[
