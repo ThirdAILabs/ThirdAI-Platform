@@ -12,9 +12,6 @@ from platform_common.pydantic_models.deployment import (
     DeploymentConfig,
     NDBDeploymentOptions,
 )
-
-pass
-
 from thirdai import neural_db_v2 as ndbv2
 
 MODEL_ID = "xyz"

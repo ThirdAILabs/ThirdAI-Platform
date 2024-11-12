@@ -7,8 +7,6 @@ import shutil
 from collections import defaultdict, deque
 from functools import wraps
 from pathlib import Path
-
-pass
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urljoin
 

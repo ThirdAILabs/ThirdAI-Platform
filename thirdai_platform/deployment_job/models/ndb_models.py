@@ -9,7 +9,8 @@ import shutil
 import tempfile
 import traceback
 import uuid
-from abc import abstractmethod
+
+pass
 from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
@@ -20,167 +21,14 @@ import thirdai.neural_db_v2.chunk_stores.constraints as ndbv2_constraints
 from deployment_job.chat import llm_providers
 from deployment_job.models.model import Model
 from deployment_job.pydantic_models import inputs
-
-pass
 from fastapi import HTTPException, status
 from platform_common.file_handler import FileInfo, expand_cloud_buckets_and_directories
 from platform_common.pydantic_models.deployment import DeploymentConfig
-
-pass
 from thirdai import neural_db_v2 as ndbv2
 from thirdai.neural_db_v2.core.types import Chunk
 
 
 class NDBModel(Model):
-    """
-    Base class for NeuralDB (NDB) models.
-    """
-
-    def __init__(self, config: DeploymentConfig, logger: logging.Logger):
-        super().__init__(config=config, logger=logger)
-        self.chat_instances = {}
-        self.chat_instance_lock = Lock()
-
-    @abstractmethod
-    def predict(self, query: str, top_k: int, **kwargs: Any) -> inputs.SearchResultsNDB:
-        """
-        Makes a prediction using the NDB model.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def insert(self, documents: List[FileInfo], **kwargs: Any) -> List[Dict[str, str]]:
-        """
-        Inserts documents into the NDB model.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def upvote(self, text_pairs: List[inputs.UpvoteInputSingle], **kwargs: Any) -> None:
-        """
-        Upvotes entries in the NDB model.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def associate(
-        self, text_pairs: List[inputs.AssociateInputSingle], **kwargs: Any
-    ) -> None:
-        """
-        Associates entries in the NDB model.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def delete(self, source_ids: List[str], **kwargs: Any) -> None:
-        """
-        Deletes entries from the NDB model.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def sources(self) -> List[Dict[str, str]]:
-        """
-        Retrieves sources from the NDB model.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def highlight_pdf(self, chunk_id: int) -> Tuple[str, Optional[bytes]]:
-        """
-        Returns the document name, and bytes of the pdf document of the given chunk
-        with the chunk highlighted.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def chunks(self, chunk_id: int) -> Optional[Dict[str, Any]]:
-        """
-        Returns information about the source file that contains the given chunk as
-        as well as the other chunks in that file.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def save(self, **kwargs: Any) -> None:
-        """
-        Saves the NDB model.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def load(self, write_mode: bool):
-        raise NotImplementedError
-
-    def set_chat(self, **kwargs):
-        """
-        Set up a chat instance for the given provider, if it hasn't been set already.
-        """
-        provider = kwargs.get("provider", "openai")
-
-        # This is to handle an issue in which when multiple calls are made in parallel
-        # that create the chat object, the second one fails with a `table already exists`
-        # error. This is likely becuase the first call as created the sqlite table but
-        # not finished updating the chat_instance map. The GIL likely does not prevent
-        # this because of IO operations related to sqlite.
-        with self.chat_instance_lock:
-            if provider in self.chat_instances and self.chat_instances[provider]:
-                # Chat instance for this provider already exists, do not recreate
-                self.logger.info(
-                    f"Chat instance for provider '{provider}' is already set."
-                )
-                return
-            try:
-                sqlite_db_path = os.path.join(
-                    self.model_dir, provider, "chat_history.db"
-                )
-
-                os.makedirs(os.path.dirname(sqlite_db_path), exist_ok=True)
-
-                chat_history_sql_uri = f"sqlite:///{sqlite_db_path}"
-
-                if provider not in llm_providers:
-                    raise ValueError(f"Unsupported chat provider: {provider}")
-
-                llm_chat_interface = llm_providers.get(provider)
-
-                key = kwargs.get("key") or self.config.model_options.genai_key
-
-                # Remove 'key' from kwargs if present
-                kwargs.pop("key", None)
-
-                self.chat_instances[provider] = llm_chat_interface(
-                    db=self.db,
-                    chat_history_sql_uri=chat_history_sql_uri,
-                    key=key,
-                    base_url=self.config.model_bazaar_endpoint,
-                    **kwargs,
-                )
-                self.logger.info(f"Chat instance set for provider '{provider}'")
-            except Exception:
-                self.logger.error(
-                    f"Error setting chat instance for provider '{provider}': {traceback.format_exc()}"
-                )
-                traceback.print_exc()
-                self.chat_instances[provider] = None
-
-    def get_chat(self, provider: str):
-        """
-        Retrieve the chat instance for the specified provider.
-        """
-        if provider in self.chat_instances:
-            return self.chat_instances[provider]
-        else:
-            raise ValueError(f"No chat instance available for provider: {provider}")
-
-    def get_ndb_path(self, model_id: str) -> Path:
-        """
-        Returns the NDB model path for the given model ID.
-        """
-        return self.get_model_dir(model_id) / "model.ndb"
-
-
-class NDBV2Model(NDBModel):
     def __init__(
         self, config: DeploymentConfig, logger: logging.Logger, write_mode: bool = False
     ):
@@ -189,7 +37,16 @@ class NDBV2Model(NDBModel):
         self.db_lock = Lock()
         self.logger.info(f"Loading NDBV2 model from {self.ndb_save_path()}")
         self.db = self.load(write_mode=write_mode)
+
+        self.chat_instances = {}
+        self.chat_instance_lock = Lock()
         self.set_chat(provider=self.config.model_options.llm_provider)
+
+    def get_ndb_path(self, model_id: str) -> Path:
+        """
+        Returns the NDB model path for the given model ID.
+        """
+        return self.get_model_dir(model_id) / "model.ndb"
 
     def ndb_save_path(self):
         return os.path.join(self.model_dir, "model.ndb")
@@ -429,3 +286,64 @@ class NDBV2Model(NDBModel):
                 shutil.rmtree(backup_path.parent)
 
             raise
+
+    def set_chat(self, **kwargs):
+        """
+        Set up a chat instance for the given provider, if it hasn't been set already.
+        """
+        provider = kwargs.get("provider", "openai")
+
+        # This is to handle an issue in which when multiple calls are made in parallel
+        # that create the chat object, the second one fails with a `table already exists`
+        # error. This is likely becuase the first call as created the sqlite table but
+        # not finished updating the chat_instance map. The GIL likely does not prevent
+        # this because of IO operations related to sqlite.
+        with self.chat_instance_lock:
+            if provider in self.chat_instances and self.chat_instances[provider]:
+                # Chat instance for this provider already exists, do not recreate
+                self.logger.info(
+                    f"Chat instance for provider '{provider}' is already set."
+                )
+                return
+            try:
+                sqlite_db_path = os.path.join(
+                    self.model_dir, provider, "chat_history.db"
+                )
+
+                os.makedirs(os.path.dirname(sqlite_db_path), exist_ok=True)
+
+                chat_history_sql_uri = f"sqlite:///{sqlite_db_path}"
+
+                if provider not in llm_providers:
+                    raise ValueError(f"Unsupported chat provider: {provider}")
+
+                llm_chat_interface = llm_providers.get(provider)
+
+                key = kwargs.get("key") or self.config.model_options.genai_key
+
+                # Remove 'key' from kwargs if present
+                kwargs.pop("key", None)
+
+                self.chat_instances[provider] = llm_chat_interface(
+                    db=self.db,
+                    chat_history_sql_uri=chat_history_sql_uri,
+                    key=key,
+                    base_url=self.config.model_bazaar_endpoint,
+                    **kwargs,
+                )
+                self.logger.info(f"Chat instance set for provider '{provider}'")
+            except Exception:
+                self.logger.error(
+                    f"Error setting chat instance for provider '{provider}': {traceback.format_exc()}"
+                )
+                traceback.print_exc()
+                self.chat_instances[provider] = None
+
+    def get_chat(self, provider: str):
+        """
+        Retrieve the chat instance for the specified provider.
+        """
+        if provider in self.chat_instances:
+            return self.chat_instances[provider]
+        else:
+            raise ValueError(f"No chat instance available for provider: {provider}")

@@ -8,7 +8,7 @@ from typing import AsyncGenerator, List
 import fitz
 import jwt
 import thirdai
-from deployment_job.models.ndb_models import NDBModel, NDBV2Model
+from deployment_job.models.ndb_models import NDBModel
 from deployment_job.permissions import Permissions
 from deployment_job.pydantic_models.inputs import (
     AssociateInput,
@@ -108,7 +108,7 @@ class NDBRouter:
     @staticmethod
     def get_model(config: DeploymentConfig, logger: Logger) -> NDBModel:
         logger.info(f"Initializing ndb model")
-        return NDBV2Model(
+        return NDBModel(
             config=config, logger=logger, write_mode=not config.autoscaling_enabled
         )
 

@@ -5,7 +5,6 @@ from urllib.parse import urljoin
 import pytest
 from utils import doc_dir
 
-pass
 from client.bazaar import ModelBazaar
 from client.utils import auth_header, http_get_with_error, http_post_with_error
 

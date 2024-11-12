@@ -35,6 +35,7 @@ def get_model(config: TrainConfig, reporter: Reporter, logger: Logger):
     logger.info(f"model type: {model_type}")
 
     if model_type == ModelType.NDB:
+        logger.info(f"Creating NDB model")
         return NeuralDBV2(config, reporter, logger)
     elif model_type == ModelType.UDT:
         udt_type = config.model_options.udt_options.udt_sub_type
