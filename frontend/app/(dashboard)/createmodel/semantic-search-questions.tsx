@@ -213,10 +213,7 @@ const SemanticSearchQuestions = ({
 
     // If user didn't select advanced, it will not add the advanced_search field at all
     const modelOptionsForm = {
-      ndb_options: {
-        ndb_sub_type: 'v2',
-        ...(indexingType === IndexingType.Advanced && { advanced_search: true }),
-      },
+      ...(indexingType === IndexingType.Advanced && { advanced_search: true }),
     };
 
     formData.append('model_options', JSON.stringify(modelOptionsForm));
