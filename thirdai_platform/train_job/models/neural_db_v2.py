@@ -21,7 +21,7 @@ class NeuralDBV2(Model):
     def __init__(self, config: TrainConfig, reporter: Reporter, logger: Logger):
         super().__init__(config=config, reporter=reporter, logger=logger)
 
-        self.ndb_options: NDBv2Options = self.config.model_options.ndb_options
+        self.ndb_options: NDBv2Options = self.config.model_options
 
         splade = self.ndb_options.advanced_search
 
