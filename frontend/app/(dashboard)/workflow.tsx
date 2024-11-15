@@ -174,7 +174,7 @@ export function WorkFlow({
 
   const handleModeSelection = async () => {
     toggleDeploymentModal();
-    await handleDeploy();
+    await handleDeploy(selectedMode); // pass mode user chose dev vs. production
   };
 
   useEffect(() => {
