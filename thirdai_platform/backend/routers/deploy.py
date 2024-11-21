@@ -37,6 +37,7 @@ from platform_common.dependencies import is_on_low_disk
 from platform_common.pydantic_models.deployment import (
     DeploymentConfig,
     EnterpriseSearchOptions,
+    KnowledgeExtractionOptions,
     NDBDeploymentOptions,
     UDTDeploymentOptions,
 )
@@ -228,6 +229,15 @@ async def deploy_single_model(
             guardrail_id=attributes.get("guardrail_id", None),
         )
         requires_on_prem_llm = attributes.get("llm_provider") == "on-prem"
+    elif model.type == ModelType.KNOWLEDGE_EXTRACTION:
+        model_options = KnowledgeExtractionOptions(
+            llm_provider=(
+                model.get_attributes().get("llm_provider")
+                or os.getenv("LLM_PROVIDER", "openai")
+            ),
+            genai_key=(genai_key or os.getenv("GENAI_KEY", "")),
+        )
+        requires_on_prem_llm = model_options.llm_provider == "on-prem"
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
