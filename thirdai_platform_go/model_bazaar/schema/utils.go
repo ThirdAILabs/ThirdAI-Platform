@@ -88,9 +88,14 @@ func ModelExists(db *gorm.DB, modelId string) (bool, error) {
 	var model Model
 	result := db.Find(&model, "id = ?", modelId)
 	if result.Error != nil {
-		return false, NewDbError("checking if model exists", result.Error)
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return false, nil // Model does not exist
+		}
+		// adding the param in error for easy tracking
+		return false, NewDbError(fmt.Sprintf("checking if model exists with modelId: %s", modelId), result.Error)
+
 	}
-	return result.RowsAffected > 0, nil
+	return true, nil
 }
 
 func UserExists(db *gorm.DB, userId string) (bool, error) {

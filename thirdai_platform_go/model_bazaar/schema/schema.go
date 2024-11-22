@@ -59,7 +59,7 @@ type User struct {
 
 	Username string `gorm:"uniqueIndex"`
 	Email    string `gorm:"uniqueIndex"`
-	Password []byte
+	Password []byte `gorm:"-"`
 
 	IsAdmin bool
 

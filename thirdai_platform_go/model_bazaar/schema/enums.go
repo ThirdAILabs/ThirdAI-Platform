@@ -18,17 +18,21 @@ const (
 )
 
 func CheckValidStatus(status string) error {
-	if status == NotStarted || status == Starting || status == InProgress || status == Stopped || status == Complete || status == Failed {
+	switch status {
+	case NotStarted, Starting, InProgress, Stopped, Complete, Failed:
 		return nil
+	default:
+		return fmt.Errorf("invalid status '%v'", status)
 	}
-	return fmt.Errorf("invalid status '%v'", status)
 }
 
 func CheckValidAccess(access string) error {
-	if access == Public || access == Private || access == Protected {
+	switch access {
+	case Public, Private, Protected:
 		return nil
+	default:
+		return fmt.Errorf("invalid access %v, must be 'public', 'private', or 'protected'", access)
 	}
-	return fmt.Errorf("invalid access %v, must be 'public', 'private', or 'protected'", access)
 }
 
 const (
@@ -50,8 +54,10 @@ const (
 )
 
 func CheckValidModelType(modelType string) error {
-	if modelType == NdbModel || modelType == NlpTokenModel || modelType == NlpTextModel {
+	switch modelType {
+	case NdbModel, NlpTokenModel, NlpTextModel:
 		return nil
+	default:
+		return fmt.Errorf("invalid model type '%v'", modelType)
 	}
-	return fmt.Errorf("invalid model type '%v'", modelType)
 }

@@ -1,7 +1,6 @@
 package services
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,7 +12,6 @@ import (
 	"thirdai_platform/model_bazaar/storage"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 )
 
@@ -153,9 +151,11 @@ func (s *DeployService) deployModel(modelId, userId string, autoscaling bool, au
 	})
 
 	// TODO(nicholas): start on prem llm if needed
-
-	if jerr := errors.Join(err, nomadErr); jerr != nil {
-		return fmt.Errorf("error starting deployment for model %v: %w", modelId, jerr)
+	if err != nil {
+		return fmt.Errorf("error starting deployment for model %v: %w", modelId, err)
+	}
+	if nomadErr != nil {
+		return fmt.Errorf("error starting deployment for model %v: %w", modelId, nomadErr)
 	}
 
 	slog.Info("model deployed successfully", "model_id", modelId)
