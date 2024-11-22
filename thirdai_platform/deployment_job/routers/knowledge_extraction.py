@@ -7,7 +7,6 @@ from typing import List
 
 from deployment_job.permissions import Permissions
 from deployment_job.pydantic_models.inputs import DocumentList
-
 from fastapi import APIRouter, Body, Depends, Form, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from platform_common.file_handler import download_local_files
@@ -42,6 +41,21 @@ class KnowledgeExtractionRouter:
         self.Session = scoped_session(sessionmaker(bind=self.engine))
 
         self.router.add_api_route("/new-report", self.new_report, methods=["POST"])
+        self.router.add_api_route("/get-report", self.get_report, methods=["GET"])
+        self.router.add_api_route(
+            "/delete-report", self.delete_report, methods=["POST"]
+        )
+        self.router.add_api_route(
+            "/add-questions", self.add_questions, methods=["POST"]
+        )
+        self.router.add_api_route("/get-questions", self.get_questions, methods=["GET"])
+        self.router.add_api_route(
+            "/delete-questions", self.delete_questions, methods=["POST"]
+        )
+        self.router.add_api_route("/add-keywords", self.add_keywords, methods=["POST"])
+        self.router.add_api_route(
+            "/delete-keywords", self.delete_keywords, methods=["POST"]
+        )
 
     def _initialize_db(self):
         if not self.db_path.parent.exists():
@@ -102,7 +116,7 @@ class KnowledgeExtractionRouter:
         self, report_id: str, _: str = Depends(Permissions.verify_permission("read"))
     ):
         with self.get_session() as session:
-            report = session.query(Report).get(report_id)
+            report: Report = session.query(Report).get(report_id)
 
             if not report:
                 return response(
@@ -208,5 +222,183 @@ class KnowledgeExtractionRouter:
             return response(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 message="An error occurred while adding questions.",
+                data={"details": str(e)},
+            )
+
+    def get_questions(self, _: str = Depends(Permissions.verify_permission("read"))):
+        try:
+            with self.get_session() as session:
+                questions = session.query(Question).all()
+
+                data = []
+                for question in questions:
+                    keywords = (
+                        session.query(Keyword)
+                        .filter(Keyword.question_id == question.id)
+                        .all()
+                    )
+                    data.append(
+                        {
+                            "question_id": question.id,
+                            "question_text": question.question_text,
+                            "keywords": [keyword.keyword_text for keyword in keywords],
+                        }
+                    )
+
+                return response(
+                    status_code=status.HTTP_200_OK,
+                    message="Successfully retrieved questions with associated keywords.",
+                    data=data,
+                )
+        except Exception as e:
+            return response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="An error occurred while retrieving questions.",
+                data={"details": str(e)},
+            )
+
+    def delete_questions(
+        self,
+        question_ids: List[str] = Body(
+            ..., description="List of question IDs to delete."
+        ),
+        _: str = Depends(Permissions.verify_permission("write")),
+    ):
+        try:
+            with self.get_session() as session:
+                for question_id in question_ids:
+                    question = session.query(Question).get(question_id)
+                    if not question:
+                        return response(
+                            status_code=status.HTTP_404_NOT_FOUND,
+                            message=f"Question with ID '{question_id}' not found.",
+                        )
+
+                    # Delete associated keywords
+                    session.query(Keyword).filter(
+                        Keyword.question_id == question_id
+                    ).delete()
+
+                    # Delete the question itself
+                    session.delete(question)
+
+                session.commit()
+
+            return response(
+                status_code=status.HTTP_200_OK,
+                message="Successfully deleted the specified questions and their associated keywords.",
+            )
+        except Exception as e:
+            return response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="An error occurred while deleting questions.",
+                data={"details": str(e)},
+            )
+
+    def add_keywords(
+        self,
+        keywords_data: List[QuestionKeywords] = Body(
+            ..., description="List of questions and their associated keywords."
+        ),
+        _: str = Depends(Permissions.verify_permission("write")),
+    ):
+        try:
+            with self.get_session() as session:
+                for item in keywords_data:
+                    question = (
+                        session.query(Question)
+                        .filter(Question.question_text == item.question)
+                        .first()
+                    )
+                    if not question:
+                        return response(
+                            status_code=status.HTTP_404_NOT_FOUND,
+                            message=f"Question '{item.question}' not found. Cannot add keywords.",
+                        )
+
+                    if item.keywords:
+                        for keyword_text in item.keywords:
+                            existing_keyword = (
+                                session.query(Keyword)
+                                .filter(
+                                    Keyword.question_id == question.id,
+                                    Keyword.keyword_text == keyword_text,
+                                )
+                                .first()
+                            )
+                            if not existing_keyword:
+                                new_keyword = Keyword(
+                                    id=str(uuid.uuid4()),
+                                    question_id=question.id,
+                                    keyword_text=keyword_text,
+                                )
+                                session.add(new_keyword)
+
+                session.commit()
+
+            return response(
+                status_code=status.HTTP_200_OK,
+                message="Successfully added keywords to the specified questions.",
+            )
+        except Exception as e:
+            return response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="An error occurred while adding keywords.",
+                data={"details": str(e)},
+            )
+
+    def delete_keywords(
+        self,
+        question_id: str = Form(
+            ..., description="The ID of the question whose keywords need to be deleted."
+        ),
+        keywords: List[str] = Form(
+            default=None,
+            description="A list of keywords to delete. If not provided, all keywords for the question will be deleted.",
+        ),
+        _: str = Depends(Permissions.verify_permission("write")),
+    ):
+        try:
+            with self.get_session() as session:
+                db_question = session.query(Question).get(question_id)
+
+                if not db_question:
+                    return response(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        message=f"Question with ID '{question_id}' not found.",
+                    )
+
+                if keywords:
+                    deleted_count = (
+                        session.query(Keyword)
+                        .filter(
+                            Keyword.question_id == question_id,
+                            Keyword.keyword_text.in_(keywords),
+                        )
+                        .delete(synchronize_session=False)
+                    )
+                else:
+                    deleted_count = (
+                        session.query(Keyword)
+                        .filter_by(question_id=question_id)
+                        .delete(synchronize_session=False)
+                    )
+
+                session.commit()
+
+                if deleted_count == 0:
+                    return response(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        message="No matching keywords found for deletion.",
+                    )
+
+                return response(
+                    status_code=status.HTTP_200_OK,
+                    message=f"Successfully deleted {deleted_count} keyword(s) for question with ID '{question_id}'.",
+                )
+        except Exception as e:
+            return response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="An error occurred while deleting keywords.",
                 data={"details": str(e)},
             )

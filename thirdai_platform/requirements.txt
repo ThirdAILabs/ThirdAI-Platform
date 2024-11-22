@@ -60,3 +60,4 @@ unstructured[pptx]
 url-normalize
 uvicorn[standard]
 websockets
+jsonlines
