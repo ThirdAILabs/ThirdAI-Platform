@@ -129,8 +129,8 @@ async def restart_thirdai_platform_frontend():
         docker_password=os.getenv("DOCKER_PASSWORD"),
         image_name=os.getenv("FRONTEND_IMAGE_NAME"),
         identity_provider=os.getenv("IDENTITY_PROVIDER", "postgres"),
-        model_bazaar_public_hostname=get_hostname_from_url(
-            os.getenv("PUBLIC_MODEL_BAZAAR_ENDPOINT")
+        keycloak_server_hostname=get_hostname_from_url(
+            os.getenv("KEYCLOAK_SERVER_URL")
         ),
         use_ssl_in_login=os.getenv("USE_SSL_IN_LOGIN", "False").lower(),
         share_dir=os.getenv("SHARE_DIR"),

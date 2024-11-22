@@ -17,6 +17,10 @@ import { UserContext } from '../user_wrapper';
 export function User() {
   const { user, logout } = useContext(UserContext);
 
+  const isKeycloakProvider =
+    process.env.NEXT_PUBLIC_IDENTITY_PROVIDER &&
+    process.env.NEXT_PUBLIC_IDENTITY_PROVIDER.toLowerCase().includes('keycloak');
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -44,7 +48,9 @@ export function User() {
           </DropdownMenuItem>
         ) : (
           <DropdownMenuItem>
-            <Link href="/login-email">Sign In</Link>
+            return (
+            <Link href={isKeycloakProvider ? '/login-keycloak' : '/login-email'}>Sign In</Link>
+            );
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>

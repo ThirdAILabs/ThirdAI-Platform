@@ -67,8 +67,44 @@ Before running the script, ensure the following are installed on your machine:
    ```bash
    ./driver.sh ./config.yml
    ```
+### Instruction to migrating to a different public IP/DNS
 
-5. **What Happens During Execution**:
+When changing the public IP of your Cluster, follow these steps to update the settings and ensure proper functionality:
+
+---
+
+5. **Steps to Update Frontend URL**
+
+   - To access the admin console, follow these steps:
+
+      1. **Set up Port Forwarding**  
+         Open a terminal on your local machine and run the following command:  
+         ```bash
+         sudo ssh -i <public-key> -L 443:<PRIVATE_IP_OF_MACHINE>:443 <USERNAME>@<NEW_PUBLIC_IP>
+         ```  
+
+      2. **Access the Admin Console**  
+         Once port forwarding is successfully set up, open your browser on the local machine and navigate to:  
+         ```  
+         https://localhost/keycloak/admin/master/console/  
+         ```  
+
+         You should now be redirected to the admin console.
+
+   - In the **Keycloak Admin Console**, go to:
+      - Select the realm: `Thirdai-Platform`.
+      - Navigate to **Realm Settings → General**.
+
+   - Update the **Frontend URL** to:
+     ```
+     https://{newPublicIP}/keycloak
+     ```
+   - Ensure the new public URL corresponds to the domain name specified for the SSL certificate.
+   - If the domain does not match the new URL, you will need to provide an updated certificate for the new domain/IP.
+   - If you dont have the access to older admin console, then you may need to do change the env var `KC_HOSTNAME` and `KC_HOSTNAME_ADMIN` to new public IP in the Keycloak Job, restart it before seeing the change. 
+
+
+6. **What Happens During Execution**:
    
    - The script checks for the installation of Ansible. If Ansible is not installed, the script will install it automatically.
    - The script verifies if the model folder (`gen-ai-models/`) is present. If the folder is not found, the script issues a warning but proceeds with the playbook execution.

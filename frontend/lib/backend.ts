@@ -1787,6 +1787,24 @@ export async function deleteUserAccount(email: string): Promise<void> {
   });
 }
 
+export async function promoteUserToGlobalAdmin(email: string): Promise<void> {
+  const accessToken = getAccessToken();
+
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+  return new Promise((resolve, reject) => {
+    axios
+      .post(`${thirdaiPlatformBaseUrl}/api/user/add-global-admin`, { email: email })
+      .then(() => {
+        resolve();
+      })
+      .catch((err) => {
+        console.error('Error promoting user:', err);
+        alert('Error promoting user:' + err);
+        reject(err);
+      });
+  });
+}
+
 export async function updateModel(modelIdentifier: string): Promise<void> {
   const accessToken = getAccessToken(); // Ensure this function is implemented elsewhere in your codebase
 

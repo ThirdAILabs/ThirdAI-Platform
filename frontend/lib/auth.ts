@@ -1,3 +1,36 @@
+/**
+ * NextAuth Configuration with Keycloak Provider
+ *
+ * This file setup the authentication options using NextAuth and Keycloak.
+ *
+ * **Providers**:
+ * - **KeycloakProvider**: Configure Keycloak as the OAuth provider with client ID, secret, and issuer.
+ *
+ * **Session**:
+ * - **Strategy**: Uses JWT for session management.
+ * - **Max Age**: Session lasts for 30 minutes (60 * 30 seconds).
+ *
+ * **Callbacks**:
+ * - **JWT Callback**:
+ *   - If account is present, save idToken, accessToken, refreshToken, and expiresAt to token.
+ *   - If token not expired, return it.
+ *   - Else, try to refresh the access token using refreshToken.
+ *   - Logs refreshed token, else set error in token.
+ *   - Note: Refresh token only work if protocol is 'http' due to secure cookie.
+ *
+ * - **Session Callback**:
+ *   - Attach accessToken, error, and expiresAt to session.
+ *
+ * **Logger**:
+ * - Logs errors and warnings to console.
+ *
+ * **Debug**:
+ * - Enabled to show debug information in development.
+ *
+ * **Secret**:
+ * - Uses NEXTAUTH_SECRET from environment variables for signing tokens.
+ */
+
 import { access } from 'fs';
 import { AuthOptions, TokenSet } from 'next-auth';
 import { JWT } from 'next-auth/jwt';
