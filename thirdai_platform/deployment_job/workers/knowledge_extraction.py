@@ -90,6 +90,9 @@ class ReportProcessorWorker:
 
             documents_path = self.reports_base_path / str(report.id) / "documents"
 
+            final_reports_path = self.reports_base_path / str(report.id) / "processed"
+            final_reports_path.mkdir(parents=True, exist_ok=True)
+
             if not documents_path.exists() or not documents_path.is_dir():
                 self.logger.error(f"Documents path missing for report {report.id}.")
                 raise FileNotFoundError(
@@ -106,9 +109,7 @@ class ReportProcessorWorker:
             for document in documents:
                 self.logger.info(f"Processing document: {document.name}")
                 document_report_path = (
-                    self.reports_base_path
-                    / str(report.id)
-                    / f"{document.stem}_report.jsnol"
+                    final_reports_path / f"{document.stem}_report.jsnol"
                 )
                 ndb_doc = convert_to_ndb_file(str(document))
 

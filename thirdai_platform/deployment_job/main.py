@@ -12,6 +12,7 @@ try:
     from deployment_job.permissions import Permissions
     from deployment_job.reporter import Reporter
     from deployment_job.routers.enterprise_search import EnterpriseSearchRouter
+    from deployment_job.routers.knowledge_extraction import KnowledgeExtractionRouter
     from deployment_job.routers.ndb import NDBRouter
     from deployment_job.routers.udt import (
         UDTRouterTextClassification,
@@ -99,6 +100,8 @@ elif config.model_options.model_type == ModelType.UDT:
         raise ValueError(error_message)
 elif config.model_options.model_type == ModelType.ENTERPRISE_SEARCH:
     backend_router_factory = EnterpriseSearchRouter
+elif config.model_options.model_type == ModelType.KNOWLEDGE_EXTRACTION:
+    backend_router_factory = KnowledgeExtractionRouter
 else:
     error_message = f"Unsupported ModelType '{config.model_options.model_type}'."
     logger.error(error_message)

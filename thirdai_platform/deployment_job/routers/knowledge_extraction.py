@@ -129,32 +129,61 @@ class KnowledgeExtractionRouter:
                 "status": report.status,
                 "submitted_at": report.submitted_at,
                 "updated_at": report.updated_at,
+                "document_reports": [],
             }
 
-            if report.status == "complete":
-                report_file_path = self.reports_base_path / report_id / "report.jsonl"
-                if not report_file_path.exists():
+            processed_reports_path = self.reports_base_path / report_id / "processed"
+
+            if not processed_reports_path.exists():
+                if report.status == "complete":
                     return response(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        message=f"Report file for ID '{report_id}' is missing.",
+                        message=f"Processed reports directory for ID '{report_id}' is missing.",
                     )
-
-                try:
-                    with report_file_path.open("r") as file:
-                        report_contents = [line.strip() for line in file.readlines()]
-                    report_data["contents"] = report_contents
-                except Exception as e:
+                else:
                     return response(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        message=f"Failed to read report file for ID '{report_id}'.",
-                        data={"details": str(e)},
+                        status_code=status.HTTP_200_OK,
+                        message="Report is not yet complete.",
+                        data=jsonable_encoder(report_data),
                     )
 
-            return response(
-                status_code=status.HTTP_200_OK,
-                message="Successfully retrieved the report details.",
-                data=jsonable_encoder(report_data),
-            )
+            try:
+                for document_report in processed_reports_path.glob("*.jsonl"):
+                    try:
+                        with document_report.open("r") as file:
+                            document_contents = [
+                                line.strip() for line in file.readlines()
+                            ]
+                        report_data["document_reports"].append(
+                            {
+                                "document_name": document_report.stem,
+                                "contents": document_contents,
+                            }
+                        )
+                    except Exception as e:
+                        self.logger.error(
+                            f"Failed to read document report {document_report.name}: {e}"
+                        )
+                        report_data["document_reports"].append(
+                            {
+                                "document_name": document_report.stem,
+                                "contents": None,
+                                "error": str(e),
+                            }
+                        )
+
+                return response(
+                    status_code=status.HTTP_200_OK,
+                    message="Successfully retrieved the report details.",
+                    data=jsonable_encoder(report_data),
+                )
+
+            except Exception as e:
+                return response(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    message=f"Failed to retrieve document reports for report ID '{report_id}'.",
+                    data={"details": str(e)},
+                )
 
     def delete_report(
         self, report_id: str, _: str = Depends(Permissions.verify_permission("write"))
