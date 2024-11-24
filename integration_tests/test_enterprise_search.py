@@ -111,3 +111,62 @@ def test_enterprise_search_with_guardrails():
         params={"model_identifier": f"admin/{guardrail_name}"},
         headers=auth_header(admin_client._access_token),
     )
+
+
+@pytest.mark.unit
+def test_enterprise_search_with_constraints():
+    base_url = "http://127.0.0.1:80/api/"
+    admin_client = ModelBazaar(base_url)
+    admin_client.log_in("admin@mail.com", "password")
+
+    model_name = f"basic_ndb_{uuid.uuid4()}"
+
+    unsupervised_docs = [
+        os.path.join(doc_dir(), "2023_KYI_PER.csv"),
+        os.path.join(doc_dir(), "2024_MNI_PER.csv"),
+    ]
+    doc_options = {
+        doc: {
+            "csv_metadata_columns": {
+                "Tax Year": "string",
+                "Formset": "string",
+                "Form Id": "string",
+                "Table Id": "string",
+                "Field ID": "string",
+                "Field FullName": "string",
+            }
+        }
+        for doc in unsupervised_docs
+    }
+
+    model = admin_client.train(
+        model_name,
+        unsupervised_docs=unsupervised_docs,
+        model_options={},
+        supervised_docs=[],
+        doc_options=doc_options,
+    )
+    admin_client.await_train(model)
+
+    ndb_client = admin_client.deploy(model.model_identifier)
+    admin_client.await_deploy(ndb_client)
+
+    res = ndb_client.search(
+        "Account types include Checking, Savings, and Electronic for estimated tax payments",
+        top_k=5,
+        constraints={"Tax Year": {"constraint_type": "EqualTo", "value": "2024"}},
+    )
+    assert all(result["metadata"]["Formset"] == "MNI" for result in res["references"])
+
+    res = ndb_client.search(
+        "no information",
+        top_k=5,
+        constraints={
+            "Field FullName": {"constraint_type": "Substring", "value": "CUT1"}
+        },
+    )
+    assert all(
+        result["metadata"]["Field FullName"]
+        == "common-comall/pri_tool/fdiv0301.ptform:CUT1"
+        for result in res["references"]
+    )

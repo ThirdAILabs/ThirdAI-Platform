@@ -315,3 +315,31 @@ def test_reset_password():
     # Ensure the user can log in with the new password
     res = login(client, username="reset-user@mail.com", password="newsecurepassword")
     assert res.status_code == 200  # New password should work
+
+
+def test_add_user_by_global_admin():
+    from main import app
+
+    client = TestClient(app)
+
+    # Admin login to get access token
+    res = login(client, username="admin@mail.com", password="password")
+    assert res.status_code == 200
+    admin_jwt = res.json()["data"]["access_token"]
+
+    # Add a new user by global admin (should be automatically verified)
+    user_payload = {
+        "username": "new_user",
+        "email": "new_user@mail.com",
+        "password": "securepassword",
+    }
+    res = client.post(
+        "/api/user/add-user", headers=auth_header(admin_jwt), json=user_payload
+    )
+    assert res.status_code == 200, f"Failed to add user: {res.json()}"
+
+    # Ensure the new user can log in immediately after being added
+    res = login(client, username="new_user@mail.com", password="securepassword")
+    assert (
+        res.status_code == 200
+    ), "User should be able to log in immediately after being added"

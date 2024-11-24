@@ -15,3 +15,6 @@ ndb_enterprise_license.json
 
 # Ignore the licensing/generate directory, which stores our private key for generating licenses
 /licensing/generate/
+
+# Ignore sample docs directory, which may have sensitive files
+/train_job/sample_docs/

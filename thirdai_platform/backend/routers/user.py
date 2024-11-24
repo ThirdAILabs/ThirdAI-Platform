@@ -600,6 +600,7 @@ def list_accessible_users(
                 }
                 for user_team in user.teams
             ],
+            "verified": user.verified,
         }
         for user in users
     ]
@@ -649,4 +650,201 @@ def get_user_info(
         status_code=status.HTTP_200_OK,
         message="Successfully retrieved user information",
         data=jsonable_encoder(user_info),
+    )
+
+
+@user_router.post(
+    "/add-user",
+    dependencies=[Depends(global_admin_only)],
+    summary="Add User by Global Admin",
+    description=get_section(docs, "Add User by Global Admin"),
+)
+def add_user_by_global_admin(
+    body: AccountSignupBody,
+    session: Session = Depends(get_session),
+):
+    global identity_provider
+
+    if identity_provider == "keycloak":
+        try:
+            keycloak_user_id = keycloak_admin.get_user_id(body.username)
+            if keycloak_user_id:
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="There is already a user associated with this name.",
+                )
+
+            existing_users = keycloak_admin.get_users({"email": body.email})
+            if existing_users:
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="There is already an account associated with this email.",
+                )
+
+            keycloak_user_id = keycloak_admin.create_user(
+                {
+                    "username": body.username,
+                    "email": body.email,
+                    "enabled": True,
+                    "emailVerified": True,
+                    "credentials": [
+                        {
+                            "type": "password",
+                            "value": body.password,
+                            "temporary": False,
+                        }
+                    ],
+                    "firstName": body.username,
+                    "lastName": "User",
+                }
+            )
+
+            new_user = schema.User(
+                username=body.username,
+                email=body.email,
+                verified=True,
+            )
+            session.add(new_user)
+            session.commit()
+            session.refresh(new_user)
+
+        except Exception as e:
+            return response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred while creating the user: {str(e)}",
+            )
+
+    else:
+        # Check if the user already exists
+        existing_user: Optional[schema.User] = (
+            session.query(schema.User)
+            .filter(
+                (schema.User.email == body.email)
+                | (schema.User.username == body.username)
+            )
+            .first()
+        )
+
+        if existing_user:
+            if existing_user.email == body.email:
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="There is already an account associated with this email.",
+                )
+            else:
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="There is already a user associated with this name.",
+                )
+
+        try:
+            new_user = schema.User(
+                username=body.username,
+                email=body.email,
+                password_hash=hash_password(body.password),
+                verified=True,  # The user is added by Global admin, so he will be verified by default.
+            )
+            session.add(new_user)
+            session.commit()
+            session.refresh(new_user)
+
+        except Exception as e:
+            return response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred while creating the user: {str(e)}",
+            )
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message=f"Successfully added user {body.username}.",
+        data={"user_id": str(new_user.id), "email": new_user.email},
+    )
+
+
+@user_router.post(
+    "/verify-user",
+    dependencies=[Depends(global_admin_only)],
+    summary="Verify User by Global Admin",
+    description=get_section(docs, "Verify User by Global Admin"),
+)
+def verify_user_by_global_admin(
+    admin_request: AdminRequest,
+    session: Session = Depends(get_session),
+):
+    global identity_provider
+
+    if identity_provider == "keycloak":
+        try:
+            # Find the user in Keycloak by email
+            users = keycloak_admin.get_users({"email": admin_request.email})
+            if not users:
+                return response(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    message="User not found.",
+                )
+            user_info = users[0]
+            user_id = user_info["id"]
+
+            if user_info.get("emailVerified", False):
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="User is already verified.",
+                )
+
+            keycloak_admin.update_user(
+                user_id,
+                {
+                    "emailVerified": True,
+                },
+            )
+
+            local_user = (
+                session.query(schema.User)
+                .filter(schema.User.email == admin_request.email)
+                .first()
+            )
+            if local_user:
+                local_user.verified = True
+                session.commit()
+
+        except Exception as e:
+            return response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred while verifying the user: {str(e)}",
+            )
+
+    else:
+        # Find the user by email
+        user: Optional[schema.User] = (
+            session.query(schema.User)
+            .filter(schema.User.email == admin_request.email)
+            .first()
+        )
+
+        if not user:
+            return response(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message="User not found.",
+            )
+
+        if user.verified:
+            return response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="User is already verified.",
+            )
+
+        # Verify the user
+        try:
+            user.verified = True
+            user.verification_token = None  # Clear the verification token
+            session.commit()
+        except Exception as e:
+            return response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"An error occurred while verifying the user: {str(e)}",
+            )
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message=f"User {admin_request.email} has been successfully verified.",
     )

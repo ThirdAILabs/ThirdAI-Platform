@@ -26,6 +26,15 @@ class EqualTo(BaseModel):
     value: Any
 
 
+class Substring(BaseModel):
+    """
+    Represents a constraint where the specified value is a substring of the field.
+    """
+
+    constraint_type: Literal["Substring"]
+    value: str
+
+
 class InRange(BaseModel):
     """
     Represents a constraint where the value must be within the specified range.
@@ -66,7 +75,7 @@ class Constraints(RootModel):
     root: Dict[
         str,
         Annotated[
-            Union[AnyOf, EqualTo, InRange, GreaterThan, LessThan],
+            Union[AnyOf, EqualTo, Substring, InRange, GreaterThan, LessThan],
             Field(discriminator="constraint_type"),
         ],
     ] = {}

@@ -183,6 +183,10 @@ class NeuralDBClient(BaseClient):
                     constraint_type: Literal["EqualTo"]
                     value: Any
 
+                class Substring(BaseModel):
+                    constraint_type: Literal["Substring"]
+                    value: str
+
                 class InRange(BaseModel):
                     constraint_type: Literal["InRange"]
                     minimum: Any

@@ -33,6 +33,7 @@ type User = {
   role: 'Member' | 'Team Admin' | 'Global Admin';
   teams: { id: string; name: string; role: 'Member' | 'team_admin' | 'Global Admin' }[];
   ownedModels: string[];
+  verified: boolean;
 };
 
 const getModels = async () => {
@@ -84,7 +85,8 @@ const getUsers = async () => {
           name: team.team_name,
           role: team.role,
         })),
-        ownedModels: [], // This should be populated with actual data if available
+        ownedModels: [],
+        verified: user.verified,
       })
     );
     return userData;

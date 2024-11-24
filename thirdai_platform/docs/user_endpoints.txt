@@ -365,3 +365,55 @@ If the user does not exist, we create the user here.
     "message": "User not found"
   }
 ```
+
+---
+
+# Add User by Global Admin
+
+**Description**: Allows a global admin to add a new user to the system.
+
+**Dependencies**:
+- **global_admin_only**: Only users with global admin privileges can access this endpoint.
+
+**Request Body**:
+{
+  "username": "new_user",
+  "email": "new_user@example.com",
+  "password": "secure_password"
+}
+
+**Responses**:
+- `200 OK`: User successfully added.
+{
+  "message": "Successfully added user new_user.",
+  "data": {
+    "user_id": "12345",
+    "email": "new_user@example.com"
+  }
+}
+
+- `400 Bad Request`: Email or username already exists.
+
+---
+
+# Verify User by Global Admin
+
+**Description**: Allows a global admin to verify an existing user.
+
+**Dependencies**:
+- **global_admin_only**: Only users with global admin privileges can access this endpoint.
+
+**Request Body**:
+{
+  "email": "user_to_verify@example.com"
+}
+
+**Responses**:
+- `200 OK`: User successfully verified.
+{
+  "message": "User user_to_verify@example.com has been successfully verified."
+}
+
+- `404 Not Found`: User not found.
+
+- `400 Bad Request`: User is already verified.
