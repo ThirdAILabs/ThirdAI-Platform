@@ -211,6 +211,7 @@ async def deploy_single_model(
     platform = get_platform()
 
     requires_on_prem_llm = False
+    knowledge_extraction = False
     if model.type == ModelType.NDB:
         model_options = NDBDeploymentOptions(
             llm_provider=(
@@ -238,6 +239,7 @@ async def deploy_single_model(
             genai_key=(genai_key or os.getenv("GENAI_KEY", "")),
         )
         requires_on_prem_llm = model_options.llm_provider == "on-prem"
+        knowledge_extraction = True
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -281,6 +283,7 @@ async def deploy_single_model(
             azure_account_name=(os.getenv("AZURE_ACCOUNT_NAME", "")),
             azure_account_key=(os.getenv("AZURE_ACCOUNT_KEY", "")),
             gcp_credentials_file=(os.getenv("GCP_CREDENTIALS_FILE", "")),
+            knowledge_extraction=knowledge_extraction,
         )
 
         model.deploy_status = schema.Status.starting

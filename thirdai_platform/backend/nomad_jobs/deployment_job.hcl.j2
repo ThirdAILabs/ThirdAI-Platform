@@ -112,6 +112,28 @@ EOF
         memory_max = {{ 4 * memory }}
       }
     }
+  }
+
+  {% if knowledge_extraction %}
+
+  group "knowledge-extraction" {
+    scaling {
+      enabled = "{{ autoscaling_enabled }}"
+      min = 1
+      max = "{{ autoscaler_max_count }}"
+      policy {
+        cooldown = "1m"
+        evaluation_interval = "30s"
+        check "avg_cpu" {
+          source = "nomad-apm"
+          query = "avg_cpu-allocated"
+          query_window = "1m"
+          strategy "target-value" {
+            target = 70
+          }
+        }
+      }
+    }
 
     task "knowledge-extraction-worker" {
       {% if platform == "local" %}
@@ -160,4 +182,6 @@ EOF
       }
     }
   }
+
+  {% endif %}
 }
