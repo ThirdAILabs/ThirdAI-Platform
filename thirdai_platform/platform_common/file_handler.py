@@ -34,6 +34,9 @@ def download_local_files(
     for file_info in file_infos:
         if file_info.location == FileLocation.local:
             try:
+                print(file_info)
+                print(filename_to_file)
+                print(filename_to_file[os.path.basename(file_info.path)])
                 local_path = download_local_file(
                     file_info=file_info,
                     upload_file=filename_to_file[os.path.basename(file_info.path)],

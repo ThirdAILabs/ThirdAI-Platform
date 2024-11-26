@@ -1397,7 +1397,9 @@ def train_knowledge_extraction(
         knowledge_session = KnowledgeSessionLocal()
         # Save questions and keywords in the knowledge extraction database
         for question_item in request.questions:
-            question = Question(id=str(uuid.uuid4()), text=question_item.question)
+            question = Question(
+                id=str(uuid.uuid4()), question_text=question_item.question
+            )
             knowledge_session.add(question)
             if question_item.keywords:
                 for keyword in question_item.keywords:

@@ -110,7 +110,53 @@ EOF
         cpu = 2400
         memory = {{ memory }}
         memory_max = {{ 4 * memory }}
+      }
+    }
 
+    task "knowledge-extraction-worker" {
+      {% if platform == "local" %}
+        driver = "raw_exec"
+      {% elif platform == "docker" %}  
+        driver = "docker"
+      {% endif %}
+
+      config {
+        {% if platform == "docker" %}  
+          image = "{{ registry }}/{{ image_name }}:{{ tag }}"
+          image_pull_timeout = "15m"
+          ports = ["{{ model_id }}-http"]
+          group_add = ["4646"]
+          auth {
+            username = "{{ docker_username }}"
+            password = "{{ docker_password }}"
+            server_address = "{{ registry }}"
+          }
+          volumes = [
+            "{{ share_dir }}:/model_bazaar"
+          ]
+          command = "python3"
+          args    = ["-m", "deployment_job.workers.knowledge_extraction"]
+        {% elif platform == "local" %}
+          command = "/bin/sh"
+          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} -m deployment_job.workers.knowledge_extraction"]
+        {% endif %}
+      }
+
+      env {
+        CONFIG_PATH = "{{ config_path }}"
+        AWS_ACCESS_KEY = "{{ aws_access_key }}"
+        AWS_ACCESS_SECRET = "{{ aws_access_secret }}"
+        AWS_REGION_NAME = "{{ aws_region_name }}"
+        TASK_RUNNER_TOKEN = "${TASK_RUNNER_TOKEN}"
+        AZURE_ACCOUNT_NAME = "{{ azure_account_name }}"
+        AZURE_ACCOUNT_KEY = "{{ azure_account_key }}"
+        GCP_CREDENTIALS_FILE = "{{ gcp_credentials_file }}"
+      }
+
+      resources {
+        cpu = 2400
+        memory = {{ 4000 }}
+        memory_max = {{ 8000 }}
       }
     }
   }

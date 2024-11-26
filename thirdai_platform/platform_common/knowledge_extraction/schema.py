@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, String, Text, create_engine
+from sqlalchemy import Column, DateTime, String, Text, create_engine, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
@@ -26,7 +26,7 @@ class Keyword(Base):
     __tablename__ = "keywords"
 
     id = Column(String, primary_key=True)
-    question_id = Column(String, nullable=False)
+    question_id = Column(String, ForeignKey("questions.id"), nullable=False)
     keyword_text = Column(Text, nullable=False)
     question = relationship("Question", back_populates="keywords")
 

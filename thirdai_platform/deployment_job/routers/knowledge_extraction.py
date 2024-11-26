@@ -3,24 +3,25 @@ import uuid
 from datetime import datetime
 from logging import Logger
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from deployment_job.permissions import Permissions
 from deployment_job.pydantic_models.inputs import DocumentList
-from fastapi import APIRouter, Body, Depends, Form, UploadFile, status
+from fastapi import APIRouter, Depends, Form, UploadFile, status
+import json
 from fastapi.encoders import jsonable_encoder
 from platform_common.file_handler import download_local_files
 from platform_common.knowledge_extraction.schema import Base, Keyword, Question, Report
 from platform_common.pydantic_models.deployment import DeploymentConfig
-from platform_common.pydantic_models.training import QuestionKeywords
 from platform_common.utils import response
 from pydantic import ValidationError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
+from deployment_job.reporter import Reporter
 
 
 class KnowledgeExtractionRouter:
-    def __init__(self, config: DeploymentConfig, logger: Logger):
+    def __init__(self, config: DeploymentConfig, reporter: Reporter, logger: Logger):
         self.config = config
         self.logger = logger
         self.router = APIRouter()
@@ -40,21 +41,20 @@ class KnowledgeExtractionRouter:
         self.engine = self._initialize_db()
         self.Session = scoped_session(sessionmaker(bind=self.engine))
 
-        self.router.add_api_route("/new-report", self.new_report, methods=["POST"])
-        self.router.add_api_route("/get-report", self.get_report, methods=["GET"])
+        self.router.add_api_route("/report/create", self.new_report, methods=["POST"])
         self.router.add_api_route(
-            "/delete-report", self.delete_report, methods=["POST"]
+            "/report/{report_id}", self.get_report, methods=["GET"]
         )
         self.router.add_api_route(
-            "/add-questions", self.add_questions, methods=["POST"]
+            "/report/{report_id}", self.delete_report, methods=["DELETE"]
         )
-        self.router.add_api_route("/get-questions", self.get_questions, methods=["GET"])
+        self.router.add_api_route("/questions", self.add_question, methods=["POST"])
+        self.router.add_api_route("/questions", self.get_questions, methods=["GET"])
         self.router.add_api_route(
-            "/delete-questions", self.delete_questions, methods=["POST"]
+            "/questions/{question_id}", self.delete_question, methods=["DELETE"]
         )
-        self.router.add_api_route("/add-keywords", self.add_keywords, methods=["POST"])
         self.router.add_api_route(
-            "/delete-keywords", self.delete_keywords, methods=["POST"]
+            "/questions/{question_id}/keywords", self.add_keywords, methods=["POST"]
         )
 
     def _initialize_db(self):
@@ -129,61 +129,36 @@ class KnowledgeExtractionRouter:
                 "status": report.status,
                 "submitted_at": report.submitted_at,
                 "updated_at": report.updated_at,
-                "document_reports": [],
             }
 
-            processed_reports_path = self.reports_base_path / report_id / "processed"
+            if report.status == "complete":
+                report_file_path = self.reports_base_path / report_id / "report.json"
 
-            if not processed_reports_path.exists():
-                if report.status == "complete":
+                if not report_file_path.exists():
+                    if report.status == "complete":
+                        return response(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            message=f"Processed reports directory for ID '{report_id}' is missing.",
+                        )
+
+                try:
+                    with open(report_file_path) as file:
+                        report_data["content"] = json.load(file)
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to read document report {report_file_path}: {e}"
+                    )
+
                     return response(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        message=f"Processed reports directory for ID '{report_id}' is missing.",
-                    )
-                else:
-                    return response(
-                        status_code=status.HTTP_200_OK,
-                        message="Report is not yet complete.",
-                        data=jsonable_encoder(report_data),
+                        message=f"failed to load report content",
                     )
 
-            try:
-                for document_report in processed_reports_path.glob("*.jsonl"):
-                    try:
-                        with document_report.open("r") as file:
-                            document_contents = [
-                                line.strip() for line in file.readlines()
-                            ]
-                        report_data["document_reports"].append(
-                            {
-                                "document_name": document_report.stem,
-                                "contents": document_contents,
-                            }
-                        )
-                    except Exception as e:
-                        self.logger.error(
-                            f"Failed to read document report {document_report.name}: {e}"
-                        )
-                        report_data["document_reports"].append(
-                            {
-                                "document_name": document_report.stem,
-                                "contents": None,
-                                "error": str(e),
-                            }
-                        )
-
-                return response(
-                    status_code=status.HTTP_200_OK,
-                    message="Successfully retrieved the report details.",
-                    data=jsonable_encoder(report_data),
-                )
-
-            except Exception as e:
-                return response(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    message=f"Failed to retrieve document reports for report ID '{report_id}'.",
-                    data={"details": str(e)},
-                )
+            return response(
+                status_code=status.HTTP_200_OK,
+                message="Successfully retrieved the report details.",
+                data=jsonable_encoder(report_data),
+            )
 
     def delete_report(
         self, report_id: str, _: str = Depends(Permissions.verify_permission("write"))
@@ -216,30 +191,29 @@ class KnowledgeExtractionRouter:
             message=f"Successfully deleted report with ID '{report_id}'.",
         )
 
-    def add_questions(
+    def add_question(
         self,
-        questions: List[QuestionKeywords] = Body(...),
+        question: str,
+        keywords: Optional[List[str]] = None,
         _: str = Depends(Permissions.verify_permission("write")),
     ):
         try:
             with self.get_session() as session:
-                for question_item in questions:
-                    new_question = Question(
-                        id=str(uuid.uuid4()),
-                        question_text=question_item.question,
-                    )
-                    session.add(new_question)
-                    session.commit()
-                    session.refresh(new_question)
+                new_question = Question(
+                    id=str(uuid.uuid4()),
+                    question_text=question,
+                )
+                session.add(new_question)
+                session.commit()
+                session.refresh(new_question)
 
-                    if question_item.keywords:
-                        for keyword_text in question_item.keywords:
-                            new_keyword = Keyword(
-                                id=str(uuid.uuid4()),
-                                question_id=new_question.id,
-                                keyword_text=keyword_text,
-                            )
-                            session.add(new_keyword)
+                if keywords:
+                    new_keyword = Keyword(
+                        id=str(uuid.uuid4()),
+                        question_id=new_question.id,
+                        keyword_text=" ".join(keywords),
+                    )
+                    session.add(new_keyword)
 
                 session.commit()
 
@@ -286,30 +260,27 @@ class KnowledgeExtractionRouter:
                 data={"details": str(e)},
             )
 
-    def delete_questions(
+    def delete_question(
         self,
-        question_ids: List[str] = Body(
-            ..., description="List of question IDs to delete."
-        ),
+        question_id: str,
         _: str = Depends(Permissions.verify_permission("write")),
     ):
         try:
             with self.get_session() as session:
-                for question_id in question_ids:
-                    question = session.query(Question).get(question_id)
-                    if not question:
-                        return response(
-                            status_code=status.HTTP_404_NOT_FOUND,
-                            message=f"Question with ID '{question_id}' not found.",
-                        )
+                question = session.query(Question).get(question_id)
+                if not question:
+                    return response(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        message=f"Question with ID '{question_id}' not found.",
+                    )
 
-                    # Delete associated keywords
-                    session.query(Keyword).filter(
-                        Keyword.question_id == question_id
-                    ).delete()
+                # Delete associated keywords
+                session.query(Keyword).filter(
+                    Keyword.question_id == question_id
+                ).delete()
 
-                    # Delete the question itself
-                    session.delete(question)
+                # Delete the question itself
+                session.delete(question)
 
                 session.commit()
 
@@ -326,43 +297,26 @@ class KnowledgeExtractionRouter:
 
     def add_keywords(
         self,
-        keywords_data: List[QuestionKeywords] = Body(
-            ..., description="List of questions and their associated keywords."
-        ),
+        question_id: str,
+        keywords: List[str],
         _: str = Depends(Permissions.verify_permission("write")),
     ):
         try:
             with self.get_session() as session:
-                for item in keywords_data:
-                    question = (
-                        session.query(Question)
-                        .filter(Question.question_text == item.question)
-                        .first()
+                question = session.query(Question).get(question_id)
+                if not question:
+                    return response(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        message=f"Question '{question_id}' not found. Cannot add keywords.",
                     )
-                    if not question:
-                        return response(
-                            status_code=status.HTTP_404_NOT_FOUND,
-                            message=f"Question '{item.question}' not found. Cannot add keywords.",
-                        )
 
-                    if item.keywords:
-                        for keyword_text in item.keywords:
-                            existing_keyword = (
-                                session.query(Keyword)
-                                .filter(
-                                    Keyword.question_id == question.id,
-                                    Keyword.keyword_text == keyword_text,
-                                )
-                                .first()
-                            )
-                            if not existing_keyword:
-                                new_keyword = Keyword(
-                                    id=str(uuid.uuid4()),
-                                    question_id=question.id,
-                                    keyword_text=keyword_text,
-                                )
-                                session.add(new_keyword)
-
+                session.add(
+                    Keyword(
+                        id=str(uuid.uuid4()),
+                        question_id=question_id,
+                        keyword_text=" ".join(keywords),
+                    )
+                )
                 session.commit()
 
             return response(
@@ -373,61 +327,5 @@ class KnowledgeExtractionRouter:
             return response(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 message="An error occurred while adding keywords.",
-                data={"details": str(e)},
-            )
-
-    def delete_keywords(
-        self,
-        question_id: str = Form(
-            ..., description="The ID of the question whose keywords need to be deleted."
-        ),
-        keywords: List[str] = Form(
-            default=None,
-            description="A list of keywords to delete. If not provided, all keywords for the question will be deleted.",
-        ),
-        _: str = Depends(Permissions.verify_permission("write")),
-    ):
-        try:
-            with self.get_session() as session:
-                db_question = session.query(Question).get(question_id)
-
-                if not db_question:
-                    return response(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        message=f"Question with ID '{question_id}' not found.",
-                    )
-
-                if keywords:
-                    deleted_count = (
-                        session.query(Keyword)
-                        .filter(
-                            Keyword.question_id == question_id,
-                            Keyword.keyword_text.in_(keywords),
-                        )
-                        .delete(synchronize_session=False)
-                    )
-                else:
-                    deleted_count = (
-                        session.query(Keyword)
-                        .filter_by(question_id=question_id)
-                        .delete(synchronize_session=False)
-                    )
-
-                session.commit()
-
-                if deleted_count == 0:
-                    return response(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        message="No matching keywords found for deletion.",
-                    )
-
-                return response(
-                    status_code=status.HTTP_200_OK,
-                    message=f"Successfully deleted {deleted_count} keyword(s) for question with ID '{question_id}'.",
-                )
-        except Exception as e:
-            return response(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                message="An error occurred while deleting keywords.",
                 data={"details": str(e)},
             )
