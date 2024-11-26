@@ -1,15 +1,16 @@
+import json
+import os
+import time
+from typing import List
+from urllib.parse import urljoin
+
+from client.clients import Login
 from client.utils import (
     auth_header,
+    http_delete_with_error,
     http_get_with_error,
     http_post_with_error,
-    http_delete_with_error,
 )
-import os
-import json
-from client.clients import Login
-from urllib.parse import urljoin
-from typing import List
-import time
 
 
 class KnowledgeExtraction:
@@ -26,13 +27,14 @@ class KnowledgeExtraction:
 
         self.deployment_url = None
 
-    def create(self, model_name: str, questions: List[str]):
+    def create(self, model_name: str, questions: List[str], llm_provider: str):
         res = http_post_with_error(
-            urljoin(self.base_url, "train/knowledge-extraction"),
+            urljoin(self.base_url, "workflow/knowledge-extraction"),
             headers=auth_header(self.login.access_token),
             json={
                 "model_name": model_name,
                 "questions": [{"question": q} for q in questions],
+                "llm_provider": llm_provider,
             },
         )
         self.model_name = model_name

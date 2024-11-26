@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, String, Text, create_engine, ForeignKey
+from sqlalchemy import Column, DateTime, ForeignKey, String, Text, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 

@@ -1,3 +1,4 @@
+import json
 import shutil
 import uuid
 from datetime import datetime
@@ -7,8 +8,8 @@ from typing import List, Optional
 
 from deployment_job.permissions import Permissions
 from deployment_job.pydantic_models.inputs import DocumentList
+from deployment_job.reporter import Reporter
 from fastapi import APIRouter, Depends, Form, UploadFile, status
-import json
 from fastapi.encoders import jsonable_encoder
 from platform_common.file_handler import download_local_files
 from platform_common.knowledge_extraction.schema import Base, Keyword, Question, Report
@@ -17,7 +18,6 @@ from platform_common.utils import response
 from pydantic import ValidationError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
-from deployment_job.reporter import Reporter
 
 
 class KnowledgeExtractionRouter:

@@ -1,10 +1,12 @@
-from client.knowledge_extraction import KnowledgeExtraction
-from utils import doc_dir
 import os
-import uuid
-import requests
-import pytest
 import time
+import uuid
+
+import pytest
+import requests
+from utils import doc_dir
+
+from client.knowledge_extraction import KnowledgeExtraction
 
 
 def await_report(report_id, client: KnowledgeExtraction):
@@ -35,6 +37,7 @@ def test_knowledge_extraction():
             "did sales in europe change from 2022 to 2023",
             "how much did apple spend on research and development in 2021",
         ],
+        llm_provider="openai",
     )
 
     client.start()

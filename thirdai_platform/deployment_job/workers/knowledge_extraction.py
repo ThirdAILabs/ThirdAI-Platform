@@ -1,22 +1,22 @@
+import json
 import logging
 import os
 import time
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urljoin
-import json
 
 import requests
+from platform_common.file_handler import expand_cloud_buckets_and_directories
 from platform_common.knowledge_extraction.schema import Keyword, Question, Report
+from platform_common.logging import setup_logger
 from platform_common.ndb.ndbv2_parser import parse_doc
 from platform_common.pydantic_models.deployment import DeploymentConfig
+from platform_common.pydantic_models.training import FileInfo
 from sqlalchemy import create_engine
 from sqlalchemy.exc import NoResultFound
-from sqlalchemy.orm import scoped_session, sessionmaker, selectinload
+from sqlalchemy.orm import scoped_session, selectinload, sessionmaker
 from thirdai import neural_db_v2 as ndb
-from platform_common.pydantic_models.training import FileInfo
-from platform_common.logging import setup_logger
-from platform_common.file_handler import expand_cloud_buckets_and_directories
 
 
 def load_config():
@@ -138,7 +138,7 @@ class ReportProcessorWorker:
 
             db = ndb.NeuralDB(splade=(total_chunks < 5000))
 
-            self.logger.info("begining indexing")
+            self.logger.info("starting indexing")
             db.insert(docs)
             self.logger.info(
                 f"indexing complete, ndocs={len(docs)} chunks={db.retriever.retriever.size()}"
