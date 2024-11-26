@@ -8,14 +8,15 @@ import json
 
 import requests
 from platform_common.knowledge_extraction.schema import Keyword, Question, Report
-from platform_common.ndb.ndbv2_parser import convert_to_ndb_doc
+from platform_common.ndb.ndbv2_parser import parse_doc
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from sqlalchemy import create_engine
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import scoped_session, sessionmaker, selectinload
 from thirdai import neural_db_v2 as ndb
-from deployment_job.pydantic_models import inputs
+from platform_common.pydantic_models.training import FileInfo
 from platform_common.logging import setup_logger
+from platform_common.file_handler import expand_cloud_buckets_and_directories
 
 
 def load_config():
@@ -92,33 +93,55 @@ class ReportProcessorWorker:
         try:
             self.logger.info(f"Processing report: {report.id}")
 
-            documents_path = self.reports_base_path / str(report.id) / "documents"
+            documents_file = self.reports_base_path / str(report.id) / "documents.json"
 
-            if not documents_path.exists() or not documents_path.is_dir():
-                self.logger.error(f"Documents path missing for report {report.id}.")
+            if not documents_file.exists():
+                self.logger.error(f"Documents file missing for report {report.id}.")
                 raise FileNotFoundError(
-                    f"Documents path missing for report {report.id}."
+                    f"Documents file missing for report {report.id}."
                 )
 
-            documents = [doc for doc in documents_path.iterdir() if doc.is_file()]
+            with open(documents_file) as file:
+                documents = json.load(file)
+
+            documents = [FileInfo.model_validate(doc) for doc in documents]
+            documents = expand_cloud_buckets_and_directories(documents)
+
             if not documents:
                 self.logger.error(f"No documents found for report {report.id}.")
                 raise ValueError(f"No documents found for report {report.id}.")
 
             questions = self.get_questions()
 
-            db = ndb.NeuralDB(splade=True)  # TODO
-
             docs = []
             for doc in documents:
-                # TODO(Nicholas): pass options
-                self.logger.info(f"Found document: {doc.name}")
-                docs.append(convert_to_ndb_doc(str(doc), str(doc), None, None, {}))
+                self.logger.info(f"parsing document: {doc.path}")
+                docs.append(
+                    parse_doc(
+                        doc=doc,
+                        doc_save_dir=str(
+                            self.reports_base_path / str(report.id) / "documents"
+                        ),
+                        tmp_dir=str(
+                            self.reports_base_path / str(report.id) / "documents/tmp"
+                        ),
+                    )
+                )
+                self.logger.info(f"parsed document: {doc.path}")
 
-            self.logger.info("begining insertion")
+            total_chunks = 0
+            for doc in docs:
+                for chunk in doc.chunks():
+                    total_chunks += len(chunk.text)
+
+            self.logger.info(f"total chunks: {total_chunks}")
+
+            db = ndb.NeuralDB(splade=(total_chunks < 5000))
+
+            self.logger.info("begining indexing")
             db.insert(docs)
             self.logger.info(
-                f"insertion complete, ndocs={len(docs)} chunks={db.retriever.retriever.size()}"
+                f"indexing complete, ndocs={len(docs)} chunks={db.retriever.retriever.size()}"
             )
 
             queries = []

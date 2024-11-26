@@ -97,6 +97,9 @@ class KnowledgeExtractionRouter:
             dest_dir=self.reports_base_path / report_id / "documents",
         )
 
+        with open(self.reports_base_path / report_id / "documents.json", "w") as file:
+            json.dump([doc.model_dump() for doc in documents], file)
+
         with self.get_session() as session:
             new_report = Report(
                 id=report_id,
