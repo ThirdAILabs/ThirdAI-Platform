@@ -17,6 +17,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import scoped_session, selectinload, sessionmaker
 from thirdai import neural_db_v2 as ndb
+from licensing.verify import verify_license
 
 
 def load_config():
@@ -44,6 +45,8 @@ class ReportProcessorWorker:
         self.llm_endpoint = urljoin(
             self.config.model_bazaar_endpoint, "llm-dispatch/generate"
         )
+
+        verify_license.activate_thirdai_license(self.config.license_key)
 
     def fetch_and_lock_pending_report(self):
         with self.Session() as session:
