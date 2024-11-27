@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import urljoin
 
 import requests
+from licensing.verify import verify_license
 from platform_common.file_handler import expand_cloud_buckets_and_directories
 from platform_common.knowledge_extraction.schema import Keyword, Question, Report
 from platform_common.logging import setup_logger
@@ -17,7 +18,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import scoped_session, selectinload, sessionmaker
 from thirdai import neural_db_v2 as ndb
-from licensing.verify import verify_license
 
 
 def load_config():
