@@ -2,6 +2,7 @@ import heapq
 import json
 import logging
 import os
+import secrets
 import traceback
 from collections import defaultdict
 from pathlib import Path
@@ -284,6 +285,7 @@ async def deploy_single_model(
             azure_account_key=(os.getenv("AZURE_ACCOUNT_KEY", "")),
             gcp_credentials_file=(os.getenv("GCP_CREDENTIALS_FILE", "")),
             knowledge_extraction=knowledge_extraction,
+            job_token=secrets.token_hex(16),
         )
 
         model.deploy_status = schema.Status.starting

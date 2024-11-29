@@ -7,6 +7,7 @@ job "deployment-{{ model_id }}" {
   group "deployment" {
     count = 1
 
+    {% if not knowledge_extraction %}
     scaling {
       enabled = "{{ autoscaling_enabled }}"
       min = 1
@@ -24,6 +25,7 @@ job "deployment-{{ model_id }}" {
         }
       }
     }
+    {% endif %}
 
     network {
       port "{{ model_id }}-http" {
@@ -82,6 +84,7 @@ EOF
         AZURE_ACCOUNT_NAME = "{{ azure_account_name }}"
         AZURE_ACCOUNT_KEY = "{{ azure_account_key }}"
         GCP_CREDENTIALS_FILE = "{{ gcp_credentials_file }}"
+        JOB_TOKEN = "{{ job_token }}"
       }
 
       config {
@@ -142,12 +145,22 @@ EOF
         driver = "docker"
       {% endif %}
 
+      template {
+        destination = "${NOMAD_SECRETS_DIR}/env.vars"
+        env         = true
+        data        = <<EOF
+{% raw %}
+{{ range nomadService "deployment-{% endraw %}{{ model_id }}{% raw %}" }}
+JOB_ENDPOINT = {{ .Address }}:{{ .Port }}
+{{- end -}}
+{% endraw %}
+EOF
+      }
+
       config {
         {% if platform == "docker" %}  
           image = "{{ registry }}/{{ image_name }}:{{ tag }}"
           image_pull_timeout = "15m"
-          ports = ["{{ model_id }}-http"]
-          group_add = ["4646"]
           auth {
             username = "{{ docker_username }}"
             password = "{{ docker_password }}"
@@ -173,6 +186,7 @@ EOF
         AZURE_ACCOUNT_NAME = "{{ azure_account_name }}"
         AZURE_ACCOUNT_KEY = "{{ azure_account_key }}"
         GCP_CREDENTIALS_FILE = "{{ gcp_credentials_file }}"
+        JOB_TOKEN = "{{ job_token }}"
       }
 
       resources {

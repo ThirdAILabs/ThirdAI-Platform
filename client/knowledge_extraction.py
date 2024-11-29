@@ -40,7 +40,7 @@ class KnowledgeExtraction:
         self.model_name = model_name
         self.model_id = res.json()["data"]["model_id"]
 
-    def start(self):
+    def start(self, autoscaling: bool = True, autoscaling_max_count: int = 4):
         if not self.model_name:
             raise ValueError(
                 "must call client.create(...) before calling client.start()"
@@ -48,7 +48,11 @@ class KnowledgeExtraction:
         http_post_with_error(
             urljoin(self.base_url, "deploy/run"),
             headers=auth_header(self.login.access_token),
-            params={"model_identifier": f"{self.login.username}/{self.model_name}"},
+            params={
+                "model_identifier": f"{self.login.username}/{self.model_name}",
+                "autoscaling_enabled": autoscaling,
+                "autoscaler_max_count": autoscaling_max_count,
+            },
         )
         self.deployment_url = urljoin(
             self.base_url.removesuffix("api/"), f"{self.model_id}/"

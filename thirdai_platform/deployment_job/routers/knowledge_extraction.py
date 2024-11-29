@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import uuid
 from datetime import datetime
@@ -9,7 +10,7 @@ from typing import List, Optional
 from deployment_job.permissions import Permissions
 from deployment_job.pydantic_models.inputs import DocumentList
 from deployment_job.reporter import Reporter
-from fastapi import APIRouter, Depends, Form, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from platform_common.file_handler import download_local_files
 from platform_common.knowledge_extraction.schema import Base, Keyword, Question, Report
@@ -18,6 +19,19 @@ from platform_common.utils import response
 from pydantic import ValidationError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
+
+JOB_TOKEN = os.environ["JOB_TOKEN"]
+
+
+def verify_job_token(request: Request):
+    auth_header = request.headers.get("Authorization")
+    if auth_header.split(" ", 1)[1] != JOB_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid access token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return None
 
 
 class KnowledgeExtractionRouter:
@@ -49,12 +63,24 @@ class KnowledgeExtractionRouter:
             "/report/{report_id}", self.delete_report, methods=["DELETE"]
         )
         self.router.add_api_route("/questions", self.add_question, methods=["POST"])
-        self.router.add_api_route("/questions", self.get_questions, methods=["GET"])
+        self.router.add_api_route(
+            "/questions", self.get_questions_public, methods=["GET"]
+        )
         self.router.add_api_route(
             "/questions/{question_id}", self.delete_question, methods=["DELETE"]
         )
         self.router.add_api_route(
             "/questions/{question_id}/keywords", self.add_keywords, methods=["POST"]
+        )
+
+        self.router.add_api_route(
+            "/questions-internal", self.get_questions_internal, methods=["GET"]
+        )
+        self.router.add_api_route(
+            "/report/{report_id}/status", self.update_report_status, methods=["POST"]
+        )
+        self.router.add_api_route(
+            "/report/next", self.next_unprocessed_report, methods=["POST"]
         )
 
     def _initialize_db(self):
@@ -231,7 +257,7 @@ class KnowledgeExtractionRouter:
                 data={"details": str(e)},
             )
 
-    def get_questions(self, _: str = Depends(Permissions.verify_permission("read"))):
+    def get_questions(self):
         try:
             with self.get_session() as session:
                 questions = session.query(Question).all()
@@ -262,6 +288,14 @@ class KnowledgeExtractionRouter:
                 message="An error occurred while retrieving questions.",
                 data={"details": str(e)},
             )
+
+    def get_questions_internal(self, _=Depends(verify_job_token)):
+        return self.get_questions()
+
+    def get_questions_public(
+        self, _: str = Depends(Permissions.verify_permission("read"))
+    ):
+        return self.get_questions()
 
     def delete_question(
         self,
@@ -330,5 +364,76 @@ class KnowledgeExtractionRouter:
             return response(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 message="An error occurred while adding keywords.",
+                data={"details": str(e)},
+            )
+
+    def next_unprocessed_report(self, _=Depends(verify_job_token)):
+        try:
+            self.logger.info("checking for unprocessed reports")
+            with self.get_session() as session:
+                report = (
+                    session.query(Report)
+                    .filter(Report.status == "queued")
+                    .order_by(Report.submitted_at.asc())  # Process oldest first
+                    .with_for_update(skip_locked=True)  # Lock row to prevent conflicts
+                    .first()
+                )
+                if report:
+                    self.logger.info(f"found unprocessed report: {report.id}")
+                    report.status = "in_progress"
+                    report.updated_at = datetime.utcnow()
+                    session.commit()
+
+                    return response(
+                        status_code=status.HTTP_200_OK,
+                        message="found unprocessed report",
+                        data={"report_id": report.id},
+                    )
+                else:
+                    self.logger.info("no unprocessed reports found")
+
+                    return response(
+                        status_code=status.HTTP_200_OK,
+                        message="no unprocessed reports found",
+                        data={"report_id": None},
+                    )
+
+        except Exception as e:
+            self.logger.error(f"error checking for unprocessed report: {e}")
+            return response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="An error occurred while checking for unprocessed reports.",
+                data={"details": str(e)},
+            )
+
+    def update_report_status(
+        self, report_id: str, new_status: str, _=Depends(verify_job_token)
+    ):
+        try:
+            with self.get_session() as session:
+                report = session.query(Report).get(report_id)
+                if not report:
+                    return response(
+                        status_code=status.HTTP_404_BAD_REQUEST,
+                        message=f"report {report_id} not found",
+                    )
+
+                report.status = new_status
+                report.updated_at = datetime.utcnow()
+                session.commit()
+                self.logger.info(
+                    f"updated status of report {report_id} to {new_status}"
+                )
+                return response(
+                    status_code=status.HTTP_200_OK,
+                    message="updated report status",
+                )
+        except Exception as e:
+            self.logger.error(
+                f"error updating report status of {report_id} to {new_status}: {e}"
+            )
+            return response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="An error occurred while updating report status.",
                 data={"details": str(e)},
             )
