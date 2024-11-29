@@ -40,6 +40,10 @@ class ReportProcessorWorker:
 
         self.auth_header = {"Authorization": f"Bearer {os.environ['JOB_TOKEN']}"}
 
+        self.logger.info(
+            f"options: advanced_indexing={self.config.model_options.advanced_indexing} rerank={self.config.model_options.rerank} generate_answers={self.config.model_options.generate_answers}"
+        )
+
         verify_license.activate_thirdai_license(self.config.license_key)
 
     def get_next_report(self):
@@ -131,7 +135,10 @@ class ReportProcessorWorker:
                 f"document parsing complete: time={e-s:.3f}s total_chunks={total_chunks}"
             )
 
-            db = ndb.NeuralDB(splade=(total_chunks < 5000))
+            db = ndb.NeuralDB(
+                splade=(total_chunks < 5000)
+                and self.config.model_options.advanced_indexing
+            )
 
             self.logger.info("starting indexing")
             s = time.perf_counter()
@@ -148,17 +155,22 @@ class ReportProcessorWorker:
 
             s = time.perf_counter()
             self.logger.info("starting answer generation")
-            batch_results = db.search_batch(queries, top_k=5, rerank=True)
+            batch_results = db.search_batch(
+                queries, top_k=5, rerank=self.config.model_options.rerank
+            )
 
             report_results = []
             for question, refs in zip(questions, batch_results):
                 refs = [
                     {"text": chunk.text, "source": chunk.document} for chunk, _ in refs
                 ]
-                answer = self.generate(
-                    question=question["question_text"],
-                    references=refs,
-                )
+                if self.config.model_options.generate_answers:
+                    answer = self.generate(
+                        question=question["question_text"],
+                        references=refs,
+                    )
+                else:
+                    answer = None
                 report_results.append(
                     {
                         "question_id": question["question_id"],

@@ -232,12 +232,15 @@ async def deploy_single_model(
         )
         requires_on_prem_llm = attributes.get("llm_provider") == "on-prem"
     elif model.type == ModelType.KNOWLEDGE_EXTRACTION:
+        attributes = model.get_attributes()
         model_options = KnowledgeExtractionOptions(
             llm_provider=(
-                model.get_attributes().get("llm_provider")
-                or os.getenv("LLM_PROVIDER", "openai")
+                attributes.get("llm_provider") or os.getenv("LLM_PROVIDER", "openai")
             ),
             genai_key=(genai_key or os.getenv("GENAI_KEY", "")),
+            advanced_indexing=attributes["advanced_indexing"],
+            rerank=attributes["rerank"],
+            generate_answers=attributes["generate_answers"],
         )
         requires_on_prem_llm = model_options.llm_provider == "on-prem"
         knowledge_extraction = True

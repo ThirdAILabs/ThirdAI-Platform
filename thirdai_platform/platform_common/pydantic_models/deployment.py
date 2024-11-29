@@ -40,6 +40,10 @@ class KnowledgeExtractionOptions(BaseModel):
     llm_provider: str = "openai"
     genai_key: Optional[str] = None
 
+    advanced_indexing: bool
+    rerank: bool
+    generate_answers: bool
+
 
 class DeploymentConfig(BaseModel):
     model_id: str
