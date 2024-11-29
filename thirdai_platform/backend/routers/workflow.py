@@ -21,7 +21,7 @@ from platform_common.pydantic_models.training import (
     UDTSubType,
 )
 from platform_common.utils import disk_usage, get_section, model_bazaar_path, response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 workflow_router = APIRouter()
@@ -161,6 +161,12 @@ class KnowledgeExtractionRequest(BaseModel):
         ..., description="A list of questions with optional keywords.", min_length=1
     )
     llm_provider: str
+
+    @model_validator(mode="after")
+    def check_valid_llm_provider(self):
+        if self.llm_provider not in {"on-prem", "openai", "cohere"}:
+            raise ValueError("Invalid llm_provider specified.")
+        return self
 
 
 @workflow_router.post("/knowledge-extraction", dependencies=[Depends(is_on_low_disk())])
