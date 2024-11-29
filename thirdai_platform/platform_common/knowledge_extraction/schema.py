@@ -1,4 +1,12 @@
-from sqlalchemy import Column, DateTime, ForeignKey, String, Text, create_engine
+from sqlalchemy import (
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    create_engine,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
@@ -11,7 +19,8 @@ class Report(Base):
     id = Column(String, primary_key=True)
     status = Column(String, nullable=False)
     submitted_at = Column(DateTime, nullable=False)
-    updated_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=False)
+    attempt = Column(Integer, default=0, nullable=False)
 
 
 class Question(Base):

@@ -48,18 +48,20 @@ class ReportProcessorWorker:
         )
 
         if res.status_code == 200:
-            report_id = res.json()["data"]["report_id"]
-            self.logger.info(f"got next report from queue: {report_id}")
-            return report_id
+            data = res.json()["data"]
+            self.logger.info(
+                f"got next report from queue: report_id={data['report_id']} attempt={data['attempt']}"
+            )
+            return data["report_id"], data["attempt"]
 
         self.logger.error(f"error retreiving next report: {str(res.content)}")
-        return None
+        return None, None
 
-    def update_report_status(self, report_id: str, new_status: str):
+    def update_report_status(self, report_id: str, new_status: str, attempt: int):
         res = requests.post(
             urljoin(self.job_endpoint, f"/report/{report_id}/status"),
             headers=self.auth_header,
-            params={"new_status": new_status},
+            params={"new_status": new_status, "attempt": attempt},
         )
 
         if res.status_code == 200:
@@ -77,9 +79,9 @@ class ReportProcessorWorker:
 
         raise ValueError(f"error getting list of questions: {str(res.content)}")
 
-    def process_report(self, report_id: str):
+    def process_report(self, report_id: str, attempt: int):
         try:
-            self.logger.info(f"Processing report: {report_id}")
+            self.logger.info(f"Processing report: {report_id=} attempt {attempt=}")
 
             documents_file = self.reports_base_path / report_id / "documents.json"
 
@@ -170,17 +172,23 @@ class ReportProcessorWorker:
                 f"answer generation complete: time={e-s:.3f}s n_questions={len(questions)}"
             )
 
-            report_file_path = self.reports_base_path / report_id / "report.json"
+            report_file_path = (
+                self.reports_base_path / report_id / f"report_{attempt}.json"
+            )
             report_file_path.parent.mkdir(parents=True, exist_ok=True)
             with open(report_file_path, mode="w") as writer:
                 json.dump({"report_id": report_id, "results": report_results}, writer)
 
-            self.update_report_status(report_id=report_id, new_status="complete")
+            self.update_report_status(
+                report_id=report_id, new_status="complete", attempt=attempt
+            )
             self.logger.info(f"Successfully processed report: {report_id}")
 
         except Exception as e:
             self.logger.error(f"Error processing report {report_id}: {e}")
-            self.update_report_status(report_id=report_id, new_status="failed")
+            self.update_report_status(
+                report_id=report_id, new_status="failed", attempt=attempt
+            )
 
     def generate(self, question, references):
         self.logger.debug(f"generating answer for question: {question}")
@@ -211,13 +219,13 @@ class ReportProcessorWorker:
 
         while True:
             try:
-                report_id = self.get_next_report()
+                report_id, attempt = self.get_next_report()
                 if not report_id:
                     self.logger.info("No pending reports. Sleeping...")
                     time.sleep(poll_interval)
                     continue
 
-                self.process_report(report_id)
+                self.process_report(report_id, attempt)
 
             except Exception as e:
                 self.logger.error(f"Worker encountered an error: {e}")

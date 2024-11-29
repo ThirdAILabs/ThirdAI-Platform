@@ -2,7 +2,7 @@ import json
 import os
 import shutil
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging import Logger
 from pathlib import Path
 from typing import List, Optional
@@ -17,7 +17,7 @@ from platform_common.knowledge_extraction.schema import Base, Keyword, Question,
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from platform_common.utils import response
 from pydantic import ValidationError
-from sqlalchemy import create_engine
+from sqlalchemy import and_, create_engine, or_
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 
 JOB_TOKEN = os.environ["JOB_TOKEN"]
@@ -32,6 +32,10 @@ def verify_job_token(request: Request):
             headers={"WWW-Authenticate": "Bearer"},
         )
     return None
+
+
+MAX_ATTEMPTS = 3
+REPORT_TIMEOUT = timedelta(minutes=5)
 
 
 class KnowledgeExtractionRouter:
@@ -131,6 +135,7 @@ class KnowledgeExtractionRouter:
                 id=report_id,
                 status="queued",
                 submitted_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
             )
             session.add(new_report)
             session.commit()
@@ -161,7 +166,9 @@ class KnowledgeExtractionRouter:
             }
 
             if report.status == "complete":
-                report_file_path = self.reports_base_path / report_id / "report.json"
+                report_file_path = (
+                    self.reports_base_path / report_id / f"report_{report.attempt}.json"
+                )
 
                 if not report_file_path.exists():
                     if report.status == "complete":
@@ -373,7 +380,17 @@ class KnowledgeExtractionRouter:
             with self.get_session() as session:
                 report = (
                     session.query(Report)
-                    .filter(Report.status == "queued")
+                    .where(
+                        or_(
+                            Report.status == "queued",
+                            and_(
+                                Report.status == "in_progress",
+                                Report.attempt < MAX_ATTEMPTS,
+                                Report.updated_at
+                                < (datetime.utcnow() - REPORT_TIMEOUT),
+                            ),
+                        )
+                    )
                     .order_by(Report.submitted_at.asc())  # Process oldest first
                     .with_for_update(skip_locked=True)  # Lock row to prevent conflicts
                     .first()
@@ -381,13 +398,14 @@ class KnowledgeExtractionRouter:
                 if report:
                     self.logger.info(f"found unprocessed report: {report.id}")
                     report.status = "in_progress"
+                    report.attempt += 1
                     report.updated_at = datetime.utcnow()
                     session.commit()
 
                     return response(
                         status_code=status.HTTP_200_OK,
                         message="found unprocessed report",
-                        data={"report_id": report.id},
+                        data={"report_id": report.id, "attempt": report.attempt},
                     )
                 else:
                     self.logger.info("no unprocessed reports found")
@@ -395,7 +413,7 @@ class KnowledgeExtractionRouter:
                     return response(
                         status_code=status.HTTP_200_OK,
                         message="no unprocessed reports found",
-                        data={"report_id": None},
+                        data={"report_id": None, "attempt": None},
                     )
 
         except Exception as e:
@@ -407,7 +425,7 @@ class KnowledgeExtractionRouter:
             )
 
     def update_report_status(
-        self, report_id: str, new_status: str, _=Depends(verify_job_token)
+        self, report_id: str, new_status: str, attempt: int, _=Depends(verify_job_token)
     ):
         try:
             with self.get_session() as session:
@@ -416,6 +434,12 @@ class KnowledgeExtractionRouter:
                     return response(
                         status_code=status.HTTP_404_BAD_REQUEST,
                         message=f"report {report_id} not found",
+                    )
+
+                if report.attempt != attempt:
+                    return response(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        message="invalid attempt number, this report has been assigned to a new worker",
                     )
 
                 report.status = new_status

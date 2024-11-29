@@ -162,6 +162,10 @@ class KnowledgeExtractionRequest(BaseModel):
     )
     llm_provider: str
 
+    advanced_indexing: bool = True
+    rerank: bool = True
+    generate_answers: bool = True
+
     @model_validator(mode="after")
     def check_valid_llm_provider(self):
         if self.llm_provider not in {"on-prem", "openai", "cohere"}:
@@ -207,13 +211,15 @@ def train_knowledge_extraction(
         session.add(new_model)
         session.commit()
         session.refresh(new_model)
-        session.add(
-            schema.ModelAttribute(
-                model_id=new_model.id,
-                key="llm_provider",
-                value=request.llm_provider,
-            )
-        )
+        attributes = {
+            "llm_provider": request.llm_provider,
+            "advanced_indexing": request.advanced_indexing,
+            "rerank": request.rerank,
+            "generate_answers": request.generate_answers,
+        }
+        for k, v in attributes.items():
+            session.add(schema.ModelAttribute(model_id=new_model.id, key=k, value=v))
+        session.commit()
 
     except Exception as err:
         raise HTTPException(

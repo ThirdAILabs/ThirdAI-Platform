@@ -27,7 +27,9 @@ class KnowledgeExtraction:
 
         self.deployment_url = None
 
-    def create(self, model_name: str, questions: List[str], llm_provider: str):
+    def create(
+        self, model_name: str, questions: List[str], llm_provider: str, **kwargs
+    ):
         res = http_post_with_error(
             urljoin(self.base_url, "workflow/knowledge-extraction"),
             headers=auth_header(self.login.access_token),
@@ -35,6 +37,7 @@ class KnowledgeExtraction:
                 "model_name": model_name,
                 "questions": [{"question": q} for q in questions],
                 "llm_provider": llm_provider,
+                **kwargs,
             },
         )
         self.model_name = model_name
