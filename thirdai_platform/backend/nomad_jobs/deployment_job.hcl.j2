@@ -187,10 +187,11 @@ EOF
         AZURE_ACCOUNT_KEY = "{{ azure_account_key }}"
         GCP_CREDENTIALS_FILE = "{{ gcp_credentials_file }}"
         JOB_TOKEN = "{{ job_token }}"
+        WORKER_CORES = "8"
       }
 
       resources {
-        cpu = 2400
+        cores = 8
         memory = 4000 
         memory_max = 8000
       }

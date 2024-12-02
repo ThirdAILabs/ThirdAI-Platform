@@ -9,13 +9,15 @@ import requests
 from licensing.verify import verify_license
 from platform_common.file_handler import expand_cloud_buckets_and_directories
 
-pass
+
 import requests
 from platform_common.logging import setup_logger
 from platform_common.ndb.ndbv2_parser import parse_doc
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from platform_common.pydantic_models.training import FileInfo
 from thirdai import neural_db_v2 as ndb
+import thirdai
+import torch
 
 
 def load_config():
@@ -34,6 +36,11 @@ class ReportProcessorWorker:
         self.llm_endpoint = urljoin(
             self.config.model_bazaar_endpoint, "llm-dispatch/generate"
         )
+
+        cores = int(os.getenv("WORKER_CORES"))
+        if hasattr(thirdai, "set_global_num_threads"):
+            thirdai.set_global_num_threads(cores)
+        torch.set_num_threads(cores)
 
         self.job_endpoint = "http://" + os.getenv("JOB_ENDPOINT") + "/"
         self.logger.info(f"JOB ENDPOINT: '{self.job_endpoint}'")
