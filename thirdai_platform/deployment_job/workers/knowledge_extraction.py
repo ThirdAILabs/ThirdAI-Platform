@@ -6,18 +6,15 @@ from pathlib import Path
 from urllib.parse import urljoin
 
 import requests
+import thirdai
+import torch
 from licensing.verify import verify_license
 from platform_common.file_handler import expand_cloud_buckets_and_directories
-
-
-import requests
 from platform_common.logging import setup_logger
 from platform_common.ndb.ndbv2_parser import parse_doc
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from platform_common.pydantic_models.training import FileInfo
 from thirdai import neural_db_v2 as ndb
-import thirdai
-import torch
 
 
 def load_config():
@@ -90,110 +87,119 @@ class ReportProcessorWorker:
 
         raise ValueError(f"error getting list of questions: {str(res.content)}")
 
+    def get_documents(self, report_id: str):
+        documents_file = self.reports_base_path / report_id / "documents.json"
+
+        if not documents_file.exists():
+            self.logger.error(f"Documents file missing for report {report_id}.")
+            raise FileNotFoundError(f"Documents file missing for report {report_id}.")
+
+        with open(documents_file) as file:
+            documents = json.load(file)
+
+        documents = [FileInfo.model_validate(doc) for doc in documents]
+        documents = expand_cloud_buckets_and_directories(documents)
+
+        if not documents:
+            self.logger.error(f"No documents found for report {report_id}.")
+            raise ValueError(f"No documents found for report {report_id}.")
+
+        return documents
+
+    def create_ndb(self, documents, report_id: str):
+        os.makedirs(self.reports_base_path / report_id / "documents/tmp", exist_ok=True)
+
+        self.logger.info("starting document parsing")
+        s = time.perf_counter()
+        docs = []
+        for doc in documents:
+            self.logger.debug(f"parsing document: {doc.path}")
+            docs.append(
+                parse_doc(
+                    doc=doc,
+                    doc_save_dir=str(self.reports_base_path / report_id / "documents"),
+                    tmp_dir=str(self.reports_base_path / report_id / "documents/tmp"),
+                )
+            )
+            self.logger.debug(f"parsed document: {doc.path}")
+
+        total_chunks = 0
+        for doc in docs:
+            for chunk in doc.chunks():
+                total_chunks += len(chunk.text)
+
+        e = time.perf_counter()
+        self.logger.info(
+            f"document parsing complete: time={e-s:.3f}s total_chunks={total_chunks}"
+        )
+
+        db = ndb.NeuralDB(
+            splade=(total_chunks < 5000) and self.config.model_options.advanced_indexing
+        )
+
+        self.logger.info("starting indexing")
+        s = time.perf_counter()
+        db.insert(docs)
+        e = time.perf_counter()
+        self.logger.info(
+            f"indexing complete: time={e-s:.3f}s ndocs={len(docs)} chunks={db.retriever.retriever.size()}"
+        )
+
+        return db
+
+    def answer_questions(self, db, questions):
+        queries = []
+        for question in questions:
+            query = question["question_text"] + " " + " ".join(question["keywords"])
+            queries.append(query)
+
+        s = time.perf_counter()
+        self.logger.info("starting answer generation")
+        search_results = db.search_batch(
+            queries, top_k=5, rerank=self.config.model_options.rerank
+        )
+
+        search_results = [
+            [{"text": chunk.text, "source": chunk.document} for chunk, _ in refs]
+            for refs in search_results
+        ]
+
+        if self.config.model_options.generate_answers:
+            answers = [
+                self.generate(q["question_text"], refs)
+                for q, refs in zip(questions, search_results)
+            ]
+        else:
+            answers = [None] * len(search_results)
+
+        report_results = [
+            {
+                "question_id": question["question_id"],
+                "question": question["question_text"],
+                "answer": answer,
+                "references": refs,
+            }
+            for question, answer, refs in zip(questions, answers, search_results)
+        ]
+
+        e = time.perf_counter()
+        self.logger.info(
+            f"answer generation complete: time={e-s:.3f}s n_questions={len(questions)}"
+        )
+
+        return report_results
+
     def process_report(self, report_id: str, attempt: int):
         try:
             self.logger.info(f"Processing report: {report_id=} attempt {attempt=}")
 
-            documents_file = self.reports_base_path / report_id / "documents.json"
-
-            if not documents_file.exists():
-                self.logger.error(f"Documents file missing for report {report_id}.")
-                raise FileNotFoundError(
-                    f"Documents file missing for report {report_id}."
-                )
-
-            with open(documents_file) as file:
-                documents = json.load(file)
-
-            documents = [FileInfo.model_validate(doc) for doc in documents]
-            documents = expand_cloud_buckets_and_directories(documents)
-
-            if not documents:
-                self.logger.error(f"No documents found for report {report_id}.")
-                raise ValueError(f"No documents found for report {report_id}.")
+            documents = self.get_documents(report_id)
 
             questions = self.get_questions()
 
-            os.makedirs(
-                self.reports_base_path / report_id / "documents/tmp", exist_ok=True
-            )
+            db = self.create_ndb(documents=documents, report_id=report_id)
 
-            self.logger.info("starting document parsing")
-            s = time.perf_counter()
-            docs = []
-            for doc in documents:
-                self.logger.debug(f"parsing document: {doc.path}")
-                docs.append(
-                    parse_doc(
-                        doc=doc,
-                        doc_save_dir=str(
-                            self.reports_base_path / report_id / "documents"
-                        ),
-                        tmp_dir=str(
-                            self.reports_base_path / report_id / "documents/tmp"
-                        ),
-                    )
-                )
-                self.logger.debug(f"parsed document: {doc.path}")
-
-            total_chunks = 0
-            for doc in docs:
-                for chunk in doc.chunks():
-                    total_chunks += len(chunk.text)
-
-            e = time.perf_counter()
-            self.logger.info(
-                f"document parsing complete: time={e-s:.3f}s total_chunks={total_chunks}"
-            )
-
-            db = ndb.NeuralDB(
-                splade=(total_chunks < 5000)
-                and self.config.model_options.advanced_indexing
-            )
-
-            self.logger.info("starting indexing")
-            s = time.perf_counter()
-            db.insert(docs)
-            e = time.perf_counter()
-            self.logger.info(
-                f"indexing complete: time={e-s:.3f}s ndocs={len(docs)} chunks={db.retriever.retriever.size()}"
-            )
-
-            queries = []
-            for question in questions:
-                query = question["question_text"] + " " + " ".join(question["keywords"])
-                queries.append(query)
-
-            s = time.perf_counter()
-            self.logger.info("starting answer generation")
-            batch_results = db.search_batch(
-                queries, top_k=5, rerank=self.config.model_options.rerank
-            )
-
-            report_results = []
-            for question, refs in zip(questions, batch_results):
-                refs = [
-                    {"text": chunk.text, "source": chunk.document} for chunk, _ in refs
-                ]
-                if self.config.model_options.generate_answers:
-                    answer = self.generate(
-                        question=question["question_text"],
-                        references=refs,
-                    )
-                else:
-                    answer = None
-                report_results.append(
-                    {
-                        "question_id": question["question_id"],
-                        "question": question["question_text"],
-                        "answer": answer,
-                        "references": refs,
-                    }
-                )
-            e = time.perf_counter()
-            self.logger.info(
-                f"answer generation complete: time={e-s:.3f}s n_questions={len(questions)}"
-            )
+            report_results = self.answer_questions(db=db, questions=questions)
 
             report_file_path = (
                 self.reports_base_path / report_id / f"report_{attempt}.json"

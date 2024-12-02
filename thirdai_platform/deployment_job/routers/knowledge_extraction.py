@@ -35,7 +35,7 @@ def verify_job_token(request: Request):
 
 
 MAX_ATTEMPTS = 3
-REPORT_TIMEOUT = timedelta(minutes=5)
+REPORT_TIMEOUT = timedelta(minutes=10)
 
 
 class KnowledgeExtractionRouter:
