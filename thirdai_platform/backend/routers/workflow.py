@@ -189,6 +189,16 @@ def train_knowledge_extraction(
             detail=f"'{request.model_name}' is not a valid model name.",
         )
 
+    unique_questions = set()
+    for q in request.questions:
+        question = q.question.lower()
+        if question in unique_questions:
+            return response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message=f"Duplicate question '{q.question}' detected",
+            )
+        unique_questions.add(question)
+
     duplicate_model = get_model(
         session, username=user.username, model_name=request.model_name
     )

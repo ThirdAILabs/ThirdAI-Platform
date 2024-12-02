@@ -235,6 +235,17 @@ class KnowledgeExtractionRouter:
     ):
         try:
             with self.get_session() as session:
+                duplicate_questions = (
+                    session.query(Question)
+                    .filter(Question.question_text.ilike(question))
+                    .count
+                )()
+                if duplicate_questions > 0:
+                    return response(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        message=f"Question '{question}' is a duplicate of an existing question.",
+                    )
+
                 new_question = Question(
                     id=str(uuid.uuid4()),
                     question_text=question,
