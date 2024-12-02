@@ -95,7 +95,9 @@ class KnowledgeExtraction:
         if not self.deployment_url:
             raise ValueError("must call client.start() before accessing this method")
 
-    def create_report(self, files: List[str]) -> str:
+    def create_report(self, files: List[str] = [], s3_objs: List[str] = []) -> str:
+        if len(files) == 0 and len(s3_objs) == 0:
+            raise ValueError("either files or s3_objs must be specified for report")
         self._check_started()
 
         multipart = []
@@ -104,7 +106,7 @@ class KnowledgeExtraction:
 
         files = [
             {"path": os.path.basename(file), "location": "local"} for file in files
-        ]
+        ] + [{"path": obj, "location": "s3"} for obj in s3_objs]
         multipart.append(
             ("documents", (None, json.dumps({"documents": files}), "application/json"))
         )

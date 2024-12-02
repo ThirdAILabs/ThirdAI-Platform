@@ -107,6 +107,10 @@ class ReportProcessorWorker:
 
             questions = self.get_questions()
 
+            os.makedirs(
+                self.reports_base_path / report_id / "documents/tmp", exist_ok=True
+            )
+
             self.logger.info("starting document parsing")
             s = time.perf_counter()
             docs = []
