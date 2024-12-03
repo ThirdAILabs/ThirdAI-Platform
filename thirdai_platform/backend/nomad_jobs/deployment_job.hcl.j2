@@ -10,8 +10,8 @@ job "deployment-{{ model_id }}" {
     {% if not knowledge_extraction %}
     scaling {
       enabled = "{{ autoscaling_enabled }}"
-      min = 1
-      max = "{{ autoscaler_max_count }}"
+      min = {{ autoscaler_min_count }}
+      max = {{ autoscaler_max_count }}
       policy {
         cooldown = "1m"
         evaluation_interval = "30s"
@@ -122,8 +122,8 @@ EOF
   group "knowledge-extraction" {
     scaling {
       enabled = "{{ autoscaling_enabled }}"
-      min = 1
-      max = "{{ autoscaler_max_count }}"
+      min = {{ autoscaler_min_count }}
+      max = {{ autoscaler_max_count }}
       policy {
         cooldown = "1m"
         evaluation_interval = "30s"
@@ -177,6 +177,12 @@ EOF
         {% endif %}
       }
 
+    {% if platform == "local" %}
+    {% set worker_cores = 4 %}
+    {% else %}
+    {% set worker_cores = 8 %}
+    {% endif %}
+
       env {
         CONFIG_PATH = "{{ config_path }}"
         AWS_ACCESS_KEY = "{{ aws_access_key }}"
@@ -187,11 +193,11 @@ EOF
         AZURE_ACCOUNT_KEY = "{{ azure_account_key }}"
         GCP_CREDENTIALS_FILE = "{{ gcp_credentials_file }}"
         JOB_TOKEN = "{{ job_token }}"
-        WORKER_CORES = "8"
+        WORKER_CORES = "{{ worker_cores }}"
       }
 
       resources {
-        cores = 8
+        cores = {{ worker_cores }}
         memory = 4000 
         memory_max = 8000
       }

@@ -43,7 +43,9 @@ class KnowledgeExtraction:
         self.model_name = model_name
         self.model_id = res.json()["data"]["model_id"]
 
-    def start(self, autoscaling: bool = True, autoscaling_max_count: int = 4):
+    def start(
+        self, autoscaling: bool = True, min_workers: int = 1, max_workers: int = 4
+    ):
         if not self.model_name:
             raise ValueError(
                 "must call client.create(...) before calling client.start()"
@@ -54,7 +56,8 @@ class KnowledgeExtraction:
             params={
                 "model_identifier": f"{self.login.username}/{self.model_name}",
                 "autoscaling_enabled": autoscaling,
-                "autoscaler_max_count": autoscaling_max_count,
+                "autoscaler_min_count": min_workers,
+                "autoscaler_max_count": max_workers,
             },
         )
         self.deployment_url = urljoin(
