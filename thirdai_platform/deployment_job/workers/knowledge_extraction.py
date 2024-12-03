@@ -28,6 +28,7 @@ KE_PROMPT = (
     "comprehensive and scholarly tone:"
 )
 
+
 class ReportProcessorWorker:
     def __init__(self, config: DeploymentConfig):
         self.config = config
