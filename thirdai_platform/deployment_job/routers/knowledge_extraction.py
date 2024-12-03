@@ -12,6 +12,7 @@ from deployment_job.pydantic_models.inputs import DocumentList
 from deployment_job.reporter import Reporter
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
 from fastapi.encoders import jsonable_encoder
+from platform_common.dependencies import is_on_low_disk
 from platform_common.file_handler import download_local_files
 from platform_common.knowledge_extraction.schema import Base, Keyword, Question, Report
 from platform_common.pydantic_models.deployment import DeploymentConfig
@@ -59,7 +60,12 @@ class KnowledgeExtractionRouter:
         self.engine = self._initialize_db()
         self.Session = scoped_session(sessionmaker(bind=self.engine))
 
-        self.router.add_api_route("/report/create", self.new_report, methods=["POST"])
+        self.router.add_api_route(
+            "/report/create",
+            self.new_report,
+            methods=["POST"],
+            dependencies=[Depends(is_on_low_disk(path=self.config.model_bazaar_dir))],
+        )
         self.router.add_api_route(
             "/report/{report_id}", self.get_report, methods=["GET"]
         )

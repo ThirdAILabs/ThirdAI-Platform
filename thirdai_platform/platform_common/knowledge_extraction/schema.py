@@ -27,7 +27,7 @@ class Question(Base):
     __tablename__ = "questions"
 
     id = Column(String, primary_key=True)
-    question_text = Column(Text, nullable=False)
+    question_text = Column(Text, nullable=False, unique=True)
     keywords = relationship("Keyword", back_populates="question")
 
 
