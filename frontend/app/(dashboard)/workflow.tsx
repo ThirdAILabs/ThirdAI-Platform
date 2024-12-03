@@ -204,6 +204,8 @@ export function WorkFlow({
       setDeployType('Natural Language Processing');
     } else if (workflow.type === 'enterprise-search') {
       setDeployType('Enterprise Search & Summarizer');
+    } else if (workflow.type === 'knowledge-extraction') {
+      setDeployType('Knowledge Extraction');
     }
   }, [workflow.type]);
 
@@ -385,7 +387,8 @@ export function WorkFlow({
             variant="contained"
             style={{ width: '100px' }}
             disabled={
-              deployStatus !== DeployStatus.Active && deployStatus !== DeployStatus.Inactive
+              (deployStatus !== DeployStatus.Active && deployStatus !== DeployStatus.Inactive) ||
+              (deployStatus === DeployStatus.Active && workflow.type === 'knowledge-extraction')
             }
           >
             {getButtonValue(deployStatus)}
