@@ -22,6 +22,12 @@ def load_config():
         return DeploymentConfig.model_validate_json(file.read())
 
 
+KE_PROMPT = (
+    "Given this context, act as a financial expert and give a short answer "
+    "for the following question based on the provided context in an unbiased, "
+    "comprehensive and scholarly tone:"
+)
+
 class ReportProcessorWorker:
     def __init__(self, config: DeploymentConfig):
         self.config = config
@@ -228,6 +234,7 @@ class ReportProcessorWorker:
             },
             json={
                 "query": question,
+                "task_prompt": KE_PROMPT,
                 "references": references,
                 "key": self.config.model_options.genai_key,
                 "provider": self.config.model_options.llm_provider,

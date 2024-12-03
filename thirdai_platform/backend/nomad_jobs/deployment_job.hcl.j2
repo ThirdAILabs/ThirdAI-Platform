@@ -177,11 +177,7 @@ EOF
         {% endif %}
       }
 
-    {% if platform == "local" %}
     {% set worker_cores = 4 %}
-    {% else %}
-    {% set worker_cores = 8 %}
-    {% endif %}
 
       env {
         CONFIG_PATH = "{{ config_path }}"
