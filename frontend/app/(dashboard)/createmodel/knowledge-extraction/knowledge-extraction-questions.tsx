@@ -1,4 +1,3 @@
-// knowledge-extraction-questions.tsx
 import React, { useState } from 'react';
 import { Button, TextField, Typography, Stepper, Step, StepLabel, Box } from '@mui/material';
 import { useRouter } from 'next/navigation';
@@ -84,13 +83,26 @@ const KnowledgeExtractionQuestions: React.FC<KnowledgeExtractionQuestionsProps> 
         <div className="mt-5">
           <CardDescription>Define questions to extract answers from documents</CardDescription>
           {questions.map((question, index) => (
-            <TextField
-              key={index}
-              className="text-md w-full mt-4"
-              value={question}
-              onChange={(e) => handleQuestionChange(index, e.target.value)}
-              placeholder={`Question ${index + 1}`}
-            />
+            <div key={index} className="flex gap-4 mt-4">
+              <TextField
+                className="text-md flex-grow"
+                value={question}
+                onChange={(e) => handleQuestionChange(index, e.target.value)}
+                placeholder={`Question ${index + 1}`}
+              />
+              {questions.length > 1 && (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => {
+                    const newQuestions = questions.filter((_, i) => i !== index);
+                    setQuestions(newQuestions);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </div>
           ))}
           <Button onClick={handleAddQuestion} className="mt-4">
             Add Question
