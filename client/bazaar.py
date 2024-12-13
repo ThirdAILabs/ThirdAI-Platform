@@ -76,21 +76,25 @@ class ModelBazaar:
         return response
 
     def add_secret_key(self, key, value):
-        secret_data = {"key": key, "value": value}
+        secret_data = {
+            "cloud_type": "generic",
+            "identifier": key,
+            "credentials": {"value": value},
+        }
 
         response = http_post_with_error(
-            urljoin(self._base_url, "vault/add-secret"),
+            urljoin(self._base_url, "vault/store-secret"),
             json=secret_data,
             headers=auth_header(self._login_instance.access_token),
         )
         return response
 
     def get_secret_key(self, key):
-        secret_data = {"key": key}
+        secret_data = {"cloud_type": "generic", "identifier": key}
 
         response = http_get_with_error(
-            urljoin(self._base_url, "vault/get-secret"),
-            json=secret_data,
+            urljoin(self._base_url, "vault/retrieve-secret"),
+            params=secret_data,
             headers=auth_header(self._login_instance.access_token),
         )
 

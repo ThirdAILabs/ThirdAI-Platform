@@ -1,116 +1,151 @@
-import pathlib
+from typing import Literal, Optional, Union
 
 import hvac  # type: ignore
 from auth.jwt import verify_access_token
 from backend.auth_dependencies import get_vault_client, global_admin_only
 from fastapi import APIRouter, Depends, HTTPException, status
-from platform_common.utils import get_section, response
+from platform_common.pydantic_models.cloud_credentials import (
+    AWSCredentials,
+    AzureCredentials,
+    GCPCredentials,
+    GenericKeyValue,
+)
+from platform_common.utils import response
 from pydantic import BaseModel
 
 vault_router = APIRouter()
 
 
+# Main model using Union to select the right type based on provided data
 class SecretRequest(BaseModel):
-    key: str
+    cloud_type: Optional[Literal["aws", "azure", "gcp", "generic"]] = "generic"
+    level: Optional[Literal["global", "bucket"]] = None
+    identifier: Optional[str] = None
+    credentials: Union[
+        AWSCredentials, AzureCredentials, GCPCredentials, GenericKeyValue
+    ]
+
+    @property
+    def path(self):
+        """Determine the Vault path based on cloud_type and level."""
+        if self.cloud_type == "generic":
+            return f"secret/data/generic/{self.identifier}"
+        elif self.level == "global":
+            return f"secret/data/{self.cloud_type}/global"
+        elif self.level == "bucket" and self.identifier:
+            return f"secret/data/{self.cloud_type}/bucket/{self.identifier}"
+        else:
+            raise ValueError(
+                "Invalid configuration: bucket-level credentials require an identifier."
+            )
 
 
-class SecretResponse(BaseModel):
-    key: str
-    value: str
-
-
-root_folder = pathlib.Path(__file__).parent
-
-docs_file = root_folder.joinpath("../../docs/vault_endpoints.txt")
-
-with open(docs_file) as f:
-    docs = f.read()
-
-
-# Note(pratik): Only global admin can add a secret to vault
 @vault_router.post(
-    "/add-secret",
+    "/store-secret",
     dependencies=[Depends(global_admin_only)],
-    summary="Add Secret",
-    description=get_section(docs, "Add Secret"),
 )
-async def add_secret(
-    secret: SecretResponse,
-    client: hvac.Client = Depends(get_vault_client),
+async def store_secret(
+    secret_request: SecretRequest, client: hvac.Client = Depends(get_vault_client)
 ):
-    if secret.key not in ["AWS_ACCESS_TOKEN", "OPENAI_API_KEY"]:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid key. Only 'AWS_ACCESS_TOKEN' and 'OPENAI_API_KEY' are allowed.",
-        )
-    secret_path = f"secret/data/{secret.key}"
+    # Use the path property to determine where to store the credentials
+    path = secret_request.path
+
+    # Store validated credentials or key-value pair in Vault
     client.secrets.kv.v2.create_or_update_secret(
-        path=secret_path, secret={"value": secret.value}
-    )
-    return response(
-        status_code=status.HTTP_200_OK,
-        message="Secret retrieved successfully",
-        data={"key": secret.key, "value": secret.value},
+        path=path, secret=secret_request.credentials.model_dump()
     )
 
-
-# Note(pratik): Any user can access the secrets, set by global admin
-# TODO(pratik): Add a way pass the vault secrets to nomad jobs as env
-# variable directly rather than accessing here
-@vault_router.get(
-    "/get-secret",
-    dependencies=[Depends(verify_access_token)],
-    summary="Get Secret",
-    description=get_section(docs, "Get Secret"),
-)
-async def get_secret(
-    secret: SecretRequest, client: hvac.Client = Depends(get_vault_client)
-):
-    if secret.key not in [
-        "AWS_ACCESS_TOKEN",
-        "AWS_SECRET_ACCESS_TOKEN",
-        "OPENAI_API_KEY",
-    ]:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid key. Only 'AWS_ACCESS_TOKEN', 'AWS_SECRET_ACCESS_TOKEN' and 'OPENAI_API_KEY' are allowed.",
-        )
-    secret_path = f"secret/data/{secret.key}"
-    try:
-        read_response = client.secrets.kv.v2.read_secret_version(path=secret_path)
-    except hvac.exceptions.InvalidPath as e:
-        return HTTPException(status_code=404, detail="Secret not found")
-
-    secret_value = read_response["data"]["data"]["value"]
     return response(
-        status_code=status.HTTP_200_OK,
-        message="Secret value retrieved successfully",
-        data={"key": secret.key, "value": secret_value},
+        status_code=status.HTTP_200_OK, message=f"Secret stored successfully at {path}"
     )
 
 
 @vault_router.get(
-    "/list-keys",
+    "/retrieve-secret",
     dependencies=[Depends(verify_access_token)],
-    summary="List Vault Keys",
-    description=get_section(docs, "List Vault Keys"),
 )
-async def list_vault_keys(
+async def retrieve_secret(
+    cloud_type: Literal["generic", "aws", "azure", "gcp"],
+    level: Optional[Literal["global", "bucket"]] = None,
+    identifier: Optional[str] = None,
     client: hvac.Client = Depends(get_vault_client),
 ):
-    try:
-        list_response = client.secrets.kv.v2.list_secrets(path="secret/data/")
-        keys = list_response["data"]["keys"]
-        return response(
-            status_code=status.HTTP_200_OK,
-            message="Keys retrieved successfully",
-            data={"keys": keys},
+    # Determine path for retrieval
+    if cloud_type == "generic":
+        path = f"secret/data/generic/{identifier}"
+    elif level == "global":
+        path = f"secret/data/{cloud_type}/global"
+    elif level == "bucket" and identifier:
+        path = f"secret/data/{cloud_type}/bucket/{identifier}"
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid configuration: bucket-level credentials require an identifier.",
         )
+
+    try:
+        read_response = client.secrets.kv.v2.read_secret_version(path=path)
+        secret_data = read_response["data"]["data"]
     except hvac.exceptions.InvalidPath:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="No keys found in the vault."
+            status_code=404, detail=f"Secret not found at path '{path}'"
         )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message=f"Successfully retrieved secret from {path}",
+        data={"path": path, "data": secret_data},
+    )
+
+
+@vault_router.get(
+    "/list-all-secrets",
+    dependencies=[Depends(verify_access_token)],
+)
+async def list_all_secrets(client: hvac.Client = Depends(get_vault_client)):
+    all_secrets = {}
+
+    # Define the top-level paths for each category of secrets
+    base_paths = {
+        "generic": "secret/data/generic",
+        "aws_global": "secret/data/aws/global",
+        "aws_buckets": "secret/data/aws/bucket",
+        "azure_global": "secret/data/azure/global",
+        "azure_buckets": "secret/data/azure/bucket",
+        "gcp_global": "secret/data/gcp/global",
+        "gcp_buckets": "secret/data/gcp/bucket",
+    }
+
+    # Helper function to list secrets at a specific path
+    def list_secrets_at_path(path):
+        try:
+            return (
+                client.secrets.kv.v2.list_secrets(path=path)
+                .get("data", {})
+                .get("keys", [])
+            )
+        except hvac.exceptions.InvalidPath:
+            return []
+        except hvac.exceptions.Forbidden:
+            raise HTTPException(
+                status_code=403, detail=f"Permission denied to access path '{path}'."
+            )
+
+    # Retrieve secrets for each path and organize them
+    for label, path in base_paths.items():
+        if "bucket" in label:
+            # Special case for bucket paths to get all bucket-specific keys
+            bucket_names = list_secrets_at_path(path)
+            all_secrets[label] = {}
+            for bucket in bucket_names:
+                bucket_path = f"{path}/{bucket}"
+                all_secrets[label][bucket] = list_secrets_at_path(bucket_path)
+        else:
+            # Global or generic paths
+            all_secrets[label] = list_secrets_at_path(path)
+
+    return response(
+        status_code=status.HTTP_200_OK,
+        message=f"Successfully listed all secrets",
+        data={"all_secrets": all_secrets},
+    )
