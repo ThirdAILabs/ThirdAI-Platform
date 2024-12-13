@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button, TextField, Typography, Stepper, Step, StepLabel, Box } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { CardDescription } from '@/components/ui/card';
+import { create_knowledge_extraction } from '@/lib/backend';
 
 interface KnowledgeExtractionQuestionsProps {
   workflowNames: string[];
@@ -47,10 +48,20 @@ const KnowledgeExtractionQuestions: React.FC<KnowledgeExtractionQuestionsProps> 
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      // Backend creation logic will go here
+      const params = {
+        model_name: modelName,
+        questions: questions.map(q => ({ question: q })),
+        llm_provider: llmType?.toLowerCase() || '',
+        advanced_indexing: true,
+        rerank: true,
+        generate_answers: true
+      };
+      
+      await create_knowledge_extraction(params);
       router.push('/');
     } catch (error) {
       console.error('Error during workflow creation:', error);
+      alert(error instanceof Error ? error.message : 'Failed to create workflow');
       setIsLoading(false);
     }
   };

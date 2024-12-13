@@ -1033,6 +1033,34 @@ export function create_enterprise_search_workflow({
   });
 }
 
+interface KnowledgeExtractionQuestion {
+  question: string;
+  keywords?: string[];
+}
+
+interface KnowledgeExtractionParams {
+  model_name: string;
+  questions: KnowledgeExtractionQuestion[];
+  llm_provider: string;
+  advanced_indexing?: boolean;
+  rerank?: boolean;
+  generate_answers?: boolean;
+}
+
+export function create_knowledge_extraction(params: KnowledgeExtractionParams): Promise<any> {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  return new Promise((resolve, reject) => {
+    axios
+      .post(`${thirdaiPlatformBaseUrl}/api/workflow/knowledge-extraction`, params)
+      .then((res) => resolve(res.data))
+      .catch((err) => {
+        reject(new Error(err.response?.data?.detail || 'Failed to create knowledge extraction model'));
+      });
+  });
+}
+
 export interface Attributes {
   llm_provider?: string;
   default_mode?: string;
@@ -1084,14 +1112,6 @@ export function fetchWorkflows(): Promise<Workflow[]> {
         }
       });
   });
-}
-
-interface ValidateWorkflowResponse {
-  status: string;
-  message: string;
-  data: {
-    models: { id: string; name: string }[];
-  };
 }
 
 function createModelIdentifier(username: string, model_name: string): string {
