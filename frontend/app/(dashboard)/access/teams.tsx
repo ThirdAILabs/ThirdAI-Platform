@@ -157,6 +157,20 @@ export default function Teams() {
         return;
       }
 
+      const selectedTeam = teams.find((team) => team.name === selectedTeamForRemove);
+      //If user not belongs to the selected team
+      if (!selectedTeam?.members.find((member) => member === memberToRemove)) {
+        alert(`${memberToRemove} is not member of the team ${selectedTeamForRemove}.`);
+        return;
+      }
+
+      if (selectedTeam.members.length === 1) {
+        alert(
+          'You need at least one member in the team. Add a new member before removing this one.'
+        );
+        return;
+      }
+
       await deleteUserFromTeam(user.email, team.id);
       await getTeamsData();
       await getUsersData();
@@ -227,10 +241,19 @@ export default function Teams() {
 
       const user = users.find((u) => u.name === adminToRemove);
       if (!user) {
-        alert('User not found.');
+        alert('User not found in the team.');
         return;
       }
-
+      if (!selectedTeam.admins.find((member) => member === adminToRemove)) {
+        alert(`${adminToRemove} is not an admin for the team ${selectedTeamForRemoveAdmin}.`);
+        return;
+      }
+      if (selectedTeam.admins.length === 1) {
+        alert(
+          'You need at least one admin in the team. Assign a new admin before removing this one.'
+        );
+        return;
+      }
       try {
         await removeTeamAdmin(user.email, selectedTeam.id);
         await getTeamsData();
