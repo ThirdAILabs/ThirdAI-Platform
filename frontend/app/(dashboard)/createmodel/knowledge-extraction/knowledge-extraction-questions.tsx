@@ -50,13 +50,13 @@ const KnowledgeExtractionQuestions: React.FC<KnowledgeExtractionQuestionsProps> 
     try {
       const params = {
         model_name: modelName,
-        questions: questions.map(q => ({ question: q })),
+        questions: questions.map((q) => ({ question: q })),
         llm_provider: llmType?.toLowerCase() || '',
         advanced_indexing: true,
         rerank: true,
-        generate_answers: true
+        generate_answers: true,
       };
-      
+
       await create_knowledge_extraction(params);
       router.push('/');
     } catch (error) {
