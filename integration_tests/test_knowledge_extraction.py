@@ -52,6 +52,10 @@ def test_knowledge_extraction():
 
     report = client.create_report([doc])
 
+    reports = client.list_reports()
+    assert len(reports) == 1
+    assert reports[0]["report_id"] == report
+
     report = await_report(report, client)
 
     question_to_expected_answer = {

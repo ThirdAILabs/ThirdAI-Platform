@@ -72,6 +72,7 @@ class KnowledgeExtractionRouter:
         self.router.add_api_route(
             "/report/{report_id}", self.delete_report, methods=["DELETE"]
         )
+        self.router.add_api_route("/reports", self.list_reports, methods=["GET"])
         self.router.add_api_route("/questions", self.add_question, methods=["POST"])
         self.router.add_api_route(
             "/questions", self.get_questions_public, methods=["GET"]
@@ -231,6 +232,26 @@ class KnowledgeExtractionRouter:
         return response(
             status_code=status.HTTP_200_OK,
             message=f"Successfully deleted report with ID '{report_id}'.",
+        )
+
+    def list_reports(self, _: str = Depends(Permissions.verify_permission("read"))):
+        with self.get_session() as session:
+            reports = session.query(Report).all()
+
+        data = [
+            {
+                "report_id": report.id,
+                "status": report.status,
+                "submitted_at": report.submitted_at,
+                "updated_at": report.updated_at,
+            }
+            for report in reports
+        ]
+
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successfully retrieved the reports.",
+            data=jsonable_encoder(data),
         )
 
     def add_question(
