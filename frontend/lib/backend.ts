@@ -1979,7 +1979,12 @@ export function useKnowledgeExtractionEndpoints(workflowId: string | null) {
     if (!deploymentUrl) throw new Error('Knowledge extraction deployment URL not set');
 
     const formData = new FormData();
-    formData.append('documents', files[0].name);
+    const documents = files.map(file => ({
+      name: file.name,
+      path: file.name,
+      location: 'local'
+    }));
+    formData.append('documents', JSON.stringify({ documents }));
     files.forEach((file) => formData.append('files', file));
 
     try {
