@@ -6,13 +6,7 @@ import { Container } from '@mui/material';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
-import { useKnowledgeExtractionEndpoints } from '@/lib/backend';
-
-interface Question {
-  id: string;
-  text: string;
-  keywords?: string[];
-}
+import { useKnowledgeExtractionEndpoints, Question } from '@/lib/backend';
 
 interface Report {
   id: string;
@@ -97,7 +91,7 @@ export default function Page(): JSX.Element {
   const handleDeleteQuestion = async (questionId: string) => {
     try {
       await deleteQuestion(questionId);
-      setQuestions(questions.filter((q) => q.id !== questionId));
+      setQuestions(questions.filter((q) => q.question_id !== questionId));
     } catch (error) {
       console.error('Error deleting question:', error);
     }
@@ -164,15 +158,18 @@ export default function Page(): JSX.Element {
             </CardHeader>
             <div className="space-y-4">
               {questions.map((question: Question) => (
-                <div key={question.id} className="flex items-center gap-2">
+                <div key={question.question_id} className="flex items-center gap-2">
                   <Input
-                    value={question.text}
+                    value={question.question_text}
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                      handleEditQuestion(question.id, e.target.value)
+                      handleEditQuestion(question.question_id, e.target.value)
                     }
                     className="flex-grow"
                   />
-                  <Button onClick={() => handleDeleteQuestion(question.id)} variant="destructive">
+                  <Button
+                    onClick={() => handleDeleteQuestion(question.question_id)}
+                    variant="destructive"
+                  >
                     Delete
                   </Button>
                 </div>

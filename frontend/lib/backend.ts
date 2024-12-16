@@ -1955,9 +1955,9 @@ export function useSentimentClassification(workflowId: string | null) {
 }
 
 export interface Question {
-  id: string;
-  text: string;
-  keywords?: string[];
+  question_id: string;
+  question_text: string;
+  keywords: string[];
 }
 
 export interface Report {
@@ -2052,7 +2052,11 @@ export function useKnowledgeExtractionEndpoints(workflowId: string | null) {
     if (!deploymentUrl) throw new Error('Knowledge extraction deployment URL not set');
     try {
       const accessToken = getAccessToken();
-      const response = await axios.get<{ data: Question[] }>(`${deploymentUrl}/questions`, {
+      const response = await axios.get<{
+        status: string;
+        message: string;
+        data: Question[];
+      }>(`${deploymentUrl}/questions`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
