@@ -46,6 +46,7 @@ export default function Page(): JSX.Element {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [newQuestionText, setNewQuestionText] = useState('');
 
   const params = useParams();
   const workflowId = params?.deploymentId as string;
@@ -115,9 +116,11 @@ export default function Page(): JSX.Element {
 
   const handleAddQuestion = async () => {
     try {
-      const questionId = await addQuestion('New Question');
+      if (!newQuestionText.trim()) return;
+      await addQuestion(newQuestionText.trim());
       const updatedQuestions = await getQuestions();
       setQuestions(updatedQuestions);
+      setNewQuestionText('');
     } catch (error) {
       console.error('Error adding question:', error);
     }
@@ -234,6 +237,19 @@ export default function Page(): JSX.Element {
               <h2 className="text-2xl font-bold mb-4">Edit Questions</h2>
             </CardHeader>
             <div className="space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  value={newQuestionText}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setNewQuestionText(e.target.value)
+                  }
+                  placeholder="Enter new question..."
+                  className="flex-grow"
+                />
+                <Button onClick={handleAddQuestion} disabled={!newQuestionText.trim()}>
+                  Add Question
+                </Button>
+              </div>
               {questions.map((question: Question) => (
                 <div key={question.question_id} className="flex items-center gap-2">
                   <Input
@@ -251,9 +267,6 @@ export default function Page(): JSX.Element {
                   </Button>
                 </div>
               ))}
-              <Button onClick={handleAddQuestion} className="w-full mt-4">
-                Ask New Question
-              </Button>
             </div>
           </Card>
         </Container>

@@ -2078,15 +2078,12 @@ export function useKnowledgeExtractionEndpoints(workflowId: string | null) {
     if (!deploymentUrl) throw new Error('Knowledge extraction deployment URL not set');
     try {
       const accessToken = getAccessToken();
-      const response = await axios.post(
-        `${deploymentUrl}/questions`,
-        { question, keywords },
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
+      const response = await axios.post(`${deploymentUrl}/questions`, null, {
+        params: { question, keywords },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
       return response.data.data.question_id;
     } catch (error) {
       console.error('Error adding question:', error);
@@ -2133,9 +2130,9 @@ export function useKnowledgeExtractionEndpoints(workflowId: string | null) {
     questionId: string,
     newQuestion: string,
     keywords?: string[]
-  ): Promise<string> => {
+  ): Promise<void> => {
     await deleteQuestion(questionId);
-    return addQuestion(newQuestion, keywords);
+    await addQuestion(newQuestion, keywords);
   };
 
   return {
