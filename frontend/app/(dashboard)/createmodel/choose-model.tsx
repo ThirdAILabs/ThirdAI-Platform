@@ -10,11 +10,6 @@ import { Typography, Box, Divider, Select, MenuItem, FormControl } from '@mui/ma
 
 const USE_CASES = [
   {
-    name: 'Knowledge Extraction',
-    value: 'knowledge-extraction',
-    description: 'Extract structured answers to specific questions from your document collection',
-  },
-  {
     name: 'Enterprise Search',
     value: 'enterprise-search',
     description: 'Build a search engine that understands context and meaning in your documents',
@@ -29,6 +24,11 @@ const USE_CASES = [
     name: 'NLP / Text Analytics',
     value: 'nlp-text-analytics',
     description: 'Extract insights, classify content, and analyze unstructured text data at scale',
+  },
+  {
+    name: 'Knowledge Extraction',
+    value: 'knowledge-extraction',
+    description: 'Extract structured answers to specific questions from your document collection',
   },
 ];
 
