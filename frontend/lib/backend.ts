@@ -1964,7 +1964,7 @@ interface Reference {
   source: string;
 }
 
-interface QuestionResult {
+export interface QuestionResult {
   question_id: string;
   question: string;
   answer: string;

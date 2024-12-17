@@ -2,12 +2,41 @@
 
 import { useState, useRef, useEffect, ChangeEvent } from 'react';
 import { useParams } from 'next/navigation';
-import { Container } from '@mui/material';
+import { Container, Dialog, DialogTitle, DialogContent } from '@mui/material';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
-import { useKnowledgeExtractionEndpoints, Question, Report } from '@/lib/backend';
 import { Badge } from '@/components/ui/badge';
+import { useKnowledgeExtractionEndpoints, Question, Report, QuestionResult } from '@/lib/backend';
+
+interface ResultsViewProps {
+  report: Report;
+  onClose: () => void;
+}
+
+const ResultsView = ({ report }: ResultsViewProps) => {
+  if (!report.content) return null;
+
+  return (
+    <div className="space-y-6 mt-4">
+      {report.content.results.map((result: QuestionResult) => (
+        <div key={result.question_id} className="border rounded-lg p-4">
+          <h3 className="font-medium mb-2">{result.question}</h3>
+          <p className="text-gray-700 mb-4">{result.answer}</p>
+          <div className="space-y-2">
+            <h4 className="font-medium text-sm text-gray-500">References:</h4>
+            {result.references.map((ref, idx) => (
+              <div key={idx} className="text-sm bg-gray-50 p-2 rounded">
+                <p className="text-gray-600">{ref.text}</p>
+                <p className="text-gray-400 text-xs mt-1">Source: {ref.source}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 export default function Page(): JSX.Element {
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -40,12 +69,8 @@ export default function Page(): JSX.Element {
         ]);
 
         setQuestions(fetchedQuestions);
-
         const reportDetails = await Promise.all(
-          fetchedReportStatuses.map(async (r) => {
-            const response = await getReport(r.report_id);
-            return response;
-          })
+          fetchedReportStatuses.map((r) => getReport(r.report_id))
         );
         setReports(reportDetails);
       } catch (error) {
@@ -57,9 +82,7 @@ export default function Page(): JSX.Element {
     fetchData();
   }, []);
 
-  const getFileName = (path: string): string => {
-    return path.split('/').pop() || path;
-  };
+  const getFileName = (path: string): string => path.split('/').pop() || path;
 
   const filteredReports = reports.filter(
     (report: Report): boolean =>
@@ -67,8 +90,6 @@ export default function Page(): JSX.Element {
         getFileName(doc.path).toLowerCase().includes(searchQuery.toLowerCase())
       ) ?? false
   );
-
-  console.log('filteredReports', filteredReports);
 
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -237,6 +258,20 @@ export default function Page(): JSX.Element {
           </Card>
         </Container>
       )}
+
+      <Dialog
+        open={!!selectedReport}
+        onClose={() => setSelectedReport(null)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogTitle>Report Results</DialogTitle>
+        <DialogContent>
+          {selectedReport && (
+            <ResultsView report={selectedReport} onClose={() => setSelectedReport(null)} />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
