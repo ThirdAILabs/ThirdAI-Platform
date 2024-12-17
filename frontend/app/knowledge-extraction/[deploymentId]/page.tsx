@@ -162,38 +162,58 @@ const Page: React.FC = () => {
     )
   );
 
-  const pollReportStatus = async (reportId: string): Promise<void> => {
-    const interval = setInterval(async () => {
-      try {
-        const updatedReport = await getReport(reportId);
-        setReports((prevReports) =>
-          prevReports.map((report) => (report.report_id === reportId ? updatedReport : report))
-        );
+  useEffect(() => {
+    const incompleteReports = reports.filter(
+      (report) => !['complete', 'failed'].includes(report.status)
+    );
 
-        if (updatedReport.status === 'complete' || updatedReport.status === 'failed') {
-          clearInterval(interval);
+    if (incompleteReports.length === 0) return;
+
+    // Create a map to store intervals
+    const intervalMap: { [key: string]: number } = {};
+
+    // Start polling for each incomplete report
+    incompleteReports.forEach((report) => {
+      intervalMap[report.report_id] = window.setInterval(async () => {
+        try {
+          const updatedReport = await getReport(report.report_id);
+          setReports((prevReports) =>
+            prevReports.map((r) => (r.report_id === report.report_id ? updatedReport : r))
+          );
+
+          if (['complete', 'failed'].includes(updatedReport.status)) {
+            clearInterval(intervalMap[report.report_id]);
+          }
+        } catch (error) {
+          console.error('Error polling report status:', error);
+          clearInterval(intervalMap[report.report_id]);
         }
-      } catch (error) {
-        console.error('Error polling report status:', error);
-        clearInterval(interval);
-      }
-    }, 3000); // Poll every 3 seconds
-  };
+      }, 3000);
+    });
+
+    // Cleanup function to clear all intervals
+    return () => {
+      Object.values(intervalMap).forEach((interval) => clearInterval(interval));
+    };
+  }, [reports]);
 
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
     const files = Array.from(e.target.files || []);
-    if (files.length > 0) {
-      try {
-        setIsLoading(true);
-        const reportId = await createReport(files);
+    if (files.length === 0) return;
+
+    setIsLoading(true);
+    try {
+      const currentReports = [...reports];
+      for (const file of files) {
+        const reportId = await createReport([file]);
         const report = await getReport(reportId);
-        setReports((prevReports) => [...prevReports, report]);
-        pollReportStatus(reportId);
-      } catch (error) {
-        console.error('Error uploading file:', error);
-      } finally {
-        setIsLoading(false);
+        currentReports.push(report);
+        setReports([...currentReports]);
       }
+    } catch (error) {
+      console.error('Error uploading files:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
