@@ -18,7 +18,7 @@ def await_report(report_id, client: KnowledgeExtraction):
         elif status == "failed":
             raise ValueError("report failed")
         else:
-            return report["content"]
+            return report
 
 
 def test_knowledge_extraction():
@@ -57,6 +57,9 @@ def test_knowledge_extraction():
     assert reports[0]["report_id"] == report
 
     report = await_report(report, client)
+
+    assert len(report["documents"]) == 1
+    report = report["content"]
 
     question_to_expected_answer = {
         "net revenue of apple": "383.3",

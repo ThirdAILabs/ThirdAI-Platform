@@ -165,11 +165,17 @@ class KnowledgeExtractionRouter:
                     message=f"Report with ID '{report_id}' not found.",
                 )
 
+            with open(
+                self.reports_base_path / report_id / "documents.json", "r"
+            ) as file:
+                documents = json.load(file)
+
             report_data = {
                 "report_id": report.id,
                 "status": report.status,
                 "submitted_at": report.submitted_at,
                 "updated_at": report.updated_at,
+                "documents": documents,
             }
 
             if report.status == "complete":
