@@ -19,12 +19,15 @@ export default function Page(): JSX.Element {
   const [showQuestions, setShowQuestions] = useState<boolean>(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  // const [reportStatuses, setReportStatuses] = useState<ReportStatus[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const params = useParams();
   const workflowId = params?.deploymentId as string;
 
   const {
+    listReports,
     createReport,
     getReport,
     deleteReport,
@@ -35,11 +38,30 @@ export default function Page(): JSX.Element {
   } = useKnowledgeExtractionEndpoints(workflowId);
 
   useEffect(() => {
-    const fetchQuestions = async () => {
-      const fetchedQuestions = await getQuestions();
-      setQuestions(fetchedQuestions);
+    const fetchData = async () => {
+      try {
+        const [fetchedQuestions, fetchedReportStatuses] = await Promise.all([
+          getQuestions(),
+          listReports(),
+        ]);
+
+        setQuestions(fetchedQuestions);
+        // setReportStatuses(fetchedReportStatuses);
+
+        const reportDetails = await Promise.all(
+          fetchedReportStatuses.map(async (r) => {
+            const response = await getReport(r.report_id);
+            // return response.data;
+          })
+        );
+        // setReports(reportDetails);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
-    fetchQuestions();
+    fetchData();
   }, []);
 
   const filteredReports = reports.filter((report: Report): boolean =>

@@ -1966,23 +1966,39 @@ export interface Report {
   content: string;
 }
 
-export interface WorkFlowDetails {
-  model_name: string;
-  model_id: string;
+interface ReportStatus {
+  data: {
+    report_id: string;
+    status: string;
+    submitted_at: string;
+    updated_at: string;
+  }[];
+  status: string;
+  message: string;
 }
 
 export function useKnowledgeExtractionEndpoints(workflowId: string | null) {
   const accessToken = useAccessToken();
   const deploymentUrl = workflowId ? `${deploymentBaseUrl}/${workflowId}` : undefined;
 
+  const listReports = async (): Promise<ReportStatus['data']> => {
+    if (!deploymentUrl) throw new Error('Knowledge extraction deployment URL not set');
+    const response = await axios.get<ReportStatus>(`${deploymentUrl}/reports`, {
+      headers: {
+        Authorization: `Bearer ${getAccessToken()}`,
+      },
+    });
+    return response.data.data;
+  };
+
   const createReport = async (files: File[]): Promise<string> => {
     if (!deploymentUrl) throw new Error('Knowledge extraction deployment URL not set');
 
     const formData = new FormData();
-    const documents = files.map(file => ({
+    const documents = files.map((file) => ({
       name: file.name,
       path: file.name,
-      location: 'local'
+      location: 'local',
     }));
     formData.append('documents', JSON.stringify({ documents }));
     files.forEach((file) => formData.append('files', file));
@@ -2098,6 +2114,7 @@ export function useKnowledgeExtractionEndpoints(workflowId: string | null) {
   };
 
   return {
+    listReports,
     createReport,
     getReport,
     deleteReport,
