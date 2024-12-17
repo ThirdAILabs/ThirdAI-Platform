@@ -6,26 +6,20 @@ import { Container } from '@mui/material';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
-import { useKnowledgeExtractionEndpoints, Question } from '@/lib/backend';
-
-interface Report {
-  id: string;
-  name: string;
-  content: string;
-}
+import { useKnowledgeExtractionEndpoints, Question, Report } from '@/lib/backend';
+import { Badge } from '@/components/ui/badge';
 
 export default function Page(): JSX.Element {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showQuestions, setShowQuestions] = useState<boolean>(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
-  // const [reportStatuses, setReportStatuses] = useState<ReportStatus[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const params = useParams();
   const workflowId = params?.deploymentId as string;
-
   const {
     listReports,
     createReport,
@@ -46,15 +40,14 @@ export default function Page(): JSX.Element {
         ]);
 
         setQuestions(fetchedQuestions);
-        // setReportStatuses(fetchedReportStatuses);
 
         const reportDetails = await Promise.all(
           fetchedReportStatuses.map(async (r) => {
             const response = await getReport(r.report_id);
-            // return response.data;
+            return response;
           })
         );
-        // setReports(reportDetails);
+        setReports(reportDetails);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -64,9 +57,18 @@ export default function Page(): JSX.Element {
     fetchData();
   }, []);
 
-  const filteredReports = reports.filter((report: Report): boolean =>
-    report.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const getFileName = (path: string): string => {
+    return path.split('/').pop() || path;
+  };
+
+  const filteredReports = reports.filter(
+    (report: Report): boolean =>
+      report.documents?.some((doc) =>
+        getFileName(doc.path).toLowerCase().includes(searchQuery.toLowerCase())
+      ) ?? false
   );
+
+  console.log('filteredReports', filteredReports);
 
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -84,7 +86,7 @@ export default function Page(): JSX.Element {
   const handleDeleteReport = async (reportId: string) => {
     try {
       await deleteReport(reportId);
-      setReports(reports.filter((r) => r.id !== reportId));
+      setReports(reports.filter((r) => r.report_id !== reportId));
     } catch (error) {
       console.error('Error deleting report:', error);
     }
@@ -155,18 +157,50 @@ export default function Page(): JSX.Element {
                 multiple
               />
               {filteredReports.map((report: Report) => (
-                <div
-                  key={report.id}
-                  className="flex items-center justify-between p-4 hover:bg-gray-50"
-                >
-                  <span>{report.name}</span>
-                  <Button
-                    onClick={() => handleDeleteReport(report.id)}
-                    variant="destructive"
-                    size="sm"
-                  >
-                    Delete
-                  </Button>
+                <div key={report.report_id} className="space-y-2">
+                  {report.documents.map((doc) => (
+                    <div
+                      key={doc.path}
+                      className="flex items-center justify-between p-4 hover:bg-gray-50 border rounded-md"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-medium">{getFileName(doc.path)}</span>
+                        <span className="text-sm text-gray-500">
+                          Submitted: {new Date(report.submitted_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Badge
+                          variant={report.status === 'complete' ? 'default' : 'secondary'}
+                          className={`capitalize ${
+                            report.status === 'complete'
+                              ? 'bg-green-100 text-green-800 hover:bg-green-100'
+                              : report.status === 'failed'
+                                ? 'bg-red-100 text-red-800 hover:bg-red-100'
+                                : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+                          }`}
+                        >
+                          {report.status}
+                        </Badge>
+                        {report.status === 'complete' && report.content && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedReport(report)}
+                          >
+                            View Results
+                          </Button>
+                        )}
+                        <Button
+                          onClick={() => handleDeleteReport(report.report_id)}
+                          variant="destructive"
+                          size="sm"
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>

@@ -1959,11 +1959,36 @@ export interface Question {
   question_text: string;
   keywords: string[];
 }
+interface Reference {
+  text: string;
+  source: string;
+}
+
+interface QuestionResult {
+  question_id: string;
+  question: string;
+  answer: string;
+  references: Reference[];
+}
+
+interface ReportContent {
+  report_id: string;
+  results: QuestionResult[];
+}
+
+interface Document {
+  name: string;
+  path: string;
+  location: string;
+}
 
 export interface Report {
-  id: string;
-  name: string;
-  content: string;
+  report_id: string;
+  status: 'complete' | 'pending' | 'failed' | 'queued' | 'in_progress';
+  submitted_at: string;
+  updated_at: string;
+  content?: ReportContent;
+  documents: Document[];
 }
 
 interface ReportStatus {
