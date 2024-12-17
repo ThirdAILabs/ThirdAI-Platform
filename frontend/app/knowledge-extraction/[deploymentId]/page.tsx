@@ -38,6 +38,59 @@ const ResultsView = ({ report }: ResultsViewProps) => {
   );
 };
 
+const QuestionItem = ({
+  question,
+  onEdit,
+  onDelete,
+}: {
+  question: Question;
+  onEdit: (id: string, text: string) => void;
+  onDelete: (id: string) => void;
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(question.question_text);
+
+  const handleConfirm = () => {
+    onEdit(question.question_id, editText);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditText(question.question_text);
+    setIsEditing(false);
+  };
+
+  return (
+    <div key={question.question_id} className="flex items-center gap-2">
+      {isEditing ? (
+        <>
+          <Input
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            className="flex-grow"
+          />
+          <Button onClick={handleConfirm} variant="default">
+            Save
+          </Button>
+          <Button onClick={handleCancel} variant="outline">
+            Cancel
+          </Button>
+        </>
+      ) : (
+        <>
+          <div className="flex-grow p-2 border rounded">{question.question_text}</div>
+          <Button onClick={() => setIsEditing(true)} variant="outline">
+            Edit
+          </Button>
+        </>
+      )}
+      <Button onClick={() => onDelete(question.question_id)} variant="destructive">
+        Delete
+      </Button>
+    </div>
+  );
+};
+
 export default function Page(): JSX.Element {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showQuestions, setShowQuestions] = useState<boolean>(false);
@@ -251,21 +304,12 @@ export default function Page(): JSX.Element {
                 </Button>
               </div>
               {questions.map((question: Question) => (
-                <div key={question.question_id} className="flex items-center gap-2">
-                  <Input
-                    value={question.question_text}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                      handleEditQuestion(question.question_id, e.target.value)
-                    }
-                    className="flex-grow"
-                  />
-                  <Button
-                    onClick={() => handleDeleteQuestion(question.question_id)}
-                    variant="destructive"
-                  >
-                    Delete
-                  </Button>
-                </div>
+                <QuestionItem
+                  key={question.question_id}
+                  question={question}
+                  onEdit={handleEditQuestion}
+                  onDelete={handleDeleteQuestion}
+                />
               ))}
             </div>
           </Card>
