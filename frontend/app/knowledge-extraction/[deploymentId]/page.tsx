@@ -162,6 +162,24 @@ const Page: React.FC = () => {
     )
   );
 
+  const pollReportStatus = async (reportId: string): Promise<void> => {
+    const interval = setInterval(async () => {
+      try {
+        const updatedReport = await getReport(reportId);
+        setReports((prevReports) =>
+          prevReports.map((report) => (report.report_id === reportId ? updatedReport : report))
+        );
+
+        if (updatedReport.status === 'complete' || updatedReport.status === 'failed') {
+          clearInterval(interval);
+        }
+      } catch (error) {
+        console.error('Error polling report status:', error);
+        clearInterval(interval);
+      }
+    }, 3000); // Poll every 3 seconds
+  };
+
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
@@ -169,7 +187,8 @@ const Page: React.FC = () => {
         setIsLoading(true);
         const reportId = await createReport(files);
         const report = await getReport(reportId);
-        setReports([...reports, report]);
+        setReports((prevReports) => [...prevReports, report]);
+        pollReportStatus(reportId);
       } catch (error) {
         console.error('Error uploading file:', error);
       } finally {
