@@ -228,6 +228,15 @@ const Page: React.FC = () => {
     }
   };
 
+  const handleReportDelete = async (reportId: string): Promise<void> => {
+    try {
+      await deleteReport(reportId);
+      setReports((prevReports) => prevReports.filter((r) => r.report_id !== reportId));
+    } catch (error) {
+      console.error('Error deleting report:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Container className="py-8 max-w-5xl">
@@ -309,7 +318,7 @@ const Page: React.FC = () => {
                                 </Button>
                               )}
                               <Button
-                                onClick={() => deleteReport(report.report_id)}
+                                onClick={() => handleReportDelete(report.report_id)}
                                 variant="destructive"
                                 size="sm"
                               >
