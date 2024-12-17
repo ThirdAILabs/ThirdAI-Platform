@@ -202,7 +202,7 @@ export default function Page(): JSX.Element {
     <div className="bg-muted min-h-screen">
       <div className="fixed top-6 right-6">
         <Button onClick={() => setShowQuestions(!showQuestions)} className="bg-blue-500 text-white">
-          Edit Questions
+          {showQuestions ? 'View Reports' : 'Edit Questions'}
         </Button>
       </div>
 
