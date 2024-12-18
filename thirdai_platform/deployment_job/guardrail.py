@@ -5,6 +5,7 @@ from urllib.parse import urljoin
 
 from deployment_job.pydantic_models.inputs import PiiEntity
 from fastapi import HTTPException, status
+from platform_common.logging import JobLogger, LogCode
 from requests import Session
 
 
@@ -69,9 +70,12 @@ class LabelMap:
 
 
 class Guardrail:
-    def __init__(self, guardrail_model_id: str, model_bazaar_endpoint: str):
+    def __init__(
+        self, guardrail_model_id: str, model_bazaar_endpoint: str, logger: JobLogger
+    ):
         self.session = Session()
         self.endpoint = urljoin(model_bazaar_endpoint, f"{guardrail_model_id}/predict")
+        self.logger = logger
 
     def query_pii_model(self, text: str, access_token: str):
         res = self.session.post(
@@ -80,7 +84,7 @@ class Guardrail:
                 "User-Agent": "NDB Deployment job",
                 "Authorization": f"Bearer {access_token}",
             },
-            json={"text": text, "top_k": 1},
+            json={"text": text, "data_type": "unstructured"},
         )
 
         if res.status_code != status.HTTP_200_OK:
@@ -89,24 +93,47 @@ class Guardrail:
                 detail=f"Unable to access guardrail model: error {res.status_code}",
             )
 
-        return res.json()["data"]["prediction_results"]
+        results = res.json()["data"]["prediction_results"]
+
+        if results["data_type"] != "unstructured":
+            message = f"Guardrail model returned non-unstructured data type: {results['data_type']}"
+            self.logger.error(message, code=LogCode.GUARDRAILS)
+            raise ValueError(message)
+
+        return results
 
     def redact_pii(self, text: str, access_token: str, label_map: LabelMap):
-        data = self.query_pii_model(text=text, access_token=access_token)
+        try:
+            data = self.query_pii_model(text=text, access_token=access_token)
 
-        entities, tags = merge_tags(tokens=data["tokens"], tags=data["predicted_tags"])
+            entities, tags = merge_tags(
+                tokens=data["tokens"], tags=data["predicted_tags"]
+            )
 
-        entities = [
-            label_map.get_label(tag=tag, entity=entity) if tag != "O" else entity
-            for entity, tag in zip(entities, tags)
-        ]
+            entities = [
+                label_map.get_label(tag=tag, entity=entity) if tag != "O" else entity
+                for entity, tag in zip(entities, tags)
+            ]
 
-        return " ".join(entities)
+            return " ".join(entities)
+        except Exception as e:
+            message = f"Error redacting PII: {e}"
+            self.logger.error(message, code=LogCode.GUARDRAILS)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=message
+            )
 
     def unredact_pii(self, redacted_text: str, entities: List[PiiEntity]):
-        entity_map = {entity.label: entity.token for entity in entities}
+        try:
+            entity_map = {entity.label: entity.token for entity in entities}
 
-        def replace(match):
-            return entity_map.get(match[0], "[UNKNOWN ENTITY]")
+            def replace(match):
+                return entity_map.get(match[0], "[UNKNOWN ENTITY]")
 
-        return re.sub(r"\[([A-Z]+)#(\d+)\]", replace, redacted_text)
+            return re.sub(r"\[([A-Z]+)#(\d+)\]", replace, redacted_text)
+        except Exception as e:
+            message = f"Error unredacting PII: {e}"
+            self.logger.error(message, code=LogCode.GUARDRAILS)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=message
+            )

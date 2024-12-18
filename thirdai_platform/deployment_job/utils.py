@@ -3,7 +3,8 @@ import datetime
 import enum
 import fcntl
 import re
-from typing import Tuple
+from dataclasses import dataclass
+from typing import Dict, Tuple
 
 import fitz
 import requests
@@ -160,3 +161,24 @@ def acquire_file_lock(lockfile):
 def release_file_lock(lock):
     fcntl.flock(lock, fcntl.LOCK_UN)
     lock.close()
+
+
+class TaskStatus(str, enum.Enum):
+    NOT_STARTED = "not_started"
+    IN_PROGRESS = "in_progress"
+    FAILED = "failed"
+    COMPLETE = "complete"
+
+
+class TaskAction(str, enum.Enum):
+    INSERT = "insert"
+    DELETE = "delete"
+
+
+@dataclass
+class Task:
+    status: TaskStatus
+    action: TaskAction
+    last_modified: str
+    data: Dict
+    message: str = ""

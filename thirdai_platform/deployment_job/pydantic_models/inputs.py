@@ -3,7 +3,7 @@ Defines input models for Pydantic validation and utility functions for conversio
 """
 
 import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from deployment_job.pydantic_models.constraints import Constraints
 from platform_common.pydantic_models.training import FileInfo
@@ -29,6 +29,16 @@ class TextAnalysisPredictParams(BaseModel):
 
     text: str
     top_k: int = 5
+
+
+class TokenAnalysisPredictParams(BaseModel):
+    """
+    Represents the query parameters for token analysis.
+    """
+
+    text: str
+    top_k: int = 5
+    data_type: Literal["unstructured", "xml"] = "unstructured"
 
 
 class AssociateInputSingle(BaseModel):
@@ -137,12 +147,6 @@ class DeleteInput(BaseModel):
 class SearchResultsTextClassification(BaseModel):
     query_text: str
     predicted_classes: List[Tuple[str, float]]
-
-
-class SearchResultsTokenClassification(BaseModel):
-    query_text: str
-    tokens: List[str]
-    predicted_tags: List[List[str]]
 
 
 class SaveModel(BaseModel):

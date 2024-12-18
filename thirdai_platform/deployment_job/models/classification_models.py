@@ -3,13 +3,11 @@ from pathlib import Path
 from typing import List, Optional
 
 from deployment_job.models.model import Model
-from deployment_job.pydantic_models.inputs import (
-    SearchResultsTextClassification,
-    SearchResultsTokenClassification,
-)
+from deployment_job.pydantic_models.inputs import SearchResultsTextClassification
 from fastapi import HTTPException, status
 from platform_common.logging import JobLogger
 from platform_common.logging.logcodes import LogCode
+from platform_common.pii.data_types import UnstructuredText, XMLLog
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from platform_common.thirdai_storage.data_types import (
     DataSample,
@@ -220,31 +218,35 @@ class TokenClassificationModel(ClassificationModel):
             )
             raise e
 
-    def predict(self, text: str, **kwargs):
+    def predict(self, text: str, data_type: str, **kwargs):
         try:
-            predicted_tags = self.model.predict(
-                {"source": text}, top_k=1, as_unicode=True
-            )
-            predictions = []
-            for predicted_tag in predicted_tags:
-                predictions.append([x[0] for x in predicted_tag])
-
-            tokens = text.split()
-
-            if len(predictions) != len(tokens):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Error parsing input text, this is likely because the input contains unsupported unicode characters.",
+            if data_type == "unstructured":
+                log = UnstructuredText(text)
+            elif data_type == "xml":
+                log = XMLLog(text)
+            else:
+                raise ValueError(
+                    "Expected data type to be either 'unstructured' or 'xml'. Found: {data_type}"
                 )
 
-            return SearchResultsTokenClassification(
-                query_text=text,
-                tokens=tokens,
-                predicted_tags=predictions,
+            model_predictions = self.model.predict(
+                log.inference_sample, top_k=1, as_unicode=True
+            )
+            result = log.process_prediction(model_predictions)
+
+        except ValueError as e:
+            message = f"Error processing prediction: {e}"
+            self.logger.error(message, code=LogCode.MODEL_PREDICT)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=message,
             )
         except Exception as e:
-            self.logger.error(f"Error predicting: {e}", code=LogCode.MODEL_PREDICT)
+            message = f"Error processing prediction: {e}"
+            self.logger.error(message, code=LogCode.MODEL_PREDICT)
             raise e
+
+        return result
 
     @property
     def tag_metadata(self) -> TagMetadata:

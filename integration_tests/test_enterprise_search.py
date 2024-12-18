@@ -87,6 +87,8 @@ def test_enterprise_search_with_guardrails():
         client.model_identifier.split("/")[1]
     ]
 
+    admin_client.await_deploy(client)
+
     query = "American Express Profit Rises 14. my phone number is 123-457-2490"
     results = client.search(query)
     assert results["query_text"] == query.replace("123-457-2490", "[PHONENUMBER#0]")

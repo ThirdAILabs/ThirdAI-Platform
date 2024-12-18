@@ -1,11 +1,10 @@
-from logging import Logger
 from urllib.parse import urljoin
 
 from deployment_job.permissions import Permissions
 from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
 from guardrail import Guardrail, LabelMap
-from platform_common.logging.logcodes import LogCode
+from platform_common.logging import JobLogger, LogCode
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from platform_common.utils import response
 from prometheus_client import Summary
@@ -17,7 +16,7 @@ query_metric = Summary("enterprise_search_query", "Enterprise Search Queries")
 
 
 class EnterpriseSearchRouter:
-    def __init__(self, config: DeploymentConfig, reporter: Reporter, logger: Logger):
+    def __init__(self, config: DeploymentConfig, reporter: Reporter, logger: JobLogger):
         self.config = config
         self.logger = logger
 
@@ -35,6 +34,7 @@ class EnterpriseSearchRouter:
             self.guardrail = Guardrail(
                 guardrail_model_id=self.config.model_options.guardrail_id,
                 model_bazaar_endpoint=self.config.model_bazaar_endpoint,
+                logger=self.logger,
             )
             self.logger.info(
                 f"Guardrail initialized with ID {self.config.model_options.guardrail_id}",

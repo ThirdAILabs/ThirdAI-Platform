@@ -1,9 +1,31 @@
-from unittest.mock import patch
+import shutil
+from pathlib import Path
 
+import pytest
 from deployment_job.guardrail import Guardrail, LabelMap
+from platform_common.logging import JobLogger
 
 
-def fake_ner_output(self, text, access_token):
+@pytest.fixture(scope="function")
+def test_logger():
+    log_dir = Path("./tmp")
+    if log_dir.exists():
+        shutil.rmtree(log_dir)
+
+    logger = JobLogger(
+        log_dir=log_dir,
+        log_prefix="deployment",
+        service_type="deployment",
+        model_id="model-123",
+        model_type="ndb",
+        user_id="user-123",
+    )
+    yield logger
+    if log_dir.exists():
+        shutil.rmtree(log_dir)
+
+
+def fake_ner_output(text, access_token):
     tokens = [
         ("my", "O"),
         ("neighbor", "O"),
@@ -30,9 +52,11 @@ def fake_ner_output(self, text, access_token):
     return {"tokens": tokens, "predicted_tags": [[tag] for tag in tags]}
 
 
-@patch.object(Guardrail, "query_pii_model", fake_ner_output)
-def test_guardrail():
-    guardrail = Guardrail("", "")
+def test_guardrail(test_logger):
+    guardrail = Guardrail("", "", test_logger)
+
+    # override the query_pii_model method
+    guardrail.query_pii_model = fake_ner_output
 
     label_map = LabelMap()
 

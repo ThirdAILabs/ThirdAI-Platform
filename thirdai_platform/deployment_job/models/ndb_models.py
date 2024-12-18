@@ -366,7 +366,7 @@ class NDBModel(Model):
                 shutil.copytree(backup_path, model_path)
                 shutil.rmtree(backup_path.parent)
 
-            raise
+            raise err
 
     def set_chat(self, **kwargs):
         """

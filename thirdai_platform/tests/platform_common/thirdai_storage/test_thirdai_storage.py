@@ -13,6 +13,8 @@ from platform_common.thirdai_storage.data_types import (
 )
 from platform_common.thirdai_storage.storage import DataStorage, SQLiteConnector
 
+pytestmark = [pytest.mark.unit]
+
 
 @pytest.fixture
 def sqlite_connector():
