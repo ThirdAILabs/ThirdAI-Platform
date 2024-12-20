@@ -435,6 +435,7 @@ class LLMClient:
             urljoin(self.base_url, "llm-dispatch/generate"),
             headers={
                 "Content-Type": "application/json",
+                **auth_header(self.login_instance.access_token),
             },
             json={
                 "query": query,

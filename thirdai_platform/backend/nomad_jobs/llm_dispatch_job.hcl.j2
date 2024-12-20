@@ -22,7 +22,9 @@ job "llm-dispatch" {
       tags = [
         "traefik.enable=true",
         "traefik.http.routers.llm-dispatch-http.rule=PathPrefix(`/llm-dispatch/`)",
-        "traefik.http.routers.llm-dispatch-http.priority=10"
+        "traefik.http.routers.llm-dispatch-http.middlewares=auth-middleware",
+        "traefik.http.routers.llm-dispatch-http.priority=10",
+        "traefik.http.middlewares.auth-middleware.forwardauth.address={{ model_bazaar_endpoint }}/api/user/auth"
       ]
     }
 

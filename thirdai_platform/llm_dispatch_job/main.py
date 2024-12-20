@@ -107,7 +107,6 @@ async def generate(generate_args: GenerateArgs):
     Caching:
     - If `original_query` and `cache_access_token` are provided, the generated content will be cached after completion.
     """
-
     key = generate_args.key or default_keys.get(generate_args.provider.lower())
     if not key:
         logger.error("No generative AI key provided")

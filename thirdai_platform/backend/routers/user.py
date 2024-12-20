@@ -12,8 +12,9 @@ from backend.mailer import mailer
 from backend.utils import hash_password
 from database import schema
 from database.session import get_session
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from platform_common.utils import get_section, response
@@ -650,6 +651,19 @@ def get_user_info(
         status_code=status.HTTP_200_OK,
         message="Successfully retrieved user information",
         data=jsonable_encoder(user_info),
+    )
+
+
+@user_router.get("/auth")
+def get_user_info(
+    session: Session = Depends(get_session),
+    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+    authorization: str = Header(None),
+):
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"message": "Verified access token."},
+        headers={"Authorization": authorization},
     )
 
 
