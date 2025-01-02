@@ -504,27 +504,16 @@ export function WorkFlow({
                   >
                     <DropdownMenuItem>
                       <Tooltip
-                        title={
-                          deployStatus === DeployStatus.Failed ||
-                          deployStatus === DeployStatus.TrainingFailed
-                            ? 'Access restricted: model failed'
-                            : ''
-                        }
+                        title={deployStatus !== DeployStatus.Active ? 'please start app first' : ''}
                         arrow
                       >
                         <span>
                           <button
                             type="button"
-                            disabled={
-                              deployStatus === DeployStatus.Failed ||
-                              deployStatus === DeployStatus.TrainingFailed
-                            }
+                            disabled={deployStatus !== DeployStatus.Active}
                             style={{
                               cursor:
-                                deployStatus === DeployStatus.Failed ||
-                                deployStatus === DeployStatus.TrainingFailed
-                                  ? 'not-allowed'
-                                  : 'pointer',
+                                deployStatus !== DeployStatus.Active ? 'not-allowed' : 'pointer',
                             }}
                           >
                             Usage Dashboard

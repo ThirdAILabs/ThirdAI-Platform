@@ -2,11 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { TextField, Typography, Box, Tooltip, Button, Alert } from '@mui/material';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, HelpCircle } from 'lucide-react';
-import { retrainTokenClassifier, trainUDTWithCSV, getTrainReport } from '@/lib/backend';
+import {
+  retrainTokenClassifier,
+  trainUDTWithCSV,
+  getTrainReport,
+  getAccessToken,
+  useTokenClassificationEndpoints,
+} from '@/lib/backend';
 import RecentSamples from './samples';
 import { TrainingResults } from './MetricsChart';
 import type { TrainReportData } from '@/lib/backend';
-import UsageStatsUDT from './usageStatsUDT';
+import axios from 'axios';
+
 interface ModelUpdateProps {
   username: string;
   modelName: string;
@@ -43,6 +50,10 @@ export default function ModelUpdate({
   // New states for button cooldown
   const [uploadButtonDisabled, setUploadButtonDisabled] = useState(false);
   const [pollingButtonDisabled, setPollingButtonDisabled] = useState(false);
+
+  //state for toggling tags list
+  const [numTagDisplay, setNumTagDisplay] = useState<number>(5);
+  const [tags, setTags] = useState<string[]>([]);
 
   // Effect to validate model name on each change
   useEffect(() => {
@@ -286,6 +297,45 @@ export default function ModelUpdate({
     }
   };
 
+  const handleTagDisplayMore = () => {
+    setNumTagDisplay(tags.length);
+  };
+
+  const handleTagDisplayLess = () => {
+    setNumTagDisplay(5);
+  };
+
+  const getLabels = async (): Promise<string[]> => {
+    axios.defaults.headers.common.Authorization = `Bearer ${getAccessToken()}`;
+    try {
+      const response = await axios.get(`${deploymentUrl}/get_labels`);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching labels:', error);
+      alert('Error fetching labels:' + error);
+      throw new Error('Failed to fetch labels');
+    }
+  };
+
+  useEffect(() => {
+    async function getTags() {
+      try {
+        const labels = await getLabels();
+        const filteredLabels = labels.filter((label) => label !== 'O');
+        console.log('Filtered labels: ', filteredLabels);
+        setTags(filteredLabels);
+        // setTags(["phone number", "name", "Anand", "Gautam", "pratik", "tharun", "sid", "yash", "Alice", "Charlie", "Diana", "Eve", "Frank", "Grace", "Ivy", "Jack", "Katie", "Liam", "Mia", "Noah", "Olivia", "Paul", "Quinn", "Ray", "Sophia", "Tom", "Ursula", "Victor", "Wendy", "Xavier", "Yara", "Zach", "Aria", "Bea", "Caleb", "Duke", "Ella", "Finn"])
+      } catch (err) {
+        if (err instanceof Error) {
+          console.log(err.message);
+        } else {
+          console.log('An unknown error occurred');
+        }
+      }
+    }
+    getTags();
+  }, []);
+
   return (
     <div className="space-y-6 px-1">
       {/* Training Report Section */}
@@ -325,6 +375,34 @@ export default function ModelUpdate({
             <br />
             {`Target: "O O O O NAME NAME"`}
             <br />
+            <br />
+            <div className="flex flex-wrap gap-2">
+              <span className="">Tags Used for Training: </span>
+              <div className="w-fit max-w-[600px]">
+                {/* Tags Box */}
+                <div className="p-1 border-2 border-slate-300 rounded-lg flex flex-wrap">
+                  {tags.map(
+                    (tag, index) =>
+                      index < numTagDisplay && (
+                        <div className="rounded-lg p-2 m-2 bg-slate-100" key={`${index}-${tag}`}>
+                          {tag}
+                        </div>
+                      )
+                  )}
+                  {tags.length > 5 && (
+                    <Button
+                      color="inherit"
+                      variant="outlined"
+                      size="medium"
+                      onClick={numTagDisplay === 5 ? handleTagDisplayMore : handleTagDisplayLess}
+                    >
+                      {numTagDisplay === 5 ? 'Expand ▼' : 'Collapse ▲'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <br />
           </CardDescription>
         </CardHeader>

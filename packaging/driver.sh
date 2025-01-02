@@ -53,7 +53,6 @@ function install_ansible() {
 install_ansible
 
 VERBOSE=0  # Default: No verbose mode
-PLATFORM_IMAGE_BRANCH="release-test-main"  # Default value if not provided
 CLEANUP=0  # Flag for cleanup mode
 ONBOARD_CLIENTS=0  # Flag for onboard_clients mode
 NEW_CLIENT_CONFIG_PATH=""   # Declare globally, default empty
@@ -61,7 +60,6 @@ NEW_CLIENT_CONFIG_PATH=""   # Declare globally, default empty
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -v|--verbose) VERBOSE=1 ;;   # Enable verbose mode if -v or --verbose is passed
-        -b|--branch) PLATFORM_IMAGE_BRANCH="$2"; shift ;;  # Capture platform_image_branch if provided
         --cleanup) CLEANUP=1 ;;  # Enable cleanup mode if --cleanup is passed
         --onboard_clients) ONBOARD_CLIENTS=1 ;;  # Enable onboard_clients if --onboard_clients is passed
         *) CONFIG_PATH=$(realpath "$1") ;;  # Treat the first argument as the config path
@@ -123,18 +121,13 @@ fi
 # Change directory to platform directory
 cd "$(dirname "$0")/platform" || exit 1
 
-# Warn if platform_image_branch was not provided and use default
-if [ "$PLATFORM_IMAGE_BRANCH" == "release-test-main" ]; then
-    echo "WARNING: No platform_image_branch specified. Using default 'release-test-main'."
-fi
-
 # Run the appropriate playbook based on the cleanup flag
 if [ "$CLEANUP" -eq 1 ]; then
     echo "Running cleanup playbook..."
     if [ "$VERBOSE" -eq 1 ]; then
-        ansible-playbook playbooks/test_cleanup.yml --extra-vars "config_path=$CONFIG_PATH model_folder=$MODEL_FOLDER  docker_images=$DOCKER_IMAGES_PATH platform_image_branch=$PLATFORM_IMAGE_BRANCH" -vvvv
+        ansible-playbook playbooks/test_cleanup.yml --extra-vars "config_path=$CONFIG_PATH model_folder=$MODEL_FOLDER  docker_images=$DOCKER_IMAGES_PATH" -vvvv
     else
-        ansible-playbook playbooks/test_cleanup.yml --extra-vars "config_path=$CONFIG_PATH model_folder=$MODEL_FOLDER  docker_images=$DOCKER_IMAGES_PATH platform_image_branch=$PLATFORM_IMAGE_BRANCH"
+        ansible-playbook playbooks/test_cleanup.yml --extra-vars "config_path=$CONFIG_PATH model_folder=$MODEL_FOLDER  docker_images=$DOCKER_IMAGES_PATH"
     fi
 elif [ "$ONBOARD_CLIENTS" -eq 1 ]; then
     echo "Running onboarding playbook..."
@@ -146,8 +139,8 @@ elif [ "$ONBOARD_CLIENTS" -eq 1 ]; then
 else
     echo "Running deployment playbook..."
     if [ "$VERBOSE" -eq 1 ]; then
-        ansible-playbook playbooks/test_deploy.yml --extra-vars "config_path=$CONFIG_PATH model_folder=$MODEL_FOLDER  docker_images=$DOCKER_IMAGES_PATH platform_image_branch=$PLATFORM_IMAGE_BRANCH" -vvvv
+        ansible-playbook playbooks/test_deploy.yml --extra-vars "config_path=$CONFIG_PATH model_folder=$MODEL_FOLDER  docker_images=$DOCKER_IMAGES_PATH" -vvvv
     else
-        ansible-playbook playbooks/test_deploy.yml --extra-vars "config_path=$CONFIG_PATH model_folder=$MODEL_FOLDER  docker_images=$DOCKER_IMAGES_PATH platform_image_branch=$PLATFORM_IMAGE_BRANCH"
+        ansible-playbook playbooks/test_deploy.yml --extra-vars "config_path=$CONFIG_PATH model_folder=$MODEL_FOLDER  docker_images=$DOCKER_IMAGES_PATH"
     fi
 fi

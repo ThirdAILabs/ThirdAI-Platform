@@ -1,0 +1,122 @@
+name: End to end integration testing
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch: # Allows manual triggering of the workflow
+    inputs:
+      installer_branch_name:
+        description: "Ansible-repo branch name"
+        type: string
+        default: main
+      
+      docker_image_branch_name:
+        description: "Branch name of the docker images. Being used in release/push.py"
+        required: true
+jobs:
+  Gather_facts:
+    runs-on: ubuntu-latest
+    outputs:
+      version: "${{ steps.docker_image_version.outputs.version }}"
+      docker_image_branch_name: ${{ steps.docker_image_branch_name.outputs.branch_name }}
+
+    steps:
+      - name: Get the new version of the docker images
+        id: docker_image_version
+        run: |
+          version=$(date "+%H.%M-%d.%m.%y")   # Format: HH.MM-DD.MM.YY
+          echo "Next version: $version"
+          echo "version=$version" >> $GITHUB_OUTPUT
+      
+      - name: Set the branch name of the docker images
+        id: docker_image_branch_name
+        run: |
+          echo "Docker image branch to build on: ${{ github.event.inputs.docker_image_branch_name }}"
+          echo "branch_name=${{ github.event.inputs.docker_image_branch_name }}" >> $GITHUB_OUTPUT
+
+  Build_and_push_images:
+    # This doesn't push the image with the 'latest' tag
+    needs: [Gather_facts]
+    uses: ./.github/workflows/build_and_push_images.yml
+    with:
+      docker_image_branch_name: ${{ needs.Gather_facts.outputs.docker_image_branch_name }}
+      docker_image_version: ${{ needs.Gather_facts.outputs.version }}
+      dont_update_latest: true
+    secrets:
+      azure_credentials: ${{ secrets.AZURE_CREDENTIALS }}
+
+  package:
+    needs: [Gather_facts, Build_and_push_images]
+    uses: ./.github/workflows/packaging.yml
+    with:
+      Installer_branch_name: ${{ github.event.inputs.installer_branch_name }}
+      docker_image_branch_name: ${{ needs.Gather_facts.outputs.docker_image_branch_name }}
+      docker_image_version: "v${{ needs.Gather_facts.outputs.version }}"
+      b64_encoded_docker_registry_pull_password: ${{ needs.Build_and_push_images.outputs.b64_encoded_docker_registry_pull_password }}
+    secrets:
+      PLATFORM_INSTALLATION_DEPLOY_KEY: ${{ secrets.PLATFORM_INSTALLATION_DEPLOY_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  tests_on_ec2:
+    needs: [Gather_facts, Build_and_push_images, package]
+    uses: ./.github/workflows/integration_testing.yml
+    with:
+      docker_image_branch_name: ${{ needs.Gather_facts.outputs.docker_image_branch_name }}
+      docker_image_version: "v${{ needs.Gather_facts.outputs.version }}"
+      b64_encoded_docker_registry_pull_password: ${{ needs.Build_and_push_images.outputs.b64_encoded_docker_registry_pull_password }}
+      tarball_filename: ${{ needs.package.outputs.online_package_name }}
+      # email: gautam@thidai.com (default)
+      # password: password (default)
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      HOST_MACHINE_PRIVATE_KEY: ${{ secrets.HOST_MACHINE_PRIVATE_KEY }}
+      GENAI_KEY: ${{ secrets.GENAI_KEY }}
+      HOST_MACHINE1: ${{ secrets.HOST_MACHINE1 }}
+      HOST_MACHINE2: ${{ secrets.HOST_MACHINE2 }}
+      
+  cleanup:
+    if: always() && needs.Build_and_push_images.result == 'success'
+    needs: [Gather_facts, Build_and_push_images, package, tests_on_ec2]
+    uses: ./.github/workflows/cleanup.yml
+    with:
+      docker_image_branch_name: ${{ needs.Gather_facts.outputs.docker_image_branch_name }}
+      docker_image_version: ${{ needs.Gather_facts.outputs.version }}
+      offline_package_name: ${{ needs.package.outputs.offline_package_name }}
+      online_package_name: ${{ needs.package.outputs.online_package_name }}
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  
+  delete_credentials:
+    if: always() && needs.Build_and_push_images.result == 'success'
+    runs-on: ubuntu-latest-8-cores
+    needs: [Gather_facts, Build_and_push_images, package, tests_on_ec2]
+
+    steps:
+      - name: "Azure Login"
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Delete the score map associated with the branch image
+        # Making sure that branch is not main_docker_image_name
+        run: |
+          if [ "${{ needs.Gather_facts.outputs.docker_image_branch_name }}" != "${{ secrets.MAIN_DOCKER_IMAGE_NAME }}" ]; then
+            az acr scope-map delete --name "thirdaiplatform-push-${{ needs.Gather_facts.outputs.docker_image_branch_name }}" --registry thirdaiplatform --yes
+            az acr scope-map delete --name "thirdaiplatform-pull-${{ needs.Gather_facts.outputs.docker_image_branch_name }}" --registry thirdaiplatform --yes
+          fi
+
+      - name: Delete the token map associated with the branch image
+        # Making sure that branch is not main_docker_image_name
+        run: |
+          if [ "${{ needs.Gather_facts.outputs.docker_image_branch_name }}" != "${{ secrets.MAIN_DOCKER_IMAGE_NAME }}" ]; then
+            az acr token delete --name "thirdaiplatform-push-${{ needs.Gather_facts.outputs.docker_image_branch_name }}" --registry thirdaiplatform --yes
+            az acr token delete --name "thirdaiplatform-pull-${{ needs.Gather_facts.outputs.docker_image_branch_name }}" --registry thirdaiplatform --yes
+          fi 

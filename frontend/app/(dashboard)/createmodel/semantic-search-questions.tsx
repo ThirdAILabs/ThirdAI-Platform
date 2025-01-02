@@ -6,6 +6,7 @@ import { CardDescription } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import FileUpload from './file-upload-component';
 
 interface SemanticSearchQuestionsProps {
   workflowNames: string[];
@@ -55,7 +56,10 @@ const SemanticSearchQuestions = ({
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
-  const validateFileTypes = (files: FileList): boolean => {
+  const validateFileTypes = (files: FileList | null): boolean => {
+    if (!files) {
+      return false;
+    }
     for (let i = 0; i < files.length; i++) {
       const extension = files[i].name.split('.').pop()?.toLowerCase();
       if (!extension || !ALLOWED_FILE_TYPES_ARRAY.includes(extension)) {
@@ -123,12 +127,12 @@ const SemanticSearchQuestions = ({
     setFileCount((prev) => [...prev, 0]);
   };
 
-  const setSourceValue = (index: number, files: FileList) => {
+  const setSourceValue = (index: number, files: FileList | null) => {
     if (!validateFileTypes(files)) {
       return;
     }
 
-    const fileArray = Array.from(files);
+    const fileArray = Array.from(files!);
 
     // Validate total file size including new files
     if (!validateTotalFileSize(sources, fileArray, index)) {
@@ -202,7 +206,7 @@ const SemanticSearchQuestions = ({
     sources.forEach(({ type, files }) => {
       files.forEach((file) => {
         formData.append('files', file);
-        unsupervisedFiles.push({ path: file.name, location: type });
+        unsupervisedFiles.push({ path: file.webkitRelativePath || file.name, location: type });
         fileCount++;
       });
     });
@@ -348,16 +352,11 @@ const SemanticSearchQuestions = ({
             )}
             {type === SourceType.LOCAL && (
               <div className="w-full">
-                <Input
-                  type="file"
-                  className="text-md w-full hover:cursor-pointer"
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      setSourceValue(index, e.target.files);
-                    }
-                  }}
-                  accept={ALLOWED_FILE_TYPES}
-                  multiple
+                <FileUpload
+                  index={index}
+                  setSourceValue={setSourceValue}
+                  // Optional: custom allowed file types
+                  allowedFileTypes={ALLOWED_FILE_TYPES_ARRAY}
                 />
               </div>
             )}

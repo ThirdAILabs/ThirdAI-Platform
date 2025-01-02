@@ -7,7 +7,6 @@ from typing import Optional
 import yaml
 from auth.utils import get_hostname_from_url
 from backend.utils import (
-    delete_nomad_job,
     get_platform,
     get_python_path,
     get_root_absolute_path,
@@ -33,8 +32,6 @@ async def restart_generate_job():
     - Response: The response from the Nomad API.
     """
     nomad_endpoint = os.getenv("NOMAD_ENDPOINT")
-    if nomad_job_exists(GENERATE_JOB_ID, nomad_endpoint):
-        delete_nomad_job(GENERATE_JOB_ID, nomad_endpoint)
     cwd = Path(os.getcwd())
     platform = get_platform()
     return submit_nomad_job(
@@ -73,7 +70,6 @@ async def start_on_prem_generate_job(
     if nomad_job_exists(ON_PREM_GENERATE_JOB_ID, nomad_endpoint):
         if not restart_if_exists:
             return
-        delete_nomad_job(ON_PREM_GENERATE_JOB_ID, nomad_endpoint)
     share_dir = os.getenv("SHARE_DIR")
     if not share_dir:
         raise ValueError("SHARE_DIR variable is not set.")
@@ -108,8 +104,6 @@ async def start_on_prem_generate_job(
 
 async def restart_thirdai_platform_frontend():
     nomad_endpoint = os.getenv("NOMAD_ENDPOINT")
-    if nomad_job_exists(THIRDAI_PLATFORM_FRONTEND_ID, nomad_endpoint):
-        delete_nomad_job(THIRDAI_PLATFORM_FRONTEND_ID, nomad_endpoint)
     cwd = Path(os.getcwd())
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
@@ -136,13 +130,14 @@ async def restart_thirdai_platform_frontend():
         # Model bazaar dockerfile does not include neuraldb_frontend code,
         # but app_dir is only used if platform == local.
         app_dir=str(get_root_absolute_path() / "frontend"),
+        majority_critical_services_nodes=os.getenv(
+            "MAJORITY_CRITICAL_SERVICE_NODES", "1"
+        ),
     )
 
 
 async def restart_llm_cache_job():
     nomad_endpoint = os.getenv("NOMAD_ENDPOINT")
-    if nomad_job_exists(LLM_CACHE_JOB_ID, nomad_endpoint):
-        delete_nomad_job(LLM_CACHE_JOB_ID, nomad_endpoint)
     cwd = Path(os.getcwd())
     platform = get_platform()
     try:
@@ -282,8 +277,6 @@ async def restart_telemetry_jobs():
     - Response: The response from the Nomad API.
     """
     nomad_endpoint = os.getenv("NOMAD_ENDPOINT")
-    if nomad_job_exists(TELEMETRY_ID, nomad_endpoint):
-        delete_nomad_job(TELEMETRY_ID, nomad_endpoint)
 
     cwd = Path(os.getcwd())
     platform = get_platform()

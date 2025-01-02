@@ -1,0 +1,141 @@
+name: Build and push docker images
+
+on:
+  workflow_call:
+    inputs:
+      docker_image_branch_name:
+        description: "Branch name of the docker images"
+        required: true
+        type: string
+      docker_image_version:
+        description: "Docker image version (without prefix 'v')"
+        required: true
+        type: string
+      base_encoded_docker_registry_push_password:
+        description: "Docker registry push password of the image encoded in base64"
+        required: false
+        type: string
+      base_encoded_docker_registry_pull_password:
+        description: "Docker registry pull password of the image encoded in base64"
+        required: false
+        type: string
+      dont_update_latest:
+        description: "Don't update the latest tagged docker image"
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      AZURE_CREDENTIALS:
+        description: 'Azure credentials'
+        required: true
+    outputs:
+      b64_encoded_docker_registry_push_password:
+        description: "Docker registry push password for the image built encoded in base64"
+        value: ${{ jobs.build_docker_images.outputs.b64_encoded_docker_registry_push_password }}
+      b64_encoded_docker_registry_pull_password:
+        description: "Docker registry pull password for the image built encoded in base64"
+        value: ${{ jobs.build_docker_images.outputs.b64_encoded_docker_registry_pull_password }}
+  workflow_dispatch:
+    inputs:
+      docker_image_branch_name:
+        description: "Branch name of the docker images"
+        required: true
+        type: string
+      docker_image_version:
+        description: "Docker image version (without prefix 'v')"
+        required: true
+        type: string
+      base_encoded_docker_registry_push_password:
+        description: "Docker registry push password of the image encoded in base64"
+        required: false
+        type: string
+      base_encoded_docker_registry_pull_password:
+        description: "Docker registry pull password of the image encoded in base64"
+        required: false
+        type: string
+
+jobs:
+  build_docker_images:
+    runs-on: ubuntu-latest-8-cores
+    outputs:
+      b64_encoded_docker_registry_push_password: ${{ steps.docker_registry.outputs.base64_encoded_push_password }}
+      b64_encoded_docker_registry_pull_password: ${{ steps.docker_registry.outputs.base64_encoded_pull_password }}
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+      
+      - name: "Azure Login"
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install yq for YAML parsing
+        run: |
+            sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+            sudo chmod +x /usr/bin/yq
+            yq --version
+      
+      - name: Add credentials for the docker image in config.yml (if provided)
+        if: ${{ inputs.base_encoded_docker_registry_push_password != '' && inputs.base_encoded_docker_registry_pull_password != '' }}
+        run: |
+          provider=$(yq e '.provider' $GITHUB_WORKSPACE/release/config.yaml)
+          push_username=$(echo -n "thirdaiplatform-push-${{ inputs.docker_image_branch_name }}" | tr '_' '-')
+          pull_username=$(echo -n "thirdaiplatform-pull-${{ inputs.docker_image_branch_name }}" | tr '_' '-')
+          decoded_push_password=$(echo -n "${{ inputs.base_encoded_docker_registry_push_password }}" | base64 --decode)
+          decoded_pull_password=$(echo -n "${{ inputs.base_encoded_docker_registry_pull_password }}" | base64 --decode)
+
+          yq -i "
+            .\"${provider}\".branches.install-test-3.push_credentials.username = \"${push_username}\"" \
+            "$GITHUB_WORKSPACE/release/config.yaml"
+
+          yq -i "
+            .\"${provider}\".branches.install-test-3.push_credentials.password = \"${decoded_push_password}\"" \
+            "$GITHUB_WORKSPACE/release/config.yaml"
+
+          yq -i "
+            .\"${provider}\".branches.install-test-3.pull_credentials.username = \"${pull_username}\"" \
+            "$GITHUB_WORKSPACE/release/config.yaml"
+
+          yq -i "
+            .\"${provider}\".branches.install-test-3.pull_credentials.password = \"${decoded_pull_password}\"" \
+            "$GITHUB_WORKSPACE/release/config.yaml"
+
+          yq -i "
+            .\"${provider}\".branches.${{ inputs.docker_image_branch_name }}.version = \"${{ inputs.docker_image_version }}\"" \
+            "$GITHUB_WORKSPACE/release/config.yaml"
+
+      - name: Build and push docker images to the repository (Only versioned)
+        if: ${{ inputs.dont_update_latest == true }}
+        run: |
+          cd release
+          pip install -r requirements.txt
+          python3 push.py -b "${{ inputs.docker_image_branch_name }}" --config config.yaml --no-cache --version "${{ inputs.docker_image_version }}" --dont-update-latest
+      
+      - name: Build and push docker images to the repository (Along with latest)
+        if: ${{ inputs.dont_update_latest != true }}
+        run: |
+          cd release
+          pip install -r requirements.txt
+          python3 push.py -b "${{ inputs.docker_image_branch_name }}" --config config.yaml --no-cache --version "${{ inputs.docker_image_version }}"
+
+      - name: Extract the docker registry_password
+        id: docker_registry
+        run: |
+          provider=$(yq e '.provider' $GITHUB_WORKSPACE/release/config.yaml)
+          base64_encoded_push_password=$(yq e '."'"$provider"'".branches.${{ inputs.docker_image_branch_name }}.push_credentials.password' $GITHUB_WORKSPACE/release/config.yaml | base64 -w 0)
+          base64_encoded_pull_password=$(yq e '."'"$provider"'".branches.${{ inputs.docker_image_branch_name }}.pull_credentials.password' $GITHUB_WORKSPACE/release/config.yaml | base64 -w 0)
+          
+          echo "base64_encoded_push_password=$base64_encoded_push_password" >> $GITHUB_OUTPUT
+          echo "base64_encoded_pull_password=$base64_encoded_pull_password" >> $GITHUB_OUTPUT
+          
+      - name: Check if base64_encoded_password is saved
+        run: |
+          if [ -z ${{ steps.docker_registry.outputs.base64_encoded_push_password }} ]; then
+            echo "::error::No push password found for branch ${{ inputs.docker_image_branch_name }}"
+            exit 1
+          fi
+
+          if [ -z ${{ steps.docker_registry.outputs.base64_encoded_pull_password }} ]; then
+            echo "::error::No pull password found for branch ${{ inputs.docker_image_branch_name }}"
+            exit 1
+          fi

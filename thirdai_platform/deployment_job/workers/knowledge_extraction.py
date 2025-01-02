@@ -3,6 +3,7 @@ import logging
 import os
 import time
 from pathlib import Path
+from typing import Optional
 from urllib.parse import urljoin
 
 import requests
@@ -72,11 +73,13 @@ class ReportProcessorWorker:
         self.logger.error(f"error retreiving next report: {str(res.content)}")
         return None, None
 
-    def update_report_status(self, report_id: str, new_status: str, attempt: int):
+    def update_report_status(
+        self, report_id: str, new_status: str, attempt: int, msg: Optional[str] = None
+    ):
         res = requests.post(
             urljoin(self.job_endpoint, f"/report/{report_id}/status"),
             headers=self.auth_header,
-            params={"new_status": new_status, "attempt": attempt},
+            json={"new_status": new_status, "attempt": attempt, "msg": msg},
         )
 
         if res.status_code == 200:
@@ -120,15 +123,20 @@ class ReportProcessorWorker:
         s = time.perf_counter()
         docs = []
         for doc in documents:
-            self.logger.debug(f"parsing document: {doc.path}")
-            docs.append(
-                parse_doc(
-                    doc=doc,
-                    doc_save_dir=str(self.reports_base_path / report_id / "documents"),
-                    tmp_dir=str(self.reports_base_path / report_id / "documents/tmp"),
-                )
+            self.logger.info(f"parsing document: {doc.path}")
+            ndb_doc = parse_doc(
+                doc=doc,
+                doc_save_dir=str(self.reports_base_path / report_id / "documents"),
+                tmp_dir=str(self.reports_base_path / report_id / "documents/tmp"),
             )
-            self.logger.debug(f"parsed document: {doc.path}")
+            if ndb_doc is None:
+                self.logger.error(f"unable to parse document {doc.path}")
+                raise ValueError(
+                    f"Unable to process document '{os.path.basename(doc.path)}'. Please ensure that document is a supported type (pdf, docx, csv, html) and has correct extension."
+                )
+            else:
+                docs.append(ndb_doc)
+                self.logger.info(f"parsed document: {doc.path}")
 
         total_chunks = 0
         for doc in docs:
@@ -223,7 +231,10 @@ class ReportProcessorWorker:
         except Exception as e:
             self.logger.error(f"Error processing report {report_id}: {e}")
             self.update_report_status(
-                report_id=report_id, new_status="failed", attempt=attempt
+                report_id=report_id,
+                new_status="failed",
+                attempt=attempt,
+                msg=f"Error processing report: {e}",
             )
 
     def generate(self, question, references):

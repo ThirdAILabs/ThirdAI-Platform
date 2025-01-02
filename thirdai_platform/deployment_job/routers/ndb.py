@@ -127,7 +127,7 @@ class NDBRouter:
             self.tasks = {}
             self.task_lock = threading.Lock()
 
-        threading.Thread(target=self.process_tasks, daemon=True).start()
+            threading.Thread(target=self.process_tasks, daemon=True).start()
 
     @staticmethod
     def get_model(config: DeploymentConfig, logger: JobLogger) -> NDBModel:

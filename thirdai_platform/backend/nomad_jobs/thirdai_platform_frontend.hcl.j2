@@ -3,8 +3,18 @@ job "thirdai-platform-frontend" {
 
   type = "service"
 
+  constraint {
+    attribute = "${node.class}"
+    value = "critical_services"
+  }
+
+  constraint {
+      attribute = "${meta.unique.hostname}"
+      distinct_hosts = true
+    }
+
   group "thirdai-platform-frontend" {
-    count = 1
+    count = "{{ majority_critical_services_nodes }}"
 
     network {
       port "thirdai-platform-frontend-http" {
@@ -19,13 +29,19 @@ job "thirdai-platform-frontend" {
     service {
       name = "thirdai-platform-frontend"
       port = "thirdai-platform-frontend-http"
-      provider = "nomad"
+      provider = "consul"
 
       tags = [
         "traefik.enable=true",
         "traefik.http.routers.thirdai-platform-frontend-http.rule=(PathPrefix(`/api/auth`) || PathPrefix(`/`))",
         "traefik.http.routers.thirdai-platform-frontend-http.priority=1"
       ]
+
+      check {
+        type     = "tcp"
+        interval = "10s"
+        timeout  = "2s"
+      }
     }
 
     task "server" {

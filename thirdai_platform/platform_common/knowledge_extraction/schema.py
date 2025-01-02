@@ -21,6 +21,7 @@ class Report(Base):
     submitted_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False)
     attempt = Column(Integer, default=0, nullable=False)
+    msg = Column(String, nullable=True, default=None)
 
 
 class Question(Base):

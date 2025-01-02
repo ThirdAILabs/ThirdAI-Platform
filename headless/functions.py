@@ -327,7 +327,7 @@ class NDBFunctions:
 
                 deployment.update_chat_settings(provider="on-prem")
 
-                deployment.chat(
+                chat_response = deployment.chat(
                     user_input=best_answer["text"],
                     session_id=deployment.model_id,
                     provider="on-prem",

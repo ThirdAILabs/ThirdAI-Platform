@@ -63,6 +63,12 @@ app.include_router(data_router, prefix="/api/data", tags=["data"])
 app.include_router(telemetry, prefix="/api/telemetry", tags=["telemetry"])
 
 
+@app.get("/api/health")
+async def health_check():
+    # TODO(pratik): we should add a check whether all the dependency are running fine
+    return {"status": "ok"}
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: fastapi.Request, exc: Exception):
     # Log the traceback

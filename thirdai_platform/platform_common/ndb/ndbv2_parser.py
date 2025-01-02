@@ -19,6 +19,11 @@ def convert_to_ndb_doc(
 ) -> Optional[ndbv2.Document]:
     filename, ext = os.path.splitext(resource_path)
     ext = ext.lower()
+    if not ext:
+        logging.warning(
+            f"unable to detect document type for '{resource_path}' please ensure that document has correct extension"
+        )
+        return None
     if ext == ".pdf":
         doc_keywords = ""
         if options.get("title_as_keywords", False):

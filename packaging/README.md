@@ -166,7 +166,7 @@ When changing the public IP of your Cluster, follow these steps to update the se
 
 ---
 
-5. **Steps to Update Frontend URL**
+4. **Steps to Update Frontend URL**
 
    - To access the admin console, follow these steps:
 
@@ -195,24 +195,12 @@ When changing the public IP of your Cluster, follow these steps to update the se
    - If you dont have the access to older admin console, then you may need to do change the env var `KC_HOSTNAME` and `KC_HOSTNAME_ADMIN` to new public IP in the Keycloak Job, restart it before seeing the change. 
 
 
-6. **What Happens During Execution**:
+5. **What Happens During Execution**:
    
    - The script checks for the installation of Ansible. If Ansible is not installed, the script will install it automatically.
    - The script verifies if the model folder (`gen-ai-models/`) is present. If the folder is not found, the script issues a warning but proceeds with the playbook execution.
    - The script searches for a `docker_images` folder and warns if it's not found, but proceeds with the playbook execution.
-   - The script then navigates to the `platform/` directory and runs the `test_deploy.yml` Ansible playbook using the provided `config.yml`, the model path, the Docker images path, and the platform image branch as extra variables.
-
-### Example Commands
-
-#### Run the script with a specified branch:
-```bash
-./driver.sh --branch your-branch-name ./config.yml
-```
-
-#### Run the script without specifying a branch (will default to `release-test-main`):
-```bash
-./driver.sh ./config.yml
-```
+   - The script then navigates to the `platform/` directory and runs the `test_deploy.yml` Ansible playbook using the provided `config.yml`, the model path, the Docker images path as extra variables.
 
 ### Troubleshooting
 

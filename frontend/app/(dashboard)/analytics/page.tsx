@@ -1,18 +1,19 @@
 'use client';
-import RecentSamples from './samples';
 import RecentFeedbacks from './recentFeedbacks';
 import UpdateButton from './updateButton';
 import ModelUpdate from './ModelUpdate';
 import UpdateButtonNDB from './updateButtonNDB';
 import UsageStats from './usageStats';
 import UsageStatsUDT from './usageStatsUDT';
-import { UsageDurationChart, UsageFrequencyChart, ReformulatedQueriesChart } from './charts';
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, use } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getWorkflowDetails, deploymentBaseUrl } from '@/lib/backend';
+import {
+  getWorkflowDetails,
+  deploymentBaseUrl,
+  useTokenClassificationEndpoints,
+} from '@/lib/backend';
 import _ from 'lodash';
 import { Workflow, fetchWorkflows } from '@/lib/backend';
-import LatencyMetrics from './LatencyMetrics'; // Add this import
 
 function AnalyticsContent() {
   const [isClient, setIsClient] = useState(false);
@@ -23,7 +24,7 @@ function AnalyticsContent() {
   const [username, setUsername] = useState<string>('');
   const [workflowtype, setWorkflowType] = useState<string>('');
   const [deployStatus, setDeployStatus] = useState<string>('not_started');
-
+  const [tags, setTags] = useState<string[]>([]);
   useEffect(() => {
     setIsClient(true);
 
@@ -90,6 +91,7 @@ function AnalyticsContent() {
   if (!isClient) {
     return null; // Return null on the first render to avoid hydration mismatch
   }
+
   if (workflowtype == 'udt')
     return (
       <div className="container mx-auto px-4 py-8">
