@@ -17,7 +17,7 @@ job "llm-dispatch" {
     service {
       name = "llm-dispatch"
       port = "llm-dispatch-http"
-      provider = "nomad"
+      provider = "consul"
 
       tags = [
         "traefik.enable=true",

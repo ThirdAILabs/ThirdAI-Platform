@@ -44,7 +44,7 @@ job "on-prem-llm-generation" {
     service {
       name = "on-prem-generation"
       port = "on-prem-generation-http"
-      provider = "nomad"
+      provider = "consul"
 
       {# This code adds the prefix 'on-prem-llm' to all endpoints in this service. #}
       tags = [
