@@ -166,14 +166,82 @@ class OnPremLLM(LLMBase):
                         yield data["choices"][0]["delta"]["content"]
 
 
+class SelfHostedLLM(LLMBase):
+    def __init__(self):
+        import requests
+
+        self.backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
+        response = requests.get(
+            urljoin(self.backend_endpoint, "/api/integrations/self-hosted-llm")
+        )
+        if response.status_code != 200:
+            raise Exception("Cannot read self-hosted endpoint.")
+        data = response.json()["data"]
+        self.self_hosted_endpoint = data["self_hosted_endpoint"]
+        self.self_hosted_api_key = data["self_hosted_api_key"]
+
+        if self.self_hosted_endpoint is None or self.self_hosted_api_key is None:
+            raise Exception(
+                "Self-hosted LLM may have been deleted or not configured. Please check the admin dashboard to configure the self-hosted llm"
+            )
+
+    async def stream(
+        self,
+        key: str,
+        query: str,
+        task_prompt: str,
+        references: List[Reference],
+        model: str,
+    ) -> AsyncGenerator[str, None]:
+        url = self.self_hosted_endpoint
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.self_hosted_api_key}",
+        }
+
+        system_prompt, user_prompt = make_prompt(query, task_prompt, references)
+
+        body = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "stream": True,
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=body) as response:
+                if response.status == 200:
+                    async for multi_chunk_bytes, _ in response.content.iter_chunks():
+                        for chunk_string in multi_chunk_bytes.decode("utf8").split(
+                            "\n"
+                        ):
+                            if chunk_string == "":
+                                continue
+                            offset = len(
+                                "data: "
+                            )  # The chunk responses are prefixed with "data: "
+                            try:
+                                chunk = json.loads(chunk_string[offset:])
+                            except:
+                                continue
+                            content = (
+                                chunk["choices"][0].get("delta", {}).get("content")
+                            )
+                            if content is not None:
+                                yield content
+
+
 model_classes = {
     "openai": OpenAILLM,
     "cohere": CohereLLM,
     "on-prem": OnPremLLM,
+    "self-host": SelfHostedLLM,
 }
 
 default_keys = {
     "openai": os.getenv("OPENAI_KEY", ""),
     "cohere": os.getenv("COHERE_KEY", ""),
     "on-prem": "no key",  # TODO(david) add authentication to the service
+    "self-host": "no key",
 }

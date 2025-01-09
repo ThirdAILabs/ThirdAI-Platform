@@ -15,6 +15,7 @@ import uvicorn
 from auth.jwt import validate_access_token
 from backend.routers.data import data_router
 from backend.routers.deploy import deploy_router as deploy
+from backend.routers.integrations import integrations_router as integrations
 from backend.routers.models import model_router as model
 from backend.routers.recovery import recovery_router as recovery
 from backend.routers.team import team_router as team
@@ -33,6 +34,13 @@ from backend.status_sync import sync_job_statuses
 from backend.utils import get_platform
 from database.session import get_session
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import event
+
+pass
+from database import schema
+from fastapi import BackgroundTasks, WebSocket, WebSocketDisconnect
+from middleware.timeout_middleware import TimeoutMiddleware
+from websocket.utils import manager, notify_model_change
 
 app = fastapi.FastAPI()
 
@@ -42,6 +50,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.add_middleware(
+    TimeoutMiddleware,
+    timeout=10.0,
 )
 
 log_dir: Path = Path(model_bazaar_path()) / "logs"
@@ -61,6 +74,7 @@ app.include_router(workflow, prefix="/api/workflow", tags=["workflow"])
 app.include_router(recovery, prefix="/api/recovery", tags=["recovery"])
 app.include_router(data_router, prefix="/api/data", tags=["data"])
 app.include_router(telemetry, prefix="/api/telemetry", tags=["telemetry"])
+app.include_router(integrations, prefix="/api/integrations", tags=["integrations"])
 
 
 @app.get("/api/health")
@@ -167,6 +181,35 @@ async def startup_event():
         logger.debug(traceback.format_exc())
 
     await sync_job_statuses()
+
+
+@app.websocket("/ws/updates")
+async def websocket_endpoint(websocket: WebSocket, background_tasks: BackgroundTasks):
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = (
+                await websocket.receive_text()
+            )  # Handle incoming messages if necessary
+            logger.info(f"Received data: {data}")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        logger.error("Client disconnected")
+
+
+@event.listens_for(schema.Model, "after_insert")
+def after_insert(mapper, connection, target):
+    notify_model_change(target, "insert")
+
+
+@event.listens_for(schema.Model, "after_update")
+def after_update(mapper, connection, target):
+    notify_model_change(target, "update")
+
+
+@event.listens_for(schema.Model, "after_delete")
+def after_delete(mapper, connection, target):
+    notify_model_change(target, "delete")
 
 
 if __name__ == "__main__":

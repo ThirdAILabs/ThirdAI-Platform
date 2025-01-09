@@ -2436,3 +2436,40 @@ export async function fetchFeedback(username: string, modelName: string) {
     throw error;
   }
 }
+
+export interface SelfHostedLLM {
+  endpoint: string;
+  api_key: string;
+}
+
+export interface APIResponse {
+  status: string;
+  message: string;
+  data?: SelfHostedLLM;
+}
+
+export const getSelfHostedLLM = (): Promise<APIResponse> => {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+  return axios.get(`${deploymentBaseUrl}/api/integrations/self-hosted-llm`).then((res) => res.data);
+};
+
+export const addSelfHostedLLM = (data: SelfHostedLLM): Promise<APIResponse> => {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  return axios
+    .post(`${deploymentBaseUrl}/api/integrations/self-hosted-llm`, {
+      endpoint: data.endpoint,
+      api_key: data.api_key,
+    })
+    .then((res) => res.data);
+};
+
+export const deleteSelfHostedLLM = (): Promise<APIResponse> => {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+  return axios
+    .delete(`${deploymentBaseUrl}/api/integrations/self-hosted-llm`)
+    .then((res) => res.data);
+};

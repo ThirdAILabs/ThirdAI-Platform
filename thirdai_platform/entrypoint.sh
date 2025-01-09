@@ -18,4 +18,4 @@ fi
 alembic upgrade head
 
 # Finally, run the Uvicorn server
-uvicorn main:app --reload --host 0.0.0.0 --port 80
+uvicorn main:app --reload --host 0.0.0.0 --port 80 --timeout-keep-alive 10

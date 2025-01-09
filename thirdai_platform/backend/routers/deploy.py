@@ -222,7 +222,7 @@ async def deploy_single_model(
     work_dir = os.getcwd()
     platform = get_platform()
 
-    requires_on_prem_llm = False
+    llm_provider = None
     knowledge_extraction = False
     if model.type == ModelType.NDB:
         model_options = NDBDeploymentOptions(
@@ -232,7 +232,7 @@ async def deploy_single_model(
             ),
             genai_key=(genai_key or os.getenv("GENAI_KEY", "")),
         )
-        requires_on_prem_llm = model_options.llm_provider == "on-prem"
+        llm_provider = model_options.llm_provider
 
         ndb_metadata_path = os.path.join(
             model_bazaar_path(), "models", str(model.id), "model.ndb", "metadata.json"
@@ -252,7 +252,7 @@ async def deploy_single_model(
             retrieval_id=attributes["retrieval_id"],
             guardrail_id=attributes.get("guardrail_id", None),
         )
-        requires_on_prem_llm = attributes.get("llm_provider") == "on-prem"
+        llm_provider = attributes.get("llm_provider")
     elif model.type == ModelType.KNOWLEDGE_EXTRACTION:
         attributes = model.get_attributes()
         model_options = KnowledgeExtractionOptions(
@@ -264,13 +264,32 @@ async def deploy_single_model(
             rerank=attributes["rerank"],
             generate_answers=attributes["generate_answers"],
         )
-        requires_on_prem_llm = model_options.llm_provider == "on-prem"
+        llm_provider = model_options.llm_provider
         knowledge_extraction = True
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported model type '{model.type}'.",
         )
+
+    if llm_provider and llm_provider not in ["openai", "on-prem", "self-host"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid llm_provider: '{model_options.llm_provider}'. Please choose one of 'openai', 'on-prem' or 'self-host'.",
+        )
+
+    if llm_provider == "self-host":
+        existing_integration = (
+            session.query(schema.Integrations)
+            .filter_by(type=schema.IntegrationType.self_hosted)
+            .first()
+        )
+
+        if existing_integration is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Self-host option not configured. Please set up self-hosting in the admin dashboard.",
+            )
 
     config = DeploymentConfig(
         user_id=str(user.id),
@@ -331,7 +350,7 @@ async def deploy_single_model(
             detail=str(err),
         )
 
-    if requires_on_prem_llm:
+    if llm_provider == "on-prem":
         llm_autoscaling_env = os.getenv("AUTOSCALING_ENABLED")
         if llm_autoscaling_env is not None:
             llm_autoscaling_enabled = llm_autoscaling_env.lower() == "true"

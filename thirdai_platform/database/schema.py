@@ -411,3 +411,18 @@ class JobMessage(SQLDeclarativeBase):
     job_type = Column(String(100), nullable=False)
     level = Column(ENUM(Level), nullable=False)
     message = Column(String)
+
+
+class IntegrationType(str, enum.Enum):
+    openai = "openai"
+    self_hosted = "self_hosted"
+
+
+class Integrations(SQLDeclarativeBase):
+    __tablename__ = "integrations"
+
+    id = Column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    type = Column(ENUM(IntegrationType), nullable=False, unique=True)
+    data = Column(JSON, nullable=True)

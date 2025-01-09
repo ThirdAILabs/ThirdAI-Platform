@@ -19,6 +19,7 @@ import {
   delete_workflow,
   getTrainingStatus,
   getDeployStatus,
+  fetchWorkflows,
   getTrainingLogs,
   getDeploymentLogs,
 } from '@/lib/backend';
@@ -96,6 +97,7 @@ export function WorkFlow({
     }
     setModelOwner(tempModelOwner);
   }
+
   function goToEndpoint() {
     switch (workflow.type) {
       case 'enterprise-search': {
@@ -258,47 +260,50 @@ export function WorkFlow({
   const [showErrorModal, setShowErrorModal] = useState(false);
 
   useEffect(() => {
-    const fetchStatuses = async () => {
+    const socket = new WebSocket(`ws://${window.location.hostname}:8000/ws/updates`);
+
+    socket.onopen = () => {
+      console.log('WebSocket connection established');
+    };
+
+    socket.onmessage = async (event) => {
+      const data = JSON.parse(event.data);
+      console.log(
+        `Received notification about change in workflow with name ${data.name} [event: ${data.event}].`
+      );
+
       try {
-        if (workflow.username && workflow.model_name) {
+        if (
+          workflow.username &&
+          workflow.model_name &&
+          workflow.model_name === data.name &&
+          data.event != 'delete'
+        ) {
           const modelIdentifier = `${workflow.username}/${workflow.model_name}`;
           const [trainStatus, deployStatus] = await Promise.all([
             getTrainingStatus(modelIdentifier),
             getDeployStatus(modelIdentifier),
           ]);
 
-          // Check training status
           if (
             trainStatus.data.train_status === 'failed' &&
             (trainStatus.data.errors?.length > 0 || trainStatus.data.messages?.length > 0)
           ) {
-            setError({
-              type: 'training',
-              messages: [...(trainStatus.data.errors || []), ...(trainStatus.data.messages || [])],
-            });
-          } else {
-            setError(null);
+            console.log('Training failed:', [
+              ...(trainStatus.data.errors || []),
+              ...(trainStatus.data.messages || []),
+            ]);
           }
 
-          // Check warnings separately
           if (trainStatus.data.warnings?.length > 0) {
-            setWarning({
-              type: 'training',
-              messages: trainStatus.data.warnings,
-            });
-          } else {
-            setWarning(null);
+            console.log('Training warnings:', trainStatus.data.warnings);
           }
 
-          // Check deployment
           if (
             deployStatus.data.deploy_status === 'failed' &&
             deployStatus.data.messages?.length > 0
           ) {
-            setError({
-              type: 'deployment',
-              messages: deployStatus.data.messages,
-            });
+            console.log('Deployment failed:', deployStatus.data.messages);
           }
         }
       } catch (error) {
@@ -306,9 +311,17 @@ export function WorkFlow({
       }
     };
 
-    fetchStatuses();
-    const intervalId = setInterval(fetchStatuses, 2000);
-    return () => clearInterval(intervalId);
+    socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    socket.onclose = () => {
+      console.log('WebSocket connection closed');
+    };
+
+    return () => {
+      socket.close();
+    };
   }, [workflow.username, workflow.model_name]);
 
   const copyContentToClipboard = () => {

@@ -33,26 +33,46 @@ export function ModelsTable({ searchStr, offset }: { searchStr: string; offset: 
 
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
 
-  useEffect(() => {
-    async function getWorkflows() {
-      try {
-        const fetchedWorkflows = await fetchWorkflows();
-        setWorkflows(fetchedWorkflows);
-      } catch (err) {
-        if (err instanceof Error) {
-          console.log(err.message);
-        } else {
-          console.log('An unknown error occurred');
-        }
+  async function getWorkflows() {
+    try {
+      const fetchedWorkflows = await fetchWorkflows();
+      setWorkflows(fetchedWorkflows);
+    } catch (err) {
+      if (err instanceof Error) {
+        console.log(err.message);
+      } else {
+        console.log('An unknown error occurred');
       }
     }
+  }
 
-    // Call the function immediately
+  useEffect(() => {
     getWorkflows();
+  }, []);
 
-    const intervalId = setInterval(getWorkflows, 3000);
+  useEffect(() => {
+    const socket = new WebSocket(`ws://${window.location.hostname}:8000/ws/updates`);
 
-    return () => clearInterval(intervalId);
+    socket.onopen = () => {
+      console.log('WebSocket connection established');
+    };
+
+    socket.onmessage = async (event) => {
+      console.log(`Received notification about change in the Model table.`);
+      getWorkflows();
+    };
+
+    socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    socket.onclose = () => {
+      console.log('WebSocket connection closed');
+    };
+
+    return () => {
+      socket.close();
+    };
   }, []);
 
   const filteredWorkflows = workflows.filter(
