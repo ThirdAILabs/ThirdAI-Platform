@@ -1259,23 +1259,23 @@ export function userEmailLogin(
   });
 }
 
-export function userEmailLoginWithAccessToken(
+export function SyncKeycloakUser(
   accessToken: string,
   setAccessToken: (token: string) => void
 ): Promise<any> {
-  console.debug('userEmailLogin called with accessToken:', accessToken);
+  console.debug('Sync keycloak user in platform with access token', accessToken);
 
   return new Promise((resolve, reject) => {
-    console.debug('Sending request to /api/user/email-login-with-keycloak with payload:', {
+    console.debug('Sending request to /api/user/keycloak-user-sync with payload:', {
       access_token: accessToken,
     });
 
     axios
-      .post(`${thirdaiPlatformBaseUrl}/api/user/email-login-with-keycloak`, {
+      .post(`${thirdaiPlatformBaseUrl}/api/user/keycloak-user-sync`, {
         access_token: accessToken,
       })
       .then((res) => {
-        console.debug('Response from email-login-with-keycloak:', res);
+        console.debug('Response from keycloak-user-sync:', res);
 
         const accessToken = res.data.data.access_token;
         const username = res.data.data.user.username;
@@ -2436,3 +2436,40 @@ export async function fetchFeedback(username: string, modelName: string) {
     throw error;
   }
 }
+
+export interface SelfHostedLLM {
+  endpoint: string;
+  api_key: string;
+}
+
+export interface LLMAPIResponse {
+  status: string;
+  message: string;
+  data?: SelfHostedLLM;
+}
+
+export const getSelfHostedLLM = (): Promise<LLMAPIResponse> => {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+  return axios.get(`${deploymentBaseUrl}/api/integrations/self-hosted-llm`).then((res) => res.data);
+};
+
+export const addSelfHostedLLM = (data: SelfHostedLLM): Promise<LLMAPIResponse> => {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  return axios
+    .post(`${deploymentBaseUrl}/api/integrations/self-hosted-llm`, {
+      endpoint: data.endpoint,
+      api_key: data.api_key,
+    })
+    .then((res) => res.data);
+};
+
+export const deleteSelfHostedLLM = (): Promise<LLMAPIResponse> => {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+  return axios
+    .delete(`${deploymentBaseUrl}/api/integrations/self-hosted-llm`)
+    .then((res) => res.data);
+};

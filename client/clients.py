@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
 
 import requests
+from pydantic import BaseModel
 from requests.auth import HTTPBasicAuth
 
 from client.utils import (
@@ -62,6 +63,18 @@ from typing import Optional
 from urllib.parse import urljoin
 
 from requests.auth import HTTPBasicAuth
+
+
+class ChatSettings(BaseModel):
+    top_k: int = 5
+    model: str = "gpt-4o-mini"
+    provider: str = "openai"
+    key: str = None
+    temperature: float = 0.2
+    chat_prompt: str = "Answer the user's questions based on the below context:"
+    query_reformulation_prompt: str = (
+        "Given the above conversation, generate a search query that would help retrieve relevant sources for responding to the last message."
+    )
 
 
 @dataclass
@@ -375,10 +388,13 @@ class NeuralDBClient(BaseClient):
         return response.json()["data"]
 
     @check_deployment_decorator
-    def update_chat_settings(self, provider: str = "openai"):
+    def update_chat_settings(self, settings: ChatSettings):
+        """
+        Update chat settings using a pre-constructed ChatSettings object.
+        """
         response = http_post_with_error(
             urljoin(self.base_url, "update-chat-settings"),
-            json={"provider": provider},
+            json=settings.model_dump(),
             headers=auth_header(self.login_instance.access_token),
         )
 
@@ -435,6 +451,7 @@ class LLMClient:
             urljoin(self.base_url, "llm-dispatch/generate"),
             headers={
                 "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.login_instance.access_token}",
             },
             json={
                 "query": query,

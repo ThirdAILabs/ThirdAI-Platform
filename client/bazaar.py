@@ -786,3 +786,28 @@ class ModelBazaar:
             headers=auth_header(upload_token),
         )
         return res.json()["data"]
+
+    def get_self_hosted_llm(self):
+        response = http_get_with_error(
+            urljoin(self._base_url, "integrations/self-hosted-llm"),
+            headers=auth_header(self._access_token),
+        )
+        return response.json()
+
+    def set_self_hosted_llm(self, endpoint: str, api_key: str):
+        payload = {"endpoint": endpoint, "api_key": api_key}
+        response = http_post_with_error(
+            urljoin(self._base_url, "integrations/self-hosted-llm"),
+            headers=auth_header(self._access_token),
+            json=payload,
+        )
+        print("Successfully set the Self-Hosted LLM Integration")
+        return response.json()
+
+    def delete_self_hosted_llm(self):
+        response = http_delete_with_error(
+            urljoin(self._base_url, "integrations/self-hosted-llm"),
+            headers=auth_header(self._access_token),
+        )
+        print("Successfully deleted the Self-Hosted LLM Integration")
+        return response.json()
