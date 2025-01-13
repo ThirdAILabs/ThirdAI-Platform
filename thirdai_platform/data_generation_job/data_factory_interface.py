@@ -91,7 +91,9 @@ class DataFactory(ABC):
     def process_prompt(
         self, prompt: str, system_prompt: Optional[str] = None, **kwargs
     ):
-        texts_of = self.llm_model.completion(prompt=prompt, system_prompt=system_prompt)
+        texts_of = self.llm_model.completion(
+            prompt=prompt, system_prompt=system_prompt, **kwargs
+        )
         return texts_of, kwargs
 
     def run_and_collect_results(

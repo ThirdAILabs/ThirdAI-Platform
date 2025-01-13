@@ -237,6 +237,58 @@ def test_udt_text_train():
     )
 
 
+@pytest.fixture()
+def doc_classification_files():
+    base_dir = os.path.join(file_dir(), "doc_classification_test_data")
+    file_list = []
+
+    for label in ["positive", "neutral", "negative"]:
+        label_dir = os.path.join(base_dir, label)
+        for file in os.listdir(label_dir):
+            if file.endswith(".pdf"):
+                file_list.append(
+                    FileInfo(
+                        path=os.path.join(label_dir, file),
+                        location="local",
+                        metadata={"label": label},
+                    )
+                )
+    return file_list
+
+
+def test_udt_document_classification(doc_classification_files):
+    verify_license.verify_and_activate(THIRDAI_LICENSE)
+
+    config = TrainConfig(
+        user_id="user_123",
+        model_bazaar_dir=MODEL_BAZAAR_DIR,
+        license_key=THIRDAI_LICENSE,
+        model_bazaar_endpoint="",
+        model_id="udt_123",
+        data_id="data_123",
+        model_options=UDTOptions(
+            udt_options=TextClassificationOptions(
+                text_column="text",
+                label_column="label",
+                n_target_classes=3,
+                word_limit=1000,
+                udt_sub_type="document",
+            ),
+            train_options=UDTTrainOptions(test_split=0.1),
+        ),
+        data=UDTData(supervised_files=doc_classification_files),
+        job_options=JobOptions(allocation_cores=2, allocation_memory=16000),
+    )
+
+    model = get_model(config, DummyReporter(), logger)
+    model.train()
+
+    # Verify model output
+    model_path = os.path.join(MODEL_BAZAAR_DIR, "models", "udt_123", "model.udt")
+    assert os.path.exists(model_path)
+    trained_model = bolt.UniversalDeepTransformer.load(model_path)
+
+
 @pytest.mark.parametrize("test_split", [0, 0.25])
 def test_udt_token_train(test_split):
     verify_license.verify_and_activate(THIRDAI_LICENSE)

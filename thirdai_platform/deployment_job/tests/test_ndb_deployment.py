@@ -160,6 +160,25 @@ def check_associate_dev_mode(client: TestClient):
     assert get_query_result(client, query) == 16
 
 
+def check_metadata(client: TestClient):
+    res = client.get("/sources")
+    assert res.status_code == 200
+    assert len(res.json()["data"]) == 1
+    assert res.json()["data"][0]["source"].endswith("articles.csv")
+
+    met_res = client.get(
+        "/get-metadata",
+        params={
+            "source_id": res.json()["data"][0]["source_id"],
+            "version": res.json()["data"][0]["version"],
+        },
+    )
+
+    assert met_res.json()["data"]["id"]["min"] == 0
+    assert met_res.json()["data"]["id"]["max"] == 99
+    assert met_res.json()["data"]["id"]["unique_count"] == 100
+
+
 def check_insertion_dev_mode(client: TestClient):
     res = client.get("/sources")
     assert res.status_code == 200
@@ -318,6 +337,7 @@ def test_deploy_ndb_dev_mode(tmp_dir):
     check_query(client)
     check_upvote_dev_mode(client)
     check_associate_dev_mode(client)
+    check_metadata(client)
     check_insertion_dev_mode(client)
     check_deletion_dev_mode(client)
     check_async_insertion_dev_mode(client)
