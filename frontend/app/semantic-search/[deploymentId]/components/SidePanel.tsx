@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import SaveButton from './buttons/SaveButton';
 import Teach from './Teach';
+import ConstraintSearch from './ConstraintSearch';
 import { HiChevronLeft } from 'react-icons/hi';
 
 const PanelContainer = styled.div<{ $isVisible: boolean }>`

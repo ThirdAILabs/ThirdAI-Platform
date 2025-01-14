@@ -51,6 +51,7 @@ export interface ChatResponse {
 export interface Source {
   source: string;
   source_id: string;
+  version: number;
 }
 
 export interface PIIDetectionResult {
@@ -876,6 +877,36 @@ export class ModelService {
       console.error(e);
       alert(e);
       throw new Error('Failed to record feedback: ' + e);
+    }
+  }
+  //To fetch metadata from backend.
+
+  async fetchMetaData(sourceId: string, version: number) {
+    try {
+      const response = await fetch(
+        `${this.url}/get-metadata?source_id=${encodeURIComponent(sourceId)}&version=${encodeURIComponent(version.toString())}`,
+        {
+          method: 'GET',
+          headers: {
+            ...this.authHeader(),
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Result: ', result.data);
+      return result.data;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to fetch metadata: ${error.message}`);
+      }
+      throw new Error('Failed to fetch metadata');
     }
   }
 }

@@ -16,6 +16,7 @@ import { TextField } from '@mui/material';
 import { DropdownMenu, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { fetchAutoCompleteQueries } from '@/lib/backend';
 import { debounce } from 'lodash';
+import ConstraintSearch from './ConstraintSearch';
 
 const Container = styled.section`
   box-shadow: 0 10px 10px 4px muted;
@@ -355,12 +356,15 @@ export default function SearchBar({
 
       <Spacer $height="5px" />
       {!showSuggestionBar && (
-        <ModelDescription
-          onClickViewDocuments={() => setShowSources((val) => !val)}
-          sources={sources}
-          setSources={setSources}
-          ifGenerationOn={ifGenerationOn}
-        />
+        <div className="flex flex-wrap gap-5">
+          <ModelDescription
+            onClickViewDocuments={() => setShowSources((val) => !val)}
+            sources={sources}
+            setSources={setSources}
+            ifGenerationOn={ifGenerationOn}
+          />
+          <ConstraintSearch />
+        </div>
       )}
       <Spacer $height="5px" />
 
