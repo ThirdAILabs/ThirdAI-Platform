@@ -43,7 +43,9 @@ class CloudProviderInterface:
     def get_registry_name(self) -> str:
         raise NotImplementedError
 
-    def get_full_image_name(self, base_name: str, branch: str, tag: str) -> str:
+    def get_full_image_name(
+        self, base_name: str, branch: str, tag: str, prod: bool
+    ) -> str:
         raise NotImplementedError
 
     def get_local_image_digest(self, image_id: str):

@@ -331,14 +331,19 @@ class AzureProvider(CloudProviderInterface):
         """
         return self.registry
 
-    def get_full_image_name(self, base_name: str, branch: str, tag: str) -> str:
+    def get_full_image_name(
+        self, base_name: str, branch: str, tag: str, prod: bool
+    ) -> str:
         """
         Get the full image name for a given base name, branch, and tag.
 
         :param base_name: Base name of the image
         :param branch: Branch name
         :param tag: Tag for the image
+        :param tag: Whether to get prod image name
         :return: Full image name
         """
-        image_name = f"{self.registry}/{image_name_for_branch(base_name, branch)}:{tag}"
+        image_name = (
+            f"{self.registry}/{image_name_for_branch(base_name, branch, prod)}:{tag}"
+        )
         return image_name

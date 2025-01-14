@@ -121,12 +121,21 @@ jobs:
       - name: Extract the docker registry_password
         id: docker_registry
         run: |
-          provider=$(yq e '.provider' $GITHUB_WORKSPACE/release/config.yaml)
-          base64_encoded_push_password=$(yq e '."'"$provider"'".branches.${{ inputs.docker_image_branch_name }}.push_credentials.password' $GITHUB_WORKSPACE/release/config.yaml | base64 -w 0)
-          base64_encoded_pull_password=$(yq e '."'"$provider"'".branches.${{ inputs.docker_image_branch_name }}.pull_credentials.password' $GITHUB_WORKSPACE/release/config.yaml | base64 -w 0)
-          
-          echo "base64_encoded_push_password=$base64_encoded_push_password" >> $GITHUB_OUTPUT
-          echo "base64_encoded_pull_password=$base64_encoded_pull_password" >> $GITHUB_OUTPUT
+          if [ "${{ inputs.docker_image_branch_name }}" = "prod" ]; then
+            provider=$(yq e '.provider' $GITHUB_WORKSPACE/release/config.yaml)
+            base64_encoded_push_password=$(yq e '."'"$provider"'".production.push_credentials.password' $GITHUB_WORKSPACE/release/config.yaml | base64 -w 0)
+            base64_encoded_pull_password=$(yq e '."'"$provider"'".production.pull_credentials.password' $GITHUB_WORKSPACE/release/config.yaml | base64 -w 0)
+            
+            echo "base64_encoded_push_password=$base64_encoded_push_password" >> $GITHUB_OUTPUT
+            echo "base64_encoded_pull_password=$base64_encoded_pull_password" >> $GITHUB_OUTPUT
+          else
+            provider=$(yq e '.provider' $GITHUB_WORKSPACE/release/config.yaml)
+            base64_encoded_push_password=$(yq e '."'"$provider"'".branches.${{ inputs.docker_image_branch_name }}.push_credentials.password' $GITHUB_WORKSPACE/release/config.yaml | base64 -w 0)
+            base64_encoded_pull_password=$(yq e '."'"$provider"'".branches.${{ inputs.docker_image_branch_name }}.pull_credentials.password' $GITHUB_WORKSPACE/release/config.yaml | base64 -w 0)
+            
+            echo "base64_encoded_push_password=$base64_encoded_push_password" >> $GITHUB_OUTPUT
+            echo "base64_encoded_pull_password=$base64_encoded_pull_password" >> $GITHUB_OUTPUT
+          fi
           
       - name: Check if base64_encoded_password is saved
         run: |

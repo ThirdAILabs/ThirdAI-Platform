@@ -19,8 +19,12 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "-b",
         "--branch",
-        required=True,
-        help="The branch to push docker images to. E.g. 'prod', 'test', etc.",
+        help="The branch to push docker images to. E.g. 'dev', 'test', etc. branch='prod' will build a production release",
+    )
+    parser.add_argument(
+        "--prod",
+        action="store_true",
+        help="Release a production build. Same behavior as setting branch='prod'.",
     )
     parser.add_argument(
         "--config",
@@ -50,15 +54,19 @@ def get_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def get_tag(branch: str, config: dict) -> str:
+def get_tag(branch: str, config: dict, prod: bool) -> str:
     """
     Get the version tag for a specific branch from the configuration.
 
     :param branch: Branch name
     :param config: Configuration dictionary
+    :param prod: Whether to get prod tag
     :return: Version tag
     """
-    return "v" + config[config["provider"]]["branches"][branch]["version"]
+    if not prod:
+        return "v" + config[config["provider"]]["branches"][branch]["version"]
+    else:
+        return "v" + config[config["provider"]]["production"]["version"]
 
 
 def get_root_absolute_path() -> Path:
@@ -83,6 +91,7 @@ def build_image(
     nocache: bool,
     dockerfile_path: str,
     context_path: str,
+    prod: bool,
 ) -> Dict[str, str]:
     """
     Build a Docker image.
@@ -95,6 +104,7 @@ def build_image(
     :param nocache: Whether to use cache during build
     :param dockerfile_path: Path to the actual Dockerfile
     :param context_path: Path to the context used to build
+    :param context_path: Whether to build prod image
     :return: Dictionary with image name and image ID
     """
     dockerfile_path = Path(dockerfile_path)
@@ -104,7 +114,7 @@ def build_image(
     if not dockerfile_path.is_absolute():
         dockerfile_path = context_path / Path(dockerfile_path)
 
-    full_name = provider.get_full_image_name(name, branch, tag)
+    full_name = provider.get_full_image_name(name, branch, tag, prod)
     image_id = provider.build_image(
         str(dockerfile_path), str(context_path), full_name, nocache, buildargs
     )
@@ -118,6 +128,7 @@ def build_images(
     username: str,
     password: str,
     nocache: bool,
+    prod: bool,
 ) -> Dict[str, str]:
     """
     Build all Docker images.
@@ -128,6 +139,7 @@ def build_images(
     :param username: Docker username
     :param password: Docker password
     :param nocache: Whether to use cache during build
+    :param prod: Whether to build prod images
     :return: Dictionary of image names and their IDs
     """
     image_ids = {}
@@ -143,7 +155,7 @@ def build_images(
                 "export_image_names_command": (
                     " ".join(
                         [
-                            f"export {image.key}={image_name_for_branch(image.name, branch)}"
+                            f"export {image.key}={image_name_for_branch(image.name, branch, prod)}"
                             for image in images_to_build
                         ]
                     )
@@ -160,6 +172,7 @@ def build_images(
                 nocache,
                 image.dockerfile_path,
                 image.context_path,
+                prod,
             )
         )
 
@@ -167,7 +180,11 @@ def build_images(
 
 
 def verify_tag(
-    provider: CloudProviderInterface, image_ids: Dict[str, str], tag: str, branch: str
+    provider: CloudProviderInterface,
+    image_ids: Dict[str, str],
+    tag: str,
+    branch: str,
+    prod: bool,
 ) -> None:
     """
     Verify that the Docker image tag matches the checksum of the built image.
@@ -180,7 +197,7 @@ def verify_tag(
     """
     for name, image_id in image_ids.items():
         existing = provider.get_image_digest(
-            name=image_name_for_branch(name, branch), tag=tag
+            name=image_name_for_branch(name, branch, prod), tag=tag
         )
         new = provider.get_local_image_digest(image_id=image_id)
         if existing and existing != new:
@@ -196,6 +213,7 @@ def push_images(
     tag: str,
     branch: str,
     dont_update_latest: bool,
+    prod: bool,
 ) -> None:
     """
     Push Docker images to the registry.
@@ -204,13 +222,16 @@ def push_images(
     :param image_ids: Dictionary of image names and their IDs
     :param tag: Version tag
     :param branch: Branch name
+    :param prod: Whether to push prod images
     :param dont_update_latest: Whether to update the 'latest' tag
     """
     for name, image_id in image_ids.items():
-        provider.push_image(image_id, provider.get_full_image_name(name, branch, tag))
+        provider.push_image(
+            image_id, provider.get_full_image_name(name, branch, tag, prod)
+        )
         if not dont_update_latest:
             provider.push_image(
-                image_id, provider.get_full_image_name(name, branch, "latest")
+                image_id, provider.get_full_image_name(name, branch, "latest", prod)
             )
 
 
@@ -237,36 +258,66 @@ def main() -> None:
         if not config["azure"]["registry"]:
             config["azure"]["registry"] = "thirdaiplatform.azurecr.io"
 
-        # Ensure branch configuration exists
-        if "branches" not in config["azure"]:
-            config["azure"]["branches"] = {}
+        if args.branch == "prod":
+            args.branch = ""
+            args.prod = True
+            print("Building production release")
 
-        if args.branch not in config["azure"]["branches"]:
-            config["azure"]["branches"][args.branch] = {
-                "version": "0.0.1",
-                "push_credentials": {"username": "", "password": ""},
-                "pull_credentials": {"username": "", "password": ""},
-            }
+        if (not args.prod and not args.branch) or (args.prod and args.branch):
+            raise Exception(
+                "Please either provide a branch name, or build a production release"
+            )
 
-        tag = "v" + args.version if args.version else get_tag(args.branch, config)
+        if args.prod and "production" not in config["azure"]:
+            raise Exception("Please provide production credentials in the config")
 
-        azure_config = config["azure"]
-        branch_config = azure_config["branches"][args.branch]
+        if args.branch:
+
+            # Ensure branch configuration exists
+            if "branches" not in config["azure"]:
+                config["azure"]["branches"] = {}
+
+            if args.branch not in config["azure"]["branches"]:
+                config["azure"]["branches"][args.branch] = {
+                    "version": "0.0.1",
+                    "push_credentials": {"username": "", "password": ""},
+                    "pull_credentials": {"username": "", "password": ""},
+                }
+
+            azure_config = config["azure"]
+            credentials_config = azure_config["branches"][args.branch]
+
+        elif args.prod:
+
+            azure_config = config["azure"]
+            credentials_config = azure_config["production"]
+
+        tag = (
+            "v" + args.version
+            if args.version
+            else get_tag(args.branch, config, args.prod)
+        )
+
         provider = AzureProvider(registry=azure_config["registry"])
-
-        push_credentials = branch_config.get("push_credentials", {})
-        pull_credentials = branch_config.get("pull_credentials", {})
+        push_credentials = credentials_config.get("push_credentials", {})
+        pull_credentials = credentials_config.get("pull_credentials", {})
         push_username = push_credentials.get("username")
         push_password = push_credentials.get("password")
         pull_username = pull_credentials.get("username")
         pull_password = pull_credentials.get("password")
 
         # Replace underscores with hyphens in the branch name
-        sanitized_branch = args.branch.replace("_", "-")
+        if args.branch:
+            sanitized_branch = args.branch.replace("_", "-")
+            push_cred_name = f"thirdaiplatform-push-{sanitized_branch}"
+            pull_cred_name = f"thirdaiplatform-pull-{sanitized_branch}"
+        elif args.prod:
+            push_cred_name = "thirdaiplatform-push"
+            pull_cred_name = "thirdaiplatform-pull"
 
         if not push_username or not push_password:
             new_push_credentials = provider.create_credentials(
-                name=f"thirdaiplatform-push-{sanitized_branch}",
+                name=push_cred_name,
                 image_names=[
                     image_name_for_branch(image.name, args.branch)
                     for image in images_to_build
@@ -284,7 +335,7 @@ def main() -> None:
         else:
             if not args.dont_update_scope:
                 provider.update_credentials(
-                    name=f"thirdaiplatform-push-{sanitized_branch}",
+                    name=push_cred_name,
                     image_names=[
                         image_name_for_branch(image.name, args.branch)
                         for image in images_to_build
@@ -295,7 +346,7 @@ def main() -> None:
 
         if not pull_username or not pull_password:
             new_pull_credentials = provider.create_credentials(
-                name=f"thirdaiplatform-pull-{sanitized_branch}",
+                name=pull_cred_name,
                 image_names=[
                     image_name_for_branch(image.name, args.branch)
                     for image in images_to_build
@@ -313,7 +364,7 @@ def main() -> None:
         else:
             if not args.dont_update_scope:
                 provider.update_credentials(
-                    name=f"thirdaiplatform-pull-{sanitized_branch}",
+                    name=pull_cred_name,
                     image_names=[
                         image_name_for_branch(image.name, args.branch)
                         for image in images_to_build
@@ -336,11 +387,19 @@ def main() -> None:
 
         # Build images
         image_ids = build_images(
-            provider, args.branch, tag, pull_username, pull_password, args.no_cache
+            provider,
+            args.branch,
+            tag,
+            pull_username,
+            pull_password,
+            args.no_cache,
+            args.prod,
         )
 
-        verify_tag(provider, image_ids, tag, args.branch)
-        push_images(provider, image_ids, tag, args.branch, args.dont_update_latest)
+        verify_tag(provider, image_ids, tag, args.branch, args.prod)
+        push_images(
+            provider, image_ids, tag, args.branch, args.dont_update_latest, args.prod
+        )
 
 
 if __name__ == "__main__":

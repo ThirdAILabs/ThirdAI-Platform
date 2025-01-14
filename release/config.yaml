@@ -1,5 +1,21 @@
 azure:
+  production:
+    pull_credentials:
+      password: 5Di/+qW2Q/++3mp0Ah/rkCq33n2N7f0E8G4+cSHnub+ACRClJvCj
+      username: thirdaiplatform-pull-release-test-main
+    push_credentials:
+      password: y/iKY+7IwCrcdd61Rp3vma3gTyYScI72TY7484cJ6c+ACRBkPJv/
+      username: thirdaiplatform-push-release-test-main
+    version: 2.0.0
   branches:
+    release-test-main:  
+      pull_credentials:
+        password: 5Di/+qW2Q/++3mp0Ah/rkCq33n2N7f0E8G4+cSHnub+ACRClJvCj
+        username: thirdaiplatform-pull-release-test-main
+      push_credentials:
+        password: y/iKY+7IwCrcdd61Rp3vma3gTyYScI72TY7484cJ6c+ACRBkPJv/
+        username: thirdaiplatform-push-release-test-main
+      version: 0.0.57
     daily-update:
       pull_credentials:
         password: xDHBncnAPPXcsodP6AqAo8kEDxNoOR5X8r5krtaZp++ACRAwcL6j
@@ -71,14 +87,6 @@ azure:
         password: c3P3qKGzI2dBE6fiKJfF+zHos70aRFcJ6vVLZh+zq0+ACRCEzI7T
         username: thirdaiplatform-push-release-test
       version: 0.0.62
-    release-test-main:
-      pull_credentials:
-        password: 5Di/+qW2Q/++3mp0Ah/rkCq33n2N7f0E8G4+cSHnub+ACRClJvCj
-        username: thirdaiplatform-pull-release-test-main
-      push_credentials:
-        password: y/iKY+7IwCrcdd61Rp3vma3gTyYScI72TY7484cJ6c+ACRBkPJv/
-        username: thirdaiplatform-push-release-test-main
-      version: 0.0.57
     test_1:
       pull_credentials:
         password: lfhxcL/qmrYP24rIH2vmRNSYV9ZlNCfxJyQI6E3kVi+ACRDjUz22

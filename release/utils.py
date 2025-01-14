@@ -4,15 +4,16 @@ import yaml
 from pydantic import BaseModel
 
 
-def image_name_for_branch(name: str, branch: str) -> str:
+def image_name_for_branch(name: str, branch: str, prod: bool = False) -> str:
     """
     Generate the image name for a given branch.
 
     :param name: Base name of the image
     :param branch: Branch name
-    :return: Image name with branch suffix, or base name if branch is 'prod'
+    :param prod: Whether to release production images
+    :return: Image name with branch suffix, or base name if prod is True
     """
-    return f"{name}_{branch}" if branch != "prod" else name
+    return f"{name}_{branch}" if not prod else name
 
 
 class Credentials(BaseModel):

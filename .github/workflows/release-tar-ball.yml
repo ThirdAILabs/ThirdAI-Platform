@@ -54,7 +54,7 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             branch_name=${{ inputs.docker_image_branch_name }}
           else
-            branch_name="release-test-main"
+            branch_name="prod"
           fi
           echo "Docker image branch to build on: $branch_name"
           echo "branch_name=$branch_name" >> $GITHUB_OUTPUT
