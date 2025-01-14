@@ -291,6 +291,11 @@ const NERQuestions = ({
     }
   }, [appName]);
 
+  useEffect(() => {
+    setGeneratedData([]);
+    setGenerateDataPrompt('');
+  }, [creationMethod]);
+
   const renderCreationMethodSelection = () => (
     <Box sx={{ width: '100%', mb: 4 }}>
       <Typography variant="h6" sx={{ mb: 2 }}>
@@ -405,13 +410,12 @@ const NERQuestions = ({
   );
 
   const renderSelectedMethod = () => {
-    if (generatedData.length > 0) {
+    // Only show generated data if we're in SYNTHETIC mode AND have generated data
+    if (creationMethod === CREATION_METHODS.SYNTHETIC && generatedData.length > 0) {
       return renderGeneratedData();
     }
 
     switch (creationMethod) {
-      // case CREATION_METHODS.PRETRAINED:
-      //   return <Typography>Coming Soon</Typography>;
       case CREATION_METHODS.UPLOAD_DATA:
         return (
           <Box sx={{ width: '100%' }}>
