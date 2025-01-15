@@ -106,66 +106,125 @@ class NeuralDBV2(Model):
 
         n_jobs = max(1, min(os.cpu_count() - 6, 20))
 
-        self.logger.debug(f"Using {n_jobs} parsing jobs")
-
         doc_save_dir = self.doc_save_path()
         tmp_dir = self.data_dir / "unsupervised"
 
         docs_indexed = 0
         successfully_indexed_files = 0
 
-        batches = [files[i : i + batch_size] for i in range(0, len(files), batch_size)]
-        with mp.Pool(processes=n_jobs) as pool:
-            first_batch_start = time.perf_counter()
-            curr_batch = pool.starmap(
-                parse_doc,
-                [(doc, doc_save_dir, tmp_dir) for doc in batches[0]],
-                chunksize=10,
-            )
-            first_batch_end = time.perf_counter()
-            self.logger.debug(
-                f"First batch parsed in {first_batch_end - first_batch_start:.3f}s"
-            )
+        parallelize = True
 
-            for i in range(len(batches)):
-                start = time.perf_counter()
-                if i + 1 < len(batches):
-                    next_batch = pool.starmap_async(
-                        parse_doc,
-                        [(doc, doc_save_dir, tmp_dir) for doc in batches[i + 1]],
-                        chunksize=10,
-                    )
-                else:
-                    next_batch = None
+        image_pdf_files = [
+            file_info
+            for file_info in files
+            if file_info.ext == ".pdf" and file_info.options.get("with_images", False)
+        ]
+        other_files = [
+            file_info
+            for file_info in files
+            if not (
+                file_info.ext == ".pdf" and file_info.options.get("with_images", False)
+            )
+        ]
 
-                docs = []
-                for doc_idx, doc in enumerate(curr_batch):
-                    if not doc:
-                        msg = f"Unable to parse {batches[i][doc_idx].path}. Unsupported filetype."
-                        self.logger.error(msg, code=LogCode.MODEL_INSERT)
-                        self.reporter.report_warning(
-                            model_id=self.config.model_id,
-                            message=msg,
+        # some static conditions to evaluate if parallelism should be done or not (can be finetuned possibly)
+        if len(image_pdf_files) >= 5 and len(other_files) <= 20:
+            # Don't parallelize the doc parsing of files
+            parallelize = False
+
+        if parallelize:
+            self.logger.debug(f"Using {n_jobs} parsing jobs")
+
+            batches = [
+                files[i : i + batch_size] for i in range(0, len(files), batch_size)
+            ]
+            with mp.Pool(processes=n_jobs) as pool:
+                first_batch_start = time.perf_counter()
+                curr_batch = pool.starmap(
+                    parse_doc,
+                    [(doc, doc_save_dir, tmp_dir) for doc in batches[0]],
+                    chunksize=10,
+                )
+
+                first_batch_end = time.perf_counter()
+                self.logger.debug(
+                    f"First batch parsed in {first_batch_end - first_batch_start:.3f}s"
+                )
+
+                for i in range(len(batches)):
+                    start = time.perf_counter()
+                    if i + 1 < len(batches):
+                        next_batch = pool.starmap_async(
+                            parse_doc,
+                            [(doc, doc_save_dir, tmp_dir) for doc in batches[i + 1]],
+                            chunksize=10,
                         )
                     else:
-                        docs.append(doc)
+                        next_batch = None
 
-                index_start = time.perf_counter()
-                self.db.insert(docs)
-                index_end = time.perf_counter()
+                    docs = []
+                    for doc_idx, doc in enumerate(curr_batch):
+                        if not doc:
+                            msg = f"Unable to parse {batches[i][doc_idx].path}. Unsupported filetype."
+                            self.logger.error(msg, code=LogCode.MODEL_INSERT)
+                            self.reporter.report_warning(
+                                model_id=self.config.model_id,
+                                message=msg,
+                            )
+                        else:
+                            docs.append(doc)
 
-                docs_indexed += len(curr_batch)
-                successfully_indexed_files += len(docs)
+                    index_start = time.perf_counter()
+                    self.db.insert(docs)
+                    index_end = time.perf_counter()
 
-                if next_batch:
-                    next_batch.wait()
-                    curr_batch = next_batch.get()
+                    docs_indexed += len(curr_batch)
+                    successfully_indexed_files += len(docs)
 
-                end = time.perf_counter()
-                self.logger.debug(
-                    f"Batch {i+1} inserted in {end - start:.3f}s, insertion time: {index_end - index_start:.3f}s, "
-                    f"total documents indexed so far: {docs_indexed}"
-                )
+                    if next_batch:
+                        next_batch.wait()
+                        curr_batch = next_batch.get()
+
+                    end = time.perf_counter()
+                    self.logger.debug(
+                        f"Batch {i+1} inserted in {end - start:.3f}s, insertion time: {index_end - index_start:.3f}s, "
+                        f"total documents indexed so far: {docs_indexed}"
+                    )
+        else:
+            self.logger.debug(f"Parsing Document serially")
+
+            docs = []
+            start = time.perf_counter()
+            for file_info in files:
+                if file_info.ext == ".pdf" and file_info.options.get(
+                    "with_images", False
+                ):
+                    # enable parallelism for image-pdf(s)
+                    file_info.options.update(parallelize=True)
+
+                doc = parse_doc(file_info, doc_save_dir, tmp_dir)
+                if not doc:
+                    msg = f"Unable to parse {file_info.path}. Unsupported filetype."
+                    self.logger.error(msg, code=LogCode.MODEL_INSERT)
+                    self.reporter.report_warning(
+                        model_id=self.config.model_id,
+                        message=msg,
+                    )
+                else:
+                    docs.append(doc)
+
+            index_start = time.perf_counter()
+            self.db.insert(docs)
+            index_end = time.perf_counter()
+
+            docs_indexed += len(files)
+            successfully_indexed_files += len(docs)
+
+            end = time.perf_counter()
+            self.logger.debug(
+                f"Files inserted in {end - start:.3f}s, insertion time: {index_end - index_start:.3f}s, "
+                f"total documents indexed so far: {docs_indexed}"
+            )
 
         total_chunks = self.db.retriever.retriever.size()
         self.logger.info(

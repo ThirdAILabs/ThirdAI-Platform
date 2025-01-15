@@ -43,10 +43,15 @@ def convert_to_ndb_doc(
 
         return ndbv2.PDF(
             resource_path,
-            doc_metadata=metadata,
+            doc_metadata={
+                **(metadata or {}),
+                "with_images": options.get("with_images", False),
+            },
             display_path=display_path,
             doc_id=doc_id,
             doc_keywords=doc_keywords,
+            with_images=options.get("with_images", False),
+            parallelize=options.get("parallelize", False),
         )
     elif ext == ".docx":
         return ndbv2.DOCX(

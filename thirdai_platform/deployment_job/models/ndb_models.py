@@ -232,31 +232,6 @@ class NDBModel(Model):
 
         return result
 
-    def highlight_v1(self, chunk: Chunk) -> Tuple[str, Optional[bytes]]:
-        source = self.full_source_path(chunk.document)
-        highlights = ast.literal_eval(chunk.metadata["highlight"])
-
-        doc = fitz.open(source)
-        for key, val in highlights.items():
-            page = doc[key]
-            blocks = page.get_text("blocks")
-            for i, b in enumerate(blocks):
-                if i in val:
-                    rect = fitz.Rect(b[:4])
-                    page.add_highlight_annot(rect)
-
-        return source, doc.tobytes()
-
-    def highlight_v2(self, chunk: Chunk) -> Tuple[str, Optional[bytes]]:
-        source = self.full_source_path(chunk.document)
-        highlights = ast.literal_eval(chunk.metadata["chunk_boxes"])
-
-        doc = fitz.open(source)
-        for page, bounding_box in highlights:
-            doc[page].add_highlight_annot(fitz.Rect(bounding_box))
-
-        return source, doc.tobytes()
-
     def highlight_pdf(self, chunk_id: int) -> Tuple[str, Optional[bytes]]:
         with self.db_lock:
             chunk = self.db.chunk_store.get_chunks([chunk_id])
@@ -264,12 +239,15 @@ class NDBModel(Model):
             raise ValueError(f"{chunk_id} is not a valid chunk_id")
         chunk = chunk[0]
 
-        if "highlight" in chunk.metadata:
-            return self.highlight_v1(chunk)
-        elif "chunk_boxes" in chunk.metadata:
-            return self.highlight_v2(chunk)
-        else:
-            return self.full_source_path(chunk.document), None
+        highlighted_pdf = ndbv2.PDF.highlighted_doc(
+            self.full_source_path(chunk.document),
+            chunk,
+            chunk.metadata.get("with_images", False),
+            parallelize=True,
+        )
+        if highlighted_pdf:
+            return self.full_source_path(chunk.document), highlighted_pdf.tobytes()
+        return self.full_source_path(chunk.document), None
 
     def chunks(self, chunk_id: int) -> Optional[Dict[str, Any]]:
         with self.db_lock:
