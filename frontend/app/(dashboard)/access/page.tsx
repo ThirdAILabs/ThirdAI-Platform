@@ -79,7 +79,7 @@ function AccessContent() {
               </TabsTrigger>
               {user?.global_admin && (
                 <TabsTrigger value="openai" className="flex-1">
-                  API Key
+                  LLM
                 </TabsTrigger>
               )}
             </TabsList>

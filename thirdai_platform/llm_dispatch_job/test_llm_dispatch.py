@@ -37,7 +37,8 @@ def test_generate_text_stream(references, prompt):
     mock_llm_instance.stream = mock_stream
 
     with patch(
-        "llm_dispatch_job.main.model_classes", {"openai": lambda: mock_llm_instance}
+        "llm_dispatch_job.llms.model_classes",
+        {"openai": lambda api_key: mock_llm_instance},
     ):
         request_data = {
             "query": "test query",
@@ -79,7 +80,7 @@ def test_unsupported_provider():
 
     response = client.post("/llm-dispatch/generate", json=request_data)
     assert response.status_code == 400
-    assert response.json() == {"detail": "Unsupported provider"}
+    assert response.json() == {"detail": "Unsupported provider: unknown_provider"}
 
 
 def test_invalid_request_body():

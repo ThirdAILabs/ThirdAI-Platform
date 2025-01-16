@@ -132,6 +132,16 @@ class KnowledgeExtraction:
 
         return res.json()["data"]
 
+    def list_reports(self):
+        self._check_started()
+
+        res = http_get_with_error(
+            urljoin(self.deployment_url, f"reports"),
+            headers=auth_header(self.login.access_token),
+        )
+
+        return res.json()["data"]
+
     def delete_report(self, report_id: str):
         self._check_started()
 

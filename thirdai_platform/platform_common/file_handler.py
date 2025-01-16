@@ -6,7 +6,6 @@ from functools import wraps
 from typing import List
 
 import boto3
-from botocore import UNSIGNED
 from botocore.client import Config
 from botocore.exceptions import ClientError
 from fastapi import HTTPException, UploadFile, status
@@ -238,7 +237,6 @@ class S3StorageHandler(CloudStorageHandler):
         # https://docs.aws.amazon.com/sdk-for-php/v3/developer-guide/guide_credentials_environment.html
         if not aws_access_key or not aws_secret_access_key:
             config = Config(
-                signature_version=UNSIGNED,
                 retries={"max_attempts": 10, "mode": "standard"},
                 connect_timeout=5,
                 read_timeout=60,

@@ -119,6 +119,7 @@ class NDBRouter:
         self.router.add_api_route(
             "/get-signed-url", self.get_signed_url, methods=["GET"]
         )
+        self.router.add_api_route("/get-metadata", self.get_metadata, methods=["GET"])
 
         # Only enable task queue in dev mode
         if not self.config.autoscaling_enabled:
@@ -127,7 +128,7 @@ class NDBRouter:
             self.tasks = {}
             self.task_lock = threading.Lock()
 
-        threading.Thread(target=self.process_tasks, daemon=True).start()
+            threading.Thread(target=self.process_tasks, daemon=True).start()
 
     @staticmethod
     def get_model(config: DeploymentConfig, logger: JobLogger) -> NDBModel:
@@ -837,6 +838,21 @@ class NDBRouter:
             data={},
         )
 
+    def get_metadata(
+        self,
+        source_id: str,
+        version: str,
+        token: str = Depends(Permissions.verify_permission("read")),
+    ):
+
+        metadata = self.model.get_metadata(doc_id=source_id, doc_version=int(version))
+
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successfully got metadata.",
+            data=jsonable_encoder(metadata),
+        )
+
     def get_tasks(
         self,
         task_id: Optional[str] = None,
@@ -898,7 +914,7 @@ class NDBRouter:
                     self.tasks[task_id].status = TaskStatus.FAILED
                     self.tasks[task_id].message = str(traceback.format_exc())
                     self.tasks[task_id].last_modified = now()
-                    logging.error(
+                    self.logger.error(
                         f"Task {task_id} with data {self.tasks[task_id]} failed: {str(traceback.format_exc())}"
                     )
 

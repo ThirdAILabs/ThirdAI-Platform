@@ -41,6 +41,8 @@ class OpenAILLM(LLMBase):
         prompt: str,
         system_prompt: Optional[str] = None,
         model_name: str = "gpt-4o",
+        temperature: float = 0.8,
+        **kwargs,
     ) -> str:
         messages = []
         if system_prompt:
@@ -51,7 +53,7 @@ class OpenAILLM(LLMBase):
         response = self.client.chat.completions.create(
             model=model_name,
             messages=messages,
-            temperature=0.8,  # TODO (anyone): Choose the temp based on a random distribution
+            temperature=temperature,  # TODO (anyone): Choose the temp based on a random distribution
         )
 
         res = response.choices[0].message.content
@@ -95,6 +97,7 @@ class CohereLLM(LLMBase):
         prompt: str,
         system_prompt: Optional[str] = None,
         model_name: str = "command-r-plus",
+        **kwargs,
     ) -> str:
         message = ""
         if system_prompt:

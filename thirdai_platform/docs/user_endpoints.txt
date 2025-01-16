@@ -204,10 +204,10 @@
 
 ---
 
-# Email Login with Keycloak
+# Sync keycloak user in platform
 
-**Description**: Log in using a Keycloak access token. It verifies the token directly in this function and returns user info.
-If the user does not exist, we create the user here.
+**Description**: Synchronizes user in platform registered via keycloak.
+In other words, this endpoint ensures that users registered via Keycloak also exists in the platform's database. It verifies using the token directly in this function and returns user info.
 
 **Request Body**:
 ```json
@@ -220,7 +220,7 @@ If the user does not exist, we create the user here.
 - `200 OK`: Successfully logged in using Keycloak token.
 ```json
   {
-    "message": "Successfully logged in using Keycloak token.",
+    "message": "Successfully synced with keycloak.",
     "data": {
       "user": {
         "username": "johndoe",

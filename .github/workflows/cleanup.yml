@@ -1,0 +1,89 @@
+name: Remove given docker images and s3 object
+
+on:
+  workflow_call:
+    inputs:
+      docker_image_branch_name:
+        description: "Branch name of the docker images"
+        required: true
+        type: string
+      docker_image_version:
+        description: "version of the docker images (without prefix 'v')"
+        required: true
+        type: string
+      offline_package_name:
+        description: "Offline tarball filename"
+        required: true
+        type: string
+      online_package_name:
+        description: "Online tarball filename"
+        required: true
+        type: string
+    secrets:
+      AZURE_CLIENT_ID:
+        description: "Azure client ID"
+        required: true
+      AZURE_TENANT_ID:
+        description: "Azure tenant ID"
+        required: true
+      AZURE_CLIENT_SECRET:
+        description: "Azure client secret"
+        required: true
+      AWS_ACCESS_KEY_ID:
+        description: "AWS access key id"
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        description: "AWS secret access key"
+        required: true
+  workflow_dispatch:
+    inputs:
+      docker_image_branch_name:
+        description: "Branch name of the docker images"
+        required: true
+        type: string
+      docker_image_version:
+        description: "version of the docker images (without prefix 'v')"
+        required: true
+        type: string
+      offline_package_name:
+        description: "Offline tarball filename"
+        required: true
+        type: string
+      online_package_name:
+        description: "Online tarball filename"
+        required: true
+        type: string
+
+jobs:
+  Cleanup:
+    runs-on: ubuntu-latest-8-cores
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Delete docker images from azure repository
+        run: |
+          cd release
+          pip install -r requirements.txt
+          version="${{ inputs.docker_image_version }}"
+          echo "Deleting Docker images for branch ${{ inputs.docker_image_branch_name }} with version: $version"
+          python3 docker_remove.py -b ${{ inputs.docker_image_branch_name }} --version "$version" --client_id ${{ secrets.AZURE_CLIENT_ID }} --tenant_id ${{ secrets.AZURE_TENANT_ID }} --secret ${{ secrets.AZURE_CLIENT_SECRET }} --config config.yaml   # This works because config.yaml is only being used to get the registry provider
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+        continue-on-error: false
+      
+      - name: Delete the offline and online tarballs from the s3 buckets
+        run: |
+          echo "Deleting package ${{ inputs.offline_package_name }} and ${{ inputs.online_package_name }} from S3..."
+          aws s3 rm s3://thirdai-corp-public/ThirdAI-Platform-latest-release/${{ inputs.offline_package_name }}
+          aws s3 rm s3://thirdai-corp-public/ThirdAI-Platform-latest-release/${{ inputs.online_package_name }}

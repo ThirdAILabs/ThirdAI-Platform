@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import contextmanager
 
@@ -91,46 +92,78 @@ class AdminAddition:
                         },
                     )
                 else:
+                    user_payload = {
+                        "username": admin_username,
+                        "email": admin_mail,
+                        "enabled": True,
+                        "emailVerified": True,
+                        "credentials": [
+                            {
+                                "type": "password",
+                                "value": admin_password,
+                                "temporary": False,
+                            }
+                        ],
+                        "realmRoles": ["admin"],
+                        "firstName": admin_username,
+                        "lastName": "User",
+                    }
+                    try:
+                        keycloak_user_id = keycloak_admin.create_user(
+                            user_payload,
+                            exist_ok=True,
+                        )
+                    except Exception as e:
+                        # Check if the user now exists
+                        check_user_id = keycloak_admin.get_user_id(admin_username)
+                        if check_user_id:
+                            logging.warning(
+                                f"Caught an exception after attempting to create user '{admin_username}', "
+                                f"but the user now appears to exist. Skipping error."
+                            )
+                            keycloak_user_id = check_user_id
+                        else:
+                            # User truly failed to create
+                            logging.error(
+                                f"Error creating user '{admin_username}': {str(e)}"
+                            )
+                            raise e
 
-                    keycloak_user_id = keycloak_admin.create_user(
-                        {
-                            "username": admin_username,
-                            "email": admin_mail,
-                            "enabled": True,
-                            "emailVerified": True,
-                            "credentials": [
-                                {
-                                    "type": "password",
-                                    "value": admin_password,
-                                    "temporary": False,
-                                }
-                            ],
-                            "realmRoles": ["admin"],
-                            "firstName": admin_username,
-                            "lastName": "User",
-                        }
-                    )
-
-            user: schema.User = (
-                session.query(schema.User)
-                .filter(schema.User.email == admin_mail)
-                .first()
-            )
-
-            if not user:
-                user = schema.User(
-                    username=admin_username,
-                    email=admin_mail,
-                    password_hash=hash_password(admin_password),
-                    verified=True,
-                    global_admin=True,
+            try:
+                user: schema.User = (
+                    session.query(schema.User)
+                    .filter(schema.User.email == admin_mail)
+                    .first()
                 )
-                session.add(user)
-                session.commit()
-                session.refresh(user)
-            else:
-                user.global_admin = True
-                session.commit()
+                if not user:
+                    user = schema.User(
+                        username=admin_username,
+                        email=admin_mail,
+                        password_hash=hash_password(admin_password),
+                        verified=True,
+                        global_admin=True,
+                    )
+                    session.add(user)
+                    session.commit()
+                    session.refresh(user)
+                else:
+                    user.global_admin = True
+                    session.commit()
+            except Exception as e:
+                existing_user = (
+                    session.query(schema.User)
+                    .filter(schema.User.email == admin_mail)
+                    .first()
+                )
+                if existing_user and existing_user.global_admin:
+                    logging.warning(
+                        f"Attempted to add admin user '{admin_username}', but the user already exists as a global admin. Skipping error."
+                    )
+                else:
+                    logging.error(
+                        f"Error adding/updating admin user '{admin_username}': {str(e)}"
+                    )
+                    raise e
 
 
 AdminAddition.add_admin(

@@ -1,0 +1,195 @@
+name: Create offline/online tarball of the thirdai-platform
+
+on:
+  workflow_call:
+    inputs:
+      Installer_branch_name:
+        description: "Ansible-repo branch name"
+        type: string
+        default: main
+      docker_image_branch_name:
+        description: "Branch name of the docker images"
+        type: string
+        required: true
+      docker_image_version:
+        description: "version of the docker images (with prefix 'v')"
+        required: true
+        type: string
+      b64_encoded_docker_registry_pull_password:
+        description: "Docker registry pull password for the branch image encoded in base64"
+        required: true
+        type: string
+    secrets:
+      PLATFORM_INSTALLATION_DEPLOY_KEY:
+        description: "key for accessing Platform repo"
+        required: true
+      AWS_ACCESS_KEY_ID:
+        description: "AWS access key id"
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        description: "AWS secret access key"
+        required: true
+    outputs:
+      offline_package_name:
+        description: "Offline tarball filename"
+        value: ${{ jobs.package.outputs.offline_package_name }}
+      online_package_name:
+        description: "Online tarball filename"
+        value: ${{ jobs.package.outputs.online_package_name }}
+
+jobs:
+    package:
+      runs-on: ubuntu-latest-8-cores
+      outputs:
+        offline_package_name: ${{ steps.offline_pack.outputs.name }}
+        online_package_name: ${{ steps.online_pack.outputs.name }}
+      steps:
+        - name: Checkout the repository
+          uses: actions/checkout@v2
+
+        - name: Set up SSH for cloning
+          run: |
+            mkdir -p ~/.ssh
+            echo "${{ secrets.PLATFORM_INSTALLATION_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+            chmod 600 ~/.ssh/id_ed25519
+            ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+        - name: Clone Platform repository
+          run: |
+            git clone git@github.com:ThirdAILabs/platform.git
+            cd platform
+            git checkout ${{ inputs.installer_branch_name }}
+            cd ..
+
+        - name: Download and store the Llama model in the unified models folder
+          run: |
+            mkdir -p pretrained-models/genai
+            wget -O pretrained-models/genai/Llama-3.2-1B-Instruct-f16.gguf https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-f16.gguf
+
+        - name: Install Python and Dependencies
+          run: |
+            sudo apt-get update
+            sudo apt-get install -y python3 python3-pip
+            pip install transformers torch
+        
+        - name: Set HF_HOME environment variable
+          run: echo "HF_HOME=$GITHUB_WORKSPACE/pretrained-models" >> $GITHUB_ENV
+
+        - name: Run Model Download Script
+          run: |
+            python3 packaging/download_pretrained_transformers.py
+
+        - name: Copy driver script to parent directory
+          run: |
+            cp ./packaging/driver.sh ./driver.sh
+
+        - name: Copy config.yml to parent directory
+          run: |
+            cp ./platform/config.yml ./config.yml
+
+        - name: Copy README.md to parent directory
+          run: |
+            cp ./packaging/README.md ./README.md
+
+        - name: Upload platform package artifact
+          uses: actions/upload-artifact@v3
+          with:
+            name: thirdai-platform-package
+            path: thirdai-platform-package.tar.gz
+
+        - name: Configure AWS credentials
+          uses: aws-actions/configure-aws-credentials@v4
+          with:
+            aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws-region: us-east-1
+
+        - name: Install Docker
+          run: |
+            sudo apt-get update
+            sudo apt-get install -y \
+            apt-transport-https \
+            ca-certificates \
+            curl \
+            software-properties-common
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+            sudo add-apt-repository \
+            "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+            sudo apt-get update
+            sudo apt-get install -y docker-ce
+        
+        - name: Decode docker registry pull password
+          run: |
+            docker_registry_password=$(echo -n "${{ inputs.b64_encoded_docker_registry_pull_password }}" | base64 --decode)
+            echo "docker_registry_password=$docker_registry_password" >> $GITHUB_ENV
+
+        - name: Login to ACR
+          uses: docker/login-action@v3
+          with:
+            registry: thirdaiplatform.azurecr.io
+            username: "thirdaiplatform-pull-${{ inputs.docker_image_branch_name }}"
+            password: ${{ env.docker_registry_password }}
+
+        - name: Download Docker images with the given tag
+          run: |
+            # TODO(pratik): write a job to keep updating the images whose releases doesnot have versioning.
+            mkdir -p docker_images-${{ inputs.docker_image_version }}
+
+            # Pull and save images
+            images=(thirdai_platform_${{ inputs.docker_image_branch_name }} frontend_${{ inputs.docker_image_branch_name }})
+
+            for image in "${images[@]}"
+            do
+                echo "Pulling thirdaiplatform.azurecr.io/${image}:${{ inputs.docker_image_version }}..."
+                docker pull thirdaiplatform.azurecr.io/${image}:${{ inputs.docker_image_version }}
+                docker save -o docker_images-${{ inputs.docker_image_version }}/${image}_${{ inputs.docker_image_version }}.tar thirdaiplatform.azurecr.io/${image}:${{ inputs.docker_image_version }}
+            done
+
+            docker pull thirdaiplatform.azurecr.io/nomad-autoscaler:0.3.7
+            docker save -o docker_images-${{ inputs.docker_image_version }}/nomad-autoscaler_0.3.7.tar thirdaiplatform.azurecr.io/nomad-autoscaler:0.3.7
+
+            # TODO(pratik): Cleanup workflows/update_llama_cpp_docker.yml.
+            docker pull thirdaiplatform.azurecr.io/llama.cpp:server
+            docker save -o docker_images-${{ inputs.docker_image_version }}/llama.cpp_server.tar thirdaiplatform.azurecr.io/llama.cpp:server
+
+            docker pull thirdaiplatform.azurecr.io/keycloak:26.0.0
+            docker save -o docker_images-${{ inputs.docker_image_version }}/keycloak_26.0.0.tar thirdaiplatform.azurecr.io/keycloak:26.0.0
+
+            docker pull registry:2
+            docker save -o docker_images-${{ inputs.docker_image_version }}/registry_2.tar registry:2
+
+            docker pull postgres:latest
+            docker save -o docker_images-${{ inputs.docker_image_version }}/postgres_latest.tar postgres:latest
+
+            docker pull thirdaiplatform.azurecr.io/traefik:v2.10
+            docker save -o docker_images-${{ inputs.docker_image_version }}/traefik_v2.10.tar thirdaiplatform.azurecr.io/traefik:v2.10
+
+            docker pull thirdaiplatform.azurecr.io/grafana:main-ubuntu
+            docker save -o docker_images-${{ inputs.docker_image_version }}/grafana_main-ubuntu.tar thirdaiplatform.azurecr.io/grafana:main-ubuntu
+
+            docker pull thirdaiplatform.azurecr.io/victoria-metrics:tags-v1.102.1-1-g76115c611f
+            docker save -o docker_images-${{ inputs.docker_image_version }}/victoria-metrics_tags-v1.102.1-1-g76115c611f.tar thirdaiplatform.azurecr.io/victoria-metrics:tags-v1.102.1-1-g76115c611f
+
+            echo "All images pulled and saved in the docker_images-${{ inputs.docker_image_version }} folder."
+
+        - name: Package platform, model, driver script, config, and README into tarball
+          id: online_pack
+          run: |
+            tarfile_name="thirdai-platform-package-${{ inputs.docker_image_branch_name }}-${{ inputs.docker_image_version }}.tar.gz"
+            echo "name=$tarfile_name" >> $GITHUB_OUTPUT
+            tar -czvf $tarfile_name ./platform ./pretrained-models ./driver.sh ./config.yml ./README.md
+
+        - name: Package Docker images, platform, model, driver script, config, and README into tarball
+          id: offline_pack
+          run: |
+            tarfile_name="thirdai-platform-package-offline-${{ inputs.docker_image_branch_name }}-${{ inputs.docker_image_version }}.tar.gz"
+            echo "name=$tarfile_name" >> $GITHUB_OUTPUT
+            tar -czvf $tarfile_name ./platform ./docker_images-${{ inputs.docker_image_version }} ./driver.sh ./config.yml ./README.md ./pretrained-models
+
+        - name: Upload online platform package to S3
+          run: |
+            aws s3 cp ${{ steps.online_pack.outputs.name }} s3://thirdai-corp-public/ThirdAI-Platform-latest-release/
+
+        - name: Upload offline platform package to S3
+          run: |
+            aws s3 cp ${{ steps.offline_pack.outputs.name }} s3://thirdai-corp-public/ThirdAI-Platform-latest-release/

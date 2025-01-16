@@ -1,89 +1,156 @@
-'use client';
 import React, { useState, useEffect } from 'react';
-import { TextField, Button } from '@mui/material';
+import {
+  TextField,
+  Button,
+  Tab,
+  Tabs,
+  Paper,
+  Alert,
+  Box,
+  Typography,
+  CircularProgress,
+} from '@mui/material';
+import SelfHostLLM from './selfHostLLM';
 
-export default function OpenAIKey() {
-  const [apiKey, setApiKey] = useState('');
-  const [newApiKey, setNewApiKey] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+interface APIResponse {
+  apiKey?: string;
+  success?: boolean;
+  message?: string;
+}
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  value: number;
+  index: number;
+}
+
+function TabPanel({ children, value, index, ...other }: TabPanelProps) {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`llm-tabpanel-${index}`}
+      aria-labelledby={`llm-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box>{children}</Box>}
+    </div>
+  );
+}
+
+export default function LLMManagement() {
+  const [apiKey, setApiKey] = useState<string>('');
+  const [newApiKey, setNewApiKey] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [success, setSuccess] = useState<string>('');
+  const [error, setError] = useState<string>('');
+  const [tabValue, setTabValue] = useState<number>(0);
 
   useEffect(() => {
     fetchApiKey();
   }, []);
 
-  const fetchApiKey = async () => {
+  const fetchApiKey = async (): Promise<void> => {
     try {
       const response = await fetch('/endpoints/get_openai_key');
-      const data = await response.json();
+      const data: APIResponse = await response.json();
       if (data.apiKey) {
-        setApiKey(data.apiKey); // set masked API key
+        setApiKey(data.apiKey);
       }
     } catch (error) {
-      console.error('Failed to fetch API key', error);
-      alert('Failed to fetch API key: ' + error);
+      setError('Failed to fetch API key');
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     if (!newApiKey) {
-      alert('Please enter a new OpenAI API Key');
+      setError('Please enter a new OpenAI API Key');
       return;
     }
 
     setLoading(true);
-
     try {
       const response = await fetch('/endpoints/change_openai_key', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newApiKey }),
       });
 
-      const data = await response.json();
+      const data: APIResponse = await response.json();
       if (data.success) {
-        setSuccessMessage('OpenAI API Key successfully updated!');
+        setSuccess('OpenAI API Key updated successfully');
         setApiKey(`sk-${newApiKey.slice(-4)}`);
-        setNewApiKey(''); // clear the openai key field
+        setNewApiKey('');
       } else {
-        alert('Error updating API Key');
+        throw new Error(data.message || 'Error updating API Key');
       }
     } catch (error) {
-      console.error('Failed to update API key', error);
-      alert('Failed to update API key: ' + error);
+      setError(error instanceof Error ? error.message : 'Failed to update API key');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number): void => {
+    setTabValue(newValue);
+  };
+
   return (
-    <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
-      <h4 className="text-lg font-semibold text-gray-800">Change OpenAI API Key</h4>
-      <div className="mt-4">
-        <label className="block text-gray-700">Current Organization OpenAI API Key (masked):</label>
-        <p className="bg-gray-200 p-2 rounded">{apiKey || 'Loading...'}</p>
-      </div>
-      <div className="mt-4">
-        <label className="block text-gray-700">New OpenAI API Key:</label>
-        <TextField
-          type="text"
-          placeholder="sk-..."
-          value={newApiKey}
-          onChange={(e) => setNewApiKey(e.target.value)}
-          className="border border-gray-300 rounded px-4 py-2 w-full"
-        />
-      </div>
-      <Button
-        onClick={handleSave}
-        variant="contained"
-        className={`mt-4 ${loading ? 'cursor-not-allowed' : ''}`}
-        disabled={loading}
-      >
-        {loading ? 'Saving...' : 'Save'}
-      </Button>
-      {successMessage && <p className="text-green-500 mt-4">{successMessage}</p>}
+    <div>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+        <Tabs value={tabValue} onChange={handleTabChange} centered>
+          <Tab label="OpenAI" />
+          <Tab label="Self-Hosted" />
+        </Tabs>
+      </Box>
+
+      <TabPanel value={tabValue} index={0}>
+        <Paper elevation={1} sx={{ p: 3, mb: 2 }}>
+          <div style={{ marginBottom: '20px' }}>
+            <Typography variant="subtitle1">Current OpenAI API Key:</Typography>
+            <Paper variant="outlined" sx={{ p: 1, bgcolor: 'grey.100' }}>
+              {apiKey || 'Loading...'}
+            </Paper>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <Typography variant="subtitle1">New OpenAI API Key:</Typography>
+            <TextField
+              type="password"
+              fullWidth
+              placeholder="sk-..."
+              value={newApiKey}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewApiKey(e.target.value)}
+              margin="dense"
+            />
+          </div>
+
+          <Button
+            variant="contained"
+            fullWidth
+            onClick={handleSave}
+            disabled={loading}
+            startIcon={loading && <CircularProgress size={20} />}
+          >
+            {loading ? 'Saving...' : 'Save'}
+          </Button>
+
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
+          {success && (
+            <Alert severity="success" sx={{ mt: 2 }}>
+              {success}
+            </Alert>
+          )}
+        </Paper>
+      </TabPanel>
+
+      <TabPanel value={tabValue} index={1}>
+        <SelfHostLLM />
+      </TabPanel>
     </div>
   );
 }

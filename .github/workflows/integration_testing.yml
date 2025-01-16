@@ -1,0 +1,319 @@
+name: Integration testing of given tarball
+
+on:
+  workflow_call:
+    inputs:
+      docker_image_branch_name:
+        description: "Branch name of the docker images"
+        required: true
+        type: string
+      docker_image_version:
+        description: "version of the docker images (with prefix 'v')"
+        required: true
+        type: string
+        default: latest
+      tarball_filename:
+        description: "Tarball file name in the S3 bucket"
+        required: true
+        type: string
+      b64_encoded_docker_registry_pull_password:
+        description: "Docker registry password for the branch image encoded in base64"
+        required: true
+        type: string
+      email:
+        description: "Global admin email ID"
+        type: string
+        default: gautam@thirdai.com
+      password:
+        description: "Global admin password"
+        type: string
+        default: password
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        description: "AWS access key id"
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        description: "AWS secret access key"
+        required: true
+      HOST_MACHINE_PRIVATE_KEY:
+        description: "server machine's private key hosted on AWS"
+        required: true
+      GENAI_KEY:
+        description: "GenAI key"
+        required: true
+      HOST_MACHINE1:
+        description: "Details of the host_machine1 (used as server node)"
+        required: true
+      HOST_MACHINE2:
+        description: "Details of the host_machine2 (used as client nodes)"
+        required: true
+    outputs:
+      backend_test_outcome:
+        description: "Backend test step outcome"
+        value: ${{ jobs.test.outputs.backend_test_outcome }}
+      frontend_test_outcome:
+        description: "Frontend test step outcome"
+        value: ${{ jobs.test.outputs.frontend_test_outcome }}
+
+jobs:
+  setup_the_ec2_instances:
+    runs-on: ubuntu-latest-8-cores
+    outputs:
+      server_machine_public_ip: ${{ steps.host_machine1.outputs.public_ip }}
+      task_runner_token: ${{ steps.task_runner.outputs.token }}
+      host_machine1_instance_id: ${{ steps.host_machine1.outputs.instance_id }}
+      host_machine2_instance_id: ${{ steps.host_machine2.outputs.instance_id }}
+    steps:
+      - name: Decode docker registry password
+        run: |
+          echo "docker_registry_password=$(echo -n "${{ inputs.b64_encoded_docker_registry_pull_password }}" | base64 --decode)" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1     # ec2-instances are in this region
+      
+      # JSON data of Host_machine secret:
+      # Host_machine1 = {
+      #   "instance_id": "i-sdsdjsdbis",
+      #   "ssh_username": "ubuntu",
+      #   "identity_key": "sdonsd"      # Corresponding public-key should be added in the authorized_keys file in the host_machine1
+      # }
+      # Host_machine2 = {
+      #   "instance_id": "i-safdfsasds",
+      #   "ssh_username": "ubuntu"
+      # }
+      - name: Fetch the host machine details
+        run: |
+          # Don't use (Double-quotes) around secrets.HOST_MACHINE1 otherwise jq won't be able to parse it because all key, value are also needed to wrapped around (double-quotes)
+          echo '${{ secrets.HOST_MACHINE1 }}' > host_machine1.json
+          echo '${{ secrets.HOST_MACHINE2 }}' > host_machine2.json
+
+          # instance_id
+          echo "host_machine1_instance_id=$(jq -r '.instance_id' host_machine1.json)" >> $GITHUB_ENV
+          echo "host_machine2_instance_id=$(jq -r '.instance_id' host_machine2.json)" >> $GITHUB_ENV
+          
+      # Regarding instances:
+      #   - Server node (Host machine1) have the aws configured to pull images from s3 bucket
+      #   - yq installed to change the config.yml file. sudo snap install yq --channel=v3/stable). Don't add repository ppa:rmescandon/yq to install yq. It is causing `sudo apt-get update` to fail.
+      #   - Host_machine1 is already configured to have ssh-access to the host_machine2 (client node)
+      #   - ndb_enterprise_license.json file is already present on the machine at the home directory
+      - name: start the ec2-instance
+        run: |
+          aws ec2 start-instances --instance-ids ${{ env.host_machine1_instance_id }} ${{ env.host_machine2_instance_id }}
+      
+      - name: Wait for EC2 instances to be running
+        run: |
+          max_attempts=10
+          attempts=0
+          while [ $attempts -lt $max_attempts ]; do
+            host_machine1_state=$(aws ec2 describe-instances --instance-ids ${{ env.host_machine1_instance_id }} --query "Reservations[].Instances[].[State.Name]" --output text)
+            host_machine2_state=$(aws ec2 describe-instances --instance-ids ${{ env.host_machine2_instance_id }} --query "Reservations[].Instances[].[State.Name]" --output text)
+
+            if [ "$host_machine1_state" == "running" ] && [ "$host_machine2_state" == "running" ]; then
+              break
+            fi
+
+            attempts=$((attempts + 1))
+            
+            # sleep for 5 seconds
+            sleep 5
+          done
+
+          if [ $attempts -ge $max_attempts ]; then
+            echo "Maximum attempts reached. Unable to start machine(s). Exiting..."
+            exit 1
+          fi
+
+      - name: Fetch the details of host machine 1
+        id: host_machine1
+        run: |
+          # Instance ID
+          echo "instance_id=${{ env.host_machine1_instance_id }}" >> $GITHUB_OUTPUT
+
+          host_machine1_ips=$(aws ec2 describe-instances \
+              --instance-ids ${{ env.host_machine1_instance_id }} \
+              --query "Reservations[0].Instances[0].[PublicIpAddress, PrivateIpAddress]" \
+              --output text)
+
+          # IPs
+          echo "public_ip=$(echo $host_machine1_ips | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "private_ip=$(echo $host_machine1_ips | awk '{print $2}')" >> $GITHUB_OUTPUT
+
+          # ssh_username
+          echo "ssh_username=$(jq -r '.ssh_username' host_machine1.json)" >> $GITHUB_OUTPUT
+
+      - name: Fetch the details of host machine 2
+        id: host_machine2
+        run: |
+          # Instance ID
+          echo "instance_id=${{ env.host_machine2_instance_id }}" >> $GITHUB_OUTPUT
+
+          host_machine2_ips=$(aws ec2 describe-instances \
+              --instance-ids ${{ env.host_machine2_instance_id }} \
+              --query "Reservations[0].Instances[0].[PublicIpAddress, PrivateIpAddress]" \
+              --output text)
+          
+          # IPs
+          echo "public_ip=$(echo $host_machine2_ips | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "private_ip=$(echo $host_machine2_ips | awk '{print $2}')">> $GITHUB_OUTPUT
+          
+          # ssh-username
+          echo "ssh_username=$(jq -r '.ssh_username' host_machine2.json)" >> $GITHUB_OUTPUT
+      
+      - name: Create an identity file for ssh-login
+        run: |
+          echo $(jq '.identity_key' host_machine1.json | tr -d '"') | sed 's/\\n/\n/g' > /tmp/id_rsa
+          chmod 600 /tmp/id_rsa
+      
+      - name: Check if license file is present on the host machine1
+        run: |
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=120 -o ServerAliveCountMax=25 -i /tmp/id_rsa ${{ steps.host_machine1.outputs.ssh_username }}@${{ steps.host_machine1.outputs.public_ip }} <<EOF
+            root_dir=/home/${{ steps.host_machine1.outputs.ssh_username }}
+            if [ ! -f "\$root_dir/ndb_enterprise_license.json" ]; then
+              echo "ndb_enterprise_license.json is not at the directory \$root_dir"
+              exit 1
+            fi
+          EOF
+      
+      - name: Root dir path in the host machine 1
+        run: |
+          # Unable to set license_path in the host_machine without minor modification
+          echo "root_dir=/home/${{ steps.host_machine1.outputs.ssh_username }}" >> $GITHUB_ENV
+
+      - name: Download the package and run driver.sh on host_machine1
+        run: |
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=120 -o ServerAliveCountMax=25 -i /tmp/id_rsa ${{ steps.host_machine1.outputs.ssh_username }}@${{ steps.host_machine1.outputs.public_ip }} <<EOF
+          
+            aws s3 cp s3://thirdai-corp-public/ThirdAI-Platform-latest-release/${{ inputs.tarball_filename }} ${{ env.root_dir }}
+
+            # unzip the package
+            mkdir -p ${{ env.root_dir }}/package/verbose
+            tar -xvf ${{ inputs.tarball_filename }} -C ${{ env.root_dir }}/package
+
+            cd ${{ env.root_dir }}/package
+
+            # Modify the config.yml
+            yq -i '
+                .license_path = "${{ env.root_dir }}/ndb_enterprise_license.json" |
+                .admin_mail = "${{ inputs.email }}" |
+                .admin_username = "admin" |
+                .admin_password = "${{ inputs.password }}" |
+                .genai_key = "${{ secrets.GENAI_KEY }}" |
+                .thirdai_platform_version = "${{ inputs.docker_image_version }}" |
+                .platform_image_branch = "${{ inputs.docker_image_branch_name }}" |
+                .docker_registry_password = "${{ env.docker_registry_password }}" |
+                .login_method = "postgres" |
+                .cluster_endpoint = "${{ steps.host_machine1.outputs.public_ip }}" |
+                .nodes[0].private_ip = "${{ steps.host_machine1.outputs.private_ip }}" |
+                .nodes[0].ssh_username = "${{ steps.host_machine1.outputs.ssh_username }}" |
+                .nodes[0].connection_type = "local" |
+                .nodes[1].private_ip = "${{ steps.host_machine2.outputs.private_ip }}" |
+                .nodes[1].ssh_username = "${{ steps.host_machine2.outputs.ssh_username }}" |
+                .nodes[1].connection_type = "ssh"
+            '  ${{ env.root_dir }}/package/config.yml
+
+            # verbose dir would contain the stdout and stderr of the run
+            mkdir -p ${{ env.root_dir }}/verbose/pre_installation_cleanup
+
+            # Run the cleanup script
+            ./driver.sh ./config.yml --cleanup 1> ${{ env.root_dir }}/verbose/pre_installation_cleanup/cleanup.out 2> ${{ env.root_dir }}/verbose/pre_installation_cleanup/cleanup.err
+
+            mkdir -p ${{ env.root_dir }}/verbose/installation
+            # Run the driver.sh script
+            ./driver.sh ./config.yml -v 1> ${{ env.root_dir }}/verbose/installation/installation.out 2> ${{ env.root_dir }}/verbose/installation/installation.err
+          
+            # Delete the package and tarfile
+            cd ${{ env.root_dir }}
+            rm -rf ${{ env.root_dir }}/package ${{ env.root_dir }}/${{ inputs.tarball_filename }}
+          EOF
+
+      - name: Fetch the task runner token
+        id: task_runner
+        run: |
+          task_runner_token=$(ssh -o StrictHostKeyChecking=no \
+          -o ServerAliveInterval=120 \
+          -o ServerAliveCountMax=25 \
+          -i /tmp/id_rsa \
+          ${{ steps.host_machine1.outputs.ssh_username }}@${{ steps.host_machine1.outputs.public_ip }} \
+          "sudo grep 'Secret ID' '/opt/thirdai_platform/nomad_data/task_runner_token.txt' | awk '{print \$NF}'")
+          echo "token=$task_runner_token" >> $GITHUB_OUTPUT
+      
+      - name: Wait for model_bazaar and frontend to get started
+        run: |
+          # wait for 3 minutes
+          sleep $((3*60))
+
+  test:
+    runs-on: ubuntu-latest-8-cores
+    needs: [setup_the_ec2_instances]
+    outputs:
+      backend_test_outcome: ${{ steps.backend_test.outcome }}
+      frontend_test_outcome: ${{ steps.frontend_test.outcome }}
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+      
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2    # docker test data is stored in the s3 bucket of this region
+
+      - name: Install requirements
+        run: |
+          cd headless
+          pip install -r requirements.txt
+
+      - name: Env variables
+        run: |
+          mkdir -p $HOME/nfs/dir
+          echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_ENV
+          echo "GENAI_KEY=${{ secrets.GENAI_KEY }}" >> $GITHUB_ENV
+          echo "TASK_RUNNER_TOKEN=${{ needs.setup_the_ec2_instances.outputs.task_runner_token }}" >> $GITHUB_ENV
+
+      - name: Generate random run name
+        id: random-run-name
+        run: |
+          echo "random_run_name=test_$(python3 -c "import secrets; print(secrets.token_urlsafe(8))")" >> $GITHUB_ENV
+      
+      - name: Run tests
+        id: backend_test
+        run: |
+          python3 -m headless.run_locally --base-url "http://${{ needs.setup_the_ec2_instances.outputs.server_machine_public_ip }}/api/" --email ${{ inputs.email }} --password ${{ inputs.password }} --run-name ${{ env.random_run_name }} --dag NDB --on-prem --generation
+          python3 -m headless.run_locally --base-url "http://${{ needs.setup_the_ec2_instances.outputs.server_machine_public_ip }}/api/" --email ${{ inputs.email }} --password ${{ inputs.password }} --run-name ${{ env.random_run_name }} --dag UDT
+          python3 -m headless.run_locally --base-url "http://${{ needs.setup_the_ec2_instances.outputs.server_machine_public_ip }}/api/" --email ${{ inputs.email }} --password ${{ inputs.password }} --run-name ${{ env.random_run_name }} --dag UDT_DATAGEN
+          python3 -m headless.run_locally --base-url "http://${{ needs.setup_the_ec2_instances.outputs.server_machine_public_ip }}/api/" --email ${{ inputs.email }} --password ${{ inputs.password }} --run-name ${{ env.random_run_name }} --dag Recovery_Backup
+
+      - name: Test Next.js frontend
+        if: always()
+        id: frontend_test
+        run: |
+          BASE_URL_WITHOUT_API=$(echo "http://${{ needs.setup_the_ec2_instances.outputs.server_machine_public_ip }}")
+          echo "Testing frontend at $BASE_URL_WITHOUT_API"
+          curl -f "$BASE_URL_WITHOUT_API" || exit 1
+
+  Stop_the_instances:
+      runs-on: ubuntu-latest-8-cores
+      needs: [setup_the_ec2_instances, test]
+      if: always()
+      steps:
+        - name: Configure AWS credentials
+          uses: aws-actions/configure-aws-credentials@v4
+          with:
+            aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws-region: us-east-1
+
+        - name: Stop the ec2-machine
+          run: |
+            aws ec2 stop-instances --instance-ids ${{ needs.setup_the_ec2_instances.outputs.host_machine1_instance_id }} ${{ needs.setup_the_ec2_instances.outputs.host_machine2_instance_id }}
+      

@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict
 
 from requests.exceptions import HTTPError
 
+from client.clients import ChatSettings
 from headless.configs import Config
 from headless.model import Flow
 from headless.utils import extract_static_methods
@@ -293,7 +294,7 @@ class NDBFunctions:
                 if not generated_answer:
                     raise Exception(f"Openai answer is not generated")
 
-                deployment.update_chat_settings(provider="openai")
+                deployment.update_chat_settings(ChatSettings(provider="openai"))
 
                 chat_response = deployment.chat(
                     user_input=best_answer["text"],
@@ -308,6 +309,12 @@ class NDBFunctions:
                 )
 
                 logging.info(f"OpenAI Chat history {chat_history}")
+
+                deployment.update_chat_settings(
+                    ChatSettings(provider="openai", temperature=0.3)
+                )
+
+                logging.info(f"OpenAI Chat settings updated")
 
             if on_prem:
                 flow.bazaar_client.start_on_prem(
@@ -325,9 +332,9 @@ class NDBFunctions:
                 if not generated_answer:
                     raise Exception(f"On prem answer is not generated")
 
-                deployment.update_chat_settings(provider="on-prem")
+                deployment.update_chat_settings(ChatSettings(provider="on-prem"))
 
-                deployment.chat(
+                chat_response = deployment.chat(
                     user_input=best_answer["text"],
                     session_id=deployment.model_id,
                     provider="on-prem",
@@ -340,6 +347,12 @@ class NDBFunctions:
                 )
 
                 logging.info(f"On prem Chat history {chat_history}")
+
+                deployment.update_chat_settings(
+                    ChatSettings(provider="on-prem", temperature=0.3)
+                )
+
+                logging.info(f"On Prem Chat settings updated")
 
     @staticmethod
     def check_unsupervised(inputs: Dict[str, Any]) -> Any:

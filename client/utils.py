@@ -72,8 +72,8 @@ def http_get_with_error(*args, **kwargs):
     2XX.
     """
     response = requests.get(*args, **kwargs)
-    print("Response GET:", response.json())
     check_response(response)
+    print("Response GET:", response.json())
     return response
 
 

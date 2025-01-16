@@ -392,11 +392,11 @@ def email_login(
 
 
 @user_router.post(
-    "/email-login-with-keycloak",
-    summary="Email Login with Keycloak",
-    description=get_section(docs, "Email Login with Keycloak"),
+    "/keycloak-user-sync",
+    summary="Sync keycloak user in platform",
+    description=get_section(docs, "Sync keycloak user in platform"),
 )
-def email_login_with_keycloak(
+def sync_user_with_keycloak(
     access_token: AccessToken,
     session: Session = Depends(get_session),
 ):
@@ -413,6 +413,7 @@ def email_login_with_keycloak(
             )
             .first()
         )
+        # checking is not necessary, because this endpoint is only invoked incase of new-user-registration but for ensure safety check.
         if not user:
             user = schema.User(
                 id=keycloak_user_id,
@@ -425,7 +426,7 @@ def email_login_with_keycloak(
 
         return response(
             status_code=status.HTTP_200_OK,
-            message="Successfully logged in using Keycloak token.",
+            message="Successfully synced with keycloak.",
             data={
                 "user": {
                     "username": user.username,

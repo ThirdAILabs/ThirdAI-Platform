@@ -15,6 +15,7 @@ import uvicorn
 from auth.jwt import validate_access_token
 from backend.routers.data import data_router
 from backend.routers.deploy import deploy_router as deploy
+from backend.routers.integrations import integrations_router as integrations
 from backend.routers.models import model_router as model
 from backend.routers.recovery import recovery_router as recovery
 from backend.routers.team import team_router as team
@@ -61,6 +62,13 @@ app.include_router(workflow, prefix="/api/workflow", tags=["workflow"])
 app.include_router(recovery, prefix="/api/recovery", tags=["recovery"])
 app.include_router(data_router, prefix="/api/data", tags=["data"])
 app.include_router(telemetry, prefix="/api/telemetry", tags=["telemetry"])
+app.include_router(integrations, prefix="/api/integrations", tags=["integrations"])
+
+
+@app.get("/api/health")
+async def health_check():
+    # TODO(pratik): we should add a check whether all the dependency are running fine
+    return {"status": "ok"}
 
 
 @app.exception_handler(Exception)

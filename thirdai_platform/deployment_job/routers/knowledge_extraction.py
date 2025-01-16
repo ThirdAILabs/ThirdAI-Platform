@@ -17,7 +17,7 @@ from platform_common.file_handler import download_local_files
 from platform_common.knowledge_extraction.schema import Base, Keyword, Question, Report
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from platform_common.utils import response
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from sqlalchemy import and_, create_engine, or_
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 
@@ -37,6 +37,12 @@ def verify_job_token(request: Request):
 
 MAX_ATTEMPTS = 3
 REPORT_TIMEOUT = timedelta(minutes=10)
+
+
+class UpdateReportRequest(BaseModel):
+    new_status: str
+    attempt: int
+    msg: Optional[str] = (None,)
 
 
 class KnowledgeExtractionRouter:
@@ -72,6 +78,7 @@ class KnowledgeExtractionRouter:
         self.router.add_api_route(
             "/report/{report_id}", self.delete_report, methods=["DELETE"]
         )
+        self.router.add_api_route("/reports", self.list_reports, methods=["GET"])
         self.router.add_api_route("/questions", self.add_question, methods=["POST"])
         self.router.add_api_route(
             "/questions", self.get_questions_public, methods=["GET"]
@@ -164,11 +171,18 @@ class KnowledgeExtractionRouter:
                     message=f"Report with ID '{report_id}' not found.",
                 )
 
+            with open(
+                self.reports_base_path / report_id / "documents.json", "r"
+            ) as file:
+                documents = json.load(file)
+
             report_data = {
                 "report_id": report.id,
                 "status": report.status,
                 "submitted_at": report.submitted_at,
                 "updated_at": report.updated_at,
+                "documents": documents,
+                "msg": report.msg,
             }
 
             if report.status == "complete":
@@ -231,6 +245,26 @@ class KnowledgeExtractionRouter:
         return response(
             status_code=status.HTTP_200_OK,
             message=f"Successfully deleted report with ID '{report_id}'.",
+        )
+
+    def list_reports(self, _: str = Depends(Permissions.verify_permission("read"))):
+        with self.get_session() as session:
+            reports = session.query(Report).all()
+
+        data = [
+            {
+                "report_id": report.id,
+                "status": report.status,
+                "submitted_at": report.submitted_at,
+                "updated_at": report.updated_at,
+            }
+            for report in reports
+        ]
+
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successfully retrieved the reports.",
+            data=jsonable_encoder(data),
         )
 
     def add_question(
@@ -442,7 +476,10 @@ class KnowledgeExtractionRouter:
             )
 
     def update_report_status(
-        self, report_id: str, new_status: str, attempt: int, _=Depends(verify_job_token)
+        self,
+        report_id: str,
+        params: UpdateReportRequest,
+        _=Depends(verify_job_token),
     ):
         try:
             with self.get_session() as session:
@@ -453,17 +490,18 @@ class KnowledgeExtractionRouter:
                         message=f"report {report_id} not found",
                     )
 
-                if report.attempt != attempt:
+                if report.attempt != params.attempt:
                     return response(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         message="invalid attempt number, this report has been assigned to a new worker",
                     )
 
-                report.status = new_status
+                report.status = params.new_status
                 report.updated_at = datetime.utcnow()
+                report.msg = params.msg
                 session.commit()
                 self.logger.info(
-                    f"updated status of report {report_id} to {new_status}"
+                    f"updated status of report {report_id} to {params.new_status}"
                 )
                 return response(
                     status_code=status.HTTP_200_OK,
@@ -471,7 +509,7 @@ class KnowledgeExtractionRouter:
                 )
         except Exception as e:
             self.logger.error(
-                f"error updating report status of {report_id} to {new_status}: {e}"
+                f"error updating report status of {report_id} to {params.new_status}: {e}"
             )
             return response(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
