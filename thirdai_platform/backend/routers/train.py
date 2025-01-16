@@ -478,24 +478,40 @@ def nlp_datagen(
     except Exception as error:
         return response(status_code=status.HTTP_400_BAD_REQUEST, message=str(error))
 
-    print('datagen_options.llm_provider', datagen_options.llm_provider, flush=True)
     # Add validation for self-hosted LLM
     if datagen_options.llm_provider == "self_hosted":
         # Verify self-hosted LLM is configured
         try:
-            llm_check_response = requests.get(  # Changed from response to llm_check_response
-                urljoin(os.getenv("MODEL_BAZAAR_ENDPOINT"), "/api/integrations/self-hosted-llm"),
+            model_bazaar_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
+            print('model_bazaar_endpoint', model_bazaar_endpoint)
+            if not model_bazaar_endpoint:
+                model_bazaar_endpoint = "http://localhost:8000"  # or whatever your default should be
+            
+            # Ensure the endpoint has a scheme
+            if not model_bazaar_endpoint.startswith(('http://', 'https://')):
+                model_bazaar_endpoint = f"http://{model_bazaar_endpoint}"
+            
+            endpoint = urljoin(model_bazaar_endpoint, "/api/integrations/self-hosted-llm")
+            logging.info(f"Checking self-hosted LLM at endpoint: {endpoint}")
+            
+            llm_check_response = requests.get(
+                endpoint,
                 headers={"Authorization": f"Bearer {token}"},
             )
-            if llm_check_response.status_code != 200:  # Updated variable name here too
+            
+            logging.info(f"LLM check response status: {llm_check_response.status_code}")
+            logging.info(f"LLM check response body: {llm_check_response.text}")
+            
+            if llm_check_response.status_code != 200:
                 return response(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    message="Self-hosted LLM not accessible. Please check configuration in admin dashboard.",
+                    message=f"Self-hosted LLM not accessible. Status: {llm_check_response.status_code}, Response: {llm_check_response.text}",
                 )
         except Exception as e:
+            logging.error(f"Error verifying self-hosted LLM: {str(e)}")
             return response(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                message="Failed to verify self-hosted LLM configuration.",
+                message=f"Failed to verify self-hosted LLM configuration: {str(e)}",
             )
     
     if datagen_options.datagen_options.sub_type == UDTSubType.text:

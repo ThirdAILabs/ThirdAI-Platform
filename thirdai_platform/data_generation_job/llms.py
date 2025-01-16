@@ -119,6 +119,8 @@ class CohereLLM(LLMBase):
 
         return response.text
 
+import logging
+
 class SelfHostedLLM(LLMBase):
     def __init__(
         self,
@@ -145,27 +147,45 @@ class SelfHostedLLM(LLMBase):
             raise Exception(
                 "Self-hosted LLM may have been deleted or not configured. Please check the admin dashboard to configure the self-hosted llm"
             )
+        self.logger = logging.getLogger(__name__)
 
-    def completion(
-        self,
-        prompt: str,
-        system_prompt: Optional[str] = None,
-        **kwargs
-    ) -> str:
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
+    def completion(self, prompt: str, system_prompt: Optional[str] = None, **kwargs):
+        try:
+            # Log the request details
+            self.logger.debug(f"Making request with prompt: {prompt[:100]}...")
+            self.logger.debug(f"System prompt: {system_prompt}")
+            self.logger.debug(f"Additional kwargs: {kwargs}")
 
-        response = requests.post(
-            self.url,
-            headers={"Authorization": f"Bearer {self.api_key}"},
-            json={"messages": messages}
-        )
-        response.raise_for_status()
-        
-        result = response.json()
-        return result["response"]
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "gpt-4-turbo-preview",  # Using the latest GPT-4 model
+                    "messages": [
+                        {"role": "system", "content": system_prompt or "You are a helpful assistant."},
+                        {"role": "user", "content": prompt}
+                    ]
+                }
+            )
+            
+            self.logger.debug(f"Response status code: {response.status_code}")
+            self.logger.debug(f"Response content: {response.text}")
+            
+            response.raise_for_status()
+            
+            response_json = response.json()
+            return response_json['choices'][0]['message']['content']
+            
+        except requests.exceptions.HTTPError as e:
+            self.logger.error(f"HTTP Error: {str(e)}")
+            self.logger.error(f"Response content: {e.response.text if hasattr(e, 'response') else 'No response content'}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error during completion: {str(e)}")
+            raise
 
 llm_classes = {
     "openai": OpenAILLM,
