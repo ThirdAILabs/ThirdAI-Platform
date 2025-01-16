@@ -15,7 +15,7 @@ from auth.jwt import (
     verify_access_token_no_throw,
 )
 from backend.auth_dependencies import is_model_owner, verify_model_read_access
-from backend.startup_jobs import start_on_prem_generate_job
+from backend.startup_jobs import start_llm_cache_job, start_on_prem_generate_job
 from backend.utils import (
     delete_nomad_job,
     get_job_logs,
@@ -26,6 +26,7 @@ from backend.utils import (
     get_warnings_and_errors,
     list_all_dependencies,
     model_accessible,
+    nomad_job_exists,
     read_file_from_back,
     submit_nomad_job,
     thirdai_platform_dir,
@@ -277,6 +278,16 @@ async def deploy_single_model(
             detail=f"Unsupported model type '{model.type}'.",
         )
 
+    if autoscaling_enabled and model.type == ModelType.NDB:
+        try:
+            await start_llm_cache_job(
+                model_id=str(model_id),
+                deployment_name=deployment_name,
+                license_info=license_info,
+            )
+        except Exception as e:
+            logging.error(f"LLM Cache Job failed with error: {e}")
+
     if llm_provider and llm_provider not in ["openai", "on-prem", "self-host"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -295,6 +306,16 @@ async def deploy_single_model(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Self-host option not configured. Please set up self-hosting in the admin dashboard.",
             )
+
+    if llm_provider == "on-prem":
+        llm_autoscaling_env = os.getenv("AUTOSCALING_ENABLED")
+        if llm_autoscaling_env is not None:
+            llm_autoscaling_enabled = llm_autoscaling_env.lower() == "true"
+        else:
+            llm_autoscaling_enabled = autoscaling_enabled
+        await start_on_prem_generate_job(
+            restart_if_exists=False, autoscaling_enabled=llm_autoscaling_enabled
+        )
 
     config = DeploymentConfig(
         user_id=str(user.id),
@@ -353,16 +374,6 @@ async def deploy_single_model(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(err),
-        )
-
-    if llm_provider == "on-prem":
-        llm_autoscaling_env = os.getenv("AUTOSCALING_ENABLED")
-        if llm_autoscaling_env is not None:
-            llm_autoscaling_enabled = llm_autoscaling_env.lower() == "true"
-        else:
-            llm_autoscaling_enabled = autoscaling_enabled
-        await start_on_prem_generate_job(
-            restart_if_exists=False, autoscaling_enabled=llm_autoscaling_enabled
         )
 
 
@@ -818,11 +829,18 @@ def undeploy_model(
             message=f"Unable to stop deployment for model {model_identifier} since it is used by other active workflows.",
         )
 
+    nomad_endpoint = os.getenv("NOMAD_ENDPOINT")
     try:
         delete_nomad_job(
             job_id=f"deployment-{str(model.id)}",
-            nomad_endpoint=os.getenv("NOMAD_ENDPOINT"),
+            nomad_endpoint=nomad_endpoint,
         )
+        llm_cache_job_id = f"llm-cache-{model.id}"
+        if nomad_job_exists(llm_cache_job_id, nomad_endpoint):
+            delete_nomad_job(
+                job_id=llm_cache_job_id,
+                nomad_endpoint=nomad_endpoint,
+            )
         model.deploy_status = schema.Status.stopped
         session.commit()
 

@@ -6,7 +6,6 @@ from deployment_job.models.classification_models import (
     TextClassificationModel,
     TokenClassificationModel,
 )
-from deployment_job.permissions import Permissions
 from deployment_job.pydantic_models.inputs import (
     TextAnalysisPredictParams,
     TokenAnalysisPredictParams,
@@ -18,6 +17,7 @@ from fastapi.encoders import jsonable_encoder
 from platform_common.dependencies import is_on_low_disk
 from platform_common.logging import JobLogger, LogCode
 from platform_common.ndb.ndbv1_parser import convert_to_ndb_file
+from platform_common.permissions import Permissions
 from platform_common.pii.data_types import (
     UnstructuredTokenClassificationResults,
     XMLTokenClassificationResults,

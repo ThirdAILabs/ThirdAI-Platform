@@ -1,6 +1,7 @@
 import logging
 import traceback
 from pathlib import Path
+from typing import List
 
 from dotenv import load_dotenv
 from platform_common.logging import setup_logger
@@ -82,7 +83,6 @@ async def generate(
         - model: str - The model to use for text generation (default: "gpt-4o-mini").
         - provider: str - The AI provider to use (default: "openai"). Providers should be one of on-prem, openai, or cohere
         - workflow_id: Optional[str] - Workflow ID for tracking the request.
-        - cache_access_token: Optional[str] - Authorization token for caching responses.
 
     Returns:
     - StreamingResponse: A stream of generated text in chunks.
@@ -102,7 +102,6 @@ async def generate(
         "model": "gpt-4o-mini",
         "provider": "openai",
         "workflow_id": "12345",
-        "cache_access_token": "cache_token_abc"
     }
     ```
 
@@ -114,7 +113,7 @@ async def generate(
         - Error during the text generation process.
 
     Caching:
-    - If `original_query` and `cache_access_token` are provided, the generated content will be cached after completion.
+    - If `original_query` is provided, the generated content will be cached after completion.
     """
 
     llm: LLMBase = LLMFactory.create(
@@ -125,7 +124,7 @@ async def generate(
     )
 
     logger.info(
-        f"Received request from workflow: '{generate_args.workflow_id}'. "
+        f"Received request from model: '{generate_args.model_id}'. "
         f"Starting generation with provider '{generate_args.provider.lower()}':",
     )
 
@@ -142,36 +141,46 @@ async def generate(
                 yield next_word
                 await asyncio.sleep(0)
             logger.info(
-                f"\nCompleted generation for workflow '{generate_args.workflow_id}'.",
+                f"\nCompleted generation for model '{generate_args.model_id}'.",
             )
         except Exception as e:
             logger.error(f"Error during generation: {e}")
             raise HTTPException(
                 status_code=500, detail=f"Error while generating content: {e}"
             )
-        else:
-            if generate_args.cache_access_token is not None:
-                await insert_into_cache(
-                    generate_args.query,
-                    generated_response,
-                    generate_args.cache_access_token,
-                )
+
+        await insert_into_cache(
+            generate_args.query,
+            generated_response,
+            [ref.ref_id for ref in generate_args.references],
+            access_token=token,
+            model_id=generate_args.model_id,
+        )
 
     return StreamingResponse(generate_stream(), media_type="text/plain")
 
 
 async def insert_into_cache(
-    original_query: str, generated_response: str, cache_access_token: str
+    original_query: str,
+    generated_response: str,
+    reference_ids: List[int],
+    access_token: str,
+    model_id: str,
 ):
+    if "I cannot answer" in generated_response:
+        logger.warning(f"Not caching generated response: {generated_response}")
+        return
+
     try:
         res = requests.post(
-            urljoin(os.environ["MODEL_BAZAAR_ENDPOINT"], "/cache/insert"),
-            params={
+            urljoin(os.environ["MODEL_BAZAAR_ENDPOINT"], f"/{model_id}/cache/insert"),
+            json={
                 "query": original_query,
                 "llm_res": generated_response,
+                "reference_ids": reference_ids,
             },
             headers={
-                "Authorization": f"Bearer {cache_access_token}",
+                "Authorization": f"Bearer {access_token}",
             },
         )
         if res.status_code != 200:
@@ -179,7 +188,7 @@ async def insert_into_cache(
                 f"LLM Cache Insertion failed with status {res.status_code}: {res.text}"
             )
     except Exception as e:
-        logger.error("LLM Cache Insert Error", e)
+        logger.error(f"LLM Cache Insert Error {str(e)}")
 
 
 @app.get("/llm-dispatch/health")

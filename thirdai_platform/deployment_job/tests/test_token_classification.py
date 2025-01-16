@@ -5,11 +5,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from deployment_job.permissions import Permissions
 from deployment_job.routers.udt import UDTRouterTokenClassification
 from fastapi.testclient import TestClient
 from licensing.verify import verify_license
 from platform_common.logging import JobLogger
+from platform_common.permissions import Permissions
 from platform_common.pydantic_models.deployment import (
     DeploymentConfig,
     UDTDeploymentOptions,

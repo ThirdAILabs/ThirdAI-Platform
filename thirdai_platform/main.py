@@ -26,7 +26,6 @@ from backend.routers.vault import vault_router as vault
 from backend.routers.workflow import workflow_router as workflow
 from backend.startup_jobs import (
     restart_generate_job,
-    restart_llm_cache_job,
     restart_telemetry_jobs,
     restart_thirdai_platform_frontend,
 )
@@ -159,14 +158,6 @@ async def startup_event():
         except Exception as error:
             logger.error(f"Failed to start the frontend: {error}")
             logger.debug(traceback.format_exc())
-
-    try:
-        logger.info("Starting LLM Cache Job...")
-        await restart_llm_cache_job()
-        logger.info("Successfully started LLM Cache Job!")
-    except Exception as error:
-        logger.error(f"Failed to start the LLM Cache Job: {error}")
-        logger.debug(traceback.format_exc())
 
     await sync_job_statuses()
 

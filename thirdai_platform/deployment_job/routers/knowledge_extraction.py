@@ -7,7 +7,6 @@ from logging import Logger
 from pathlib import Path
 from typing import List, Optional
 
-from deployment_job.permissions import Permissions
 from deployment_job.pydantic_models.inputs import DocumentList
 from deployment_job.reporter import Reporter
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
@@ -15,6 +14,7 @@ from fastapi.encoders import jsonable_encoder
 from platform_common.dependencies import is_on_low_disk
 from platform_common.file_handler import download_local_files
 from platform_common.knowledge_extraction.schema import Base, Keyword, Question, Report
+from platform_common.permissions import Permissions
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from platform_common.utils import response
 from pydantic import BaseModel, ValidationError

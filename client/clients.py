@@ -438,15 +438,6 @@ class LLMClient:
         if cache_result:
             return cache_result
 
-        # No cached result or cache disabled, proceed with generation
-        token_response = http_get_with_error(
-            urljoin(self.base_url, "cache/token"),
-            headers=auth_header(self.login_instance.access_token),
-            params={"model_id": self.neuraldb_client.model_id},
-        )
-
-        cache_token = json.loads(token_response.content)["access_token"]
-
         response = requests.post(
             urljoin(self.base_url, "llm-dispatch/generate"),
             headers={
@@ -458,7 +449,6 @@ class LLMClient:
                 "key": api_key,
                 "provider": provider,
                 "original_query": query,
-                "cache_access_token": cache_token,
             },
         )
 

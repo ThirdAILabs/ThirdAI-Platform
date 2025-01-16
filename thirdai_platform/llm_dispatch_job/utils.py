@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 class Reference(BaseModel):
     text: str
+    ref_id: int
     source: Optional[str] = None
     metadata: Dict[str, Any] = {}
 
@@ -18,9 +19,7 @@ class GenerateArgs(BaseModel):
     key: Optional[str] = None
     model: str = "gpt-4o-mini"
     provider: str = "openai"
-    workflow_id: Optional[str] = None
-
-    cache_access_token: Optional[str] = None
+    model_id: Optional[str] = None
 
 
 DEFAULT_SYSTEM_PROMPT = (

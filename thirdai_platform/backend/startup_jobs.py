@@ -14,13 +14,10 @@ from backend.utils import (
     submit_nomad_job,
     thirdai_platform_dir,
 )
-from fastapi import status
-from licensing.verify.verify_license import valid_job_allocation, verify_license
-from platform_common.utils import model_bazaar_path, response
+from platform_common.utils import model_bazaar_path
 
 GENERATE_JOB_ID = "llm-generation"
 THIRDAI_PLATFORM_FRONTEND_ID = "thirdai-platform-frontend"
-LLM_CACHE_JOB_ID = "llm-cache"
 TELEMETRY_ID = "telemetry"
 
 
@@ -102,6 +99,30 @@ async def start_on_prem_generate_job(
     )
 
 
+async def start_llm_cache_job(model_id: str, deployment_name: str, license_info):
+    nomad_endpoint = os.getenv("NOMAD_ENDPOINT")
+    cwd = Path(os.getcwd())
+    platform = get_platform()
+    return submit_nomad_job(
+        nomad_endpoint=nomad_endpoint,
+        filepath=str(cwd / "backend" / "nomad_jobs" / "llm_cache_job.hcl.j2"),
+        platform=platform,
+        tag=os.getenv("TAG"),
+        registry=os.getenv("DOCKER_REGISTRY"),
+        docker_username=os.getenv("DOCKER_USERNAME"),
+        docker_password=os.getenv("DOCKER_PASSWORD"),
+        image_name=os.getenv("THIRDAI_PLATFORM_IMAGE_NAME"),
+        model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
+        share_dir=os.getenv("SHARE_DIR"),
+        python_path=get_python_path(),
+        thirdai_platform_dir=thirdai_platform_dir(),
+        app_dir="llm_cache_job",
+        license_key=license_info["boltLicenseKey"],
+        model_id=model_id,
+        deployment_name=deployment_name,
+    )
+
+
 async def restart_thirdai_platform_frontend():
     nomad_endpoint = os.getenv("NOMAD_ENDPOINT")
     cwd = Path(os.getcwd())
@@ -133,44 +154,6 @@ async def restart_thirdai_platform_frontend():
         majority_critical_services_nodes=os.getenv(
             "MAJORITY_CRITICAL_SERVICE_NODES", "1"
         ),
-    )
-
-
-async def restart_llm_cache_job():
-    nomad_endpoint = os.getenv("NOMAD_ENDPOINT")
-    cwd = Path(os.getcwd())
-    platform = get_platform()
-    try:
-        license_info = verify_license(
-            os.getenv(
-                "LICENSE_PATH", "/model_bazaar/license/ndb_enterprise_license.json"
-            )
-        )
-        if not valid_job_allocation(license_info, os.getenv("NOMAD_ENDPOINT")):
-            return response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                message="Resource limit reached, cannot allocate new jobs.",
-            )
-    except Exception as e:
-        return response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message=f"License is not valid. {str(e)}",
-        )
-    return submit_nomad_job(
-        nomad_endpoint=nomad_endpoint,
-        filepath=str(cwd / "backend" / "nomad_jobs" / "llm_cache_job.hcl.j2"),
-        platform=platform,
-        tag=os.getenv("TAG"),
-        registry=os.getenv("DOCKER_REGISTRY"),
-        docker_username=os.getenv("DOCKER_USERNAME"),
-        docker_password=os.getenv("DOCKER_PASSWORD"),
-        image_name=os.getenv("THIRDAI_PLATFORM_IMAGE_NAME"),
-        model_bazaar_endpoint=os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"),
-        share_dir=os.getenv("SHARE_DIR"),
-        python_path=get_python_path(),
-        thirdai_platform_dir=thirdai_platform_dir(),
-        app_dir="llm_cache_job",
-        license_key=license_info["boltLicenseKey"],
     )
 
 

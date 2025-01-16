@@ -10,7 +10,6 @@ try:
     from typing import Any
 
     import uvicorn
-    from deployment_job.permissions import Permissions
     from deployment_job.reporter import Reporter
     from deployment_job.routers.enterprise_search import EnterpriseSearchRouter
     from deployment_job.routers.knowledge_extraction import KnowledgeExtractionRouter
@@ -24,6 +23,7 @@ try:
     from fastapi.responses import JSONResponse
     from licensing.verify import verify_license
     from platform_common.logging import JobLogger, LogCode, setup_logger
+    from platform_common.permissions import Permissions
     from platform_common.pydantic_models.deployment import DeploymentConfig, UDTSubType
     from platform_common.pydantic_models.training import ModelType
     from prometheus_client import make_asgi_app

@@ -400,7 +400,6 @@ function App() {
               });
             },
             genAiProvider || undefined,
-            workflowId || undefined,
             undefined,
             controller.signal
           )
@@ -422,7 +421,6 @@ function App() {
       results!.references.filter((ref) => checkedIds.has(ref.id)),
       (next) => setAnswer((prev) => prev + next),
       genAiProvider || undefined, // Convert null to undefined
-      workflowId || undefined
     );
   }
 

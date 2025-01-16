@@ -1,0 +1,56 @@
+job "llm-cache-refresh-{{ model_id }}" {
+
+  datacenters = ["dc1"]
+
+  type = "batch"
+
+  group "llm-cache-refresh" {
+    count = 1
+
+    task "cache-refresh" {
+
+      {% if platform == "docker" %}
+        driver = "docker"
+      {% elif platform == "local" %}
+        driver = "raw_exec"
+      {% endif %}
+
+      env {
+        {% if platform == "docker" %}
+        MODEL_BAZAAR_DIR = "/model_bazaar"
+        {% elif platform == "local" %}
+        MODEL_BAZAAR_DIR = "{{ share_dir }}"
+        {% endif %}
+        MODEL_ID = "{{ model_id }}"
+        LICENSE_KEY = "{{ license_key }}"
+        MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
+      }
+
+      config {
+        {% if platform == "docker" %}
+          image = "{{ registry }}/{{ image_name }}:{{ tag }}"
+          image_pull_timeout = "15m"
+          auth {
+            username = "{{ docker_username }}"
+            password = "{{ docker_password }}"
+            server_address = "{{ registry }}"
+          }
+          volumes = [
+            "{{ share_dir }}:/model_bazaar"
+          ]
+          command = "python3"
+          args    = ["-m", "{{ llm_cache_script }}"]
+        {% elif platform == "local" %}
+          command = "/bin/sh"
+          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} -m {{ llm_cache_script }}"]
+        {% endif %}
+      }
+
+      resources {
+        cpu = {{ allocation_cores * 2400 }}
+        memory = {{ allocation_memory }}
+        memory_max = {{ allocation_memory_max }}
+      }
+    }
+  }
+}

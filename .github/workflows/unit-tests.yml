@@ -144,6 +144,7 @@ jobs:
       run: |
         cd thirdai_platform
         python3 -m pytest llm_dispatch_job -v
+        python3 -m pytest llm_cache_job -v
 
   deployment-job-unit-tests:
     runs-on: ubuntu-latest-8-cores

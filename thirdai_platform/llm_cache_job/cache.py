@@ -3,25 +3,21 @@ from abc import ABC, abstractmethod
 from logging import Logger
 from typing import Any, Dict, List, Optional, Set
 
+from llm_cache_job.utils import CacheInsertLog, UpdateLogger
 from thirdai import neural_db_v2 as ndb
-from thirdai.neural_db_v2.chunk_stores import constraints
 
 
 class Cache(ABC):
     @abstractmethod
-    def suggestions(self, model_id: str, query: str) -> List[Dict[str, Any]]:
+    def suggestions(self, query: str) -> List[Dict[str, Any]]:
         raise NotImplemented
 
     @abstractmethod
-    def query(self, model_id: str, query: str) -> Optional[Dict[str, Any]]:
+    def query(self, query: str) -> Optional[Dict[str, Any]]:
         raise NotImplemented
 
     @abstractmethod
-    def insert(self, model_id: str, query: str, llm_res: str) -> None:
-        raise NotImplemented
-
-    @abstractmethod
-    def invalidate(self, model_id: str) -> None:
+    def insert(self, query: str, llm_res: str) -> None:
         raise NotImplemented
 
 
@@ -31,22 +27,19 @@ def token_similarity(query_tokens: Set[str], cached_query: str) -> float:
 
 
 class NDBSemanticCache(Cache):
-    def __init__(self, logger: Logger):
+    def __init__(self, cache_ndb_path: str, log_dir: str, logger: Logger):
         self.logger = logger
-        self.cache_ndb_path = os.path.join(
-            os.getenv("MODEL_BAZAAR_DIR"), "llm_cache.ndb"
-        )
-        self.logger.info(f"cache ndb at {self.cache_ndb_path}")
-        if os.path.exists(self.cache_ndb_path):
+        self.logger.info(f"cache ndb at {cache_ndb_path}")
+        if os.path.exists(cache_ndb_path):
             try:
-                self.db = ndb.NeuralDB.load(self.cache_ndb_path)
+                self.db = ndb.NeuralDB.load(cache_ndb_path)
                 self.logger.info("Loaded existing cache model from disk.")
             except Exception as e:
                 self.logger.error("Failed to load cache model", exc_info=True)
                 raise e
         else:
             try:
-                self.db = ndb.NeuralDB(save_path=self.cache_ndb_path)
+                self.db = ndb.NeuralDB(save_path=cache_ndb_path)
                 self.logger.info("Initialized new cache model.")
             except Exception as e:
                 self.logger.error("Failed to initialize new cache model", exc_info=True)
@@ -54,19 +47,17 @@ class NDBSemanticCache(Cache):
         self.threshold = float(os.getenv("LLM_CACHE_THRESHOLD", "0.95"))
         self.logger.info(f"Cache threshold set to {self.threshold}")
 
-    def suggestions(self, model_id: str, query: str) -> List[Dict[str, Any]]:
-        self.logger.info(
-            f"Fetching suggestions for model_id={model_id}, query='{query}'"
+        self.insertion_logger = UpdateLogger(
+            os.path.join(log_dir, "llm_cache", "insertions", "new")
         )
+
+    def suggestions(self, query: str) -> List[Dict[str, Any]]:
+        self.logger.info(f"Fetching suggestions for query='{query}'")
         if self.db.retriever.retriever.size() == 0:
             self.logger.info("No suggestions found; cache is empty.")
             return []
 
-        results = self.db.search(
-            query=query,
-            top_k=5,
-            constraints={"model_id": constraints.EqualTo(model_id)},
-        )
+        results = self.db.search(query=query, top_k=5)
 
         unique_suggestions = set()
         suggestions = []
@@ -78,19 +69,13 @@ class NDBSemanticCache(Cache):
 
         return suggestions
 
-    def query(self, model_id: str, query: str) -> Optional[str]:
-        self.logger.info(
-            f"Executing cache query for model_id={model_id}, query='{query}'"
-        )
+    def query(self, query: str) -> Optional[str]:
+        self.logger.info(f"Executing cache query for query='{query}'")
         if self.db.retriever.retriever.size() == 0:
             self.logger.info("Cache is empty;")
             return None
 
-        results = self.db.search(
-            query=query,
-            top_k=5,
-            constraints={"model_id": constraints.EqualTo(model_id)},
-        )
+        results = self.db.search(query=query, top_k=5)
 
         query_tokens = set(query.split())
         reranked = sorted(
@@ -112,22 +97,30 @@ class NDBSemanticCache(Cache):
         self.logger.info("Cache miss or similarity below threshold.")
         return None
 
-    def insert(self, model_id: str, query: str, llm_res: str) -> None:
-        self.logger.info(f"Inserting query into cache for model_id={model_id}")
-        self.db.insert(
-            [
-                ndb.InMemoryText(
-                    document_name="",
-                    text=[query],
-                    doc_metadata={"model_id": model_id, "llm_res": llm_res},
-                )
-            ]
+    def queue_insert(self, query: str, llm_res: str, reference_ids: List[int]) -> None:
+        self.logger.info(f"Inserting query into cache for query '{query}'")
+        self.insertion_logger.log(
+            CacheInsertLog(
+                query=query,
+                llm_res=llm_res,
+                reference_ids=reference_ids,
+            )
         )
 
-    def invalidate(self, model_id: str) -> None:
-        self.logger.info(f"Invalidating cache entries for model_id={model_id}")
-        ids = self.db.chunk_store.filter_chunk_ids(
-            constraints={"model_id": constraints.EqualTo(model_id)}
-        )
-
-        self.db.delete(list(ids))
+    def insert(self, insertions: List[CacheInsertLog], batch_size: int = 2000):
+        i = 0
+        while i < len(insertions):
+            self.db.insert(
+                [
+                    ndb.InMemoryText(
+                        document_name="",
+                        text=insert_log.query,
+                        doc_metadata={
+                            "llm_res": insert_log.llm_res,
+                            "reference_ids": insert_log.reference_ids,
+                        },
+                    )
+                    for insert_log in insertions[i : i + batch_size]
+                ]
+            )
+            i += batch_size

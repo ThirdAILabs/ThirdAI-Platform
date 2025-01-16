@@ -1,4 +1,4 @@
-job "llm-cache" {
+job "llm-cache-{{ model_id }}" {
   datacenters = ["dc1"]
 
   type = "service"
@@ -7,7 +7,7 @@ job "llm-cache" {
     count = 1
 
     network {
-      port "llm-cache-http" {
+      port "llm-cache-{{ model_id }}-http" {
         {% if platform == "docker" %}
           to = 80
         {% endif %}
@@ -15,14 +15,22 @@ job "llm-cache" {
     }
 
     service {
-      name = "llm-cache"
-      port = "llm-cache-http"
+      name = "llm-cache-{{ model_id }}"
+      port = "llm-cache-{{ model_id }}-http"
       provider = "nomad"
 
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.llm-cache-http.rule=PathPrefix(`/cache/`)",
-        "traefik.http.routers.llm-cache-http.priority=10"
+        "traefik.http.routers.llm-cache-{{ model_id }}-http.middlewares={{ model_id }}-stripprefix",
+        {% if deployment_name %}
+        "traefik.http.routers.llm-cache-{{ model_id }}-http.rule=(PathPrefix(`/{{ model_id }}/cache`) || PathPrefix(`/{{ deployment_name }}/cache`))",
+        "traefik.http.middlewares.llm-cache-{{ model_id }}-stripprefix.stripprefix.prefixes=/{{ model_id }}/cache,/{{ deployment_name }}/cache",
+        {% else %}
+        "traefik.http.routers.llm-cache-{{ model_id }}-http.rule=PathPrefix(`/{{ model_id }}/cache`)",
+        "traefik.http.middlewares.llm-cache-{{ model_id }}-stripprefix.stripprefix.prefixes=/{{ model_id }}/cache",
+        {% endif %}
+        # This priority is above 10 because otherwise we could match the deployment job prefix of /model_id 
+        "traefik.http.routers.llm-cache-{{ model_id }}-http.priority=11" 
       ]
     }
 
@@ -31,12 +39,12 @@ job "llm-cache" {
         driver = "raw_exec"
       {% elif platform == "docker" %}  
         driver = "docker"
-
       {% endif %}
 
       env {
         MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
         LICENSE_KEY = "{{ license_key }}"
+        MODEL_ID = "{{ model_id }}"
         {% if platform == "docker" %}
         MODEL_BAZAAR_DIR = "/model_bazaar"
         {% elif platform == "local" %}
@@ -48,7 +56,7 @@ job "llm-cache" {
         {% if platform == "docker" %}  
           image = "{{ registry }}/{{ image_name }}:{{ tag }}"
           image_pull_timeout = "15m"
-          ports = ["llm-cache-http"]
+          ports = ["llm-cache-{{ model_id }}-http"]
           auth {
             username = "{{ docker_username }}"
             password = "{{ docker_password }}"
@@ -61,7 +69,7 @@ job "llm-cache" {
           args    = ["-m", "uvicorn", "main:app", "--app-dir", "{{ app_dir }}", "--host", "0.0.0.0", "--port", "80"]
         {% elif platform == "local" %}
           command = "/bin/sh"
-          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} -m uvicorn main:app --app-dir {{ app_dir }} --host 0.0.0.0 --port ${NOMAD_PORT_llm_cache_http}"]
+          args    = ["-c", "cd {{ thirdai_platform_dir }} && {{ python_path }} -m uvicorn main:app --app-dir {{ app_dir }} --host 0.0.0.0 --port ${NOMAD_PORT_llm_cache_{{ model_id | replace("-", "_") }}_http}"]
         {% endif %}
       }
 

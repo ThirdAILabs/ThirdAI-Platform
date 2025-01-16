@@ -10,7 +10,6 @@ import fitz
 import jwt
 import thirdai
 from deployment_job.models.ndb_models import NDBModel
-from deployment_job.permissions import Permissions
 from deployment_job.pydantic_models.inputs import (
     AssociateInput,
     ChatHistoryInput,
@@ -41,6 +40,7 @@ from platform_common.dependencies import is_on_low_disk
 from platform_common.file_handler import download_local_files, get_cloud_client
 from platform_common.logging import LogCode
 from platform_common.logging.job_loggers import JobLogger
+from platform_common.permissions import Permissions
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from platform_common.pydantic_models.feedback_logs import (
     AssociateLog,

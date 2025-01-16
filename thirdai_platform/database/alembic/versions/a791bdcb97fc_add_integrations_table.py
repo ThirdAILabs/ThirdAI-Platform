@@ -6,7 +6,7 @@ Create Date: 2024-12-16 14:37:09.553718
 
 """
 
-import enum
+pass
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -20,17 +20,7 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-class IntegrationType(str, enum.Enum):
-    openai = "openai"
-    self_hosted = "self_hosted"
-    anthropic = "anthropic"
-    cohere = "cohere"
-
-
 def upgrade():
-    integration_type_enum = pg.ENUM(IntegrationType, name="integrationtype")
-    integration_type_enum.create(op.get_bind(), checkfirst=True)
-
     op.create_table(
         "integrations",
         sa.Column(
@@ -39,13 +29,16 @@ def upgrade():
             primary_key=True,
             server_default=sa.text("gen_random_uuid()"),
         ),
-        sa.Column("type", integration_type_enum, nullable=False),
+        sa.Column(
+            "type",
+            pg.ENUM(
+                "openai", "self_hosted", "anthropic", "cohere", name="integrationtype"
+            ),
+            nullable=False,
+        ),
         sa.Column("data", sa.JSON(), nullable=True),
     )
 
 
 def downgrade():
     op.drop_table("integrations")
-
-    integration_type_enum = pg.ENUM(IntegrationType, name="integrationtype")
-    integration_type_enum.drop(op.get_bind(), checkfirst=True)

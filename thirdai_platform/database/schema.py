@@ -176,6 +176,9 @@ class Model(SQLDeclarativeBase):
     name = Column(String, nullable=False)
     train_status = Column(ENUM(Status), nullable=False, default=Status.not_started)
     deploy_status = Column(ENUM(Status), nullable=False, default=Status.not_started)
+    cache_refresh_status = Column(
+        ENUM(Status), nullable=False, default=Status.not_started
+    )
     type = Column(String(256), nullable=False)
     sub_type = Column(String(256), nullable=True)
     downloads = Column(Integer, nullable=False, default=0)

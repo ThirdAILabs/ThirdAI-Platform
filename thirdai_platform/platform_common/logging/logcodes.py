@@ -32,3 +32,5 @@ class LogCode(str, Enum):
     MODEL_INSERT = "MODEL_INSERT"
     MODEL_DELETE = "MODEL_DELETE"
     MODEL_RLHF = "MODEL_RLHF"
+
+    LLM_CACHE = "LLM_CACHE"

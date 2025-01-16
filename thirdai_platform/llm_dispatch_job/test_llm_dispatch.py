@@ -43,7 +43,7 @@ def test_generate_text_stream(references, prompt):
         request_data = {
             "query": "test query",
             "prompt": prompt,
-            "references": [{"text": ref} for ref in references],
+            "references": [{"text": ref, "ref_id": 0} for ref in references],
             "provider": "openai",
             "key": "dummy key",
         }
