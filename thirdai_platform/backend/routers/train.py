@@ -1,5 +1,7 @@
 import io
 import json
+import requests
+from urllib.parse import urljoin
 import logging
 import os
 import secrets
@@ -413,6 +415,12 @@ def retrain_ndb(
         },
     )
 
+from fastapi import Depends, Header, HTTPException, Request
+
+def extract_token(authorization: Optional[str] = Header(None)) -> Optional[str]:
+    if authorization and authorization.startswith("Bearer "):
+        return authorization[len("Bearer ") :]
+    return None
 
 @train_router.post(
     "/nlp-datagen", dependencies=[Depends(is_on_low_disk(threshold=0.75))]
@@ -425,6 +433,7 @@ def nlp_datagen(
     train_job_options: str = Form(default="{}"),
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
+    token: Optional[str] = Depends(extract_token),  # Get access token here
 ):
     user: schema.User = authenticated_user.user
     try:
@@ -469,6 +478,26 @@ def nlp_datagen(
     except Exception as error:
         return response(status_code=status.HTTP_400_BAD_REQUEST, message=str(error))
 
+    print('datagen_options.llm_provider', datagen_options.llm_provider, flush=True)
+    # Add validation for self-hosted LLM
+    if datagen_options.llm_provider == "self_hosted":
+        # Verify self-hosted LLM is configured
+        try:
+            llm_check_response = requests.get(  # Changed from response to llm_check_response
+                urljoin(os.getenv("MODEL_BAZAAR_ENDPOINT"), "/api/integrations/self-hosted-llm"),
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            if llm_check_response.status_code != 200:  # Updated variable name here too
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="Self-hosted LLM not accessible. Please check configuration in admin dashboard.",
+                )
+        except Exception as e:
+            return response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Failed to verify self-hosted LLM configuration.",
+            )
+    
     if datagen_options.datagen_options.sub_type == UDTSubType.text:
         placeholder_udt_options = TextClassificationOptions(
             text_column="", label_column="", n_target_classes=0
@@ -538,6 +567,7 @@ def nlp_datagen(
             license_key=license_info["boltLicenseKey"],
             options=datagen_options,
             job_options=datagen_job_options,
+            access_token=token
         )
 
     except Exception as err:

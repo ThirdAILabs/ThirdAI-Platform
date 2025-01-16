@@ -65,6 +65,7 @@ def generate_data_for_train_job(
     license_key: str,
     options: DatagenOptions,
     job_options: JobOptions,
+    access_token: str,  # Add this parameter
 ):
     options_dict = options.datagen_options.model_dump()
     del options_dict["sub_type"]
@@ -87,6 +88,7 @@ def generate_data_for_train_job(
             llm_provider=options.llm_provider,
             datagen_options=TokenClassificationGenerateArgs(**options_dict),
             job_options=job_options,
+            access_token=access_token
         )
 
 
@@ -179,6 +181,7 @@ def generate_token_data(
     llm_provider: LLMProvider,
     datagen_options: TokenClassificationGenerateArgs,
     job_options: JobOptions,
+    access_token: str,
 ):
     try:
         extra_options = JobOptions.model_validate(job_options).model_dump()
@@ -189,6 +192,7 @@ def generate_token_data(
         raise ValueError(f"Invalid extra options format: {e}")
 
     extra_options["secret_token"] = secret_token
+    extra_options["access_token"] = access_token
     genai_key = os.getenv("GENAI_KEY")
     if genai_key is None:
         raise ValueError(f"Need gen_ai key for data-generation")

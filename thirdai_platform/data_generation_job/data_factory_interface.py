@@ -1,3 +1,4 @@
+import os
 import random
 from abc import ABC, abstractmethod
 from logging import Logger
@@ -18,6 +19,15 @@ class DataFactory(ABC):
     def __init__(self, logger: Logger):
         self.general_variables: GeneralVariables = GeneralVariables.load_from_env()
         self.logger = logger
+
+        # Add handling for self-hosted LLM
+        if self.general_variables.llm_provider == "self_hosted":
+            self.llm = llm_classes["self_hosted"](
+                access_token=self.general_variables.access_token,
+                response_file=self.save_dir / "llm_responses.txt",
+                record_usage_at=self.save_dir / "llm_usage.json"
+            )
+
         self.save_dir = Path(self.general_variables.storage_dir)
         self.llm_model = llm_classes.get(self.general_variables.llm_provider.value)(
             api_key=self.general_variables.genai_key,

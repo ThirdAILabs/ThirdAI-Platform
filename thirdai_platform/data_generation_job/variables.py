@@ -20,7 +20,7 @@ class DataCategory(str, Enum):
 class LLMProvider(str, Enum):
     openai = "openai"
     cohere = "cohere"
-
+    self_hosted = "self_hosted"
 
 class EnvLoader:
     type_mapping = {"DataCategory": DataCategory, "LLMProvider": LLMProvider}
@@ -104,6 +104,7 @@ class GeneralVariables(EnvLoader):
     secret_token: str
     llm_provider: LLMProvider = LLMProvider.openai
     test_size: float = 0.05
+    access_token: Optional[str] = None
 
 
 class EntityStatus(str, Enum):

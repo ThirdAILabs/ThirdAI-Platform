@@ -1371,25 +1371,26 @@ type Category = {
   description: string;
 };
 
+type LLMProvider = 'openai' | 'self_hosted';
+
 export function trainTokenClassifier(
   modelName: string,
   modelGoal: string,
-  categories: Category[]
+  categories: Category[],
+  llmProvider: LLMProvider
 ): Promise<TrainTokenClassifierResponse> {
-  // Retrieve the access token from local storage
   const accessToken = getAccessToken();
-
-  // Set the default authorization header for axios
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
+  // Create the datagen_options object with all required fields
+  const datagenOptions = {
+    task_prompt: modelGoal,
+    llm_provider: llmProvider,  // Add the llm_provider at the root level
+    datagen_options: tokenClassifierDatagenForm(modelGoal, categories)
+  };
+
   const formData = new FormData();
-  formData.append(
-    'datagen_options',
-    JSON.stringify({
-      task_prompt: modelGoal,
-      datagen_options: tokenClassifierDatagenForm(modelGoal, categories),
-    })
-  );
+  formData.append('datagen_options', JSON.stringify(datagenOptions));
 
   return new Promise((resolve, reject) => {
     axios
