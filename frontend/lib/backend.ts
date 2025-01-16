@@ -605,7 +605,7 @@ export function trainTextClassifierWithCSV({
             reject(
               new Error(
                 (axiosError.response.data as any).detail ||
-                'Failed to train text classification model'
+                  'Failed to train text classification model'
               )
             );
           } else {
@@ -737,7 +737,7 @@ export function trainTokenClassifierWithCSV({
             reject(
               new Error(
                 (axiosError.response.data as any).detail ||
-                'Failed to train token classification model'
+                  'Failed to train token classification model'
               )
             );
           } else {
@@ -916,7 +916,7 @@ export function trainTokenClassifierFromCSV({
             reject(
               new Error(
                 (axiosError.response.data as any).detail ||
-                'Failed to train token classification model'
+                  'Failed to train token classification model'
               )
             );
           } else {
@@ -2105,10 +2105,7 @@ export async function updateModelAccessLevel(
   });
 }
 
-export async function updateModelOwner(
-  model_identifier: string,
-  username: string
-): Promise<void> {
+export async function updateModelOwner(model_identifier: string, username: string): Promise<void> {
   const accessToken = getAccessToken();
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 

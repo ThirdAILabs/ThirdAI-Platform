@@ -934,12 +934,13 @@ def update_access_level(
 
     model.access_level = access_level
     session.commit()
-    
+
     return response(
         status_code=status.HTTP_200_OK,
         message=f"Access level updated to '{access_level}' for model '{model_identifier}'.",
         data={"model_id": str(model.id), "access_level": str(model.access_level)},
     )
+
 
 # Update model ownership:-
 @model_router.post("/update-owner", dependencies=[Depends(is_model_owner)])
@@ -975,7 +976,7 @@ def update_model_owner(
         )
 
     # Update the owner of the model
-    model.user_id= new_owner.id
+    model.user_id = new_owner.id
     session.commit()
 
     return response(
@@ -983,7 +984,6 @@ def update_model_owner(
         message=f"Ownership of model '{model_identifier}' updated to '{username}'.",
         data={"model_id": str(model.id), "new_owner": username},
     )
-
 
 
 @model_router.post("/update-default-permission", dependencies=[Depends(is_model_owner)])

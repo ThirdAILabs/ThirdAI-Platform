@@ -1,5 +1,12 @@
 import React, { useState, useEffect, use } from 'react';
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
+import {
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Typography,
+} from '@mui/material';
 import {
   fetchAllUsers,
   deleteUserAccount,
@@ -136,7 +143,12 @@ export default function Users() {
             )}
           </div>
           {user.ownedModels.length > 0 && (
-            <div className="text-gray-700 flex flex-wrap gap-2">Owned Models: {user.ownedModels.map((model, index) => <span>{(index < user.ownedModels.length - 1) ? model.name + ", " : model.name}</span>)}</div>
+            <div className="text-gray-700 flex flex-wrap gap-2">
+              Owned Models:{' '}
+              {user.ownedModels.map((model, index) => (
+                <span>{index < user.ownedModels.length - 1 ? model.name + ', ' : model.name}</span>
+              ))}
+            </div>
           )}
           {isGlobalAdmin && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '30%' }}>
@@ -156,26 +168,32 @@ export default function Users() {
       {/* Delete Confirmation Dialog */}
       {selectedUser?.is_deactivated ? (
         <Dialog open={isDeleteDialogOpen} onClose={handleCloseDeleteDialog}>
-          <DialogTitle>Are you sure you want to delete {' '}
-            <strong>{selectedUser.name}</strong>?</DialogTitle>
+          <DialogTitle>
+            Are you sure you want to delete <strong>{selectedUser.name}</strong>?
+          </DialogTitle>
           <DialogContent>
             <Typography>
-              {selectedUser.name} currently owns{' '}
-              <strong>{selectedUser?.ownedModels.length}</strong> models.<br />
-              Deleting {selectedUser.name} will also remove their models. <br />Please transfer model ownership
-              before proceeding to avoid data loss.
+              {selectedUser.name} currently owns <strong>{selectedUser?.ownedModels.length}</strong>{' '}
+              models.
+              <br />
+              Deleting {selectedUser.name} will also remove their models. <br />
+              Please transfer model ownership before proceeding to avoid data loss.
             </Typography>
           </DialogContent>
           <DialogActions>
-            <div className='justify-end flex flex-row gap-3'>
+            <div className="justify-end flex flex-row gap-3">
               <Button onClick={handleCloseDeleteDialog} color="secondary">
                 Cancel
               </Button>
               <ConditionalButton
                 onClick={handleDeleteUser}
-                isDisabled={selectedUser.ownedModels.find((model) => model.access_level === 'protected' || model.access_level === 'public') !== undefined}
+                isDisabled={
+                  selectedUser.ownedModels.find(
+                    (model) => model.access_level === 'protected' || model.access_level === 'public'
+                  ) !== undefined
+                }
                 tooltipMessage={`Please change the ownership of public and protected models owned by ${selectedUser.name}`}
-                color='error'
+                color="error"
               >
                 Delete User
               </ConditionalButton>
@@ -184,23 +202,24 @@ export default function Users() {
         </Dialog>
       ) : (
         // Deactivate confirmation dialog box
-        selectedUser && <Dialog open={isDeleteDialogOpen} onClose={handleCloseDeleteDialog}>
-          <DialogTitle>Confirm Deactivation</DialogTitle>
-          <DialogContent>
-            <Typography>
-              Are you sure you want to deactivate the user{' '}
-              <strong>{selectedUser?.name}</strong>
-            </Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseDeleteDialog} color="secondary">
-              No
-            </Button>
-            <Button onClick={handleDeleteUser} color="error">
-              Yes
-            </Button>
-          </DialogActions>
-        </Dialog>
+        selectedUser && (
+          <Dialog open={isDeleteDialogOpen} onClose={handleCloseDeleteDialog}>
+            <DialogTitle>Confirm Deactivation</DialogTitle>
+            <DialogContent>
+              <Typography>
+                Are you sure you want to deactivate the user <strong>{selectedUser?.name}</strong>
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseDeleteDialog} color="secondary">
+                No
+              </Button>
+              <Button onClick={handleDeleteUser} color="error">
+                Yes
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )
       )}
     </div>
   );

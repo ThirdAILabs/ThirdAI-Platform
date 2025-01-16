@@ -81,11 +81,12 @@ export default function Models() {
       alert('Failed to update model access level' + error);
     }
   };
-  ownershipChangeIndex && console.log("HUE model", ownershipChangeIndex, models[ownershipChangeIndex]);
+  ownershipChangeIndex &&
+    console.log('HUE model', ownershipChangeIndex, models[ownershipChangeIndex]);
 
   // Function to handle model ownership change
   const handleModelOwnershipChange = async (index: number) => {
-    if (!selectedAssignee || selectedAssignee === "") return;
+    if (!selectedAssignee || selectedAssignee === '') return;
     try {
       const model = models[index];
       const model_identifier = `${model.owner}/${model.name}`;
@@ -94,7 +95,7 @@ export default function Models() {
       await getModelsData();
 
       setOnwershipChangeIndex(null);
-      setSelectedAssignee("");
+      setSelectedAssignee('');
     } catch (error) {
       console.error('Failed to update model owner', error);
       alert('Failed to update model owner' + error);
@@ -244,7 +245,7 @@ export default function Models() {
                 )}
               </td>
               <td className="py-3 px-4">
-                {(ownershipChangeIndex === index) ? (
+                {ownershipChangeIndex === index ? (
                   <div className="flex flex-col space-y-2">
                     <select
                       value={selectedAssignee || models[index].owner}
@@ -252,14 +253,11 @@ export default function Models() {
                       className="border border-gray-300 rounded px-4 py-2"
                     >
                       {users.map((assignee, index) => {
-                        if (assignee.role === "Global Admin") {
-                          return (
-                            <option value={assignee.name}>{assignee.name}</option>
-                          )
+                        if (assignee.role === 'Global Admin') {
+                          return <option value={assignee.name}>{assignee.name}</option>;
                         }
                       })}
                     </select>
-
 
                     <div className="flex space-x-2 mt-2">
                       <Button
