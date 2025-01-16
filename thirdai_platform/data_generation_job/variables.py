@@ -22,6 +22,7 @@ class LLMProvider(str, Enum):
     cohere = "cohere"
     self_hosted = "self_hosted"
 
+
 class EnvLoader:
     type_mapping = {"DataCategory": DataCategory, "LLMProvider": LLMProvider}
 

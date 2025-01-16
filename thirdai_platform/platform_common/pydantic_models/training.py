@@ -217,7 +217,8 @@ class UDTGeneratedData(BaseModel):
 class LLMProvider(str, Enum):
     openai = "openai"
     cohere = "cohere"
-    SELF_HOSTED = 'self_hosted'
+    SELF_HOSTED = "self_hosted"
+
 
 class TextClassificationDatagenOptions(BaseModel):
     sub_type: Literal[UDTSubType.text] = UDTSubType.text

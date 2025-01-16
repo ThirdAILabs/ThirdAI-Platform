@@ -1,7 +1,5 @@
 import io
 import json
-import requests
-from urllib.parse import urljoin
 import logging
 import os
 import secrets
@@ -9,8 +7,10 @@ import shutil
 import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
+from urllib.parse import urljoin
 
 import pandas as pd
+import requests
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
 from backend.datagen import generate_data_for_train_job
@@ -37,7 +37,16 @@ from backend.utils import (
 from data_generation_job.llms import verify_llm_access
 from database import schema
 from database.session import get_session
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    UploadFile,
+    status,
+)
 from platform_common.dependencies import is_on_low_disk
 from platform_common.file_handler import download_local_files
 
@@ -415,12 +424,12 @@ def retrain_ndb(
         },
     )
 
-from fastapi import Depends, Header, HTTPException, Request
 
 def extract_token(authorization: Optional[str] = Header(None)) -> Optional[str]:
     if authorization and authorization.startswith("Bearer "):
         return authorization[len("Bearer ") :]
     return None
+
 
 @train_router.post(
     "/nlp-datagen", dependencies=[Depends(is_on_low_disk(threshold=0.75))]
@@ -483,25 +492,29 @@ def nlp_datagen(
         # Verify self-hosted LLM is configured
         try:
             model_bazaar_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
-            print('model_bazaar_endpoint', model_bazaar_endpoint)
+            print("model_bazaar_endpoint", model_bazaar_endpoint)
             if not model_bazaar_endpoint:
-                model_bazaar_endpoint = "http://localhost:8000"  # or whatever your default should be
-            
+                model_bazaar_endpoint = (
+                    "http://localhost:8000"  # or whatever your default should be
+                )
+
             # Ensure the endpoint has a scheme
-            if not model_bazaar_endpoint.startswith(('http://', 'https://')):
+            if not model_bazaar_endpoint.startswith(("http://", "https://")):
                 model_bazaar_endpoint = f"http://{model_bazaar_endpoint}"
-            
-            endpoint = urljoin(model_bazaar_endpoint, "/api/integrations/self-hosted-llm")
+
+            endpoint = urljoin(
+                model_bazaar_endpoint, "/api/integrations/self-hosted-llm"
+            )
             logging.info(f"Checking self-hosted LLM at endpoint: {endpoint}")
-            
+
             llm_check_response = requests.get(
                 endpoint,
                 headers={"Authorization": f"Bearer {token}"},
             )
-            
+
             logging.info(f"LLM check response status: {llm_check_response.status_code}")
             logging.info(f"LLM check response body: {llm_check_response.text}")
-            
+
             if llm_check_response.status_code != 200:
                 return response(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -513,7 +526,7 @@ def nlp_datagen(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 message=f"Failed to verify self-hosted LLM configuration: {str(e)}",
             )
-    
+
     if datagen_options.datagen_options.sub_type == UDTSubType.text:
         placeholder_udt_options = TextClassificationOptions(
             text_column="", label_column="", n_target_classes=0
@@ -583,7 +596,7 @@ def nlp_datagen(
             license_key=license_info["boltLicenseKey"],
             options=datagen_options,
             job_options=datagen_job_options,
-            access_token=token
+            access_token=token,
         )
 
     except Exception as err:

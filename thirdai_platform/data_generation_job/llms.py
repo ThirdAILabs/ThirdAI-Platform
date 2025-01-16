@@ -1,13 +1,12 @@
 import os
-import requests
-from urllib.parse import urljoin
-
 from abc import ABC, abstractmethod
 from pathlib import Path
 from threading import Lock
 from typing import Optional
+from urllib.parse import urljoin
 
 import cohere
+import requests
 from openai import OpenAI
 from platform_common.utils import save_dict
 
@@ -119,7 +118,9 @@ class CohereLLM(LLMBase):
 
         return response.text
 
+
 import logging
+
 
 class SelfHostedLLM(LLMBase):
     def __init__(
@@ -129,7 +130,7 @@ class SelfHostedLLM(LLMBase):
         record_usage_at: Optional[Path] = None,
     ):
         super().__init__(response_file, record_usage_at)
-        
+
         # Get the endpoint configuration from the backend
         self.backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
         response = requests.get(
@@ -138,7 +139,7 @@ class SelfHostedLLM(LLMBase):
         )
         if response.status_code != 200:
             raise Exception("Cannot read self-hosted endpoint.")
-            
+
         data = response.json()["data"]
         self.url = data["endpoint"]  # This should be the full OpenAI-compatible URL
         self.api_key = data["api_key"]
@@ -160,23 +161,27 @@ class SelfHostedLLM(LLMBase):
                 json={
                     "model": "gpt-4o-mini",  # Added model parameter
                     "messages": [
-                        {"role": "system", "content": system_prompt or "You are a helpful assistant."},
-                        {"role": "user", "content": prompt}
-                    ]
-                }
+                        {
+                            "role": "system",
+                            "content": system_prompt or "You are a helpful assistant.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                },
             )
-            
+
             self.logger.debug(f"Response status code: {response.status_code}")
             if not response.ok:
                 self.logger.error(f"Response content: {response.text}")
             response.raise_for_status()
-            
+
             response_json = response.json()
-            return response_json['choices'][0]['message']['content']
-            
+            return response_json["choices"][0]["message"]["content"]
+
         except Exception as e:
             self.logger.error(f"Unexpected error during completion: {str(e)}")
             raise
+
 
 llm_classes = {
     "openai": OpenAILLM,

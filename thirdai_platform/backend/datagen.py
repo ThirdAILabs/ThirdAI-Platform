@@ -88,7 +88,7 @@ def generate_data_for_train_job(
             llm_provider=options.llm_provider,
             datagen_options=TokenClassificationGenerateArgs(**options_dict),
             job_options=job_options,
-            access_token=access_token
+            access_token=access_token,
         )
 
 
