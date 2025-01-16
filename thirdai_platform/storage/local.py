@@ -157,7 +157,7 @@ class LocalStorage(StorageInterface):
             if not os.path.exists(uncompressed_path):
                 raise ValueError("Failure to find saved model.")
             if os.path.exists(file_path):
-                os.path.remove(file_path)
+                os.remove(file_path)
             try:
                 shutil.make_archive(uncompressed_path, "zip", uncompressed_path)
             except Exception as e:
