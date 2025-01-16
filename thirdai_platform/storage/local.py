@@ -127,7 +127,10 @@ class LocalStorage(StorageInterface):
             extract_dir = os.path.join(
                 self.root, f"models/{model_id}/model.{model_type}"
             )
-            shutil.unpack_archive(filename=filepath, extract_dir=extract_dir)
+            try:
+                shutil.unpack_archive(filename=filepath, extract_dir=extract_dir)
+            except Exception as e:
+                raise Exception(f"Failed unpacking zipfile during upload commit: {e}")
             os.remove(filepath)
 
     def prepare_download(
@@ -155,7 +158,10 @@ class LocalStorage(StorageInterface):
                 raise ValueError("Failure to find saved model.")
             if os.path.exists(file_path):
                 os.path.remove(file_path)
-            shutil.make_archive(uncompressed_path, "zip", uncompressed_path)
+            try:
+                shutil.make_archive(uncompressed_path, "zip", uncompressed_path)
+            except Exception as e:
+                raise Exception(f"Failed to create a zipfile for download: {e}")
         else:
             if not os.path.exists(file_path):
                 raise ValueError("Failure to find saved model.")
