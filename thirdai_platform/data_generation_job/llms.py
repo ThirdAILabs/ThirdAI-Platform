@@ -158,7 +158,7 @@ class SelfHostedLLM(LLMBase):
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "gpt-4-turbo",  # Added model parameter
+                    "model": "gpt-4o-mini",  # Added model parameter
                     "messages": [
                         {"role": "system", "content": system_prompt or "You are a helpful assistant."},
                         {"role": "user", "content": prompt}
