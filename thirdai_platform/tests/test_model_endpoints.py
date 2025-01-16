@@ -411,15 +411,16 @@ def test_accessible_models_no_access(setup_users_and_models):
     assert "model4" not in model_names
     assert "model5" not in model_names
 
+
 def test_update_model_owner(setup_users_and_models):
     client, tokens = setup_users_and_models
-    
+
     # Test non-existent model
     res = client.post(
         "/api/model/update-owner",
         params={
             "model_identifier": "user_1_model/non_existent_model",
-            "username": "user_2_model"
+            "username": "user_2_model",
         },
         headers=auth_header(tokens["user_1_model"]),
     )
@@ -428,39 +429,33 @@ def test_update_model_owner(setup_users_and_models):
     # Test unauthorized update attempt
     res = client.post(
         "/api/model/update-owner",
-        params={
-            "model_identifier": "user_1_model/model5",
-            "username": "user_3_model"
-        },
+        params={"model_identifier": "user_1_model/model5", "username": "user_3_model"},
         headers=auth_header(tokens["user_2_model"]),
     )
     assert res.status_code == 403
-    
+
     # Test successful update
     res = client.post(
         "/api/model/update-owner",
-        params={
-            "model_identifier": "user_1_model/model5",
-            "username": "user_2_model"
-        },
+        params={"model_identifier": "user_1_model/model5", "username": "user_2_model"},
         headers=auth_header(tokens["user_1_model"]),
     )
     assert res.status_code == 200
     assert res.json()["data"]["new_owner"] == "user_2_model"
-    
+
     # Verify model access after ownership change
     res = client.get(
         "/api/model/list",
         headers=auth_header(tokens["user_2_model"]),
     )
     assert "model5" in [m["model_name"] for m in res.json()["data"]]
-    
+
     # Global admin update
     res = client.post(
         "/api/model/update-owner",
         params={
             "model_identifier": "user_2_model/model5",  # Now owned by user_2_model
-            "username": "user_3_model"
+            "username": "user_3_model",
         },
         headers=auth_header(tokens["global_admin"]),
     )
