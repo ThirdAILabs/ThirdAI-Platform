@@ -18,19 +18,14 @@ from platform_common.thirdai_storage.data_types import (
     XMLFeedbackData,
 )
 from platform_common.thirdai_storage.schemas import XMLElement, XMLLog
-from platform_common.thirdai_storage.storage import DataStorage, SQLiteConnector
+from platform_common.thirdai_storage.storage import DataStorage
 
 pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture
-def sqlite_connector():
-    return SQLiteConnector(db_path=":memory:")
-
-
-@pytest.fixture
-def data_storage(sqlite_connector):
-    return DataStorage(connector=sqlite_connector)
+def data_storage():
+    return DataStorage(db_path=":memory:")
 
 
 def sample_data():
@@ -221,7 +216,7 @@ def test_xml_basic_feedback(data_storage):
     data_storage.store_user_xml_feedback(log_id, feedback_items)
 
     # Verify storage
-    session = data_storage.connector.Session()
+    session = data_storage.samples.Session()
     inserted_log = session.query(XMLLog).get(log_id)
     assert len(inserted_log.feedback) == 1
     assert inserted_log.feedback[0].element.xpath == "/Employee/Email[@Name='email']"
@@ -256,7 +251,7 @@ def test_xml_element_reuse(data_storage):
 
     # log1 and log2 have overlapping element /Employee/Email[@Name='email']
     # with attr email and /Employee/Email[@Name='email'] with attr None
-    session = data_storage.connector.Session()
+    session = data_storage.xml.Session()
     element_count = session.query(XMLElement).count()
     assert element_count == 3
 

@@ -26,7 +26,7 @@ from platform_common.thirdai_storage.data_types import (
     TextClassificationData,
     TokenClassificationData,
 )
-from platform_common.thirdai_storage.storage import DataStorage, SQLiteConnector
+from platform_common.thirdai_storage.storage import DataStorage
 from thirdai import bolt
 
 
@@ -89,9 +89,7 @@ class TextClassificationModel(ClassificationModel):
                     )
 
                 # Connector will instantiate an sqlite db at the specified path if it doesn't exist
-                self.data_storage = DataStorage(
-                    connector=SQLiteConnector(db_path=data_storage_path)
-                )
+                self.data_storage = DataStorage(db_path=data_storage_path)
 
                 self.data_storage.insert_metadata(
                     Metadata(
@@ -101,9 +99,7 @@ class TextClassificationModel(ClassificationModel):
                     )
                 )
             else:
-                self.data_storage = DataStorage(
-                    connector=SQLiteConnector(db_path=data_storage_path)
-                )
+                self.data_storage = DataStorage(db_path=data_storage_path)
             self.logger.info(
                 f"Loaded data storage from {data_storage_path}",
                 code=LogCode.DATA_STORAGE,
@@ -196,9 +192,7 @@ class TokenClassificationModel(ClassificationModel):
                     )
 
                 # connector will instantiate an sqlite db at the specified path if it doesn't exist
-                self.data_storage = DataStorage(
-                    connector=SQLiteConnector(db_path=data_storage_path)
-                )
+                self.data_storage = DataStorage(db_path=data_storage_path)
 
                 self.data_storage.insert_metadata(
                     Metadata(
@@ -213,9 +207,7 @@ class TokenClassificationModel(ClassificationModel):
                 )
 
             else:
-                self.data_storage = DataStorage(
-                    connector=SQLiteConnector(db_path=data_storage_path)
-                )
+                self.data_storage = DataStorage(db_path=data_storage_path)
         except Exception as e:
             self.logger.error(
                 f"Error loading data storage: {e} for the model {self.config.model_id}",

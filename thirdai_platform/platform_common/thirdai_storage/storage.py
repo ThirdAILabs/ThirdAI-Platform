@@ -17,11 +17,13 @@ from .data_types import (
     XMLLogData,
 )
 from .schemas import (
-    Base,
     LogElementAssociation,
     MetaData,
+    MetadataBase,
+    SampleBase,
     Samples,
     SampleSeen,
+    XMLBase,
     XMLElement,
     XMLFeedback,
     XMLLog,
@@ -31,288 +33,11 @@ from .utils import reservoir_sampling
 RESERVOIR_RECENCY_MULTIPLIER = 1
 
 
-class Connector:
-    # Interface for data store backend. Can be repurposed to a DB based storage,
-    # a file based storage, etc. The DataStore should be persistent.
-    @abstractmethod
-    def add_samples(
-        self,
-        entries: typing.List[typing.tuple[str, str, str, str, bool]],
-        reservoir_size: int = None,
-    ):
-        """
-        Performs batch insertion of samples into the data store using reservoir sampling.
-
-        Reservoir sampling ensures a random sample of fixed size is maintained even as new samples
-        are added over time. This is useful for keeping a representative subset of data when the
-        total dataset is too large to store completely.
-
-        Args:
-            entries: List of tuples containing sample information with fields:
-                unique_id (str): Unique identifier for the sample
-                datatype (str): Type of the sample (e.g. "token_classification", "text_classification")
-                name (str): Name/category of the sample (e.g. "ner", "sentiment")
-                serialized_data (str): The sample data in serialized format
-                status (str): Processing status of the sample (e.g. "untrained", "trained")
-                user_provided (bool): Whether this sample was provided by a user (True) or generated (False)
-
-            reservoir_size (int, optional): Maximum number of samples to maintain in the reservoir.
-                If None, all samples will be stored without sampling.
-        """
-        pass
-
-    @abstractmethod
-    def get_sample_count(self, name: str):
-        # returns the total count of entries with the given name
-        pass
-
-    @abstractmethod
-    def delete_old_samples(self, name: str, samples_to_store: int):
-        # sort the entries by timestamp and deletes the oldest k entries
-        pass
-
-    @abstractmethod
-    def get_samples(self, name: str, num_samples: int, user_provided: bool):
-        # get num_entries entries with a specific name
-        pass
-
-    @abstractmethod
-    def existing_sample_names(self):
-        # get unique names in the store
-        pass
-
-    @abstractmethod
-    def insert_metadata(self, name: str, datatype: str, serialized_data: str):
-        # if an entry with the value name exists, updates its serialized data,
-        # else makes a new entry for the metadata in the DB.
-        pass
-
-    @abstractmethod
-    def get_metadata(self, name: str):
-        pass
-
-    @abstractmethod
-    def remove_untrained_samples(self, name: str):
-        pass
-
-    @abstractmethod
-    def update_metadata_status(self, name: str, status: MetadataStatus):
-        pass
-
-    @abstractmethod
-    def update_sample_status(self, name: str, status: SampleStatus):
-        pass
-
-    @abstractmethod
-    def add_xml_log(self, xml_log: XMLLogData) -> str:
-        pass
-
-    @abstractmethod
-    def store_user_xml_feedback(
-        self, log_id: str, feedbacks: typing.List[XMLFeedbackData]
-    ):
-        pass
-
-    @abstractmethod
-    def get_xml_log_by_id(self, log_id: str) -> XMLLogData:
-        pass
-
-    @abstractmethod
-    def get_user_provided_xml_feedback(self, status: SampleStatus):
-        pass
-
-    @abstractmethod
-    def find_conflicting_xml_feedback(self, feedback: XMLFeedbackData):
-        pass
-
-
-class SQLiteConnector(Connector):
-    def __init__(self, db_path: str):
-        self.engine = create_engine(f"sqlite:///{db_path}", echo=False)
+class XMLConnector:
+    def __init__(self, db_url: str):
+        self.engine = create_engine(db_url, echo=False)
         self.Session = scoped_session(sessionmaker(bind=self.engine))
-        Base.metadata.create_all(self.engine)
-
-    def add_samples(
-        self,
-        entries: typing.List[typing.Tuple[str, str, str, str, str, bool]],
-        reservoir_size: int = None,
-    ):
-        # NOTE : Reservoir Size restrictions will not be held if used in a multi-threaded environment
-
-        if len(entries) == 0:
-            return
-
-        session = self.Session()
-
-        reservoir_counter = (
-            session.query(SampleSeen).filter(SampleSeen.name == entries[0][2]).first()
-        )
-        if not reservoir_counter:
-            reservoir_counter = SampleSeen(name=entries[0][2], seen=0)
-            session.add(reservoir_counter)
-
-        if reservoir_size:
-            # NOTE: This isn't true reservoir sampling as the elements are deleted in bulk before adding new ones. This implies that there is a bias towards keeping recent samples in the reservoir. The parameter RESERVOIR_RECENCY_MULTIPLIER can be tuned to control this bias.
-
-            # find the indices of the entries to be added to the reservoir
-            valid_indices = list(range(len(entries)))
-            selected_indices = reservoir_sampling(
-                valid_indices,
-                reservoir_size,
-                current_size=self.get_sample_count(entries[0][2]),
-                total_items_seen=reservoir_counter.seen,
-                recency_multipler=RESERVOIR_RECENCY_MULTIPLIER,
-            )
-
-            entries = [entries[i] for i in selected_indices]
-
-            num_samples_to_remove = (
-                len(selected_indices)
-                + self.get_sample_count(entries[0][2])
-                - reservoir_size
-            )
-
-            if num_samples_to_remove > 0:
-                samples_to_remove = (
-                    session.query(Samples)
-                    .filter(Samples.name == entries[0][2])
-                    .order_by(func.random())
-                    .limit(num_samples_to_remove)
-                    .all()
-                )
-                session.query(Samples).filter(
-                    Samples.id.in_([sample.id for sample in samples_to_remove])
-                ).delete(synchronize_session=False)
-
-        session.bulk_insert_mappings(
-            Samples,
-            [
-                {
-                    "id": unique_id,
-                    "datatype": datatype,
-                    "name": name,
-                    "serialized_data": data,
-                    "status": status,
-                    "user_provided": user_provided,
-                }
-                for unique_id, datatype, name, data, status, user_provided in entries
-            ],
-        )
-
-        reservoir_counter.seen = reservoir_counter.seen + len(entries)
-        session.commit()
-
-    def get_sample_count(self, name: str):
-
-        session = self.Session()
-
-        return (
-            session.query(func.count(Samples.id)).filter(Samples.name == name).scalar()
-        )
-
-    def delete_old_samples(self, name: str, samples_to_store: int):
-        # total samples
-        total_samples = self.get_sample_count(name)
-
-        samples_to_delete = total_samples - samples_to_store
-
-        if samples_to_delete > 0:
-            session = self.Session()
-            oldest_entries = (
-                session.query(Samples.id)
-                .filter(Samples.name == name)
-                .filter(Samples.user_provided == False)
-                .order_by(Samples.timestamp.asc())
-                .limit(samples_to_delete)
-                .all()
-            )
-
-            for entry_id in oldest_entries:
-                session.delete(session.query(Samples).get(entry_id[0]))
-            session.commit()
-
-    def get_samples(self, name: str, num_samples: int, user_provided: bool):
-        session = self.Session()
-        entries = (
-            session.query(
-                Samples.datatype,
-                Samples.id,
-                Samples.serialized_data,
-                Samples.status,
-            )
-            .filter(Samples.name == name)
-            .filter(Samples.user_provided == user_provided)
-            .order_by(Samples.timestamp.desc())
-            .limit(num_samples)
-            .all()
-        )
-        return entries
-
-    def existing_sample_names(self):
-        session = self.Session()
-        names = session.query(Samples.name).distinct().all()
-
-        return set([name[0] for name in names])
-
-    def insert_metadata(
-        self, name: str, status: str, datatype: str, serialized_data: str
-    ):
-        session = self.Session()
-
-        existing_metadata = (
-            session.query(MetaData).filter(MetaData.name == name).first()
-        )
-        if existing_metadata:
-            # update the entry in place
-            existing_metadata.serialized_data = serialized_data
-            existing_metadata.status = status
-        else:
-            new_metadata = MetaData(
-                name=name,
-                datatype=datatype,
-                serialized_data=serialized_data,
-                status=status,
-            )
-            session.add(new_metadata)
-
-        session.commit()
-
-    def get_metadata(self, name: str):
-        session = self.Session()
-
-        entry = (
-            session.query(
-                MetaData.datatype,
-                MetaData.name,
-                MetaData.serialized_data,
-                MetaData.status,
-            )
-            .filter(MetaData.name == name)
-            .first()
-        )
-        return entry
-
-    def remove_untrained_samples(self, name: str):
-        # remove all untrained samples for a given name
-        session = self.Session()
-        session.query(Samples).filter(Samples.name == name).filter(
-            Samples.status == SampleStatus.untrained
-        ).delete()
-        session.commit()
-
-    def update_metadata_status(self, name: str, status: MetadataStatus):
-        session = self.Session()
-        session.query(MetaData).filter(MetaData.name == name).update(
-            {MetaData.status: status}
-        )
-        session.commit()
-
-    def update_sample_status(self, name: str, status: SampleStatus):
-        session = self.Session()
-        session.query(Samples).filter(Samples.name == name).update(
-            {Samples.status: status}
-        )
-        session.commit()
+        XMLBase.metadata.create_all(self.engine)
 
     def add_xml_log(self, log: XMLLogData):
         session = self.Session()
@@ -505,21 +230,204 @@ class SQLiteConnector(Connector):
             for c in conflicts
         ]
 
-    def update_xml_feedback_status(
-        self, feedback: XMLFeedbackData, status: SampleStatus
+
+class SampleConnector:
+    def __init__(self, db_url: str):
+        self.engine = create_engine(db_url, echo=False)
+        self.Session = scoped_session(sessionmaker(bind=self.engine))
+        SampleBase.metadata.create_all(self.engine)
+
+    def add_samples(
+        self,
+        entries: typing.List[typing.Tuple[str, str, str, str, str, bool]],
+        reservoir_size: int = None,
+    ):
+        # NOTE : Reservoir Size restrictions will not be held if used in a multi-threaded environment
+
+        if len(entries) == 0:
+            return
+
+        session = self.Session()
+
+        reservoir_counter = (
+            session.query(SampleSeen).filter(SampleSeen.name == entries[0][2]).first()
+        )
+        if not reservoir_counter:
+            reservoir_counter = SampleSeen(name=entries[0][2], seen=0)
+            session.add(reservoir_counter)
+
+        if reservoir_size:
+            # NOTE: This isn't true reservoir sampling as the elements are deleted in bulk before adding new ones. This implies that there is a bias towards keeping recent samples in the reservoir. The parameter RESERVOIR_RECENCY_MULTIPLIER can be tuned to control this bias.
+
+            # find the indices of the entries to be added to the reservoir
+            valid_indices = list(range(len(entries)))
+            selected_indices = reservoir_sampling(
+                valid_indices,
+                reservoir_size,
+                current_size=self.get_sample_count(entries[0][2]),
+                total_items_seen=reservoir_counter.seen,
+                recency_multipler=RESERVOIR_RECENCY_MULTIPLIER,
+            )
+
+            entries = [entries[i] for i in selected_indices]
+
+            num_samples_to_remove = (
+                len(selected_indices)
+                + self.get_sample_count(entries[0][2])
+                - reservoir_size
+            )
+
+            if num_samples_to_remove > 0:
+                samples_to_remove = (
+                    session.query(Samples)
+                    .filter(Samples.name == entries[0][2])
+                    .order_by(func.random())
+                    .limit(num_samples_to_remove)
+                    .all()
+                )
+                session.query(Samples).filter(
+                    Samples.id.in_([sample.id for sample in samples_to_remove])
+                ).delete(synchronize_session=False)
+
+        session.bulk_insert_mappings(
+            Samples,
+            [
+                {
+                    "id": unique_id,
+                    "datatype": datatype,
+                    "name": name,
+                    "serialized_data": data,
+                    "status": status,
+                    "user_provided": user_provided,
+                }
+                for unique_id, datatype, name, data, status, user_provided in entries
+            ],
+        )
+
+        reservoir_counter.seen = reservoir_counter.seen + len(entries)
+        session.commit()
+
+    def get_sample_count(self, name: str):
+        session = self.Session()
+        return (
+            session.query(func.count(Samples.id)).filter(Samples.name == name).scalar()
+        )
+
+    def delete_old_samples(self, name: str, samples_to_store: int):
+        total_samples = self.get_sample_count(name)
+        samples_to_delete = total_samples - samples_to_store
+
+        if samples_to_delete > 0:
+            session = self.Session()
+            oldest_entries = (
+                session.query(Samples.id)
+                .filter(Samples.name == name)
+                .filter(Samples.user_provided == False)
+                .order_by(Samples.timestamp.asc())
+                .limit(samples_to_delete)
+                .all()
+            )
+
+            for entry_id in oldest_entries:
+                session.delete(session.query(Samples).get(entry_id[0]))
+            session.commit()
+
+    def get_samples(self, name: str, num_samples: int, user_provided: bool):
+        session = self.Session()
+        entries = (
+            session.query(
+                Samples.datatype,
+                Samples.id,
+                Samples.serialized_data,
+                Samples.status,
+            )
+            .filter(Samples.name == name)
+            .filter(Samples.user_provided == user_provided)
+            .order_by(Samples.timestamp.desc())
+            .limit(num_samples)
+            .all()
+        )
+        return entries
+
+    def existing_sample_names(self):
+        session = self.Session()
+        names = session.query(Samples.name).distinct().all()
+        return set([name[0] for name in names])
+
+    def remove_untrained_samples(self, name: str):
+        session = self.Session()
+        session.query(Samples).filter(Samples.name == name).filter(
+            Samples.status == SampleStatus.untrained
+        ).delete()
+        session.commit()
+
+    def update_sample_status(self, name: str, status: SampleStatus):
+        session = self.Session()
+        session.query(Samples).filter(Samples.name == name).update(
+            {Samples.status: status}
+        )
+        session.commit()
+
+
+class MetadataConnector:
+    def __init__(self, db_url: str):
+        self.engine = create_engine(db_url, echo=False)
+        self.Session = scoped_session(sessionmaker(bind=self.engine))
+        MetadataBase.metadata.create_all(self.engine)
+
+    def insert_metadata(
+        self, name: str, status: str, datatype: str, serialized_data: str
     ):
         session = self.Session()
-        session.query(XMLFeedback).filter_by(id=feedback.id).update(
-            {XMLFeedback.status: status}
+
+        existing_metadata = (
+            session.query(MetaData).filter(MetaData.name == name).first()
+        )
+        if existing_metadata:
+            existing_metadata.serialized_data = serialized_data
+            existing_metadata.status = status
+        else:
+            new_metadata = MetaData(
+                name=name,
+                datatype=datatype,
+                serialized_data=serialized_data,
+                status=status,
+            )
+            session.add(new_metadata)
+
+        session.commit()
+
+    def get_metadata(self, name: str):
+        session = self.Session()
+
+        entry = (
+            session.query(
+                MetaData.datatype,
+                MetaData.name,
+                MetaData.serialized_data,
+                MetaData.status,
+            )
+            .filter(MetaData.name == name)
+            .first()
+        )
+        return entry
+
+    def update_metadata_status(self, name: str, status: MetadataStatus):
+        session = self.Session()
+        session.query(MetaData).filter(MetaData.name == name).update(
+            {MetaData.status: status}
         )
         session.commit()
 
 
 class DataStorage:
-    def __init__(self, connector: Connector):
+    def __init__(self, db_path: str):
         # all class attributes should be generated using the connector
         # and it is supposed to be used as a single source of truth.
-        self.connector = connector
+        db_url = f"sqlite:///{db_path}"
+        self.xml = XMLConnector(db_url)
+        self.samples = SampleConnector(db_url)
+        self.metadata = MetadataConnector(db_url)
 
         # if per name buffer size is None then no limit on the number of samples for each name
         # this attribute is set as private so that two different instances of
@@ -542,7 +450,7 @@ class DataStorage:
                 )
             )
 
-        self.connector.add_samples(
+        self.samples.add_samples(
             samples_to_insert,
             reservoir_size=(
                 self._reservoir_size if not override_reservoir_limit else None
@@ -550,7 +458,7 @@ class DataStorage:
         )
 
     def retrieve_samples(self, name: str, num_samples: int, user_provided: bool):
-        entries = self.connector.get_samples(
+        entries = self.samples.get_samples(
             name, num_samples=num_samples, user_provided=user_provided
         )
 
@@ -567,17 +475,17 @@ class DataStorage:
         ]
 
     def clip_storage(self):
-        existing_sample_types = self.connector.existing_sample_names()
+        existing_sample_types = self.samples.existing_sample_names()
 
         for name in existing_sample_types:
-            self.connector.delete_old_samples(
+            self.samples.delete_old_samples(
                 name=name, samples_to_store=self._reservoir_size
             )
 
     def insert_metadata(self, metadata: Metadata):
         # updates the serialized data in place if another entry with the same
         # name exists
-        self.connector.insert_metadata(
+        self.metadata.insert_metadata(
             name=metadata.name,
             status=metadata.status,
             datatype=metadata.datatype,
@@ -585,7 +493,7 @@ class DataStorage:
         )
 
     def get_metadata(self, name) -> Metadata:
-        data = self.connector.get_metadata(name)
+        data = self.metadata.get_metadata(name)
         if data:
             return Metadata.from_serialized(
                 type=data[0], name=data[1], serialized_data=data[2], status=data[3]
@@ -594,7 +502,7 @@ class DataStorage:
         return None
 
     def remove_untrained_samples(self, name: str):
-        self.connector.remove_untrained_samples(name)
+        self.samples.remove_untrained_samples(name)
 
     def rollback_metadata(self, name: str):
         metadata = self.get_metadata(name)
@@ -604,26 +512,26 @@ class DataStorage:
             self.insert_metadata(metadata)
 
     def update_metadata_status(self, name: str, status: MetadataStatus):
-        self.connector.update_metadata_status(name, status)
+        self.metadata.update_metadata_status(name, status)
 
     def update_sample_status(self, name: str, status: SampleStatus):
-        self.connector.update_sample_status(name, status)
+        self.samples.update_sample_status(name, status)
 
     def add_xml_log(self, xml_log: XMLLogData) -> str:
-        return self.connector.add_xml_log(xml_log)
+        return self.xml.add_xml_log(xml_log)
 
     def store_user_xml_feedback(
         self, log_id: str, feedbacks: typing.List[XMLFeedbackData]
     ):
-        self.connector.store_user_xml_feedback(log_id, feedbacks)
+        self.xml.store_user_xml_feedback(log_id, feedbacks)
 
     def get_xml_log_by_id(self, log_id: str) -> XMLLogData:
-        return self.connector.get_xml_log_by_id(log_id)
+        return self.xml.get_xml_log_by_id(log_id)
 
     def get_user_provided_xml_feedback(self, status: SampleStatus):
-        return self.connector.get_user_provided_xml_feedback(status)
+        return self.xml.get_user_provided_xml_feedback(status)
 
     def find_conflicting_xml_feedback(
         self, feedback: XMLFeedbackData
     ) -> typing.List[XMLFeedbackData]:
-        return self.connector.find_conflicting_xml_feedback(feedback)
+        return self.xml.find_conflicting_xml_feedback(feedback)
