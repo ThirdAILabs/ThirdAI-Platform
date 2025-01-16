@@ -8,6 +8,7 @@ from logging import Logger
 from typing import List
 
 import thirdai
+from llm_cache_job.utils import CacheInsertLog
 from platform_common.file_handler import expand_cloud_buckets_and_directories
 from platform_common.logging.logcodes import LogCode
 from platform_common.ndb.ndbv2_parser import parse_doc
@@ -69,17 +70,16 @@ class NeuralDBV2(Model):
                 "models",
                 self.config.base_model_id,
                 "llm_cache",
-                "llm_cache.ndb",
             )
 
             if os.path.exists(cache_path):
                 shutil.copytree(
                     cache_path,
-                    self.llm_cache_path(),
+                    self.llm_cache_folder_path(),
                     ignore=shutil.ignore_patterns("*.tmpdb"),
                     dirs_exist_ok=True,
                 )
-                self.llm_cache = ndbv2.NeuralDB.load(self.llm_cache_path())
+                self.llm_cache = ndbv2.NeuralDB.load(self.llm_cache_ndb_path())
         else:
             self.logger.info("Creating new NDBv2 model", code=LogCode.MODEL_INIT)
             if self.on_disk:
@@ -104,8 +104,11 @@ class NeuralDBV2(Model):
     def ndb_save_path(self):
         return os.path.join(self.model_dir, "model.ndb")
 
-    def llm_cache_path(self):
+    def llm_cache_ndb_path(self):
         return os.path.join(self.model_dir, "llm_cache", "llm_cache.ndb")
+
+    def llm_cache_folder_path(self):
+        return os.path.join(self.model_dir, "llm_cache")
 
     def doc_save_path(self):
         return os.path.join(self.ndb_save_path(), "documents")
@@ -396,25 +399,49 @@ class NeuralDBV2(Model):
 
     def evict_stale_cache_responses(self, **kwargs) -> int:
         """
-        If references used for generation of llm cache responses are different,
-        delete that response from the cache
+        If references used for generation of llm cache responses have changed for
+        the same query, delete that response from the cache.
         """
+        past_insertions_file = os.path.join(
+            self.llm_cache_folder_path(),
+            "insertions",
+            "past_insertions.jsonl",
+        )
+
         chunk_ids_to_delete = []
-        # TODO (david) Universe PR for iter_chunks() method
+        evicted_response_lines = []
+        with open(past_insertions_file, "r") as f:
+            # TODO (david) Revisit this by adding a chunk iterator in NeuralDB
+            # The issue:
+            # Determining chunk_id in this way is a bit of a leaky abstraction but
+            # since we know NeuralDB assigns chunks in increasing order and we
+            # inserted all of the entries in past_insertions.jsonl in order, we
+            # can be sure that we're deleting the right ids here. This will be
+            # inefficient on subsequent calls since we might loop through ids
+            # that have already been deleted, but NeuralDB at least doesn't throw
+            # when deleting duplicate ids so this code should be correct.
+            for chunk_id, line in enumerate(f.readlines(), start=1):
+                log = CacheInsertLog.model_validate_json(line)
+                query = log.query
+                cache_ref_ids = log.reference_ids
+                results = self.db.search(query)
+                model_ref_ids = [r[0].chunk_id for r in results][: len(cache_ref_ids)]
+                if set(cache_ref_ids) != set(model_ref_ids):
+                    chunk_ids_to_delete.append(chunk_id)
+                    evicted_response_lines.append(line)
 
-        # TODO log the queries that have been evicted from the cache due to stale results.
-        # We could potentially regenerate answers for those. though its tricky.
-        # if the references it used originally have been deleted or the question
-        # is no longer relevant then the generation might not be relevant either
-        for chunk in self.llm_cache.chunk_store.iter_chunks():
-            query = chunk.metadata["query"]
-            results = self.db.search(query)
-            cache_ref_ids = chunk.metadata["reference_ids"]
-            model_ref_ids = [r.chunk_id for r in results][: len(cache_ref_ids)]
-            if set(cache_ref_ids) != set(model_ref_ids):
-                chunk_ids_to_delete.append(chunk.id)
+        self.llm_cache.delete(chunk_ids_to_delete)
 
-        self.cache.delete(chunk_ids_to_delete)
+        evicted_responses_file = os.path.join(
+            self.llm_cache_folder_path(),
+            "insertions",
+            "evicted_responses.jsonl",
+        )
+
+        with open(evicted_responses_file, "a") as f:
+            for evicted_response_line in evicted_response_lines:
+                f.write(evicted_response_line)
+
         return len(chunk_ids_to_delete)
 
     def evaluate(self, **kwargs):

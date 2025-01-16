@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from logging import Logger
 from typing import Any, Dict, List, Optional, Set
 
-from llm_cache_job.utils import InsertLog, UpdateLogger
+from llm_cache_job.utils import CacheInsertLog, UpdateLogger
 from thirdai import neural_db_v2 as ndb
 
 
@@ -48,7 +48,7 @@ class NDBSemanticCache(Cache):
         self.logger.info(f"Cache threshold set to {self.threshold}")
 
         self.insertion_logger = UpdateLogger(
-            os.path.join(log_dir, "llm_cache", "insertions")
+            os.path.join(log_dir, "llm_cache", "insertions", "new")
         )
 
     def suggestions(self, query: str) -> List[Dict[str, Any]]:
@@ -100,14 +100,14 @@ class NDBSemanticCache(Cache):
     def queue_insert(self, query: str, llm_res: str, reference_ids: List[int]) -> None:
         self.logger.info(f"Inserting query into cache for query '{query}'")
         self.insertion_logger.log(
-            InsertLog(
+            CacheInsertLog(
                 query=query,
                 llm_res=llm_res,
                 reference_ids=reference_ids,
             )
         )
 
-    def insert(self, insertions: List[InsertLog], batch_size: int = 2000):
+    def insert(self, insertions: List[CacheInsertLog], batch_size: int = 2000):
         i = 0
         while i < len(insertions):
             self.db.insert(

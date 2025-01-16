@@ -4,7 +4,7 @@ from typing import List
 from pydantic import BaseModel
 
 
-class InsertLog(BaseModel):
+class CacheInsertLog(BaseModel):
     query: str
     llm_res: str
     reference_ids: List[int]

@@ -1,12 +1,15 @@
+pass
 import logging
 import os
 from pathlib import Path
-from typing import List
+
+pass
+import glob
 
 from licensing.verify import verify_license
 from llm_cache_job.cache import Cache, NDBSemanticCache
 from llm_cache_job.reporter import HttpReporter
-from llm_cache_job.utils import InsertLog
+from llm_cache_job.utils import CacheInsertLog
 from platform_common.logging import setup_logger
 
 license_key = os.getenv("LICENSE_KEY")
@@ -16,20 +19,6 @@ model_bazaar_dir = os.getenv("MODEL_BAZAAR_DIR")
 model_id = os.getenv("MODEL_ID")
 model_dir = Path(model_bazaar_dir) / "models" / model_id
 log_dir: Path = Path(model_bazaar_dir) / "logs" / model_id
-
-insertions_folder = os.path.join(model_dir, "llm_cache", "insertions")
-
-
-def list_insertions() -> List[InsertLog]:
-    insertions = []
-    for logfile in os.listdir(insertions_folder):
-        filepath = os.path.join(insertions_folder, logfile)
-        if os.path.isfile(filepath) and logfile.endswith(".jsonl"):
-            with open(filepath) as f:
-                for line in f.readlines():
-                    log = InsertLog.model_validate_json(line)
-                    insertions.append(log)
-    return insertions
 
 
 def main():
@@ -48,12 +37,31 @@ def main():
             cache_ndb_path=cache_ndb_path, log_dir=model_dir, logger=logger
         )
 
-        insertions = list_insertions()
+        insertions_folder = os.path.join(
+            model_dir, "llm_cache", "insertions", "new", "*.jsonl"
+        )
+        insertion_files = glob.glob(insertions_folder)
+
+        insertions = []
+        lines = []
+        for insertion_file in insertion_files:
+            with open(insertion_file) as f:
+                for line in f.readlines():
+                    lines.append(line)
+                    log = CacheInsertLog.model_validate_json(line)
+                    insertions.append(log)
 
         cache.insert(insertions)
 
-        for logfile in os.listdir(insertions_folder):
-            os.remove(os.path.join(insertions_folder, logfile))
+        past_insertions_file = os.path.join(
+            model_dir, "llm_cache", "insertions", "past_insertions.jsonl"
+        )
+        with open(past_insertions_file, "a") as f:
+            for line in lines:
+                f.write(line)
+
+        for insertion_file in insertion_files:
+            os.remove(insertion_file)
     except Exception as e:
         reporter.report_status(model_id, "failed", str(e))
         raise
