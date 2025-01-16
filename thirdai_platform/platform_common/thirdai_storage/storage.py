@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import typing
-from abc import abstractmethod
 from uuid import uuid4
 
 from sqlalchemy import create_engine, func

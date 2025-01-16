@@ -954,7 +954,7 @@ class TokenClassificationModel(ClassificationModel):
             self.logger.debug(f"Inserting {len(samples)} samples into storage.")
 
             self.data_storage.insert_samples(samples=samples)
-            num_samples_in_storage = self.data_storage.connector.get_sample_count("ner")
+            num_samples_in_storage = self.data_storage.samples.get_sample_count("ner")
 
             self.logger.info(
                 f"Number of samples in storage after insertion: {num_samples_in_storage}",

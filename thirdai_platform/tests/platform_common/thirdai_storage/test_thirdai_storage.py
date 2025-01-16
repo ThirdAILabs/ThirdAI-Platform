@@ -216,7 +216,7 @@ def test_xml_basic_feedback(data_storage):
     data_storage.store_user_xml_feedback(log_id, feedback_items)
 
     # Verify storage
-    session = data_storage.samples.Session()
+    session = data_storage.xml.Session()
     inserted_log = session.query(XMLLog).get(log_id)
     assert len(inserted_log.feedback) == 1
     assert inserted_log.feedback[0].element.xpath == "/Employee/Email[@Name='email']"
