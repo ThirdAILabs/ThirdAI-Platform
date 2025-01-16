@@ -89,7 +89,7 @@ export default function Models() {
     try {
       const model = models[index];
       const model_identifier = `${model.owner}/${model.name}`;
-      //TODO: write a ownership transfer endpoint (Backend)
+
       await updateModelOwner(model_identifier, selectedAssignee);
       await getModelsData();
 
@@ -247,26 +247,17 @@ export default function Models() {
                 {(ownershipChangeIndex === index) ? (
                   <div className="flex flex-col space-y-2">
                     <select
-                      value={selectedAssignee}
+                      value={selectedAssignee || models[index].owner}
                       onChange={(e) => setSelectedAssignee(e.target.value)}
                       className="border border-gray-300 rounded px-4 py-2"
                     >
-                      {(models[index].type === "Private Model" || models[index].type === "Public Model" || models[index].type === "Protected Model") && users.map((assignee, index) => {
+                      {users.map((assignee, index) => {
                         if (assignee.role === "Global Admin") {
                           return (
                             <option value={assignee.name}>{assignee.name}</option>
                           )
                         }
                       })}
-
-
-                      {/* {(models[index].type === "Protected Model") && users.map((assignee, index) => {
-                        if (assignee.teams) {
-                          return (
-                            <option value={assignee.name}>{assignee.name}</option>
-                          )
-                        }
-                      })} */}
                     </select>
 
 

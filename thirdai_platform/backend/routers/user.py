@@ -286,7 +286,6 @@ def delete_user(
         )
 
     if not user.is_deactivated:
-        # Modify user.is_deactivated to 1
         user.is_deactivated = True
         session.commit()
         if identity_provider == "keycloak":
@@ -616,7 +615,7 @@ def list_accessible_users(
                 }
                 for user_team in user.teams
             ],
-            "ownedModels": [
+            "owned_models": [
                 {
                     "id": model.id,
                     "name": model.name,
@@ -737,7 +736,6 @@ def add_user_by_global_admin(
                 username=body.username,
                 email=body.email,
                 verified=True,
-                is_deactivated=False,
             )
             session.add(new_user)
             session.commit()

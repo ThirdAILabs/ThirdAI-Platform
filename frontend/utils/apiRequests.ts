@@ -75,7 +75,6 @@ const getModels = async () => {
 const getUsers = async () => {
   try {
     const response = await fetchAllUsers();
-    console.log('Response of getUsers -> ', response);
     const userData = response.data.map(
       (user): User => ({
         id: user.id,
@@ -87,12 +86,11 @@ const getUsers = async () => {
           name: team.team_name,
           role: team.role,
         })),
-        ownedModels: user.ownedModels,
+        ownedModels: user.owned_models,
         verified: user.verified,
         is_deactivated: user.is_deactivated,
       })
     );
-    console.log('In apiRequests getUsers-> ', userData);
     return userData;
   } catch (error) {
     console.error('Failed to fetch users', error);

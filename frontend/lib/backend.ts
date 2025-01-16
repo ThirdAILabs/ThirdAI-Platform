@@ -2003,7 +2003,7 @@ interface UserResponse {
   id: string;
   teams: UserTeamInfo[];
   username: string;
-  ownedModels: OwnedModel[];
+  owned_models: OwnedModel[];
   verified: boolean;
   is_deactivated: boolean;
 }
@@ -2107,16 +2107,16 @@ export async function updateModelAccessLevel(
 
 export async function updateModelOwner(
   model_identifier: string,
-  userName: string
+  username: string
 ): Promise<void> {
   const accessToken = getAccessToken();
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-  const params = new URLSearchParams({ model_identifier, userName });
+  const params = new URLSearchParams({ model_identifier, username });
 
   return new Promise((resolve, reject) => {
     axios
-      .post(`${thirdaiPlatformBaseUrl}/api/model/update-model-owner?${params.toString()}`)
+      .post(`${thirdaiPlatformBaseUrl}/api/model/update-owner?${params.toString()}`)
       .then(() => {
         resolve();
       })
