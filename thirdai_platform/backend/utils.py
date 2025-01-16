@@ -299,7 +299,7 @@ def get_model_from_identifier(model_identifier, session):
     )
     if not model:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=f"There is no model with name {model_identifier}.",
         )
     return model

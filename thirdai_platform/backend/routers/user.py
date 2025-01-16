@@ -285,18 +285,25 @@ def delete_user(
             message=f"User with email {email} not found.",
         )
 
+    if not user.is_deactivated:
+        user.is_deactivated = True
+        session.commit()
+        if identity_provider == "keycloak":
+            try:
+                keycloak_admin.delete_user(user.id)
+            except Exception as e:
+                return response(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    message=f"Failed to delete user in Keycloak: {str(e)}",
+                )
+        return response(
+            status_code=status.HTTP_200_OK,
+            message=f"User with {email} is soft deleted.",
+        )
+
     delete_all_models_for_user(user, session)
 
     session.delete(user)
-
-    if identity_provider == "keycloak":
-        try:
-            keycloak_admin.delete_user(user.id)
-        except Exception as e:
-            return response(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                message=f"Failed to delete user in Keycloak: {str(e)}",
-            )
 
     session.commit()
 
@@ -345,7 +352,10 @@ def email_login(
 ):
     user: Optional[schema.User] = (
         session.query(schema.User)
-        .filter(schema.User.email == credentials.username)
+        .filter(
+            schema.User.email == credentials.username,
+            schema.User.is_deactivated == False,
+        )
         .first()
     )
     if not user:
@@ -396,7 +406,10 @@ def sync_user_with_keycloak(
 
         user = (
             session.query(schema.User)
-            .filter(schema.User.email == user_info.get("email"))
+            .filter(
+                schema.User.email == user_info.get("email"),
+                schema.User.is_deactivated == False,
+            )
             .first()
         )
         # checking is not necessary, because this endpoint is only invoked incase of new-user-registration but for ensure safety check.
@@ -601,7 +614,23 @@ def list_accessible_users(
                 }
                 for user_team in user.teams
             ],
+            "owned_models": [
+                {
+                    "id": model.id,
+                    "name": model.name,
+                    "type": model.type,
+                    "sub_type": model.sub_type,
+                    "train_status": model.train_status.value,
+                    "deploy_status": model.deploy_status.value,
+                    "published_date": model.published_date,
+                    "access_level": model.access_level,
+                }
+                for model in session.query(schema.Model)
+                .filter(schema.Model.user_id == user.id)
+                .all()
+            ],
             "verified": user.verified,
+            "is_deactivated": user.is_deactivated,
         }
         for user in users
     ]
@@ -645,6 +674,7 @@ def get_user_info(
             }
             for user_team in user.teams
         ],
+        "is_deactivated": user.is_deactivated,
     }
 
     return response(
@@ -701,6 +731,7 @@ def add_user_by_global_admin(
             )
 
             new_user = schema.User(
+                id=keycloak_user_id,
                 username=body.username,
                 email=body.email,
                 verified=True,

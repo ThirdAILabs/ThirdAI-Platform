@@ -88,7 +88,7 @@ export default function Button(theme) {
       }),
     };
 
-    // ***** New Code for Delete Button with Red Color *****
+    // ***** New Code for Button with Red Color *****
     const containedRedDelete = {
       ...(containedVariant &&
         ownerState.color === 'error' && {
@@ -100,7 +100,7 @@ export default function Button(theme) {
         }),
     };
 
-    // ***** New Code for Delete Button with Red Color *****
+    // ***** New Code for Button with Green Color *****
     const containedGreenSuccess = {
       ...(containedVariant &&
         ownerState.color === 'success' && {
@@ -108,6 +108,17 @@ export default function Button(theme) {
           color: theme.palette.common.white,
           '&:hover': {
             backgroundColor: theme.palette.success.dark,
+          },
+        }),
+    };
+    // ***** New Code for Button with Green Color *****
+    const containedYellowWarning = {
+      ...(containedVariant &&
+        ownerState.color === 'warning' && {
+          backgroundColor: theme.palette.warning.main,
+          color: theme.palette.common.white,
+          '&:hover': {
+            backgroundColor: theme.palette.warning.dark,
           },
         }),
     };
@@ -143,6 +154,7 @@ export default function Button(theme) {
       containedLightBlue,
       containedRedDelete,
       containedGreenSuccess,
+      containedYellowWarning,
       ...colorStyle,
       defaultStyle,
       disabledState,

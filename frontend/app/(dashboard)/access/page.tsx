@@ -50,7 +50,7 @@ function AccessContent() {
 
   return (
     <div className="container mx-auto p-6 bg-gray-50 min-h-screen">
-      <Card className="shadow-lg max-w-4xl mx-auto">
+      <Card className="shadow-lg max-w-[1100px] mx-auto">
         <CardHeader className="bg-blue-500 text-white p-6 rounded-t-lg">
           <CardTitle className="text-2xl font-bold">Manage Access</CardTitle>
           <CardDescription className="text-white">

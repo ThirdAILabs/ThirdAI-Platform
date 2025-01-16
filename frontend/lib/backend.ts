@@ -1987,14 +1987,25 @@ interface UserTeamInfo {
   team_name: string;
   role: 'Member' | 'team_admin' | 'Global Admin';
 }
-
+export interface OwnedModel {
+  id: string; // UUID represented as a string
+  name: string;
+  type: string;
+  subType?: string; // Optional field
+  trainStatus: string;
+  deployStatus: string;
+  publishedDate?: string; // Optional ISO date string
+  access_level: 'private' | 'protected' | 'public';
+}
 interface UserResponse {
   email: string;
   global_admin: boolean;
   id: string;
   teams: UserTeamInfo[];
   username: string;
+  owned_models: OwnedModel[];
   verified: boolean;
+  is_deactivated: boolean;
 }
 
 interface TeamResponse {
@@ -2083,6 +2094,26 @@ export async function updateModelAccessLevel(
   return new Promise((resolve, reject) => {
     axios
       .post(`${thirdaiPlatformBaseUrl}/api/model/update-access-level?${params.toString()}`)
+      .then(() => {
+        resolve();
+      })
+      .catch((err) => {
+        console.error('Error updating model access level:', err);
+        alert('Error updating model access level:' + err);
+        reject(err);
+      });
+  });
+}
+
+export async function updateModelOwner(model_identifier: string, username: string): Promise<void> {
+  const accessToken = getAccessToken();
+  axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+  const params = new URLSearchParams({ model_identifier, username });
+
+  return new Promise((resolve, reject) => {
+    axios
+      .post(`${thirdaiPlatformBaseUrl}/api/model/update-owner?${params.toString()}`)
       .then(() => {
         resolve();
       })
@@ -2350,6 +2381,7 @@ export interface User {
   email: string;
   global_admin: boolean;
   teams: Team[];
+  is_deactivated: boolean;
 }
 
 export async function accessTokenUser(accessToken: string | null) {

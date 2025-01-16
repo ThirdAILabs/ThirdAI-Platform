@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { Button } from '@mui/material';
-import { updateModelAccessLevel, deleteModel } from '@/lib/backend';
+import { updateModelAccessLevel, deleteModel, updateModelOwner } from '@/lib/backend';
 import { UserContext } from '../../user_wrapper';
 import ConditionalButton from '@/components/ui/ConditionalButton';
 import { getModels, getTeams, getUsers, Model, Team, User } from '@/utils/apiRequests';
@@ -15,6 +15,8 @@ export default function Models() {
   const [selectedType, setSelectedType] = useState<
     'Private Model' | 'Protected Model' | 'Public Model' | null
   >(null);
+  const [selectedAssignee, setSelectedAssignee] = useState<string>();
+  const [ownershipChangeIndex, setOnwershipChangeIndex] = useState<number | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const { user } = React.useContext(UserContext);
   const [modelEditPermissions, setModelEditPermissions] = useState<boolean[]>([]);
@@ -79,6 +81,26 @@ export default function Models() {
       alert('Failed to update model access level' + error);
     }
   };
+  ownershipChangeIndex &&
+    console.log('HUE model', ownershipChangeIndex, models[ownershipChangeIndex]);
+
+  // Function to handle model ownership change
+  const handleModelOwnershipChange = async (index: number) => {
+    if (!selectedAssignee || selectedAssignee === '') return;
+    try {
+      const model = models[index];
+      const model_identifier = `${model.owner}/${model.name}`;
+
+      await updateModelOwner(model_identifier, selectedAssignee);
+      await getModelsData();
+
+      setOnwershipChangeIndex(null);
+      setSelectedAssignee('');
+    } catch (error) {
+      console.error('Failed to update model owner', error);
+      alert('Failed to update model owner' + error);
+    }
+  };
 
   // Function to handle model deletion
   const handleDeleteModel = async (index: number) => {
@@ -139,6 +161,7 @@ export default function Models() {
             <th className="py-3 px-4 text-left text-gray-700">Model Type</th>
             <th className="py-3 px-4 text-left text-gray-700">Access Details</th>
             <th className="py-3 px-4 text-left text-gray-700">Edit Model Access</th>
+            <th className="py-3 px-4 text-left text-gray-700">Edit Model Owner</th>
             <th className="py-3 px-4 text-left text-gray-700">Delete Model</th>
           </tr>
         </thead>
@@ -221,7 +244,47 @@ export default function Models() {
                   </ConditionalButton>
                 )}
               </td>
+              <td className="py-3 px-4">
+                {ownershipChangeIndex === index ? (
+                  <div className="flex flex-col space-y-2">
+                    <select
+                      value={selectedAssignee || models[index].owner}
+                      onChange={(e) => setSelectedAssignee(e.target.value)}
+                      className="border border-gray-300 rounded px-4 py-2"
+                    >
+                      {users.map((assignee, index) => {
+                        if (assignee.role === 'Global Admin') {
+                          return <option value={assignee.name}>{assignee.name}</option>;
+                        }
+                      })}
+                    </select>
 
+                    <div className="flex space-x-2 mt-2">
+                      <Button
+                        onClick={() => handleModelOwnershipChange(index)}
+                        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                      >
+                        Confirm
+                      </Button>
+                      <Button
+                        onClick={() => setOnwershipChangeIndex(null)}
+                        className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <ConditionalButton
+                    onClick={() => setOnwershipChangeIndex(index)}
+                    isDisabled={!modelEditPermissions[index]}
+                    tooltipMessage="Global Admin, Model owner and Team Admin can change ownership"
+                    variant="contained"
+                  >
+                    Change Ownership
+                  </ConditionalButton>
+                )}
+              </td>
               <td className="py-3 px-4">
                 <ConditionalButton
                   onClick={() => handleDeleteModel(index)}

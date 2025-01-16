@@ -58,6 +58,7 @@ export default function UserWrapper({ children }: { children: React.ReactNode })
           process.env.NEXT_PUBLIC_IDENTITY_PROVIDER.toLowerCase().includes('keycloak')
         ) {
           router.push('/login-keycloak');
+          ('');
         } else {
           router.push('/login-email');
         }
