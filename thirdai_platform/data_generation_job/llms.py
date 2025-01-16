@@ -140,7 +140,7 @@ class SelfHostedLLM(LLMBase):
             raise Exception("Cannot read self-hosted endpoint.")
             
         data = response.json()["data"]
-        self.url = data["endpoint"]
+        self.url = data["endpoint"]  # This should be the full OpenAI-compatible URL
         self.api_key = data["api_key"]
 
         if self.url is None or self.api_key is None:
@@ -151,19 +151,14 @@ class SelfHostedLLM(LLMBase):
 
     def completion(self, prompt: str, system_prompt: Optional[str] = None, **kwargs):
         try:
-            # Log the request details
-            self.logger.debug(f"Making request with prompt: {prompt[:100]}...")
-            self.logger.debug(f"System prompt: {system_prompt}")
-            self.logger.debug(f"Additional kwargs: {kwargs}")
-
             response = requests.post(
-                "https://api.openai.com/v1/chat/completions",
+                self.url,
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "gpt-4-turbo-preview",  # Using the latest GPT-4 model
+                    "model": "gpt-4-turbo",  # Added model parameter
                     "messages": [
                         {"role": "system", "content": system_prompt or "You are a helpful assistant."},
                         {"role": "user", "content": prompt}
@@ -172,17 +167,13 @@ class SelfHostedLLM(LLMBase):
             )
             
             self.logger.debug(f"Response status code: {response.status_code}")
-            self.logger.debug(f"Response content: {response.text}")
-            
+            if not response.ok:
+                self.logger.error(f"Response content: {response.text}")
             response.raise_for_status()
             
             response_json = response.json()
             return response_json['choices'][0]['message']['content']
             
-        except requests.exceptions.HTTPError as e:
-            self.logger.error(f"HTTP Error: {str(e)}")
-            self.logger.error(f"Response content: {e.response.text if hasattr(e, 'response') else 'No response content'}")
-            raise
         except Exception as e:
             self.logger.error(f"Unexpected error during completion: {str(e)}")
             raise
