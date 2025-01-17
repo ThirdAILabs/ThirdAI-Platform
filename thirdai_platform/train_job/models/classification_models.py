@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import pandas as pd
+import platform_common.ndb.ndbv2_parser as ndbv2_parser
 import thirdai
 from platform_common.file_handler import (
     expand_cloud_buckets_and_directories,
@@ -23,6 +24,8 @@ from platform_common.file_handler import (
 from platform_common.logging import LogCode
 from platform_common.pii.udt_common_patterns import find_common_pattern
 from platform_common.pydantic_models.training import (
+    FileInfo,
+    FileLocation,
     TextClassificationOptions,
     TokenClassificationOptions,
     TrainConfig,
@@ -337,7 +340,7 @@ class TextClassificationModel(ClassificationModel):
 
 import csv
 
-import PyPDF2
+pass
 from platform_common.file_handler import FileInfo
 
 
@@ -409,44 +412,45 @@ class DocClassificationModel(TextClassificationModel):
 
         processed_docs = []
         categories = set()
-
-        def extract_text_from_pdf(file_path: str) -> str:
-            with open(file_path, "rb") as f:
-                pdf_reader = PyPDF2.PdfReader(f)
-                return " ".join(page.extract_text() for page in pdf_reader.pages)
-
-        def extract_text_from_docx(file_path: str) -> str:
-            import docx
-
-            doc = docx.Document(file_path)
-            return " ".join(paragraph.text for paragraph in doc.paragraphs)
-
-        def extract_text_from_txt(file_path: str) -> str:
-            with open(file_path, "r", encoding="utf-8") as f:
-                return f.read()
-
-        extractors = {
-            ".pdf": extract_text_from_pdf,
-            ".docx": extract_text_from_docx,
-            ".doc": extract_text_from_docx,  # Note: May need additional handling for older .doc files
-            ".txt": extract_text_from_txt,
-        }
+        doc_save_dir = os.path.join(temp_dir, "doc_artifacts")
+        os.makedirs(doc_save_dir, exist_ok=True)
 
         for file_info in files:
             try:
-                file_path = file_info.path
-                file_ext = os.path.splitext(file_path)[1].lower()
-
-                if file_ext not in extractors:
-                    self.logger.warning(f"Unsupported file type: {file_ext}")
+                # Check for unsupported cloud storage files
+                if file_info.location in {
+                    FileLocation.s3,
+                    FileLocation.azure,
+                    FileLocation.gcp,
+                }:
+                    self.logger.warning(
+                        f"Cloud storage files not supported for classification: {file_info.path}"
+                    )
                     continue
 
                 # Extract category from parent directory name
-                category = os.path.basename(os.path.dirname(file_path))
+                category = os.path.basename(os.path.dirname(file_info.path))
                 categories.add(category)
 
-                # Extract text using appropriate extractor
-                text = extractors[file_ext](file_path)
+                # Use existing document parsing infrastructure
+                ndb_doc = ndbv2_parser.parse_doc(
+                    doc=file_info, doc_save_dir=doc_save_dir, tmp_dir=temp_dir
+                )
+
+                if not ndb_doc:
+                    self.logger.warning(f"Could not parse document: {file_info.path}")
+                    continue
+
+                # Handle pandas Series output - convert to string properly
+                texts = []
+                for chunk in ndb_doc.chunks():
+                    # Convert Series to string if necessary
+                    chunk_text = chunk.text
+                    if hasattr(chunk_text, "iloc"):  # Check if it's a pandas Series
+                        chunk_text = chunk_text.iloc[0] if len(chunk_text) > 0 else ""
+                    texts.append(str(chunk_text))
+
+                text = " ".join(texts)
 
                 # Truncate if needed
                 word_limit = getattr(self.txt_cls_vars, "word_limit", 1000)
@@ -454,10 +458,14 @@ class DocClassificationModel(TextClassificationModel):
                 truncated_text = " ".join(words)
 
                 processed_docs.append({"text": truncated_text, "label": category})
+
             except Exception as e:
                 file_path_str = getattr(file_info, "path", "unknown file")
                 self.logger.error(f"Error processing file {file_path_str}: {str(e)}")
                 continue
+
+        if not processed_docs:
+            raise ValueError("No documents were successfully processed")
 
         # Create CSV file
         csv_path = os.path.join(temp_dir, "classification.csv")
