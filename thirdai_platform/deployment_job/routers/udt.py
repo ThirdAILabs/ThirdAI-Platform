@@ -418,11 +418,27 @@ class UDTRouterTokenClassification(UDTBaseRouter):
         - JSONResponse: Evaluation metrics and example samples
         """
         try:
+            if not file.filename.endswith(".csv"):
+                return response(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    message="Invalid file format. Only CSV files are supported.",
+                )
+
             # Save uploaded file temporarily
             destination_path = self.model.data_dir / file.filename
             with open(destination_path, "wb") as f:
                 contents = await file.read()
                 f.write(contents)
+
+            try:
+                # Try to read as CSV to validate format
+                pd.read_csv(destination_path)
+            except Exception as e:
+                destination_path.unlink()  # Clean up file
+                return response(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    message=f"Invalid CSV format: {str(e)}",
+                )
 
             self.logger.info(
                 f"Starting evaluation on file: {file.filename}",
@@ -455,11 +471,14 @@ class UDTRouterTokenClassification(UDTBaseRouter):
         except Exception as e:
             self.logger.error(
                 f"Error during model evaluation: {str(e)}",
-                code=LogCode.MODEL_TRAIN,  # Using MODEL_TRAIN code for now since it exists
+                code=LogCode.MODEL_TRAIN,
             )
-            if destination_path.exists():
+            if "destination_path" in locals() and destination_path.exists():
                 destination_path.unlink()
-            raise e
+            return response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"Error during evaluation: {str(e)}",
+            )
 
     @staticmethod
     def get_model(config: DeploymentConfig, logger: JobLogger) -> ClassificationModel:
