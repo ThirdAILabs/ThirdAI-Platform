@@ -275,6 +275,9 @@ class PerTagMetrics:
 
 
 class UDTRouterTokenClassification(UDTBaseRouter):
+    MAX_FILE_SIZE_MB = 1
+    MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024  # 1MB in bytes
+
     def __init__(self, config: DeploymentConfig, reporter: Reporter, logger: JobLogger):
         super().__init__(config, reporter, logger)
         # The following routes are only applicable for token classification models
@@ -408,26 +411,27 @@ class UDTRouterTokenClassification(UDTBaseRouter):
     ):
         """
         Evaluates the NER model performance using a provided test file.
-
-        Parameters:
-        - file: UploadFile - CSV file containing test data
-        - samples_to_collect: int - Number of example samples to collect for each metric (default: 5)
-        - token: str - Authorization token (inferred from permissions dependency)
-
-        Returns:
-        - JSONResponse: Evaluation metrics and example samples
+        Includes file size validation.
         """
         try:
+            # Validate file format
             if not file.filename.endswith(".csv"):
                 return response(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    status_code=status.HTTP_400_BAD_REQUEST,
                     message="Invalid file format. Only CSV files are supported.",
+                )
+
+            # Read file content to check size
+            contents = await file.read()
+            if len(contents) > self.MAX_FILE_SIZE_BYTES:
+                return response(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    message=f"File size exceeds {self.MAX_FILE_SIZE_MB}MB limit. Please upload a smaller file.",
                 )
 
             # Save uploaded file temporarily
             destination_path = self.model.data_dir / file.filename
             with open(destination_path, "wb") as f:
-                contents = await file.read()
                 f.write(contents)
 
             try:
@@ -436,13 +440,13 @@ class UDTRouterTokenClassification(UDTBaseRouter):
             except Exception as e:
                 destination_path.unlink()  # Clean up file
                 return response(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    status_code=status.HTTP_400_BAD_REQUEST,
                     message=f"Invalid CSV format: {str(e)}",
                 )
 
             self.logger.info(
                 f"Starting evaluation on file: {file.filename}",
-                code=LogCode.MODEL_TRAIN,  # Using MODEL_TRAIN code for now since it exists
+                code=LogCode.MODEL_TRAIN,
             )
 
             # Evaluate the model

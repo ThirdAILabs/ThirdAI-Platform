@@ -1654,6 +1654,35 @@ export async function evaluateModel(
   }
 }
 
+// Constants
+const MAX_FILE_SIZE_MB = 1;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024; // 1MB in bytes
+
+// Type for validation result
+interface FileValidationResult {
+  isValid: boolean;
+  error?: string;
+}
+
+export function validateEvalFile(file: File): FileValidationResult {
+  if (!file) {
+    return { isValid: false, error: 'Please select a CSV file first' };
+  }
+
+  if (!file.name.endsWith('.csv')) {
+    return { isValid: false, error: 'Only CSV files are supported' };
+  }
+
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    return {
+      isValid: false,
+      error: `File size exceeds ${MAX_FILE_SIZE_MB}MB limit. Please upload a smaller file.`,
+    };
+  }
+
+  return { isValid: true };
+}
+
 export function useTokenClassificationEndpoints() {
   const accessToken = useAccessToken();
   const params = useParams();

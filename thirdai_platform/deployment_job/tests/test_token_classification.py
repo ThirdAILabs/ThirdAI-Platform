@@ -233,8 +233,9 @@ def test_evaluate_endpoint_invalid_file(tmp_dir):
         response = client.post("/evaluate", files=files)
 
     assert (
-        response.status_code == 500
-    )  # Since the code raises an exception for invalid files
+        response.status_code == 400
+    )  # Bad Request is more appropriate for invalid file type
+    assert "Invalid file format" in response.json()["message"]  # Verify error message
 
 
 @pytest.mark.unit
@@ -259,3 +260,55 @@ def test_evaluate_endpoint_empty_file(tmp_dir):
     data = response.json()["data"]
     assert "metrics" in data
     assert "examples" in data
+
+
+@pytest.fixture
+def large_test_file(tmp_dir):
+    """Create a test CSV file that exceeds the size limit (1MB)"""
+    # Create a large string that will make the file exceed 1MB
+    # Increased the multiplier to ensure we go over 1MB
+    large_text = "This is a very long email " + "x" * 100000 + " test@example.com"
+
+    # Create enough rows to exceed 1MB
+    test_data = pd.DataFrame(
+        {
+            "source": [large_text] * 20,  # Multiple rows of large text
+            "target": ["O O O O EMAIL"] * 20,  # Corresponding labels
+        }
+    )
+
+    file_path = Path(tmp_dir) / "large_test_data.csv"
+    test_data.to_csv(file_path, index=False)
+
+    # Verify the file is actually larger than 1MB
+    assert (
+        file_path.stat().st_size > UDTRouterTokenClassification.MAX_FILE_SIZE_BYTES
+    ), f"File size {file_path.stat().st_size} bytes is not greater than {UDTRouterTokenClassification.MAX_FILE_SIZE_BYTES} bytes"
+
+    return str(file_path)
+
+
+@pytest.mark.unit
+@patch.object(Permissions, "verify_permission", mock_verify_permission)
+@patch.object(Permissions, "check_permission", mock_check_permission)
+@patch.object(Permissions, "_deployment_permissions", mock_deployment_permissions)
+def test_evaluate_endpoint_file_too_large(tmp_dir, large_test_file):
+    """Test evaluation with a file that exceeds the size limit"""
+    config = create_config(tmp_dir)
+    router = UDTRouterTokenClassification(config, None, logger)
+    client = TestClient(router.router)
+
+    with open(large_test_file, "rb") as f:
+        files = {"file": ("large_test_data.csv", f, "text/csv")}
+        response = client.post("/evaluate", files=files)
+
+    assert response.status_code == 413  # HTTP 413 Request Entity Too Large
+    assert "File size exceeds 1MB limit" in response.json()["message"]
+
+    # Verify the error message format matches our API response structure
+    error_response = response.json()
+    assert "status" in error_response
+    assert "message" in error_response
+    assert (
+        error_response["status"] == "failed"
+    )  # Changed from "error" to "failed" to match API response

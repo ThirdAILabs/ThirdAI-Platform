@@ -9,6 +9,7 @@ import {
   getAccessToken,
   evaluateModel,
   EvaluationData,
+  validateEvalFile,
 } from '@/lib/backend';
 import RecentSamples from './samples';
 import { TrainingResults } from './MetricsChart';
@@ -497,6 +498,13 @@ export default function ModelUpdate({
   const handleEvaluate = async () => {
     if (!evalFile) {
       setEvalError('Please select a CSV file first');
+      return;
+    }
+
+    // Validate file before processing
+    const validation = validateEvalFile(evalFile);
+    if (!validation.isValid) {
+      setEvalError(validation.error!);
       return;
     }
 
