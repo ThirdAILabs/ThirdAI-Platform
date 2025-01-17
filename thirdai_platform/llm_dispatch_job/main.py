@@ -9,13 +9,14 @@ load_dotenv()
 
 import asyncio
 import os
+from typing import Optional
 from urllib.parse import urljoin
 
 import requests
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from llm_dispatch_job.llms import LLMBase, default_keys, model_classes
+from llm_dispatch_job.llms import LLMBase, LLMFactory
 from llm_dispatch_job.utils import GenerateArgs
 
 app = FastAPI()
@@ -59,8 +60,16 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
+def extract_token(authorization: Optional[str] = Header(None)) -> Optional[str]:
+    if authorization and authorization.startswith("Bearer "):
+        return authorization[len("Bearer ") :]
+    return None
+
+
 @app.post("/llm-dispatch/generate")
-async def generate(generate_args: GenerateArgs):
+async def generate(
+    generate_args: GenerateArgs, token: Optional[str] = Depends(extract_token)
+):
     """
     Generate text using a specified generative AI model, with content streamed in real-time.
     Returns a StreamingResponse with chunks of generated text.
@@ -108,28 +117,22 @@ async def generate(generate_args: GenerateArgs):
     - If `original_query` and `cache_access_token` are provided, the generated content will be cached after completion.
     """
 
-    key = generate_args.key or default_keys.get(generate_args.provider.lower())
-    if not key:
-        logger.error("No generative AI key provided")
-        raise HTTPException(status_code=400, detail="No generative AI key provided")
-
-    llm_class = model_classes.get(generate_args.provider.lower())
-    if llm_class is None:
-        logger.error(f"Unsupported provider '{generate_args.provider.lower()}'")
-        raise HTTPException(status_code=400, detail="Unsupported provider")
+    llm: LLMBase = LLMFactory.create(
+        provider=generate_args.provider.lower(),
+        api_key=generate_args.key,
+        access_token=token,
+        logger=logger,
+    )
 
     logger.info(
         f"Received request from workflow: '{generate_args.workflow_id}'. "
         f"Starting generation with provider '{generate_args.provider.lower()}':",
     )
 
-    llm: LLMBase = llm_class()
-
     async def generate_stream():
         generated_response = ""
         try:
             async for next_word in llm.stream(
-                key=key,
                 query=generate_args.query,
                 task_prompt=generate_args.task_prompt,
                 references=generate_args.references,
