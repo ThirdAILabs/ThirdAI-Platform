@@ -2010,7 +2010,7 @@ export function useKnowledgeExtractionEndpoints(workflowId: string | null) {
     if (!deploymentUrl) throw new Error('Knowledge extraction deployment URL not set');
     const response = await axios.get<ReportStatus>(`${deploymentUrl}/reports`, {
       headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
+        Authorization: `Bearer ${accessToken}`,
       },
     });
     return response.data.data;
