@@ -15,8 +15,12 @@ import RecentSamples from './samples';
 import { TrainingResults } from './MetricsChart';
 import type { TrainReportData } from '@/lib/backend';
 import axios from 'axios';
-import { Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
-import { ExpandMore } from '@mui/icons-material';
+
+export enum PredictionType {
+  TRUE_POSITIVE = 'tp',
+  FALSE_POSITIVE = 'fp',
+  FALSE_NEGATIVE = 'fn',
+}
 
 interface ModelUpdateProps {
   username: string;
@@ -25,6 +29,24 @@ interface ModelUpdateProps {
   workflowNames: string[];
   deployStatus: string;
 }
+
+const predictionTypes = [
+  {
+    id: PredictionType.TRUE_POSITIVE,
+    label: 'True Positives',
+    color: 'bg-green-100 hover:bg-green-200',
+  },
+  {
+    id: PredictionType.FALSE_POSITIVE,
+    label: 'False Positives',
+    color: 'bg-red-100 hover:bg-red-200',
+  },
+  {
+    id: PredictionType.FALSE_NEGATIVE,
+    label: 'False Negatives',
+    color: 'bg-yellow-100 hover:bg-yellow-200',
+  },
+];
 
 const getMetricColor = (value: number) => {
   if (value >= 95) return 'text-green-600 font-semibold';
@@ -44,23 +66,25 @@ const MetricCell = ({ value }: { value: number | string }) => {
   return <td className="px-6 py-4 whitespace-nowrap text-gray-500">{value}</td>;
 };
 
-// Token highlighting component
-const TokenHighlight: React.FC<{
+interface TokenHighlightProps {
   text: string;
   index: number;
   highlightIndex: number;
-  type: 'tp' | 'fp' | 'fn';
-}> = ({ text, index, highlightIndex, type }) => {
+  type: PredictionType;
+}
+
+// Token highlighting component
+const TokenHighlight: React.FC<TokenHighlightProps> = ({ text, index, highlightIndex, type }) => {
   const isHighlighted = index === highlightIndex;
 
   const getHighlightColor = () => {
     if (!isHighlighted) return 'bg-transparent';
     switch (type) {
-      case 'tp':
+      case PredictionType.TRUE_POSITIVE:
         return 'bg-green-100 border-green-400';
-      case 'fp':
+      case PredictionType.FALSE_POSITIVE:
         return 'bg-red-100 border-red-400';
-      case 'fn':
+      case PredictionType.FALSE_NEGATIVE:
         return 'bg-yellow-100 border-yellow-400';
       default:
         return 'bg-transparent';
@@ -76,38 +100,40 @@ const TokenHighlight: React.FC<{
   );
 };
 
-// Example display component
-const ExamplePair: React.FC<{
+interface ExamplePairProps {
   example: {
     source: string;
     target: string;
     predictions: string;
     index: number;
   };
-  type: 'tp' | 'fp' | 'fn';
-}> = ({ example, type }) => {
+  type: PredictionType;
+}
+
+// Example display component
+const ExamplePair: React.FC<ExamplePairProps> = ({ example, type }) => {
   const sourceTokens = example.source.split(' ');
   const targetTokens = example.target.split(' ');
   const predictionTokens = example.predictions.split(' ');
 
   const getTypeLabel = () => {
     switch (type) {
-      case 'tp':
+      case PredictionType.TRUE_POSITIVE:
         return 'True Positive';
-      case 'fp':
+      case PredictionType.FALSE_POSITIVE:
         return 'False Positive';
-      case 'fn':
+      case PredictionType.FALSE_NEGATIVE:
         return 'False Negative';
     }
   };
 
   const getTypeColor = () => {
     switch (type) {
-      case 'tp':
+      case PredictionType.TRUE_POSITIVE:
         return 'text-green-700 bg-green-50';
-      case 'fp':
+      case PredictionType.FALSE_POSITIVE:
         return 'text-red-700 bg-red-50';
-      case 'fn':
+      case PredictionType.FALSE_NEGATIVE:
         return 'text-yellow-700 bg-yellow-50';
     }
   };
@@ -542,7 +568,7 @@ export default function ModelUpdate({
   }, []);
 
   const [selectedLabel, setSelectedLabel] = useState<string>('');
-  const [selectedType, setSelectedType] = useState<'tp' | 'fp' | 'fn'>('tp');
+  const [selectedType, setSelectedType] = useState<PredictionType>(PredictionType.TRUE_POSITIVE);
 
   useEffect(() => {
     if (evalResults?.metrics) {
@@ -722,28 +748,12 @@ export default function ModelUpdate({
                   <div className="space-y-2 mt-4">
                     <div className="text-sm font-medium text-gray-500">Select Prediction Type</div>
                     <div className="flex flex-wrap gap-2">
-                      {[
-                        {
-                          id: 'tp',
-                          label: 'True Positives',
-                          color: 'bg-green-100 hover:bg-green-200',
-                        },
-                        {
-                          id: 'fp',
-                          label: 'False Positives',
-                          color: 'bg-red-100 hover:bg-red-200',
-                        },
-                        {
-                          id: 'fn',
-                          label: 'False Negatives',
-                          color: 'bg-yellow-100 hover:bg-yellow-200',
-                        },
-                      ].map(({ id, label, color }) => (
+                      {predictionTypes.map(({ id, label, color }) => (
                         <button
                           key={id}
-                          onClick={() => setSelectedType(id as 'tp' | 'fp' | 'fn')}
+                          onClick={() => setSelectedType(id)}
                           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors
-                      ${selectedType === id ? color : 'bg-gray-100 hover:bg-gray-200'}`}
+                            ${selectedType === id ? color : 'bg-gray-100 hover:bg-gray-200'}`}
                         >
                           {label}
                         </button>

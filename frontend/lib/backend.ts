@@ -1623,13 +1623,6 @@ export interface EvaluationResponse {
   data: EvaluationData;
 }
 
-/**
- * Evaluates a model using a provided test file
- * @param deploymentUrl - The deployment URL for the model
- * @param file - The CSV file containing test data
- * @param samplesToCollect - Optional number of samples to collect for each category (default: 5)
- * @returns Promise containing evaluation metrics and examples
- */
 export async function evaluateModel(
   deploymentUrl: string,
   file: File,
