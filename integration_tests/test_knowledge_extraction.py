@@ -60,9 +60,6 @@ def test_knowledge_extraction():
     assert len(report["documents"]) == 1
     report = report["content"]
 
-    assert len(report["documents"]) == 1
-    report = report["content"]
-
     question_to_expected_answer = {
         "net revenue of apple": "383.3",
         "iphone sales in 2021 (in billion)": "191.973",

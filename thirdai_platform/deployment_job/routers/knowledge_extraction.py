@@ -182,7 +182,7 @@ class KnowledgeExtractionRouter:
                 "submitted_at": report.submitted_at,
                 "updated_at": report.updated_at,
                 "documents": documents,
-                "msg": report.msg
+                "msg": report.msg,
             }
 
             if report.status == "complete":
