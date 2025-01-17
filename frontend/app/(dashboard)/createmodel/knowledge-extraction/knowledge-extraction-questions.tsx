@@ -163,6 +163,17 @@ const KnowledgeExtractionQuestions: React.FC<KnowledgeExtractionQuestionsProps> 
     }
   };
 
+  const isFormValid = (): boolean => {
+    const validations = [
+      !isLoading,
+      !!modelName,
+      !!llmType,
+      questions.every((question) => !!question.trim()),
+    ];
+
+    return validations.every(Boolean);
+  };
+
   return (
     <div>
       <Box sx={{ width: '100%' }}>
@@ -187,10 +198,7 @@ const KnowledgeExtractionQuestions: React.FC<KnowledgeExtractionQuestionsProps> 
             Next
           </Button>
         ) : (
-          <Button
-            onClick={handleSubmit}
-            disabled={isLoading || !modelName || !llmType || questions.some((q) => !q.trim())}
-          >
+          <Button onClick={handleSubmit} disabled={!isFormValid()}>
             {isLoading ? 'Creating...' : 'Create'}
           </Button>
         )}
