@@ -66,6 +66,35 @@ const MetricCell = ({ value }: { value: number | string }) => {
   return <td className="px-6 py-4 whitespace-nowrap text-gray-500">{value}</td>;
 };
 
+interface TokenData {
+  tokens: string[];
+  label: string;
+  bgColor: string;
+}
+
+interface TokenRowProps {
+  data: TokenData;
+  index: number;
+  highlightIndex: number;
+  type: PredictionType;
+}
+
+const TokenRow: React.FC<TokenRowProps> = ({ data, index, highlightIndex, type }) => {
+  return (
+    <div className="space-y-1">
+      <div className="text-sm font-medium text-gray-500">{data.label}</div>
+      <div className={`p-2 ${data.bgColor} rounded`}>
+        {data.tokens.map((token, idx) => (
+          <React.Fragment key={idx}>
+            <TokenHighlight text={token} index={idx} highlightIndex={highlightIndex} type={type} />
+            {idx < data.tokens.length - 1 && ' '}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 interface TokenHighlightProps {
   text: string;
   index: number;
@@ -116,85 +145,39 @@ const ExamplePair: React.FC<ExamplePairProps> = ({ example, type }) => {
   const targetTokens = example.target.split(' ');
   const predictionTokens = example.predictions.split(' ');
 
-  const getTypeLabel = () => {
-    switch (type) {
-      case PredictionType.TRUE_POSITIVE:
-        return 'True Positive';
-      case PredictionType.FALSE_POSITIVE:
-        return 'False Positive';
-      case PredictionType.FALSE_NEGATIVE:
-        return 'False Negative';
-    }
-  };
+  const tokenRows: TokenData[] = [
+    { tokens: sourceTokens, label: 'Input', bgColor: 'bg-gray-50' },
+    { tokens: targetTokens, label: 'Ground Truth', bgColor: 'bg-gray-50' },
+    { tokens: predictionTokens, label: 'Prediction', bgColor: 'bg-gray-50' },
+  ];
 
-  const getTypeColor = () => {
-    switch (type) {
-      case PredictionType.TRUE_POSITIVE:
-        return 'text-green-700 bg-green-50';
-      case PredictionType.FALSE_POSITIVE:
-        return 'text-red-700 bg-red-50';
-      case PredictionType.FALSE_NEGATIVE:
-        return 'text-yellow-700 bg-yellow-50';
-    }
+  const typeConfig = {
+    [PredictionType.TRUE_POSITIVE]: { label: 'True Positive', color: 'text-green-700 bg-green-50' },
+    [PredictionType.FALSE_POSITIVE]: { label: 'False Positive', color: 'text-red-700 bg-red-50' },
+    [PredictionType.FALSE_NEGATIVE]: {
+      label: 'False Negative',
+      color: 'text-yellow-700 bg-yellow-50',
+    },
   };
 
   return (
     <div className="border rounded-lg p-4 space-y-3">
-      <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getTypeColor()}`}>
-        {getTypeLabel()}
+      <div
+        className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${typeConfig[type].color}`}
+      >
+        {typeConfig[type].label}
       </div>
 
       <div className="space-y-2">
-        <div className="space-y-1">
-          <div className="text-sm font-medium text-gray-500">Input</div>
-          <div className="p-2 bg-gray-50 rounded">
-            {sourceTokens.map((token, idx) => (
-              <React.Fragment key={idx}>
-                <TokenHighlight
-                  text={token}
-                  index={idx}
-                  highlightIndex={example.index}
-                  type={type}
-                />
-                {idx < sourceTokens.length - 1 && ' '}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <div className="text-sm font-medium text-gray-500">Ground Truth</div>
-          <div className="p-2 bg-gray-50 rounded">
-            {targetTokens.map((token, idx) => (
-              <React.Fragment key={idx}>
-                <TokenHighlight
-                  text={token}
-                  index={idx}
-                  highlightIndex={example.index}
-                  type={type}
-                />
-                {idx < targetTokens.length - 1 && ' '}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <div className="text-sm font-medium text-gray-500">Prediction</div>
-          <div className="p-2 bg-gray-50 rounded">
-            {predictionTokens.map((token, idx) => (
-              <React.Fragment key={idx}>
-                <TokenHighlight
-                  text={token}
-                  index={idx}
-                  highlightIndex={example.index}
-                  type={type}
-                />
-                {idx < predictionTokens.length - 1 && ' '}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
+        {tokenRows.map((row, index) => (
+          <TokenRow
+            key={index}
+            data={row}
+            index={index}
+            highlightIndex={example.index}
+            type={type}
+          />
+        ))}
       </div>
     </div>
   );
@@ -570,6 +553,12 @@ export default function ModelUpdate({
   const [selectedLabel, setSelectedLabel] = useState<string>('');
   const [selectedType, setSelectedType] = useState<PredictionType>(PredictionType.TRUE_POSITIVE);
 
+  const performanceIndicators = [
+    { color: 'bg-green-600', label: 'Excellent', threshold: '≥95%' },
+    { color: 'bg-yellow-600', label: 'Good', threshold: '85-94%' },
+    { color: 'bg-red-600', label: 'Needs Improvement', threshold: 'Below 85%' },
+  ];
+
   useEffect(() => {
     if (evalResults?.metrics) {
       const labels = Object.keys(evalResults.metrics);
@@ -658,18 +647,14 @@ export default function ModelUpdate({
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Label
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Precision
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Recall
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            F1 Score
-                          </th>
+                          {['Label', 'Precision', 'Recall', 'F1 Score'].map((header) => (
+                            <th
+                              key={header}
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                            >
+                              {header}
+                            </th>
+                          ))}
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -701,18 +686,12 @@ export default function ModelUpdate({
 
                     {/* Legend */}
                     <div className="mt-4 flex gap-6 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-block w-3 h-3 bg-green-600 rounded-full" />
-                        <span>Excellent (≥95%)</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="inline-block w-3 h-3 bg-yellow-600 rounded-full" />
-                        <span>Good (85-94%)</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="inline-block w-3 h-3 bg-red-600 rounded-full" />
-                        <span>Needs Improvement (Below 85%)</span>
-                      </div>
+                      {performanceIndicators.map(({ color, label, threshold }) => (
+                        <div key={label} className="flex items-center gap-2">
+                          <span className={`inline-block w-3 h-3 ${color} rounded-full`} />
+                          <span>{`${label} (${threshold})`}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
