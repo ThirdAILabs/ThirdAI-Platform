@@ -140,6 +140,8 @@ class NDBRouter:
             "/get_all_chat_history", self.fetch_all_session_chat, methods=["GET"]
         )
         self.router.add_api_route("/sources", self.get_sources, methods=["GET"])
+        self.router.add_api_route("/doc_metadata", self.get_doc_metadata, methods=["GET"])
+        # self.router.add_api_route("/doc_metadata", self.update_doc_metadata, methods=["POST"])
         self.router.add_api_route(
             "/save",
             self.save,
@@ -810,6 +812,22 @@ class NDBRouter:
             message="Successful",
             data=sources,
         )
+    
+    def get_doc_metadata(self, source_id: str):
+        chunks = self.model.chunk_store.get_chunks(
+            self.model.chunk_store.get_doc_chunks(source_id, before_version=float("inf"))
+        )
+        metadata = chunks[0].metadata
+        del metadata["page"]
+        del metadata["highlight"]
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successful",
+            data=metadata,
+        )
+    
+    # def update_doc_metadata(self, source_id: str):
+    #     pass
 
     def save(
         self,
