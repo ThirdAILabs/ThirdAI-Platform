@@ -64,7 +64,7 @@ from prometheus_client import Counter, Summary
 from pydantic import ValidationError, BaseModel
 
 class NewMetadata(BaseModel):
-    metadata: Dict[str]
+    metadata: Dict[str, str]
 
 ndb_query_metric = Summary("ndb_query", "NDB Queries")
 ndb_upvote_metric = Summary("ndb_upvote", "NDB upvotes")
