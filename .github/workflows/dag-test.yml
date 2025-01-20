@@ -41,104 +41,43 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        debug: true # Debug for checkout step
 
     - name: Wait for PostgreSQL to be ready
       run: |
-        echo "Checking if PostgreSQL is ready..."
         until pg_isready -h localhost -U postgres; do
           echo "Waiting for PostgreSQL..."
           sleep 1
         done
-        echo "PostgreSQL is ready!"
-      env:
-        PGPASSWORD: password # Ensure password is available for `pg_isready`
-
-    - name: Debug PostgreSQL Connection
-      run: |
-        echo "Testing connection to PostgreSQL..."
-        export PGPASSWORD='password'
-        psql -h localhost -U postgres -d model_bazaar -c "SELECT version();" || {
-          echo "Failed to connect to PostgreSQL"
-          exit 1
-        }
-        echo "PostgreSQL connection successful!"
 
     - name: Create Extension
       run: |
-        echo "Creating pgcrypto extension..."
         export PGPASSWORD='password'
-        psql -h localhost -U postgres -d model_bazaar -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;" || {
-          echo "Failed to create extension"
-          exit 1
-        }
-        echo "pgcrypto extension created successfully!"
+        psql -h localhost -U postgres -d model_bazaar -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
 
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: '3.11'
-      env:
-        DEBUG: true # Enable debug for Python setup
-
-    - name: Check Python Version and Environment
-      run: |
-        echo "Checking Python version..."
-        python --version
-        echo "Python environment setup complete!"
+        python-version: '3.10'
 
     - name: Setup Python and Install Dependencies
+      # We need to run the backend in sudo for the delete endpoint to work, thus
+      # we need to install the requirements for the backend job in sudo. However,
+      # since the other jobs (train_job, cache_job, etc) are spun up as seperate
+      # processes, we also need so install their requirements in the virtual env
       run: |
-        echo "Setting up Python virtual environment..."
         python -m venv ${{ github.workspace }}/venv
-        python3 --version
         source venv/bin/activate
-        echo "Python version in virtual environment:"
-        python --version
-
-        echo "Installing dependencies for headless..."
-        pip install --upgrade pip
-        pip install -r headless/requirements.txt || {
-          echo "Failed to install headless/requirements.txt"
-          exit 1
-        }
-
-        echo "Verifying headless dependencies installation..."
-        pip list
-
-        echo "Installing dependencies for thirdai_platform with sudo..."
-        sudo python3.11 -m pip install -r thirdai_platform/requirements.txt || {
-          echo "Failed to install thirdai_platform/requirements.txt with sudo"
-          exit 1
-        }
-
-        echo "Installing dependencies for thirdai_platform in virtual environment..."
-        pip install -r thirdai_platform/requirements.txt || {
-          echo "Failed to install thirdai_platform/requirements.txt in virtual environment"
-          exit 1
-        }
-        echo "All dependencies installed successfully!"
-
-    - name: Verify Installed Dependencies
+        pip install -r headless/requirements.txt
+        python3 -m pip install -r thirdai_platform/requirements.txt
+        pip install -r thirdai_platform/requirements.txt
+    
+    - name: Update openssl
       run: |
-        echo "Checking installed packages in virtual environment..."
-        pip list || {
-          echo "Failed to list installed packages"
-          exit 1
-        }
-        echo "Package verification complete!"
-
-    - name: Update OpenSSL and Cryptography
-      run: |
-        echo "Updating cryptography and pyopenssl..."
-        sudo python3.11 -m pip install --upgrade cryptography pyopenssl
-        echo "Updating OpenSSL..."
-        sudo apt-get install --only-upgrade openssl -y
+        sudo pip install --upgrade cryptography pyopenssl
+        sudo apt-get install --only-upgrade openssl
 
     - name: Install PostgreSQL client version 17.x
       run: |
-          echo "Installing PostgreSQL client version 17.x..."
           sudo apt-get update && \
           sudo apt-get install -y wget gnupg2 lsb-release && \
           echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list && \
@@ -154,156 +93,114 @@ jobs:
 
     - name: Start Nomad in Development Mode
       run: |
-        echo "Starting Nomad in development mode..."
         NOMAD_PATH=$(which nomad)
         nohup sudo $NOMAD_PATH agent -dev -config="local_setup/agent.hcl" > nomad.log 2>&1 &
-        echo "Nomad started."
-
+    
     - name: Verify Nomad Cluster
       run: |
-        echo "Verifying Nomad cluster..."
         NOMAD_PATH=$(which nomad)
-        echo "Nomad executable path: $NOMAD_PATH"
-        sleep 10
-        $NOMAD_PATH node status
+        echo $NOMAD_PATH
+        sleep 10 && $NOMAD_PATH node status
 
     - name: Install Traefik
       run: |
-        echo "Installing Traefik..."
         wget https://github.com/traefik/traefik/releases/download/v3.1.2/traefik_v3.1.2_linux_amd64.tar.gz
         sudo tar -xf traefik_v3.1.2_linux_amd64.tar.gz -C /usr/local/bin
-        echo "Traefik installed."
 
     - name: Run Traefik
       run: |
-        echo "Launching Traefik..."
         cd local_setup
         nohup sudo bash launch_traefik.sh > traefik.log 2>&1 &
         cd ..
-        echo "Traefik launched."
 
     - name: Install Vault
       run: |
-        echo "Installing Vault..."
         curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
         sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
         sudo apt-get update
         sudo apt-get install -y vault
-        echo "Vault installed."
 
     - name: Start Vault Server
-      run: |
-        echo "Starting Vault server..."
-        nohup sudo vault server --dev --dev-root-token-id="00000000-0000-0000-0000-000000000000" > vault.log 2>&1 &
-        echo "Vault server started."
+      run: nohup sudo vault server --dev --dev-root-token-id="00000000-0000-0000-0000-000000000000" > vault.log 2>&1 &
 
     - name: Create Directories for Share and Test
       run: |
-        echo "Creating directories for share and test..."
         mkdir -p $HOME/nfs/dir
         sudo chmod -R 777 $HOME/nfs/dir
         sudo chmod +t $HOME/nfs/dir
         sudo chmod g+s $HOME/nfs/dir
         echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_ENV
         echo "GENAI_KEY=${{ secrets.GENAI_KEY }}" >> $GITHUB_ENV
-        echo "Directories created and environment variables set."
 
     - name: Create Google Application credentials file
       run: |
-        echo "Creating Google Application credentials file..."
         echo '${{ secrets.GCP_CREDENTIALS_FILE }}' > $HOME/nfs/dir/google_license.json
-        echo "Google credentials file created."
 
     - name: Write All Environment Variables to .env File
       run: |
-        echo "Writing environment variables to .env file..."
-        cat <<EOF >> $GITHUB_WORKSPACE/.env
-        LICENSE_PATH=${{ github.workspace }}/thirdai_platform/tests/ndb_enterprise_license.json
-        JWT_SECRET=CsnCr3lebs9eJQ
-        SENDGRID_KEY=sendgrid-key
-        GENAI_KEY=${{ secrets.GENAI_KEY }}
-        ADMIN_USERNAME=admin
-        ADMIN_MAIL=admin@mail.com
-        ADMIN_PASSWORD=password
-        PLATFORM=local
-        AIRGAPPED=True
-        DATABASE_URI=postgresql://postgres:password@localhost:5432/model_bazaar
-        NOMAD_ENDPOINT=http://localhost:4646/
-        PUBLIC_MODEL_BAZAAR_ENDPOINT=http://localhost:80/
-        PRIVATE_MODEL_BAZAAR_ENDPOINT=http://localhost:80/
-        HASHICORP_VAULT_ENDPOINT=http://127.0.0.1:8200
-        HASHICORP_VAULT_TOKEN=00000000-0000-0000-0000-000000000000
-        SHARE_DIR=$HOME/nfs/dir
-        PYTHON_PATH=${{ github.workspace }}/venv/bin/python
-        AZURE_ACCOUNT_NAME=${{ secrets.AZURE_ACCOUNT_NAME }}
-        AZURE_ACCOUNT_KEY=${{ secrets.AZURE_ACCOUNT_KEY }}
-        GCP_CREDENTIALS_FILE=$HOME/nfs/dir/google_license.json
-        AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
-        AWS_ACCESS_SECRET=${{ secrets.AWS_ACCESS_SECRET }}
-        AWS_REGION_NAME=us-east-2
-        EOF
-        echo ".env file created with environment variables."
+        echo "LICENSE_PATH=${{ github.workspace }}/thirdai_platform/tests/ndb_enterprise_license.json" >> $GITHUB_WORKSPACE/.env
+        echo "JWT_SECRET=CsnCr3lebs9eJQ" >> $GITHUB_WORKSPACE/.env
+        echo "SENDGRID_KEY=sendgrid-key" >> $GITHUB_WORKSPACE/.env
+        echo "GENAI_KEY=${{ secrets.GENAI_KEY }}" >> $GITHUB_WORKSPACE/.env
+        echo "ADMIN_USERNAME=admin" >> $GITHUB_WORKSPACE/.env
+        echo "ADMIN_MAIL=admin@mail.com" >> $GITHUB_WORKSPACE/.env
+        echo "ADMIN_PASSWORD=password" >> $GITHUB_WORKSPACE/.env
+        echo "PLATFORM=local" >> $GITHUB_WORKSPACE/.env
+        echo "AIRGAPPED=True" >> $GITHUB_WORKSPACE/.env
+        echo "DATABASE_URI=postgresql://postgres:password@localhost:5432/model_bazaar" >> $GITHUB_WORKSPACE/.env
+        echo "NOMAD_ENDPOINT=http://localhost:4646/" >> $GITHUB_WORKSPACE/.env
+        echo "PUBLIC_MODEL_BAZAAR_ENDPOINT=http://localhost:80/" >> $GITHUB_WORKSPACE/.env
+        echo "PRIVATE_MODEL_BAZAAR_ENDPOINT=http://localhost:80/" >> $GITHUB_WORKSPACE/.env
+        echo "HASHICORP_VAULT_ENDPOINT=http://127.0.0.1:8200" >> $GITHUB_WORKSPACE/.env
+        echo "HASHICORP_VAULT_TOKEN=00000000-0000-0000-0000-000000000000" >> $GITHUB_WORKSPACE/.env
+        echo "SHARE_DIR=$HOME/nfs/dir" >> $GITHUB_WORKSPACE/.env
+        echo "PYTHON_PATH=${{ github.workspace }}/venv/bin/python" >> $GITHUB_WORKSPACE/.env
+        echo "AZURE_ACCOUNT_NAME=${{ secrets.AZURE_ACCOUNT_NAME }}" >> $GITHUB_WORKSPACE/.env
+        echo "AZURE_ACCOUNT_KEY=${{ secrets.AZURE_ACCOUNT_KEY }}" >> $GITHUB_WORKSPACE/.env
+        echo "GCP_CREDENTIALS_FILE=$HOME/nfs/dir/google_license.json" >> $GITHUB_WORKSPACE/.env
+        echo "AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}" >> $GITHUB_WORKSPACE/.env
+        echo "AWS_ACCESS_SECRET=${{ secrets.AWS_ACCESS_SECRET }}" >> $GITHUB_WORKSPACE/.env
+        echo "AWS_REGION_NAME=us-east-2" >> $GITHUB_WORKSPACE/.env
 
     - name: Launch Backend
       run: |
-        echo "Launching backend..."
         source ${{ github.workspace }}/venv/bin/activate
         cd $GITHUB_WORKSPACE/thirdai_platform
         nohup sudo uvicorn main:app --host 0.0.0.0 --port 8000 > uvicorn.log 2>&1 &
-        echo "Backend launched."
-
+    
     - name: List files in local_setup
-      run: |
-        echo "Listing files in local_setup directory..."
-        ls -la local_setup
-
+      run: ls -la local_setup
+    
     - name: Launch Autoscaler
       run: |
-        echo "Launching Autoscaler..."
         cd local_setup
         NOMAD_PATH=$(which nomad)
         sudo bash launch_nomad_jobs.sh $NOMAD_PATH
-        echo "Autoscaler launched."
 
     - name: Run Tests
       run: |
-        echo "Running tests..."
         source ${{ github.workspace }}/venv/bin/activate
         cd $GITHUB_WORKSPACE
-        pytest || {
-          echo "Tests failed!"
-          exit 1
-        }
-        echo "Tests completed successfully!"
+        pytest
 
     - name: Display Logs
       if: always()
       run: |
-        echo "Displaying Nomad Logs:"
-        cat nomad.log || echo "nomad.log not found."
+        echo "Nomad Logs:"
+        cat nomad.log
+        echo "Traefik Logs:"
+        cat local_setup/traefik.log
+        echo "Vault Logs:"
+        cat vault.log
+        echo "Uvicorn Logs:"
+        cat $GITHUB_WORKSPACE/thirdai_platform/uvicorn.log
 
-        echo "Displaying Traefik Logs:"
-        cat local_setup/traefik.log || echo "traefik.log not found."
-
-        echo "Displaying Vault Logs:"
-        cat vault.log || echo "vault.log not found."
-
-        echo "Displaying Uvicorn Logs:"
-        cat $GITHUB_WORKSPACE/thirdai_platform/uvicorn.log || echo "uvicorn.log not found."
-
-        echo "Fetching additional Nomad Logs..."
         bash local_setup/fetch_nomad_logs.sh
 
     - name: Stop Services
       if: always()
       run: |
-        echo "Stopping PostgreSQL service..."
-        sudo systemctl stop postgresql || echo "PostgreSQL service not running."
-
-        echo "Stopping Nomad, Vault, and Traefik services..."
-        sudo killall nomad || echo "Nomad not running."
-        sudo killall vault || echo "Vault not running."
-        sudo killall traefik || echo "Traefik not running."
-
-        echo "Services stopped."
-
+        sudo systemctl stop postgresql
+        sudo killall nomad
+        sudo killall vault
+        sudo killall traefik
