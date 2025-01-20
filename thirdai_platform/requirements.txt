@@ -7,7 +7,7 @@ PyMuPDF
 requests<2.32.0
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch
-thirdai[neural_db_v2]>=0.9.21
+thirdai[all]>=0.9.21
 aiohttp
 alembic
 apscheduler
