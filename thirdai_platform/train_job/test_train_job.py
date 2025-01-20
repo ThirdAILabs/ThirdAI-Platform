@@ -26,6 +26,7 @@ from platform_common.pydantic_models.training import (
     UDTData,
     UDTOptions,
     UDTTrainOptions,
+    AutopopulateMetadataInfo
 )
 from thirdai import bolt
 from thirdai import neural_db as ndb
@@ -374,3 +375,54 @@ def test_udt_token_train_with_balancing(dummy_ner_file):
     assert df["text"][0] == "Shubh"
     assert df["tags"][0] == "O"
     assert df["user_provided"][0] == False
+
+
+def test_autotune_metadata():
+    verify_license.verify_and_activate(THIRDAI_LICENSE)
+
+    source_id = ndb.CSV(
+        os.path.join(file_dir(), "articles.csv"),
+        weak_columns=["text"],
+        metadata={"a": 140},
+    ).hash
+
+    config = TrainConfig(
+        user_id="user_123",
+        model_bazaar_dir=MODEL_BAZAAR_DIR,
+        license_key=THIRDAI_LICENSE,
+        model_bazaar_endpoint="",
+        model_id="ndb_123",
+        data_id="data_123",
+        # model_options=NDBOptions(),
+        model_options=NDBOptions(autopopulate_doc_metadata_fields=[
+            AutopopulateMetadataInfo(attribute_name="brand", description="the name of the brand in the document"),
+            AutopopulateMetadataInfo(attribute_name="model_id", description="the id of the model in the document")
+        ]),
+        data=NDBData(
+            unsupervised_files=[
+                FileInfo(
+                    path=os.path.join(file_dir(), "Haier_HPM09XC5.pdf"),
+                    location="local",
+                ),
+            ],
+            supervised_files=[],
+            test_files=[],
+        ),
+        job_options=JobOptions(),
+    )
+
+    model = get_model(config, DummyReporter(), logger)
+
+    model.train()
+
+    db_path = os.path.join(MODEL_BAZAAR_DIR, "models", "ndb_123", "model.ndb")
+
+    db = ndbv2.NeuralDB.load(db_path)
+
+    assert len(db.documents()) == 1
+
+    chunk = db.chunk_store.get_doc_chunks(db.documents()[0]["doc_id"], float("inf"))[0]
+    chunks = db.chunk_store.get_chunks([chunk])
+
+    assert chunks[0].metadata["brand"] == "haier"
+    assert chunks[0].metadata["model_id"] == "hpm09xc5"
