@@ -994,10 +994,6 @@ export interface EnterpriseSearchOptions {
   nlp_classifier_id?: string;
   llm_provider?: string;
   default_mode?: string;
-  metadata_attributes?: Array<{
-    attribute_name: string;
-    description: string;
-  }>;
 }
 
 interface CreateWorkflowParams {

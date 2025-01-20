@@ -30,11 +30,6 @@ const ChatbotQuestions: React.FC<ChatbotQuestionsProps> = ({ models, workflowNam
   const [ssModelId, setSsModelId] = useState<string | null>(null);
   const [createdSS, setCreatedSS] = useState<boolean>(false);
 
-  // NEW: store the additional attributes (metadata keys) that come from SemanticSearchQuestions
-  const [metadataKeys, setMetadataKeys] = useState<Array<{ name: string; description: string }>>(
-    []
-  );
-
   useEffect(() => {
     setExistingSSmodels(models.filter((model) => model.type === 'ndb'));
   }, [models]);
@@ -108,11 +103,6 @@ const ChatbotQuestions: React.FC<ChatbotQuestionsProps> = ({ models, workflowNam
         nlp_classifier_id: nlpClassifierModelId || '',
         llm_provider: '',
         default_mode: 'chat',
-        // IMPORTANT: pass the metadata keys here
-        metadata_attributes: metadataKeys.map((attr) => ({
-          attribute_name: attr.name,
-          description: attr.description,
-        })),
       };
 
       switch (llmType) {
@@ -268,8 +258,6 @@ const ChatbotQuestions: React.FC<ChatbotQuestionsProps> = ({ models, workflowNam
                       setSsModelId(modelID);
                       setCreatedSS(true);
                     }}
-                    // Pass a callback that will store the user-defined metadata
-                    onMetadataAttributesChange={(newAttributes) => setMetadataKeys(newAttributes)}
                     stayOnPage={true}
                     appName={`${modelName}-KB`}
                   />

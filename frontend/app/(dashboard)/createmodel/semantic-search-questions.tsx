@@ -12,8 +12,6 @@ interface SemanticSearchQuestionsProps {
   workflowNames: string[];
   models: Workflow[];
   onCreateModel?: (modelID: string) => void;
-  // NEW: parent callback so it can track user-specified metadata
-  onMetadataAttributesChange?: (metadata: Array<{ name: string; description: string }>) => void;
   stayOnPage?: boolean;
   appName?: string;
 }
@@ -44,7 +42,6 @@ const SemanticSearchQuestions = ({
   workflowNames,
   models,
   onCreateModel,
-  onMetadataAttributesChange,
   stayOnPage,
   appName,
 }: SemanticSearchQuestionsProps) => {
@@ -228,6 +225,13 @@ const SemanticSearchQuestions = ({
     // If user didn't select advanced, it will not add the advanced_search field at all
     const modelOptionsForm = {
       ...(indexingType === IndexingType.Advanced && { advanced_search: true }),
+      // Add the metadata fields with the new name
+      ...(metadataAttributes.length > 0 && {
+        autopopulate_doc_metadata_fields: metadataAttributes.map((attr) => ({
+          attribute_name: attr.name,
+          description: attr.description,
+        })),
+      }),
     };
 
     formData.append('model_options', JSON.stringify(modelOptionsForm));
@@ -273,7 +277,6 @@ const SemanticSearchQuestions = ({
       if (onCreateModel) {
         onCreateModel(modelId);
       }
-      onMetadataAttributesChange?.(metadataAttributes);
 
       if (!stayOnPage) {
         router.push('/');
