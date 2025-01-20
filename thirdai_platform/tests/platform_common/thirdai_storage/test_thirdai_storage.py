@@ -153,7 +153,7 @@ def test_remove_untrained_samples(data_storage):
 
 def test_xml_basic_insertion(data_storage):
     xml_query = """<Employee>
-  <Email Name = "email">
+  <Email Name = "work email">
           shubh@thirdai.com
   </Email>
 </Employee>"""
@@ -164,10 +164,10 @@ def test_xml_basic_insertion(data_storage):
     assert len(log.elements) == 2, "Expected 2 elements in the log"
     assert len(feedbacks) == 0, "Expected 0 feedbacks"
     assert log.elements[0] == XMLElementData(
-        xpath="/Employee/Email[@Name='email']", attribute="Name", n_tokens=1
+        xpath="/Employee/Email[@Name='work email']", attribute="Name", n_tokens=2
     )
     assert log.elements[1] == XMLElementData(
-        xpath="/Employee/Email[@Name='email']", attribute=None, n_tokens=1
+        xpath="/Employee/Email[@Name='work email']", attribute=None, n_tokens=1
     )
 
     log_id = data_storage.add_xml_log(log)
@@ -258,9 +258,9 @@ def test_xml_element_reuse(data_storage):
 
 def test_xml_feedback_conflict(data_storage):
     xml_query = """<Employee>
-  <Email Name = "email">
-          shubh@thirdai.com
-  </Email>
+  <Worker type = "name">
+          jonathan burger
+  </Worker>
 </Employee>"""
 
     log, _ = convert_xml_feedback_to_storage_format(
@@ -271,19 +271,19 @@ def test_xml_feedback_conflict(data_storage):
     feedback_items = [
         XMLFeedbackData(
             element=XMLElementData(
-                xpath="/Employee/Email[@Name='email']",
+                xpath="/Employee/Worker[@type='name']",
                 attribute=None,
-                n_tokens=1,
+                n_tokens=2,
             ),
             token_start=0,
-            token_end=4,
-            label="EMAIL",
+            token_end=2,
+            label="NAME",
             user_provided=True,
         ),
         XMLFeedbackData(
             element=XMLElementData(
-                xpath="/Employee/Email[@Name='email']",
-                attribute="Name",
+                xpath="/Employee/Worker[@type='name']",
+                attribute=None,
                 n_tokens=1,
             ),
             token_start=0,
@@ -296,17 +296,17 @@ def test_xml_feedback_conflict(data_storage):
 
     conflicting_feedback = XMLFeedbackData(
         element=XMLElementData(
-            xpath="/Employee/Email[@Name='email']",
+            xpath="/Employee/Worker[@type='name']",
             attribute=None,
-            n_tokens=1,
+            n_tokens=2,
         ),
-        token_start=0,
-        token_end=1,
-        label="NOT_EMAIL",
+        token_start=1,
+        token_end=2,
+        label="NOT_NAME",
         user_provided=True,
     )
 
     conflicts = data_storage.find_conflicting_xml_feedback(conflicting_feedback)
     assert len(conflicts) == 1
-    assert conflicts[0].element.xpath == "/Employee/Email[@Name='email']"
-    assert conflicts[0].label == "EMAIL"
+    assert conflicts[0].element.xpath == "/Employee/Worker[@type='name']"
+    assert conflicts[0].label == "NAME"
