@@ -92,6 +92,7 @@ jobs:
       run: |
         echo "Setting up Python virtual environment..."
         python -m venv ${{ github.workspace }}/venv
+        python3 --version
         source venv/bin/activate
         echo "Installing dependencies for headless..."
         pip install -r headless/requirements.txt || {
