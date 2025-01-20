@@ -495,6 +495,16 @@ export function WorkFlow({
                     </Link>
                   )}
 
+                {workflow.type === 'enterprise-search' && (
+                  <Link
+                    href={`/metadata?workflow_id=${encodeURIComponent(workflow.model_id)}&username=${encodeURIComponent(workflow.username)}`}
+                  >
+                    <DropdownMenuItem>
+                      <button type="button">Metadata Management</button>
+                    </DropdownMenuItem>
+                  </Link>
+                )}
+
                 {workflow.type === 'udt' && (
                   <Link
                     href={`/analytics?id=${encodeURIComponent(workflow.model_id)}&username=${encodeURIComponent(workflow.username)}&model_name=${encodeURIComponent(workflow.model_name)}&old_model_id=${encodeURIComponent(workflow.model_id)}`}
