@@ -1,3 +1,4 @@
+import openai
 import json
 import multiprocessing as mp
 import os
@@ -5,7 +6,7 @@ import shutil
 import time
 from collections import defaultdict
 from logging import Logger
-from typing import List
+from typing import List, Dict
 
 import thirdai
 from platform_common.file_handler import expand_cloud_buckets_and_directories
@@ -13,7 +14,7 @@ from platform_common.logging.logcodes import LogCode
 from platform_common.ndb.ndbv2_parser import parse_doc
 from platform_common.ndb.utils import delete_docs_and_remove_files
 from platform_common.pydantic_models.feedback_logs import ActionType, FeedbackLog
-from platform_common.pydantic_models.training import FileInfo, TrainConfig
+from platform_common.pydantic_models.training import FileInfo, TrainConfig, AutopopulateMetadataInfo
 from thirdai import neural_db_v2 as ndbv2
 from thirdai.neural_db_v2.chunk_stores import PandasChunkStore
 from thirdai.neural_db_v2.retrievers import FinetunableRetriever
@@ -100,6 +101,56 @@ class NeuralDBV2(Model):
                     "Only CSV or jsonl files are supported for NDB supervised training."
                 )
         return all_files
+    
+    def ask_gpt(self, prompt):
+        client = openai.OpenAI(api_key=os.getenv("GENAI_KEY"))
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {"role": "developer", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt}],
+            model="gpt-4o",
+        )
+        response = chat_completion.choices[0].message.content
+        return response
+
+    def autotune_metadata(self, doc: FileInfo, doc_save_dir: str, tmp_dir: str, autopopulated_metadata_fields: List[AutopopulateMetadataInfo]) -> Dict[str, str]:
+        doc_object = parse_doc(doc, doc_save_dir, tmp_dir)
+        chunks = list(doc_object.chunks()[0].text)
+
+        metadatafields_str = ""
+        for metadata_field_obj in autopopulated_metadata_fields:
+            attribute_name = metadata_field_obj.attribute_name
+            description = metadata_field_obj.description
+            metadatafields_str += f" * '{attribute_name}': '{description}'\n"
+
+        prompt = f"""
+Here is a list of fields with a name and a description. 
+{metadatafields_str}
+
+I want you to extract those fields from the following text:
+
+{' '.join(chunks[:5])}
+
+Please format your outputs as a newline separated list of (name, value) pairs such that the output can be parsed by doing string.split("\n") in python. Please do not include quotes, bullets, or any other fluff other than newlines and a colon for the delimiter between the name and value Here is an example:
+
+model_name: some model name
+brand: coca cola
+other name: some other value
+        """
+        
+        response = self.ask_gpt(prompt)
+
+        print("answers")
+        print(response)
+
+        new_metadata = {}
+        for line in response.split("\n"):
+            output = line.strip().split(":")
+            if len(output) != 2:
+                continue
+            new_metadata[output[0].strip()] = output[1].strip()
+        return new_metadata
+        
 
     def unsupervised_train(self, files: List[FileInfo], batch_size=500):
         self.logger.debug("Starting unsupervised training.")
@@ -113,6 +164,12 @@ class NeuralDBV2(Model):
 
         docs_indexed = 0
         successfully_indexed_files = 0
+
+        autopopulated_metadata_fields = self.config.model_options.autopopulate_doc_metadata_fields
+        if autopopulated_metadata_fields:
+            for i in range(len(files)):
+
+                files[i].metadata = self.autotune_metadata(files[i], doc_save_dir, tmp_dir, autopopulated_metadata_fields)
 
         batches = [files[i : i + batch_size] for i in range(0, len(files), batch_size)]
         with mp.Pool(processes=n_jobs) as pool:

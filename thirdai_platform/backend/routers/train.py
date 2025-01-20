@@ -211,6 +211,7 @@ def train_ndb(
             azure_account_name=(os.getenv("AZURE_ACCOUNT_NAME", "")),
             azure_account_key=(os.getenv("AZURE_ACCOUNT_KEY", "")),
             gcp_credentials_file=(os.getenv("GCP_CREDENTIALS_FILE", "")),
+            openai_api_key=os.getenv("GENAI_KEY"),
             train_job_name=new_model.get_train_job_name(),
             config_path=config.save_train_config(),
             allocation_cores=job_options.allocation_cores,
