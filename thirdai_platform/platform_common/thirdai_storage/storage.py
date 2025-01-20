@@ -3,8 +3,8 @@ from __future__ import annotations
 import typing
 from uuid import uuid4
 
-from sqlalchemy import create_engine, func
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy import and_, create_engine, func, or_
+from sqlalchemy.orm import scoped_session, selectinload, sessionmaker
 
 from .data_types import (
     DataSample,
@@ -131,7 +131,7 @@ class XMLConnector:
 
     def get_xml_log_by_id(self, log_id: str) -> XMLLogData:
         session = self.Session()
-        log = session.query(XMLLog).get(log_id)
+        log = session.query(XMLLog).options(selectinload(XMLLog.elements)).get(log_id)
         return XMLLogData(
             xml_string=log.xml_string,
             elements=[
@@ -204,8 +204,17 @@ class XMLConnector:
             session.query(XMLFeedback)
             .filter(
                 XMLFeedback.element_id == element.id,
-                XMLFeedback.token_start <= feedback.token_start,
-                XMLFeedback.token_end >= feedback.token_end,
+                # Check if either endpoint of existing feedback falls within new feedback range
+                or_(
+                    and_(
+                        XMLFeedback.token_start >= feedback.token_start,
+                        XMLFeedback.token_start < feedback.token_end,
+                    ),
+                    and_(
+                        XMLFeedback.token_end > feedback.token_start,
+                        XMLFeedback.token_end <= feedback.token_end,
+                    ),
+                ),
                 XMLFeedback.label != feedback.label,
                 XMLFeedback.status == feedback.status,
             )
