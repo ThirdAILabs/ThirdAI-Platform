@@ -5,7 +5,7 @@ import { Button, Divider } from '@mui/material';
 interface ConversationData {
   query_time: string;
   query_text: string;
-  user_input: string,
+  user_input: string;
   response_time: string;
   response_text: string;
   user_input_category: string;
@@ -81,7 +81,8 @@ const Conversations: React.FC = () => {
     return <div className="p-4 text-center">Loading chat history...</div>;
   }
 
-  const [selectedCategories, setSelectedCategories] = useState(Object.fromEntries(categoryList.map((category) => [category, false]))
+  const [selectedCategories, setSelectedCategories] = useState(
+    Object.fromEntries(categoryList.map((category) => [category, false]))
   );
 
   // Toggle handler for category selection
@@ -118,10 +119,11 @@ const Conversations: React.FC = () => {
                       key={`${category}-${index}`}
                       onClick={() => handleCategoryToggle(category)}
                       className={`border rounded-xl p-1 px-4 transition-colors
-              ${selectedCategories[category]
-                          ? 'bg-blue-900 text-white'
-                          : 'hover:bg-slate-100 hover:text-black'
-                        }`}
+              ${
+                selectedCategories[category]
+                  ? 'bg-blue-900 text-white'
+                  : 'hover:bg-slate-100 hover:text-black'
+              }`}
                     >
                       {category}
                     </button>
@@ -144,11 +146,21 @@ const Conversations: React.FC = () => {
                     <div className="flex flex-col">
                       {/* Query Section */}
                       <div className="flex justify-center">
-                        {(selectedCategories[conversation.user_input_category] === true || !getSelectedCategories().join(', ')) && <div className="border py-2 px-4 rounded-lg w-[90%]">
-                          <div className="text-gray-700 flex flex-wrap"> <strong>User Query: </strong>{" " + conversation.user_input}</div>
-                          <div className="text-gray-700"><strong>Reformulated Query:</strong>{" " + conversation.query_text}</div>
-                          <div className="text-xs text-gray-500">{conversation.query_time}</div>
-                        </div>}
+                        {(selectedCategories[conversation.user_input_category] === true ||
+                          !getSelectedCategories().join(', ')) && (
+                          <div className="border py-2 px-4 rounded-lg w-[90%]">
+                            <div className="text-gray-700 flex flex-wrap">
+                              {' '}
+                              <strong>User Query: </strong>
+                              {' ' + conversation.user_input}
+                            </div>
+                            <div className="text-gray-700">
+                              <strong>Reformulated Query:</strong>
+                              {' ' + conversation.query_text}
+                            </div>
+                            <div className="text-xs text-gray-500">{conversation.query_time}</div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

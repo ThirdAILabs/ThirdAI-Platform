@@ -12,6 +12,8 @@ interface SemanticSearchQuestionsProps {
   workflowNames: string[];
   models: Workflow[];
   onCreateModel?: (modelID: string) => void;
+  // NEW: parent callback so it can track user-specified metadata
+  onMetadataAttributesChange?: (metadata: Array<{ name: string; description: string }>) => void;
   stayOnPage?: boolean;
   appName?: string;
 }
@@ -42,6 +44,7 @@ const SemanticSearchQuestions = ({
   workflowNames,
   models,
   onCreateModel,
+  onMetadataAttributesChange,
   stayOnPage,
   appName,
 }: SemanticSearchQuestionsProps) => {
@@ -52,6 +55,13 @@ const SemanticSearchQuestions = ({
   const [parsingType, setParsingType] = useState<ParsingType>(ParsingType.Basic);
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
   const [fileError, setFileError] = useState<string>('');
+
+  // NEW: Additional attributes for metadata
+  const [metadataAttributes, setMetadataAttributes] = useState<
+    Array<{ name: string; description: string }>
+  >([]);
+  const [newAttributeName, setNewAttributeName] = useState('');
+  const [newAttributeDescription, setNewAttributeDescription] = useState('');
 
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -263,6 +273,7 @@ const SemanticSearchQuestions = ({
       if (onCreateModel) {
         onCreateModel(modelId);
       }
+      onMetadataAttributesChange?.(metadataAttributes);
 
       if (!stayOnPage) {
         router.push('/');
@@ -401,6 +412,71 @@ const SemanticSearchQuestions = ({
         <Button onClick={() => addSource(SourceType.GCP)} variant="contained">
           GCP Bucket
         </Button>
+      </div>
+
+      {/* ADDITIONAL ATTRIBUTES (Optional) - BELOW Sources, ABOVE Advanced Options */}
+      <div style={{ marginTop: '40px' }}>
+        <span className="block text-lg font-semibold">Additional Attributes (Optional)</span>
+        <CardDescription>
+          These can be domain-specific attributes you may use later to filter or group your data.
+        </CardDescription>
+
+        <div style={{ marginTop: '10px' }}>
+          <TextField
+            size="small"
+            label="Attribute Name"
+            value={newAttributeName}
+            onChange={(e) => setNewAttributeName(e.target.value)}
+          />
+
+          <TextField
+            size="small"
+            label="Description"
+            value={newAttributeDescription}
+            onChange={(e) => setNewAttributeDescription(e.target.value)}
+          />
+
+          <Button
+            variant="contained"
+            style={{ marginLeft: '10px', marginTop: '2px' }}
+            onClick={() => {
+              if (newAttributeName.trim() !== '' && newAttributeDescription.trim() !== '') {
+                setMetadataAttributes((prev) => [
+                  ...prev,
+                  {
+                    name: newAttributeName.trim(),
+                    description: newAttributeDescription.trim(),
+                  },
+                ]);
+                setNewAttributeName('');
+                setNewAttributeDescription('');
+              }
+            }}
+          >
+            Add
+          </Button>
+        </div>
+
+        {metadataAttributes.length > 0 && (
+          <ul style={{ marginTop: '10px' }}>
+            {metadataAttributes.map((attr, idx) => (
+              <li key={idx} style={{ marginBottom: '5px' }}>
+                <strong>{attr.name}:</strong> {attr.description}
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="error"
+                  onClick={() => {
+                    setMetadataAttributes((prev) => prev.filter((_, i) => i !== idx));
+                  }}
+                  style={{ marginLeft: '10px' }}
+                >
+                  Remove
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Advanced Configuration Dropdown */}
