@@ -9,7 +9,7 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from queue import Queue
-from typing import AsyncGenerator, List, Optional
+from typing import AsyncGenerator, List, Optional, Dict
 from urllib.parse import urljoin
 
 import fitz
@@ -61,7 +61,10 @@ from platform_common.pydantic_models.feedback_logs import (
 )
 from platform_common.utils import response
 from prometheus_client import Counter, Summary
-from pydantic import ValidationError
+from pydantic import ValidationError, BaseModel
+
+class NewMetadata(BaseModel):
+    metadata: Dict[str]
 
 ndb_query_metric = Summary("ndb_query", "NDB Queries")
 ndb_upvote_metric = Summary("ndb_upvote", "NDB upvotes")
@@ -141,7 +144,7 @@ class NDBRouter:
         )
         self.router.add_api_route("/sources", self.get_sources, methods=["GET"])
         self.router.add_api_route("/doc_metadata", self.get_doc_metadata, methods=["GET"])
-        # self.router.add_api_route("/doc_metadata", self.update_doc_metadata, methods=["POST"])
+        self.router.add_api_route("/doc_metadata", self.update_doc_metadata, methods=["POST"])
         self.router.add_api_route(
             "/save",
             self.save,
@@ -814,20 +817,37 @@ class NDBRouter:
         )
     
     def get_doc_metadata(self, source_id: str):
-        chunks = self.model.chunk_store.get_chunks(
-            self.model.chunk_store.get_doc_chunks(source_id, before_version=float("inf"))
+        try:
+            chunks = self.model.chunk_store.get_chunks(
+                self.model.chunk_store.get_doc_chunks(source_id, before_version=float("inf"))
+            )
+            metadata = chunks[0].metadata
+            del metadata["page"]
+            del metadata["highlight"]
+        except Exception as e:
+            return response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed with error: {e}",
         )
-        metadata = chunks[0].metadata
-        del metadata["page"]
-        del metadata["highlight"]
         return response(
             status_code=status.HTTP_200_OK,
             message="Successful",
             data=metadata,
         )
     
-    # def update_doc_metadata(self, source_id: str):
-    #     pass
+    def update_doc_metadata(self, source_id: str, metadata: NewMetadata):
+        try:
+            self.model.chunk_store.update_metadata(source_id, metadata.metadata)
+        except Exception as e:
+            return response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed with error: {e}",
+        )
+
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successful",
+        )
 
     def save(
         self,
