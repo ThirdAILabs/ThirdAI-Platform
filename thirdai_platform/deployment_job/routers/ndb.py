@@ -818,12 +818,13 @@ class NDBRouter:
     
     def get_doc_metadata(self, source_id: str):
         try:
-            chunks = self.model.chunk_store.get_chunks(
-                self.model.chunk_store.get_doc_chunks(source_id, before_version=float("inf"))
-            )
-            metadata = chunks[0].metadata
-            del metadata["page"]
-            del metadata["highlight"]
+            with self.model.db_lock:
+                chunks = self.model.chunk_store.get_chunks(
+                    self.model.chunk_store.get_doc_chunks(source_id, before_version=float("inf"))
+                )
+                metadata = chunks[0].metadata
+                del metadata["page"]
+                del metadata["highlight"]
         except Exception as e:
             return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -837,7 +838,8 @@ class NDBRouter:
     
     def update_doc_metadata(self, source_id: str, metadata: NewMetadata):
         try:
-            self.model.chunk_store.update_metadata(source_id, metadata.metadata)
+            with self.model.db_lock:
+                self.model.chunk_store.update_metadata(source_id, metadata.metadata)
         except Exception as e:
             return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
