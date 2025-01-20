@@ -12,33 +12,20 @@ from platform_common.thirdai_storage.data_types import (
 
 def convert_charspan_to_token_span(charspan: CharSpan, string: str) -> Tuple[int, int]:
     cleaned_string = remove_special_characters(string)
-    tokens = cleaned_string.split()
 
-    char_pos = 0
-    token_starts = []
+    # Get start token index
+    start_token = len(cleaned_string[: charspan.start].split())
+    # Adjust if we're in the middle of a token
+    if start_token > 0 and not cleaned_string[charspan.start - 1].isspace():
+        start_token -= 1
 
-    # Build mapping of character positions to token positions
-    for token in tokens:
-        # Skip whitespace
-        while char_pos < len(cleaned_string) and cleaned_string[char_pos].isspace():
-            char_pos += 1
-        token_starts.append(char_pos)
-        char_pos += len(token)
-
-    # Find start token
-    start_token = 0
-    for i, pos in enumerate(token_starts):
-        if pos <= charspan.start < pos + len(tokens[i]):
-            start_token = i
-            break
-
-    # Find end token
-    end_token = start_token
-    for i, pos in enumerate(token_starts[start_token:], start_token):
-        if charspan.end <= pos:
-            break
-        else:
-            end_token = i + 1
+    # Get end token index
+    end_token = len(cleaned_string[: charspan.end].split())
+    if (
+        charspan.end < len(cleaned_string)
+        and not cleaned_string[charspan.end - 1].isspace()
+    ):
+        end_token -= 1
 
     return (start_token, end_token)
 
@@ -58,7 +45,9 @@ def convert_xml_feedback_to_storage_format(
         attribute = feedback.location.attribute
 
         xml_reference = parsed_xml.tree.xpath(xpath)
-        assert len(xml_reference) == 1
+        assert (
+            len(xml_reference) == 1
+        ), f"Expected 1 XML element by xpath {xpath}, got {len(xml_reference)}"
         xml_reference = xml_reference[0]
 
         if attribute:
