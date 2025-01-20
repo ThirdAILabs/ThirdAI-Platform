@@ -52,12 +52,10 @@ job "deployment-{{ model_id }}" {
         {% endif %}
         "traefik.http.routers.{{ model_id }}-http.priority=10",
         # Health check configuration
-        {% if platform == "docker" %} 
         "traefik.http.services.deployment-{{ model_id }}.loadbalancer.healthcheck.path=/health",
         "traefik.http.services.deployment-{{ model_id }}.loadbalancer.healthcheck.interval=4s",
         "traefik.http.services.deployment-{{ model_id }}.loadbalancer.healthcheck.timeout=3s",
         "traefik.http.services.deployment-{{ model_id }}.loadbalancer.healthcheck.scheme=http",
-        {% endif %}
       ]
     }
 
