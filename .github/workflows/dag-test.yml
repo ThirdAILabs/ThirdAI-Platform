@@ -41,35 +41,83 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        debug: true # Debug for checkout step
 
     - name: Wait for PostgreSQL to be ready
       run: |
+        echo "Checking if PostgreSQL is ready..."
         until pg_isready -h localhost -U postgres; do
           echo "Waiting for PostgreSQL..."
           sleep 1
         done
+        echo "PostgreSQL is ready!"
+      env:
+        PGPASSWORD: password # Ensure password is available for `pg_isready`
+
+    - name: Debug PostgreSQL Connection
+      run: |
+        echo "Testing connection to PostgreSQL..."
+        export PGPASSWORD='password'
+        psql -h localhost -U postgres -d model_bazaar -c "SELECT version();" || {
+          echo "Failed to connect to PostgreSQL"
+          exit 1
+        }
+        echo "PostgreSQL connection successful!"
 
     - name: Create Extension
       run: |
+        echo "Creating pgcrypto extension..."
         export PGPASSWORD='password'
-        psql -h localhost -U postgres -d model_bazaar -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+        psql -h localhost -U postgres -d model_bazaar -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;" || {
+          echo "Failed to create extension"
+          exit 1
+        }
+        echo "pgcrypto extension created successfully!"
 
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
         python-version: '3.11'
+      env:
+        DEBUG: true # Enable debug for Python setup
+
+    - name: Check Python Version and Environment
+      run: |
+        echo "Checking Python version..."
+        python --version
+        echo "Python environment setup complete!"
 
     - name: Setup Python and Install Dependencies
-      # We need to run the backend in sudo for the delete endpoint to work, thus
-      # we need to install the requirements for the backend job in sudo. However,
-      # since the other jobs (train_job, cache_job, etc) are spun up as seperate
-      # processes, we also need so install their requirements in the virtual env
       run: |
+        echo "Setting up Python virtual environment..."
         python -m venv ${{ github.workspace }}/venv
         source venv/bin/activate
-        pip install -r headless/requirements.txt
-        sudo pip install -r thirdai_platform/requirements.txt
-        pip install -r thirdai_platform/requirements.txt
+        echo "Installing dependencies for headless..."
+        pip install -r headless/requirements.txt || {
+          echo "Failed to install headless/requirements.txt"
+          exit 1
+        }
+        echo "Installing dependencies for thirdai_platform..."
+        sudo pip install -r thirdai_platform/requirements.txt || {
+          echo "Failed to install thirdai_platform/requirements.txt with sudo"
+          exit 1
+        }
+        pip install -r thirdai_platform/requirements.txt || {
+          echo "Failed to install thirdai_platform/requirements.txt in virtual environment"
+          exit 1
+        }
+        echo "All dependencies installed successfully!"
+
+    - name: Verify Installed Dependencies
+      run: |
+        echo "Checking installed packages..."
+        pip list || {
+          echo "Failed to list installed packages"
+          exit 1
+        }
+        echo "Package verification complete!"
+
     
     - name: Update openssl
       run: |
