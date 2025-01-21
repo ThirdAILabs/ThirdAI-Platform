@@ -130,9 +130,6 @@ async def restart_thirdai_platform_frontend():
         # Model bazaar dockerfile does not include neuraldb_frontend code,
         # but app_dir is only used if platform == local.
         app_dir=str(get_root_absolute_path() / "frontend"),
-        majority_critical_services_nodes=os.getenv(
-            "MAJORITY_CRITICAL_SERVICE_NODES", "1"
-        ),
     )
 
 
