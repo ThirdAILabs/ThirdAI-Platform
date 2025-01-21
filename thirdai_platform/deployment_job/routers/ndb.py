@@ -9,7 +9,7 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from queue import Queue
-from typing import AsyncGenerator, List, Optional, Dict
+from typing import AsyncGenerator, Dict, List, Optional
 from urllib.parse import urljoin
 
 import fitz
@@ -52,7 +52,6 @@ from platform_common.logging.job_loggers import JobLogger
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from platform_common.pydantic_models.feedback_logs import (
     AssociateLog,
-    ChatFeedbackLog,
     DeleteLog,
     FeedbackLog,
     ImplicitUpvoteLog,
@@ -61,18 +60,22 @@ from platform_common.pydantic_models.feedback_logs import (
 )
 from platform_common.utils import response
 from prometheus_client import Counter, Summary
-from pydantic import ValidationError, BaseModel
+from pydantic import BaseModel, ValidationError
+
 
 class NewMetadata(BaseModel):
     metadata: Dict[str, str]
+
 
 ndb_query_metric = Summary("ndb_query", "NDB Queries")
 ndb_upvote_metric = Summary("ndb_upvote", "NDB upvotes")
 ndb_associate_metric = Summary("ndb_associate", "NDB associations")
 ndb_implicit_feedback_metric = Summary("ndb_implicit_feedback", "NDB implicit feedback")
 ndb_chat_upvote_metric = Counter("ndb_chat_upvote_metric", "NDB chat upvote")
-ndb_chat_upvote_metric.inc()        # satisfaction score = (chat_upvote / (chat_upvote + chat_downvote)). To avoid divide-by-zero error, incrementing chat_upvote by 1
-ndb_chat_same_question = Counter("ndb_chat_same_question", "Metric for same question being asked in the chat")
+ndb_chat_upvote_metric.inc()  # satisfaction score = (chat_upvote / (chat_upvote + chat_downvote)). To avoid divide-by-zero error, incrementing chat_upvote by 1
+ndb_chat_same_question = Counter(
+    "ndb_chat_same_question", "Metric for same question being asked in the chat"
+)
 ndb_chat_downvote_metric = Counter("ndb_chat_downvote_metric", "NDB chat downvote")
 ndb_insert_metric = Summary("ndb_insert", "NDB insertions")
 ndb_delete_metric = Summary("ndb_delete", "NDB deletions")
@@ -143,8 +146,12 @@ class NDBRouter:
             "/get_all_chat_history", self.fetch_all_session_chat, methods=["GET"]
         )
         self.router.add_api_route("/sources", self.get_sources, methods=["GET"])
-        self.router.add_api_route("/doc_metadata", self.get_doc_metadata, methods=["GET"])
-        self.router.add_api_route("/doc_metadata", self.update_doc_metadata, methods=["POST"])
+        self.router.add_api_route(
+            "/doc_metadata", self.get_doc_metadata, methods=["GET"]
+        )
+        self.router.add_api_route(
+            "/doc_metadata", self.update_doc_metadata, methods=["POST"]
+        )
         self.router.add_api_route(
             "/save",
             self.save,
@@ -605,10 +612,7 @@ class NDBRouter:
         token: str = Depends(Permissions.verify_permission("read")),
     ):
         ndb_chat_same_question.inc()
-        return response(
-            status_code=status.HTTP_200_OK,
-            message = "Logged successfully"
-        )
+        return response(status_code=status.HTTP_200_OK, message="Logged successfully")
 
     def chat_feedback(
         self,
@@ -702,9 +706,9 @@ class NDBRouter:
                 )
         else:
             session_id = input.session_id
-        
+
         # get the query category
-        user_input_category = chat.categorize_query(user_input = input.user_input)
+        user_input_category = chat.categorize_query(user_input=input.user_input)
 
         async def generate_response() -> AsyncGenerator[str, None]:
             start_time = time.time()
@@ -723,7 +727,9 @@ class NDBRouter:
                 if not chunk.startswith("context: "):
                     conversation_response += chunk
                 else:
-                    reformulated_query = json.loads(chunk.split('context: ', 1)[1])[0]['query']
+                    reformulated_query = json.loads(chunk.split("context: ", 1)[1])[0][
+                        "query"
+                    ]
             end_time = time.time()
             chat_response_time.observe(end_time - start_time)
 
@@ -737,9 +743,9 @@ class NDBRouter:
                     "%Y-%m-%d %H:%M:%S"
                 ),
                 query_text=reformulated_query,
-                user_input = input.user_input,
+                user_input=input.user_input,
                 response_text=conversation_response,
-                user_input_category = user_input_category
+                user_input_category=user_input_category,
             )
 
         return StreamingResponse(generate_response(), media_type="text/plain")
@@ -768,10 +774,10 @@ class NDBRouter:
             data = json.loads(line)
             chat_history[data["session_id"]].append(
                 {
-                    "user_input": data["user_input"],       # un-reformulated query
+                    "user_input": data["user_input"],  # un-reformulated query
                     "user_input_category": data["user_input_category"],
                     "query_time": data["query_time"],
-                    "query_text": data["query_text"],       # reformulated query
+                    "query_text": data["query_text"],  # reformulated query
                     "response_time": data["response_time"],
                     "response_text": data["response_text"],
                 }
@@ -815,11 +821,13 @@ class NDBRouter:
             message="Successful",
             data=sources,
         )
-    
+
     def get_doc_metadata(self, source_id: str):
         try:
             chunks = self.model.db.chunk_store.get_chunks(
-                self.model.db.chunk_store.get_doc_chunks(source_id, before_version=float("inf"))
+                self.model.db.chunk_store.get_doc_chunks(
+                    source_id, before_version=float("inf")
+                )
             )
             metadata = chunks[0].metadata
             if "page" in metadata:
@@ -828,25 +836,29 @@ class NDBRouter:
                 del metadata["highlight"]
         except Exception as e:
             return response(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message=f"Failed with error: {e}",
-        )
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"Failed with error: {e}",
+            )
         return response(
             status_code=status.HTTP_200_OK,
             message="Successful",
             data=metadata,
         )
-    
+
     def update_doc_metadata(self, source_id: str, metadata: NewMetadata):
+        for key in metadata.metadata.keys():
+            metadata.metadata[key] = metadata.metadata[key].lower()
         try:
             if not self.config.autoscaling_enabled:
                 with self.model.db_lock:
-                    self.model.db.chunk_store.update_metadata(source_id, metadata.metadata)
+                    self.model.db.chunk_store.update_metadata(
+                        source_id, metadata.metadata
+                    )
         except Exception as e:
             return response(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message=f"Failed with error: {e}",
-        )
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"Failed with error: {e}",
+            )
 
         return response(
             status_code=status.HTTP_200_OK,

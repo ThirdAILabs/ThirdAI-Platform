@@ -14,6 +14,7 @@ from platform_common.pydantic_models.feedback_logs import (
     UpvoteLog,
 )
 from platform_common.pydantic_models.training import (
+    AutopopulateMetadataInfo,
     DatagenOptions,
     FileInfo,
     JobOptions,
@@ -26,7 +27,6 @@ from platform_common.pydantic_models.training import (
     UDTData,
     UDTOptions,
     UDTTrainOptions,
-    AutopopulateMetadataInfo
 )
 from thirdai import bolt
 from thirdai import neural_db as ndb
@@ -394,10 +394,18 @@ def test_autotune_metadata():
         model_id="ndb_123",
         data_id="data_123",
         # model_options=NDBOptions(),
-        model_options=NDBOptions(autopopulate_doc_metadata_fields=[
-            AutopopulateMetadataInfo(attribute_name="brand", description="the name of the brand in the document"),
-            AutopopulateMetadataInfo(attribute_name="model_id", description="the id of the model in the document")
-        ]),
+        model_options=NDBOptions(
+            autopopulate_doc_metadata_fields=[
+                AutopopulateMetadataInfo(
+                    attribute_name="brand",
+                    description="the name of the brand in the document",
+                ),
+                AutopopulateMetadataInfo(
+                    attribute_name="model_id",
+                    description="the id of the model in the document",
+                ),
+            ]
+        ),
         data=NDBData(
             unsupervised_files=[
                 FileInfo(
