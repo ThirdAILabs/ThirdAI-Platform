@@ -25,6 +25,13 @@ interface DocumentMetadata {
   metadata_attributes: MetadataAttribute[];
 }
 
+interface DynamicLabel {
+  id: number;
+  name: string;
+  color: string;
+  checked: boolean;
+}
+
 const PdfViewerWrapper = styled.section`
   position: fixed;
   top: 0;
@@ -142,28 +149,6 @@ const Placeholder = styled.section`
   height: 80%;
 `;
 
-const labels = [
-  {
-    id: 1,
-    name: 'BRAND',
-    color: 'blue',
-    amount: '217,323',
-    checked: true,
-    description:
-      'The format of a US phone number is (XXX) XXX-XXXX, where "X" represents a digit from 0 to 9. It consists of a three-digit area code, followed by a three-digit exchange code, and a four-digit line number.',
-  },
-  {
-    id: 2,
-    name: 'MODEL_NUMBER',
-    color: 'orange',
-    amount: '8,979',
-    checked: true,
-    description:
-      'The format of a US Social Security Number (SSN) is XXX-XX-XXXX, where "X" represents a digit from 0 to 9. It consists of three parts: area, group, and serial numbers.',
-  },
-];
-
-// ChatBox component to display human/AI message with sentiment
 const sentimentColor = (sentiment: string) => {
   switch (sentiment) {
     case 'positive':
@@ -253,6 +238,19 @@ const ReferenceItem: React.FC<ReferenceItemProps> = ({
   );
 };
 
+
+interface ChatBoxProps {
+  message: ChatMessage;
+  transformedMessage?: string[][];
+  sentiment?: string;
+  context?: Reference[];
+  modelService: ModelService | null;
+  onOpenPdf: (pdfInfo: PdfInfo) => void;
+  showFeedback: boolean;
+  showReferences?: boolean;
+  dynamicLabels: DynamicLabel[]; 
+}
+
 function ChatBox({
   message,
   transformedMessage,
@@ -262,16 +260,8 @@ function ChatBox({
   onOpenPdf,
   showFeedback,
   showReferences = true,
-}: {
-  message: ChatMessage;
-  transformedMessage?: string[][];
-  sentiment?: string;
-  context?: Reference[];
-  modelService: ModelService | null;
-  onOpenPdf: (pdfInfo: PdfInfo) => void;
-  showFeedback: boolean;
-  showReferences?: boolean;
-}) {
+  dynamicLabels, 
+}: ChatBoxProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const references = context || message.references || [];
 
@@ -318,7 +308,7 @@ function ChatBox({
         <div>
           {transformedMessage && transformedMessage.length > 0 ? (
             transformedMessage.map(([sentence, tag], index) => {
-              const label = labels.find((label) => label.name === tag);
+              const label = dynamicLabels.find((label) => label.name === tag);
               return (
                 <span key={index} style={{ color: label?.checked ? label.color : 'inherit' }}>
                   {sentence} {label?.checked && `(${tag}) `}
@@ -441,11 +431,20 @@ export default function Chat({
   const workflowId = searchParams.get('workflowId');
   const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dynamicLabels, setDynamicLabels] = useState<DynamicLabel[]>([]);
+
+  const getColorForAttribute = (attribute: string): string => {
+    const colors = ['blue', 'orange', 'green', 'purple', 'red', 'teal'];
+    let hash = 0;
+    for (let i = 0; i < attribute.length; i++) {
+      hash = attribute.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
 
   useEffect(() => {
     const fetchMetadata = async () => {
-      console.log('workflowId', workflowId)
-
       if (!workflowId) {
         setIsLoading(false);
         return;
@@ -471,8 +470,21 @@ export default function Chat({
           })
         );
 
-        console.log('documentsData', documentsData)
+        // Generate dynamic labels from unique metadata attributes
+        const uniqueAttributes = new Set(
+          documentsData.flatMap(doc => 
+            doc.metadata_attributes.map(attr => attr.attribute_name)
+          )
+        );
 
+        const newLabels: DynamicLabel[] = Array.from(uniqueAttributes).map((attr, index) => ({
+          id: index + 1,
+          name: attr.toUpperCase(),
+          color: getColorForAttribute(attr),
+          checked: true
+        }));
+
+        setDynamicLabels(newLabels);
         setDocuments(documentsData);
       } catch (error) {
         console.error('Error fetching metadata:', error);
@@ -486,12 +498,10 @@ export default function Chat({
 
   const searchMetadataInQuery = (query: string): string[][] => {
     const metadataValues = documents.flatMap(doc => 
-      doc.metadata_attributes
-        .filter(attr => attr.attribute_name === 'brand' || attr.attribute_name === 'model_num')
-        .map(attr => ({
-          value: attr.value,
-          tag: attr.attribute_name.toUpperCase()
-        }))
+      doc.metadata_attributes.map(attr => ({
+        value: attr.value,
+        tag: attr.attribute_name.toUpperCase()
+      }))
     );
 
     const tokens = query.toLowerCase().split(/\s+/);
@@ -630,10 +640,11 @@ export default function Chat({
           [currentIndex]: transformed,
         }));
 
-        // Process constraints from metadata
+        // Process all metadata constraints
         const newConstraints: SearchConstraints = {};
         transformed.forEach(([text, tag]) => {
-          if (tag === 'BRAND' || tag === 'MODEL_NUM') {
+          // Check if tag exists in dynamicLabels
+          if (dynamicLabels.some(label => label.name === tag)) {
             newConstraints[tag] = {
               constraint_type: 'EqualTo',
               value: text.trim(),
@@ -763,6 +774,7 @@ export default function Chat({
           <AllChatBoxes>
             {chatHistory.map((message, i) => (
               <ChatBox
+                dynamicLabels = {dynamicLabels}
                 key={i}
                 modelService={modelService}
                 message={message}
@@ -782,6 +794,7 @@ export default function Chat({
           </AllChatBoxes>
         ) : (
           <ChatBox
+            dynamicLabels={dynamicLabels}
             message={{
               sender: 'AI',
               content:
