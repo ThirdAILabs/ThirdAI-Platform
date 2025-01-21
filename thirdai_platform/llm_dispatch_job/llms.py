@@ -187,8 +187,8 @@ class SelfHostedLLM(OpenAILLM):
         if response.status_code != 200:
             raise Exception("Cannot read self-hosted endpoint.")
         data = response.json()["data"]
-        self.url = data["endpoint"]
         super().__init__(data["api_key"])
+        self.url = data["endpoint"]
 
         if self.url is None or self.api_key is None:
             raise Exception(
