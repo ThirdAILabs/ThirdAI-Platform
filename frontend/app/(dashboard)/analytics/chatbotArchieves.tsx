@@ -54,6 +54,9 @@ const Conversations: React.FC = () => {
   const [chatHistory, setChatHistory] = useState<ConversationData[]>([]);
   const [numberOfQuestions, setNumberOfQuestions] = useState<number>(0);
   const [categoryList, setCategoryList] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState(
+    Object.fromEntries(categoryList.map((category) => [category, false]))
+  );
   const handleShowMore = () => {
     setNumberOfQuestions(min(numberOfQuestions + 50, chatHistory.length));
   };
@@ -80,10 +83,6 @@ const Conversations: React.FC = () => {
   if (!chatHistory) {
     return <div className="p-4 text-center">Loading chat history...</div>;
   }
-
-  const [selectedCategories, setSelectedCategories] = useState(
-    Object.fromEntries(categoryList.map((category) => [category, false]))
-  );
 
   // Toggle handler for category selection
   const handleCategoryToggle = (category: string) => {
