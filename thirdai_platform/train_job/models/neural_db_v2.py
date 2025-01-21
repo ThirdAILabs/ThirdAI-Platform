@@ -134,14 +134,15 @@ class NeuralDBV2(Model):
             attribute_name = metadata_field_obj.attribute_name
             description = metadata_field_obj.description
             metadatafields_str += f" * '{attribute_name}': '{description}'\n"
-            example_str += f"{attribute_name}: some value\n"
+            example_str += f"{attribute_name}: value\n"
 
         prompt = f"""
 Here is a list of fields with a name and a description. 
 {metadatafields_str}
 I want you to extract those fields from the following text:
 {' '.join(chunks[:5])}
-Please format your outputs as a newline separated list of (name, value) pairs such that the output can be parsed by doing string.split("\n") in python. Please do not include quotes, bullets, or any other fluff other than newlines and a colon for the delimiter between the name and value. If there is no value, put N/A. Here is an example:
+Please format your outputs as a newline separated list of (name, value) pairs such that the output can be parsed by doing string.split("\n") in python. Please do not include quotes, bullets, or any other fluff other than newlines and a colon for the delimiter between the name and value. If there is no value, put N/A. Also there should be exactly one value for each field.
+Here is an example:
 {example_str}
         """
 
