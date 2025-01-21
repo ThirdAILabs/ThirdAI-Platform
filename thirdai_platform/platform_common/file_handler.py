@@ -6,6 +6,7 @@ from functools import wraps
 from typing import List
 
 import boto3
+import botocore
 from botocore.client import Config
 from botocore.exceptions import ClientError
 from fastapi import HTTPException, UploadFile, status
@@ -221,7 +222,11 @@ class S3StorageHandler(CloudStorageHandler):
     """
 
     def __init__(
-        self, aws_access_key=None, aws_secret_access_key=None, region_name=None
+        self,
+        aws_access_key=None,
+        aws_secret_access_key=None,
+        region_name=None,
+        unsigned: bool = False,
     ):
         self.s3_client = self.create_s3_client(
             aws_access_key=aws_access_key,
@@ -231,16 +236,29 @@ class S3StorageHandler(CloudStorageHandler):
 
     @handle_exceptions
     def create_s3_client(
-        self, aws_access_key=None, aws_secret_access_key=None, region_name=None
+        self,
+        aws_access_key=None,
+        aws_secret_access_key=None,
+        region_name=None,
+        unsigned: bool = False,
     ):
         # TODO(YASH): Customers will also have rotating aws session token so add that support.
         # https://docs.aws.amazon.com/sdk-for-php/v3/developer-guide/guide_credentials_environment.html
         if not aws_access_key or not aws_secret_access_key:
-            config = Config(
-                retries={"max_attempts": 10, "mode": "standard"},
-                connect_timeout=5,
-                read_timeout=60,
-            )
+            if unsigned:
+                config = Config(
+                    retries={"max_attempts": 10, "mode": "standard"},
+                    connect_timeout=5,
+                    read_timeout=60,
+                    signature_version=botocore.UNSIGNED,
+                )
+            else:
+                config = Config(
+                    retries={"max_attempts": 10, "mode": "standard"},
+                    connect_timeout=5,
+                    read_timeout=60,
+                )
+
             s3_client = boto3.client("s3", config=config)
         else:
             config = Config(
@@ -708,10 +726,12 @@ def get_cloud_client(provider: str):
         aws_access_key = os.getenv("AWS_ACCESS_KEY", None)
         aws_secret_access_key = os.getenv("AWS_ACCESS_SECRET", None)
         region_name = os.getenv("AWS_REGION_NAME", None) or None
+        unsigned = os.getenv("AWS_UNSIGNED", "false").lower() == "true"
         return S3StorageHandler(
             aws_access_key=aws_access_key,
             aws_secret_access_key=aws_secret_access_key,
             region_name=region_name,
+            unsigned=unsigned,
         )
     elif provider == "azure":
         account_name = os.getenv("AZURE_ACCOUNT_NAME", None)
