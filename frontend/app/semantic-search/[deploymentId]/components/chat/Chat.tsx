@@ -504,7 +504,7 @@ export default function Chat({
       }))
     );
 
-    const tokens = query.toLowerCase().split(/\s+/);
+    const tokens = query.split(/\s+/);
     let result: string[][] = [];
     let currentPhrase = '';
     let currentTag = '';
