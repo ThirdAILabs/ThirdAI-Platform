@@ -822,8 +822,10 @@ class NDBRouter:
                 self.model.db.chunk_store.get_doc_chunks(source_id, before_version=float("inf"))
             )
             metadata = chunks[0].metadata
-            del metadata["page"]
-            del metadata["highlight"]
+            if "page" in metadata:
+                del metadata["page"]
+            if "highlight" in metadata:
+                del metadata["highlight"]
         except Exception as e:
             return response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

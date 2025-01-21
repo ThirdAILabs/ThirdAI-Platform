@@ -469,3 +469,34 @@ def test_deploy_ndb_prod_mode(tmp_dir, on_disk):
     check_log_lines(os.path.join(deployment_dir, "feedback"), 2)
     check_log_lines(os.path.join(deployment_dir, "insertions"), 1)
     check_log_lines(os.path.join(deployment_dir, "deletions"), 1)
+
+
+@pytest.mark.unit
+@patch.object(Permissions, "verify_permission", mock_verify_permission)
+@patch.object(Permissions, "check_permission", mock_check_permission)
+def test_deployment_metadata(tmp_dir):
+    from deployment_job.routers.ndb import NDBRouter
+
+    config = create_config(tmp_dir=tmp_dir, autoscaling=False, on_disk=False)
+
+    router = NDBRouter(config, None, logger)
+    client = TestClient(router.router)
+
+    deployment_dir = os.path.join(
+        tmp_dir, "models", config.model_id, "deployments/data"
+    )
+
+    client.post("/search", json={"query": "manufacturing faster chips"})
+    response = client.get("/sources")
+    print("haha")
+    print(response.text)
+    source_id = response.json()["data"][0]["source_id"]
+    response = client.get("/doc_metadata", params={"source_id": source_id})
+    print(response.text)
+
+    response = client.post("/doc_metadata", params={"source_id": source_id}, json={"metadata": {"attribute_name": "something"}})
+    print(response.text)
+
+    response = client.get("/doc_metadata", params={"source_id": source_id})
+    print(response.text)
+    assert "attribute_name" in response.json()["data"]
