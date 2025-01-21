@@ -494,7 +494,11 @@ def test_deployment_metadata(tmp_dir):
     response = client.get("/doc_metadata", params={"source_id": source_id})
     print(response.text)
 
-    response = client.post("/doc_metadata", params={"source_id": source_id}, json={"metadata": {"attribute_name": "something"}})
+    response = client.post(
+        "/doc_metadata",
+        params={"source_id": source_id},
+        json={"metadata": {"attribute_name": "something"}},
+    )
     print(response.text)
 
     response = client.get("/doc_metadata", params={"source_id": source_id})
