@@ -1319,6 +1319,50 @@ export async function getDocumentMetadata(
   });
 }
 
+// First define the interfaces
+export interface NewMetadata {
+  metadata: {
+    [key: string]: string | number;
+  };
+}
+
+export interface UpdateMetadataResponse {
+  status_code: number;
+  message: string;
+}
+
+export async function updateDocumentMetadata(
+  deploymentUrl: string,
+  sourceId: string,
+  metadata: NewMetadata
+): Promise<UpdateMetadataResponse> {
+  const accessToken = getAccessToken();
+
+  return new Promise((resolve, reject) => {
+    axios
+      .post<UpdateMetadataResponse>(`${deploymentUrl}/doc_metadata`, metadata, {
+        params: {
+          source_id: sourceId,
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        console.error('Error updating document metadata:', err);
+        if (err.response?.data?.message) {
+          reject(new Error(err.response.data.message));
+        } else {
+          reject(new Error('Failed to update document metadata'));
+        }
+      });
+  });
+}
+
 export function userEmailLoginWithAccessToken(
   accessToken: string,
   setAccessToken: (token: string) => void

@@ -44,6 +44,7 @@ const MetadataTable: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deploymentUrl, setDeploymentUrl] = useState<string>('');
 
   useEffect(() => {
     const fetchMetadata = async () => {
@@ -63,6 +64,7 @@ const MetadataTable: React.FC = () => {
           throw new Error('No dependency model found');
         }
         const deploymentUrl = `${deploymentBaseUrl}/${firstDependency.model_id}`;
+        setDeploymentUrl(deploymentUrl); // Add this line
         console.log('Deployment URL:', deploymentUrl);
 
         // Fetch sources
@@ -194,13 +196,13 @@ const MetadataTable: React.FC = () => {
         </Table>
       </TableContainer>
 
-      {isModalOpen && selectedDocument && (
-        <></>
-        // <EditMetadataModal
-        //   document={selectedDocument}
-        //   onClose={() => setIsModalOpen(false)}
-        //   onSave={(updatedAttributes) => handleUpdate(selectedDocument.document_id, updatedAttributes)}
-        // />
+      {isModalOpen && selectedDocument && deploymentUrl && (
+        <EditMetadataModal
+          document={selectedDocument}
+          deploymentUrl={deploymentUrl}
+          onClose={() => setIsModalOpen(false)}
+          onSave={(documentId, updatedAttributes) => handleUpdate(documentId, updatedAttributes)}
+        />
       )}
     </>
   );

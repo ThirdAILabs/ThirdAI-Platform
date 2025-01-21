@@ -1,4 +1,4 @@
-// /app/metadata/EditMetadataModal.tsx
+// EditMetadataModal.tsx
 'use client';
 
 import React, { useState } from 'react';
@@ -11,20 +11,39 @@ import {
   TextField,
   IconButton,
   Grid,
-  Typography,
+  CircularProgress,
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
-import { DocumentMetadata, MetadataAttribute } from './sampleData';
+import { updateDocumentMetadata } from '@/lib/backend';
+
+interface MetadataAttribute {
+  attribute_name: string;
+  value: string | number;
+}
+
+interface DocumentMetadata {
+  document_id: string;
+  document_name: string;
+  metadata_attributes: MetadataAttribute[];
+}
 
 interface EditMetadataModalProps {
   document: DocumentMetadata;
+  deploymentUrl: string; // Add this prop
   onClose: () => void;
-  onSave: (updatedAttributes: MetadataAttribute[]) => void;
+  onSave: (documentId: string, updatedAttributes: MetadataAttribute[]) => void;
 }
 
-const EditMetadataModal: React.FC<EditMetadataModalProps> = ({ document, onClose, onSave }) => {
+const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
+  document,
+  deploymentUrl,
+  onClose,
+  onSave,
+}) => {
   const [attributes, setAttributes] = useState<MetadataAttribute[]>(document.metadata_attributes);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleChange = (index: number, field: keyof MetadataAttribute, value: string) => {
     const updated = [...attributes];
@@ -33,7 +52,7 @@ const EditMetadataModal: React.FC<EditMetadataModalProps> = ({ document, onClose
   };
 
   const handleAddAttribute = () => {
-    setAttributes([...attributes, { attribute_name: '', description: '', value: '' }]);
+    setAttributes([...attributes, { attribute_name: '', value: '' }]);
   };
 
   const handleRemoveAttribute = (index: number) => {
@@ -42,21 +61,48 @@ const EditMetadataModal: React.FC<EditMetadataModalProps> = ({ document, onClose
     setAttributes(updated);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Validation: Ensure all fields are filled
     for (const attr of attributes) {
-      if (!attr.attribute_name.trim() || !attr.value.trim()) {
-        alert('Attribute Name and Value cannot be empty.');
+      if (!attr.attribute_name.trim() || attr.value === '') {
+        setError('Attribute Name and Value cannot be empty.');
         return;
       }
     }
-    onSave(attributes);
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Convert attributes array to metadata object
+      const metadata = attributes.reduce(
+        (acc, attr) => {
+          acc[attr.attribute_name] = attr.value;
+          return acc;
+        },
+        {} as Record<string, string | number>
+      );
+
+      // Call the API to update metadata
+      await updateDocumentMetadata(deploymentUrl, document.document_id, { metadata });
+
+      // If successful, update the UI
+      onSave(document.document_id, attributes);
+      onClose();
+    } catch (err) {
+      console.error('Error updating metadata:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update metadata');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <Dialog open onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Edit Metadata for {document.document_name}</DialogTitle>
       <DialogContent dividers>
+        {error && <div className="text-red-500 mb-4 p-2 bg-red-50 rounded">{error}</div>}
+
         {attributes.map((attr, index) => (
           <Grid
             container
@@ -65,7 +111,7 @@ const EditMetadataModal: React.FC<EditMetadataModalProps> = ({ document, onClose
             alignItems="center"
             style={{ marginBottom: '16px' }}
           >
-            <Grid item xs={12} sm={4}>
+            <Grid item xs={12} sm={5}>
               <TextField
                 label="Attribute Name"
                 value={attr.attribute_name}
@@ -76,15 +122,6 @@ const EditMetadataModal: React.FC<EditMetadataModalProps> = ({ document, onClose
             </Grid>
             <Grid item xs={12} sm={5}>
               <TextField
-                label="Description"
-                value={attr.description}
-                onChange={(e) => handleChange(index, 'description', e.target.value)}
-                fullWidth
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={3}>
-              <TextField
                 label="Value"
                 value={attr.value}
                 onChange={(e) => handleChange(index, 'value', e.target.value)}
@@ -92,7 +129,7 @@ const EditMetadataModal: React.FC<EditMetadataModalProps> = ({ document, onClose
                 required
               />
             </Grid>
-            <Grid item xs={12} sm={12}>
+            <Grid item xs={12} sm={2}>
               <IconButton
                 color="error"
                 aria-label="remove attribute"
@@ -114,11 +151,11 @@ const EditMetadataModal: React.FC<EditMetadataModalProps> = ({ document, onClose
         </Button>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} variant="outlined" color="secondary">
+        <Button onClick={onClose} variant="outlined" color="secondary" disabled={isLoading}>
           Cancel
         </Button>
-        <Button onClick={handleSubmit} variant="contained" color="primary">
-          Save
+        <Button onClick={handleSubmit} variant="contained" color="primary" disabled={isLoading}>
+          {isLoading ? <CircularProgress size={24} /> : 'Save'}
         </Button>
       </DialogActions>
     </Dialog>
