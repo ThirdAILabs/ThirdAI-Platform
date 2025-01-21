@@ -7,11 +7,30 @@ import { ChatMessage, ModelService, ReferenceInfo, PdfInfo } from '../../modelSe
 import { Chunk } from '../pdf_viewer/interfaces';
 import PdfViewer from '../pdf_viewer/PdfViewer';
 import TypingAnimation from '../TypingAnimation';
-import { piiDetect, useSentimentClassification } from '@/lib/backend'; // Import for sentiment classification
+import { piiDetect, useSentimentClassification, getWorkflowDetails, deploymentBaseUrl, getSources, getDocumentMetadata } from '@/lib/backend'; // Import for sentiment classification
 // Import FontAwesomeIcon and faPause
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faStop } from '@fortawesome/free-solid-svg-icons';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+
+interface MetadataAttribute {
+  attribute_name: string;
+  value: string | number;
+}
+
+interface DocumentMetadata {
+  document_id: string;
+  document_name: string;
+  metadata_attributes: MetadataAttribute[];
+}
+
+interface DynamicLabel {
+  id: number;
+  name: string;
+  color: string;
+  checked: boolean;
+}
 
 const PdfViewerWrapper = styled.section`
   position: fixed;
@@ -130,28 +149,6 @@ const Placeholder = styled.section`
   height: 80%;
 `;
 
-const labels = [
-  {
-    id: 1,
-    name: 'BRAND',
-    color: 'blue',
-    amount: '217,323',
-    checked: true,
-    description:
-      'The format of a US phone number is (XXX) XXX-XXXX, where "X" represents a digit from 0 to 9. It consists of a three-digit area code, followed by a three-digit exchange code, and a four-digit line number.',
-  },
-  {
-    id: 2,
-    name: 'MODEL_NUMBER',
-    color: 'orange',
-    amount: '8,979',
-    checked: true,
-    description:
-      'The format of a US Social Security Number (SSN) is XXX-XX-XXXX, where "X" represents a digit from 0 to 9. It consists of three parts: area, group, and serial numbers.',
-  },
-];
-
-// ChatBox component to display human/AI message with sentiment
 const sentimentColor = (sentiment: string) => {
   switch (sentiment) {
     case 'positive':
@@ -241,6 +238,19 @@ const ReferenceItem: React.FC<ReferenceItemProps> = ({
   );
 };
 
+
+interface ChatBoxProps {
+  message: ChatMessage;
+  transformedMessage?: string[][];
+  sentiment?: string;
+  context?: Reference[];
+  modelService: ModelService | null;
+  onOpenPdf: (pdfInfo: PdfInfo) => void;
+  showFeedback: boolean;
+  showReferences?: boolean;
+  dynamicLabels: DynamicLabel[]; 
+}
+
 function ChatBox({
   message,
   transformedMessage,
@@ -250,16 +260,8 @@ function ChatBox({
   onOpenPdf,
   showFeedback,
   showReferences = true,
-}: {
-  message: ChatMessage;
-  transformedMessage?: string[][];
-  sentiment?: string;
-  context?: Reference[];
-  modelService: ModelService | null;
-  onOpenPdf: (pdfInfo: PdfInfo) => void;
-  showFeedback: boolean;
-  showReferences?: boolean;
-}) {
+  dynamicLabels, 
+}: ChatBoxProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const references = context || message.references || [];
 
@@ -306,7 +308,7 @@ function ChatBox({
         <div>
           {transformedMessage && transformedMessage.length > 0 ? (
             transformedMessage.map(([sentence, tag], index) => {
-              const label = labels.find((label) => label.name === tag);
+              const label = dynamicLabels.find((label) => label.name === tag);
               return (
                 <span key={index} style={{ color: label?.checked ? label.color : 'inherit' }}>
                   {sentence} {label?.checked && `(${tag}) `}
@@ -425,6 +427,110 @@ export default function Chat({
   const contextBuffer = useRef<string>('');
   const isCollectingContext = useRef<boolean>(false);
 
+  const searchParams = useSearchParams();
+  const workflowId = searchParams.get('workflowId');
+  const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [dynamicLabels, setDynamicLabels] = useState<DynamicLabel[]>([]);
+
+  const getColorForAttribute = (attribute: string): string => {
+    const colors = ['blue', 'orange', 'green', 'purple', 'red', 'teal'];
+    let hash = 0;
+    for (let i = 0; i < attribute.length; i++) {
+      hash = attribute.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      if (!workflowId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const workflowDetails = await getWorkflowDetails(workflowId);
+        const firstDependency = workflowDetails.data.dependencies?.[0];
+        const deploymentUrl = `${deploymentBaseUrl}/${firstDependency.model_id}`;
+        
+        const sources = await getSources(deploymentUrl);
+        const documentsData = await Promise.all(
+          sources.map(async (source) => {
+            const metadataResponse = await getDocumentMetadata(deploymentUrl, source.source_id);
+            return {
+              document_id: source.source_id,
+              document_name: source.source.split('/').pop() || source.source,
+              metadata_attributes: Object.entries(metadataResponse.data).map(([key, value]) => ({
+                attribute_name: key,
+                value: String(value),
+              })),
+            };
+          })
+        );
+
+        // Generate dynamic labels from unique metadata attributes
+        const uniqueAttributes = new Set(
+          documentsData.flatMap(doc => 
+            doc.metadata_attributes.map(attr => attr.attribute_name)
+          )
+        );
+
+        const newLabels: DynamicLabel[] = Array.from(uniqueAttributes).map((attr, index) => ({
+          id: index + 1,
+          name: attr.toUpperCase(),
+          color: getColorForAttribute(attr),
+          checked: true
+        }));
+
+        setDynamicLabels(newLabels);
+        setDocuments(documentsData);
+      } catch (error) {
+        console.error('Error fetching metadata:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMetadata();
+  }, [workflowId]);
+
+  const searchMetadataInQuery = (query: string): string[][] => {
+    const metadataValues = documents.flatMap(doc => 
+      doc.metadata_attributes.map(attr => ({
+        value: attr.value,
+        tag: attr.attribute_name.toUpperCase()
+      }))
+    );
+
+    const tokens = query.toLowerCase().split(/\s+/);
+    let result: string[][] = [];
+    let currentPhrase = '';
+    let currentTag = '';
+
+    tokens.forEach(token => {
+      const match = metadataValues.find(mv => mv.value === token);
+      if (match) {
+        if (currentPhrase) result.push([currentPhrase.trim(), currentTag]);
+        result.push([token, match.tag]);
+        currentPhrase = '';
+        currentTag = '';
+      } else {
+        if (!currentTag) {
+          currentPhrase = currentPhrase ? `${currentPhrase} ${token}` : token;
+        } else {
+          result.push([currentPhrase.trim(), currentTag]);
+          currentPhrase = token;
+          currentTag = '';
+        }
+      }
+    });
+
+    if (currentPhrase) result.push([currentPhrase.trim(), currentTag]);
+    return result;
+  };
+
   useEffect(() => {
     if (modelService && provider) {
       modelService
@@ -447,49 +553,6 @@ export default function Chat({
         });
     }
   }, [modelService, provider]);
-
-  const performPIIDetection = (messageContent: string): Promise<string[][]> => {
-    if (!piiWorkflowId) {
-      return Promise.resolve([]);
-    }
-
-    return piiDetect(messageContent, piiWorkflowId)
-      .then((result) => {
-        const { tokens, predicted_tags } = result.data.prediction_results;
-
-        let transformed: string[][] = [];
-        let currentSentence = '';
-        let currentTag = '';
-
-        console.log('tokens', tokens);
-        console.log('predicted_tags', predicted_tags);
-
-        for (let i = 0; i < tokens.length; i++) {
-          const word = tokens[i];
-          const tag = predicted_tags[i] && predicted_tags[i][0];
-
-          if (tag !== currentTag) {
-            if (currentSentence) {
-              transformed.push([currentSentence.trim(), currentTag]);
-            }
-            currentSentence = word;
-            currentTag = tag;
-          } else {
-            currentSentence += ` ${word}`;
-          }
-        }
-
-        if (currentSentence) {
-          transformed.push([currentSentence.trim(), currentTag]);
-        }
-
-        return transformed;
-      })
-      .catch((error) => {
-        console.error('Error detecting PII:', error);
-        return [];
-      });
-  };
 
   const [sentiments, setSentiments] = useState<Record<number, string>>({}); // Store sentiment for human messages
 
@@ -532,9 +595,9 @@ export default function Chat({
   const handleEnterPress = async (e: any) => {
     if (e.keyCode === 13 && e.shiftKey === false) {
       e.preventDefault();
-      if (!textInput.trim()) return;
+      if (!textInput.trim() || isLoading) return;
 
-      // If a generation is already in progress, abort it
+      // Abort existing generation if any
       if (abortController) {
         abortController.abort();
         setAiLoading(false);
@@ -547,11 +610,9 @@ export default function Chat({
       const currentIndex = chatHistory.length;
       const aiIndex = chatHistory.length + 1;
 
-      // Clear input and set loading state
       setTextInput('');
       setAiLoading(true);
 
-      // Add human message
       const humanMessage: ChatMessage = {
         sender: 'human',
         content: lastTextInput,
@@ -559,32 +620,31 @@ export default function Chat({
       const newHistory = [...chatHistory, humanMessage];
       setChatHistory(newHistory);
 
-      // Handle sentiment classification
+      // Handle sentiment if enabled
       if (sentimentWorkflowId) {
         classifySentiment(lastTextInput, currentIndex);
       }
 
-      // Reset buffers and state
       responseBuffer.current = '';
       contextReceived.current = false;
       isCollectingContext.current = false;
       contextBuffer.current = '';
 
       try {
-        // Handle PII detection
-        if (piiWorkflowId) {
-          const humanTransformed = await performPIIDetection(lastTextInput);
-          setTransformedMessages((prev) => ({
-            ...prev,
-            [currentIndex]: humanTransformed,
-          }));
-        }
+        // Search for metadata in query
+        const transformed = searchMetadataInQuery(lastTextInput);
+        console.log('transformed', transformed)
 
-        // Process constraints
-        const detectedPII = await performPIIDetection(lastTextInput);
+        setTransformedMessages((prev) => ({
+          ...prev,
+          [currentIndex]: transformed,
+        }));
+
+        // Process all metadata constraints
         const newConstraints: SearchConstraints = {};
-        detectedPII.forEach(([text, tag]) => {
-          if (tag === 'BRAND' || tag === 'MODEL_NUMBER') {
+        transformed.forEach(([text, tag]) => {
+          // Check if tag exists in dynamicLabels
+          if (dynamicLabels.some(label => label.name === tag)) {
             newConstraints[tag] = {
               constraint_type: 'EqualTo',
               value: text.trim(),
@@ -596,7 +656,7 @@ export default function Chat({
           setPersistentConstraints(newConstraints);
         }
 
-        // Initialize AI message in chat history
+        // Initialize AI message
         setChatHistory((prev) => [...prev, { sender: 'AI', content: '' }]);
 
         // Start chat with streaming
@@ -607,38 +667,30 @@ export default function Chat({
           (newData: string) => {
             if (newData.startsWith('context:') || isCollectingContext.current) {
               // Handle context streaming
+              if (newData.startsWith('context:')) {
+                isCollectingContext.current = true;
+                contextBuffer.current = newData.substring(9);
+              } else {
+                contextBuffer.current += newData;
+              }
+  
               try {
-                if (newData.startsWith('context:')) {
-                  isCollectingContext.current = true;
-                  contextBuffer.current = newData.substring(9);
-                } else {
-                  contextBuffer.current += newData;
-                }
-
-                try {
-                  const contextJson = JSON.parse(contextBuffer.current);
-                  setContextData((prev) => ({
-                    ...prev,
-                    [aiIndex]: contextJson,
-                  }));
-                  isCollectingContext.current = false;
-                  contextBuffer.current = '';
-                } catch {
-                  // Continue collecting context if JSON is incomplete
-                  return;
-                }
-              } catch (e) {
-                console.error('Error handling context:', e);
+                const contextJson = JSON.parse(contextBuffer.current);
+                setContextData((prev) => ({
+                  ...prev,
+                  [aiIndex]: contextJson,
+                }));
+                isCollectingContext.current = false;
+                contextBuffer.current = '';
+              } catch {
+                // Continue collecting context if JSON is incomplete
               }
             } else if (!isCollectingContext.current) {
               // Handle message streaming
               responseBuffer.current += newData;
-
-              // Update chat history with new content
               setChatHistory((prev) => {
                 const updatedHistory = [...prev];
                 const lastMessage = updatedHistory[updatedHistory.length - 1];
-
                 if (lastMessage?.sender === 'AI') {
                   return [
                     ...updatedHistory.slice(0, -1),
@@ -650,24 +702,20 @@ export default function Chat({
             }
           },
           () => {
-            // Final callback - ensure message persists
+            // Final callback
             const finalContent = responseBuffer.current;
-
             setChatHistory((prev) => {
               const updatedHistory = [...prev];
               const lastMessage = updatedHistory[updatedHistory.length - 1];
-
               if (lastMessage?.sender === 'AI') {
                 return [...updatedHistory.slice(0, -1), { ...lastMessage, content: finalContent }];
               }
-              // If no AI message exists, add it
               return [...updatedHistory, { sender: 'AI', content: finalContent }];
             });
-
-            // Reset state
+  
             setAiLoading(false);
             setAbortController(null);
-            responseBuffer.current = finalContent; // Keep the content in buffer
+            responseBuffer.current = finalContent;
             contextBuffer.current = '';
             isCollectingContext.current = false;
           },
@@ -675,11 +723,9 @@ export default function Chat({
         );
       } catch (error) {
         console.error('Chat error:', error);
-        // Handle error state
         setChatHistory((prev) => {
           const updatedHistory = [...prev];
           const lastMessage = updatedHistory[updatedHistory.length - 1];
-
           if (lastMessage?.sender === 'AI') {
             return [
               ...updatedHistory.slice(0, -1),
@@ -728,10 +774,11 @@ export default function Chat({
           <AllChatBoxes>
             {chatHistory.map((message, i) => (
               <ChatBox
+                dynamicLabels = {dynamicLabels}
                 key={i}
                 modelService={modelService}
                 message={message}
-                transformedMessage={piiWorkflowId ? transformedMessages[i] : undefined}
+                transformedMessage={true ? transformedMessages[i] : undefined}
                 sentiment={sentiments[i]}
                 context={contextData[i]}
                 onOpenPdf={handleOpenPdf}
@@ -747,6 +794,7 @@ export default function Chat({
           </AllChatBoxes>
         ) : (
           <ChatBox
+            dynamicLabels={dynamicLabels}
             message={{
               sender: 'AI',
               content:
