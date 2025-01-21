@@ -846,6 +846,8 @@ class NDBRouter:
         )
 
     def update_doc_metadata(self, source_id: str, metadata: NewMetadata):
+        for key in metadata.metadata.keys():
+            metadata.metadata[key] = metadata.metadata[key].lower()
         try:
             if not self.config.autoscaling_enabled:
                 with self.model.db_lock:

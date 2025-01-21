@@ -155,7 +155,7 @@ Please format your outputs as a newline separated list of (name, value) pairs su
             output = line.strip().split(":")
             if len(output) != 2:
                 continue
-            new_metadata[output[0].strip()] = output[1].strip()
+            new_metadata[output[0].strip()] = output[1].strip().lower()
         return new_metadata
 
     def unsupervised_train(self, files: List[FileInfo], batch_size=500):
