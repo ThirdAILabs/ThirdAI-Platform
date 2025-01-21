@@ -1259,6 +1259,66 @@ export function userEmailLogin(
   });
 }
 
+export interface Source {
+  source: string;
+  source_id: string;
+}
+
+export interface SourcesResponse {
+  data: Source[];
+}
+
+export async function getSources(deploymentUrl: string): Promise<Source[]> {
+  const accessToken = getAccessToken();
+
+  return new Promise((resolve, reject) => {
+    axios
+      .get<SourcesResponse>(`${deploymentUrl}/sources`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
+      .then((res) => {
+        resolve(res.data.data);
+      })
+      .catch((err) => {
+        console.error('Error fetching sources:', err);
+        reject(new Error('Failed to fetch sources'));
+      });
+  });
+}
+
+export interface DocumentMetadataResponse {
+  status_code: number;
+  message: string;
+  data: {
+    [key: string]: string | number; // Metadata is a key-value pair
+  };
+}
+
+export async function getDocumentMetadata(
+  deploymentUrl: string,
+  sourceId: string
+): Promise<DocumentMetadataResponse> {
+  const accessToken = getAccessToken();
+
+  return new Promise((resolve, reject) => {
+    axios
+      .get<DocumentMetadataResponse>(`${deploymentUrl}/doc_metadata?source_id=${sourceId}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
+      .then((res) => {
+        resolve(res.data);
+      })
+      .catch((err) => {
+        console.error('Error fetching document metadata:', err);
+        reject(new Error('Failed to fetch document metadata'));
+      });
+  });
+}
+
 export function userEmailLoginWithAccessToken(
   accessToken: string,
   setAccessToken: (token: string) => void

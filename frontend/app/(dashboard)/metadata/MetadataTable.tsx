@@ -1,7 +1,6 @@
-// /app/metadata/MetadataTable.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TableContainer,
   Table,
@@ -12,15 +11,108 @@ import {
   Paper,
   IconButton,
   Typography,
+  CircularProgress,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import EditMetadataModal from './EditMetadataModal';
-import { DocumentMetadata, MetadataAttribute, sampleDocuments } from './sampleData';
+import {
+  getDocumentMetadata,
+  getWorkflowDetails,
+  deploymentBaseUrl,
+  getSources,
+} from '@/lib/backend';
+import { useSearchParams } from 'next/navigation';
+
+interface MetadataAttribute {
+  attribute_name: string;
+  value: string | number;
+}
+
+interface DocumentMetadata {
+  document_id: string;
+  document_name: string;
+  metadata_attributes: MetadataAttribute[];
+}
 
 const MetadataTable: React.FC = () => {
-  const [documents, setDocuments] = useState<DocumentMetadata[]>(sampleDocuments);
+  const searchParams = useSearchParams();
+  const workflowId = searchParams.get('workflow_id');
+  const username = searchParams.get('username');
+
+  const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
   const [selectedDocument, setSelectedDocument] = useState<DocumentMetadata | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      if (!workflowId) return;
+
+      try {
+        // First get the workflow details to get the dependencies
+        const workflowDetails = await getWorkflowDetails(workflowId);
+
+        if (workflowDetails.data.type !== 'enterprise-search') {
+          throw new Error('This workflow is not an enterprise-search type');
+        }
+
+        // Get the deployment URL using the first dependency for enterprise-search
+        const firstDependency = workflowDetails.data.dependencies?.[0];
+        if (!firstDependency?.model_id) {
+          throw new Error('No dependency model found');
+        }
+        const deploymentUrl = `${deploymentBaseUrl}/${firstDependency.model_id}`;
+        console.log('Deployment URL:', deploymentUrl);
+
+        // Fetch sources
+        const sources = await getSources(deploymentUrl);
+        console.log('Sources:', sources);
+
+        if (sources.length === 0) {
+          throw new Error('No sources found for this model');
+        }
+
+        // Fetch metadata for each source
+        const documentsData = await Promise.all(
+          sources.map(async (source) => {
+            try {
+              const metadataResponse = await getDocumentMetadata(deploymentUrl, source.source_id);
+
+              // Extract filename from the full path
+              const fileName = source.source.split('/').pop() || source.source;
+
+              // Transform the metadata into our document format
+              const metadataEntries = Object.entries(metadataResponse.data).map(([key, value]) => ({
+                attribute_name: key,
+                value: value,
+              }));
+
+              return {
+                document_id: source.source_id,
+                document_name: fileName,
+                metadata_attributes: metadataEntries,
+              };
+            } catch (err) {
+              console.error(`Error fetching metadata for source ${source.source_id}:`, err);
+              return null;
+            }
+          })
+        );
+
+        // Filter out any failed metadata fetches and set the documents
+        const validDocuments = documentsData.filter((doc): doc is DocumentMetadata => doc !== null);
+        setDocuments(validDocuments);
+      } catch (err) {
+        console.error('Error fetching metadata:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch metadata');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMetadata();
+  }, [workflowId]);
 
   const handleEdit = (document: DocumentMetadata) => {
     setSelectedDocument(document);
@@ -35,6 +127,22 @@ const MetadataTable: React.FC = () => {
     setIsModalOpen(false);
     setSelectedDocument(null);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <CircularProgress />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-red-500 text-center p-4">
+        <Typography variant="h6">Error: {error}</Typography>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -86,15 +194,13 @@ const MetadataTable: React.FC = () => {
         </Table>
       </TableContainer>
 
-      {/* Edit Metadata Modal */}
       {isModalOpen && selectedDocument && (
-        <EditMetadataModal
-          document={selectedDocument}
-          onClose={() => setIsModalOpen(false)}
-          onSave={(updatedAttributes) =>
-            handleUpdate(selectedDocument.document_id, updatedAttributes)
-          }
-        />
+        <></>
+        // <EditMetadataModal
+        //   document={selectedDocument}
+        //   onClose={() => setIsModalOpen(false)}
+        //   onSave={(updatedAttributes) => handleUpdate(selectedDocument.document_id, updatedAttributes)}
+        // />
       )}
     </>
   );
