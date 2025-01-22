@@ -102,6 +102,12 @@ class ImplicitFeedbackInput(BaseModel):
     reference_rank: Optional[int] = Field(None, ge=0)
 
 
+class ChatFeedbackInput(BaseModel):
+    query_text: str
+    reference_id: int = Field(..., ge=0)
+    upvote: bool
+
+
 class SearchResultsNDB(BaseModel):
     """
     Represents the search results including the query and references.

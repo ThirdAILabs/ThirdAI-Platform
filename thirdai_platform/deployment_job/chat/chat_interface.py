@@ -16,6 +16,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableBranch, RunnablePassthrough
 from thirdai import neural_db as ndb
 from thirdai import neural_db_v2 as ndbv2
+import json
 
 
 class ChatInterface(ABC):
@@ -91,7 +92,7 @@ class ChatInterface(ABC):
 
         # The chatbot currently doesn't utilize any metadata, so we delete it to save memory
         for doc in top_k_docs:
-            doc.metadata = {}
+            doc.metadata["metadata"] = None
 
         return top_k_docs
 
@@ -147,6 +148,15 @@ class ChatInterface(ABC):
             if "answer" in chunk:
                 response_chunks.append(chunk["answer"])
                 yield chunk["answer"]
+            elif "context" in chunk:
+                context = [
+                    {
+                        "chunk_id": doc.metadata["chunk_id"],
+                        "query": doc.metadata["query"],
+                    }
+                    for doc in chunk["context"]
+                ]
+                yield "context: " + json.dumps(context)
 
         full_response = "".join(response_chunks)
         chat_history.add_ai_message(full_response)

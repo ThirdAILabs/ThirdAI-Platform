@@ -236,6 +236,8 @@ class NeuralDBV2VectorStore(VectorStore):
                     metadata={
                         "document": chunk.document,
                         "metadata": chunk.metadata,
+                        "query": query,
+                        "chunk_id": chunk.chunk_id,
                         "score": score,
                     },
                 )
