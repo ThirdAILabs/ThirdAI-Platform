@@ -1,16 +1,22 @@
 import json
 import os
-from typing import AsyncGenerator, List
+from abc import ABC, abstractmethod
+from typing import AsyncGenerator, List, Optional
 from urllib.parse import urljoin
 
 import aiohttp
+import requests
+from fastapi import HTTPException
 from llm_dispatch_job.utils import Reference, make_prompt
 
 
-class LLMBase:
+class LLMBase(ABC):
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    @abstractmethod
     async def stream(
         self,
-        key: str,
         query: str,
         task_prompt: str,
         references: List[Reference],
@@ -20,18 +26,20 @@ class LLMBase:
 
 
 class OpenAILLM(LLMBase):
+    def __init__(self, api_key: str):
+        super().__init__(api_key)
+        self.url = "https://api.openai.com/v1/chat/completions"
+
     async def stream(
         self,
-        key: str,
         query: str,
         task_prompt: str,
         references: List[Reference],
         model: str,
     ) -> AsyncGenerator[str, None]:
-        url = "https://api.openai.com/v1/chat/completions"
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {key}",
+            "Authorization": f"Bearer {self.api_key}",
         }
 
         system_prompt, user_prompt = make_prompt(query, task_prompt, references)
@@ -45,7 +53,7 @@ class OpenAILLM(LLMBase):
             "stream": True,
         }
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=body) as response:
+            async with session.post(self.url, headers=headers, json=body) as response:
                 if response.status == 200:
                     async for multi_chunk_bytes, _ in response.content.iter_chunks():
                         for chunk_string in multi_chunk_bytes.decode("utf8").split(
@@ -68,18 +76,20 @@ class OpenAILLM(LLMBase):
 
 
 class CohereLLM(LLMBase):
+    def __init__(self, api_key: str):
+        super().__init__(api_key)
+        self.url = "https://api.cohere.com/v1/chat"
+
     async def stream(
         self,
-        key: str,
         query: str,
         task_prompt: str,
         references: List[Reference],
         model: str,
     ) -> AsyncGenerator[str, None]:
-        url = "https://api.cohere.com/v1/chat"
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {key}",
+            "Authorization": f"Bearer {self.api_key}",
         }
 
         system_prompt, user_prompt = make_prompt(query, task_prompt, references)
@@ -93,7 +103,7 @@ class CohereLLM(LLMBase):
             "stream": True,
         }
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=body) as response:
+            async with session.post(self.url, headers=headers, json=body) as response:
                 if response.status == 200:
                     async for line in response.content:
                         line = line.decode("utf8").strip()
@@ -115,22 +125,21 @@ class CohereLLM(LLMBase):
 
 
 class OnPremLLM(LLMBase):
-    def __init__(self):
+    def __init__(self, api_key: str = None):
+        super().__init__(api_key)
         self.backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
         if self.backend_endpoint is None:
             raise ValueError("Could not read MODEL_BAZAAR_ENDPOINT.")
+        self.url = urljoin(self.backend_endpoint, "/on-prem-llm/v1/chat/completions")
 
     async def stream(
         self,
-        key: str,
         query: str,
         task_prompt: str,
         references: List[Reference],
         model: str,
     ) -> AsyncGenerator[str, None]:
         system_prompt, user_prompt = make_prompt(query, task_prompt, references)
-
-        url = urljoin(self.backend_endpoint, "/on-prem-llm/v1/chat/completions")
 
         headers = {"Content-Type": "application/json"}
         data = {
@@ -151,7 +160,7 @@ class OnPremLLM(LLMBase):
             "model": model,
         }
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=data) as response:
+            async with session.post(self.url, headers=headers, json=data) as response:
                 if response.status != 200:
                     raise Exception(
                         f"Failed to connect to On Prem LLM server: {response.status}"
@@ -166,14 +175,55 @@ class OnPremLLM(LLMBase):
                         yield data["choices"][0]["delta"]["content"]
 
 
+class SelfHostedLLM(OpenAILLM):
+    def __init__(self, access_token: str):
+        # TODO(david) figure out another way for internal service to service
+        # communication that doesn't require forwarding JWT access tokens
+        self.backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
+        response = requests.get(
+            urljoin(self.backend_endpoint, "/api/integrations/self-hosted-llm"),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if response.status_code != 200:
+            raise Exception("Cannot read self-hosted endpoint.")
+        data = response.json()["data"]
+        self.url = data["endpoint"]
+        super().__init__(data["api_key"])
+
+        if self.url is None or self.api_key is None:
+            raise Exception(
+                "Self-hosted LLM may have been deleted or not configured. Please check the admin dashboard to configure the self-hosted llm"
+            )
+
+
 model_classes = {
     "openai": OpenAILLM,
     "cohere": CohereLLM,
     "on-prem": OnPremLLM,
 }
 
-default_keys = {
-    "openai": os.getenv("OPENAI_KEY", ""),
-    "cohere": os.getenv("COHERE_KEY", ""),
-    "on-prem": "no key",  # TODO(david) add authentication to the service
-}
+
+class LLMFactory:
+    @staticmethod
+    def create(
+        provider: str, api_key: Optional[str], access_token: Optional[str], logger
+    ):
+        if provider in model_classes:
+            if provider in ["openai", "cohere"] and api_key is None:
+                logger.error("No generative AI key provided")
+                raise HTTPException(
+                    status_code=400, detail="No generative AI key provided"
+                )
+            return model_classes[provider](api_key=api_key)
+
+        if provider == "self-host":
+            if access_token is None:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Unauthorized. Need access token for self-hosted LLM",
+                )
+
+            return SelfHostedLLM(access_token=access_token)
+
+        logger.error(f"Unsupported provider '{provider.lower()}'")
+        raise HTTPException(status_code=400, detail=f"Unsupported provider: {provider}")

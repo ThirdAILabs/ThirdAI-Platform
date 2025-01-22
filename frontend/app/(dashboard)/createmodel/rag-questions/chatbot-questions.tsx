@@ -17,7 +17,7 @@ interface ChatbotQuestionsProps {
 enum LlmProvider {
   OpenAI = 'openai',
   OnPrem = 'on-prem',
-  SelfHosted = 'self-hosted',
+  SelfHosted = 'self-host',
 }
 
 const ChatbotQuestions: React.FC<ChatbotQuestionsProps> = ({ models, workflowNames }) => {

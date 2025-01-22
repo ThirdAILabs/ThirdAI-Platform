@@ -1,0 +1,115 @@
+# Get Self-Hosted LLM Integration
+
+**Description**: Retrieve the self-hosted LLM integration if it exists.
+
+**Dependencies**:
+- **verify_access_token**: Access is restricted to users with a valid access token.
+
+**Sample Request**:  
+```http
+GET /self-hosted-llm
+```
+
+**Sample Responses**:
+
+- `200 OK`: Self-hosted LLM integration found.
+```json
+{
+  "message": "Found Self-Hosted LLM Integration",
+  "data": {
+    "endpoint": "https://example.com/llm",
+    "api_key": "api-key-example"
+  }
+}
+```
+
+- `200 OK`: No self-hosted LLM integration found.
+```json
+{
+  "message": "No Self-Hosted LLM Integration found"
+}
+```
+
+- `500 Internal Server Error`: Failed to retrieve self-hosted LLM integration.
+```json
+{
+  "detail": "Failed to retrieve self-hosted LLM integration."
+}
+```
+
+---
+
+# Store Self-Hosted LLM Integration
+
+**Description**: Store a new self-hosted LLM integration or update the existing one.
+
+**Dependencies**:  
+- **global_admin_only**: Only global admins can access this endpoint.
+
+**Sample Request**:  
+```json
+{
+  "endpoint": "https://example.com/llm",
+  "api_key": "api-key-example"
+}
+```
+
+**Sample Responses**:
+
+- `200 OK`: Self-hosted LLM integration stored successfully.
+```json
+{
+  "message": "Successfully set the Self-Hosted LLM Integration"
+}
+```
+
+- `400 Bad Request`: Invalid endpoint or API key; not OpenAI-compatible.
+```json
+{
+  "detail": "Error: Unexpected response structure. The endpoint may not be OpenAI-compatible."
+}
+```
+
+- `500 Internal Server Error`: Failed to store self-hosted LLM integration.
+```json
+{
+  "detail": "Failed to store self-hosted LLM integration"
+}
+```
+
+---
+
+# Delete Self-Hosted LLM Integration
+
+**Description**: Delete the existing self-hosted LLM integration.
+
+**Dependencies**:  
+- **global_admin_only**: Only global admins can access this endpoint.
+
+**Sample Request**:  
+```http
+DELETE /self-hosted-llm
+```
+
+**Sample Responses**:
+
+- `200 OK`: Self-hosted LLM integration deleted successfully.
+```json
+{
+  "message": "Successfully deleted the Self-Hosted LLM Integration"
+}
+```
+
+- `200 OK`: No self-hosted LLM integration found to delete.
+```json
+{
+  "message": "Self-Hosted LLM Integration not found"
+}
+```
+
+- `500 Internal Server Error`: Failed to delete self-hosted LLM integration.
+```json
+{
+  "detail": "Failed to delete self-hosted LLM integration."
+}
+```

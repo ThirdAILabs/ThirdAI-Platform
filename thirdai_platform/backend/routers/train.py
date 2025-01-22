@@ -4,7 +4,6 @@ import logging
 import os
 import secrets
 import shutil
-import tempfile
 import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
@@ -15,7 +14,6 @@ from backend.auth_dependencies import verify_model_read_access
 from backend.datagen import generate_data_for_train_job
 from backend.utils import (
     copy_data_storage,
-    create_classification_csv,
     delete_nomad_job,
     get_job_logs,
     get_model,
@@ -1439,61 +1437,6 @@ async def validate_document_classification_folder(
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
-class CSVCreationResponse(BaseModel):
-    status: str
-    message: str
-    data: dict = {}
-
-
-@train_router.post("/create-classification-csv", response_model=CSVCreationResponse)
-async def create_classification_csv_endpoint(
-    files: List[UploadFile] = File(...),
-    word_limit: int = 1000,
-    session: Session = Depends(get_session),
-    authenticated_user: AuthenticatedUser = Depends(verify_access_token),
-):
-    """
-    Endpoint to create a CSV file from uploaded documents organized in folders
-    """
-    try:
-        # Create a temporary directory for processing
-        with tempfile.TemporaryDirectory() as temp_dir:
-            try:
-                # Create CSV and get categories
-                csv_path, categories = await create_classification_csv(
-                    temp_dir=temp_dir, files=files, word_limit=word_limit
-                )
-
-                # Read the CSV content
-                with open(csv_path, "r") as f:
-                    csv_content = f.read()
-
-                # Return the CSV content and categories
-                return CSVCreationResponse(
-                    status="success",
-                    message="Successfully created classification CSV",
-                    data={
-                        "csv_content": csv_content,
-                        "categories": categories,
-                        "n_categories": len(categories),
-                    },
-                )
-
-            except Exception as e:
-                logging.error(f"Error in create_classification_csv: {str(e)}")
-                raise HTTPException(
-                    status_code=400, detail=f"Error creating CSV: {str(e)}"
-                )
-
-    except Exception as e:
-        logging.error(f"Error in create_classification_csv_endpoint: {str(e)}")
-        return CSVCreationResponse(
-            status="failed",
-            message=f"Failed to create classification CSV: {str(e)}",
-            data={},
-        )
 
 
 @train_router.get("/train-report", dependencies=[Depends(verify_model_read_access)])

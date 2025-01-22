@@ -429,13 +429,7 @@ class NDBModel(Model):
         # not finished updating the chat_instance map. The GIL likely does not prevent
         # this because of IO operations related to sqlite.
         with self.chat_instance_lock:
-            if provider in self.chat_instances and self.chat_instances[provider]:
-                # Chat instance for this provider already exists, do not recreate
-                self.logger.info(
-                    f"Chat instance for provider '{provider}' is already set.",
-                    code=LogCode.CHAT,
-                )
-                return
+            previous_instance = self.chat_instances.get(provider)
             try:
                 sqlite_db_path = os.path.join(
                     self.model_dir, provider, "chat_history.db"
@@ -455,7 +449,8 @@ class NDBModel(Model):
                 # Remove 'key' from kwargs if present
                 kwargs.pop("key", None)
 
-                self.chat_instances[provider] = llm_chat_interface(
+                # Create or update the chat instance
+                new_instance = llm_chat_interface(
                     db=self.db,
                     chat_history_sql_uri=chat_history_sql_uri,
                     key=key,
@@ -463,16 +458,34 @@ class NDBModel(Model):
                     query_categories = kwargs.get('query_categories', []),
                     **kwargs,
                 )
+
+                # Successfully set the new instance
+                self.chat_instances[provider] = new_instance
                 self.logger.info(
-                    f"Chat instance set for provider '{provider}'", code=LogCode.CHAT
+                    f"Chat instance updated for provider '{provider}'",
+                    code=LogCode.CHAT,
                 )
+
             except Exception:
                 self.logger.error(
-                    f"Error setting chat instance for provider '{provider}': {traceback.format_exc()}",
+                    f"Error updating chat instance for provider '{provider}': {traceback.format_exc()}",
                     code=LogCode.CHAT,
                 )
                 traceback.print_exc()
-                self.chat_instances[provider] = None
+
+                # Revert to the previous instance if available
+                if previous_instance:
+                    self.chat_instances[provider] = previous_instance
+                    self.logger.warning(
+                        f"Reverted to the previous chat instance for provider '{provider}'",
+                        code=LogCode.CHAT,
+                    )
+                else:
+                    self.chat_instances[provider] = None
+                    self.logger.warning(
+                        f"No previous chat instance available for provider '{provider}'. Setting it to None.",
+                        code=LogCode.CHAT,
+                    )
 
     def get_chat(self, provider: str):
         """

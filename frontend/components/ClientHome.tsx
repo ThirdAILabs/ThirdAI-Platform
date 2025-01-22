@@ -3,7 +3,7 @@
 import { useEffect, useContext, useState } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import { UserContext } from '../app/user_wrapper';
-import { userEmailLoginWithAccessToken } from '@/lib/backend';
+import { SyncKeycloakUser } from '@/lib/backend';
 import { useRouter } from 'next/navigation';
 
 export default function ClientHome() {
@@ -24,7 +24,7 @@ export default function ClientHome() {
     if (status === 'authenticated' && !backendLoginAttempted) {
       setBackendLoginAttempted(true);
       if (session?.accessToken) {
-        userEmailLoginWithAccessToken(session.accessToken, setAccessToken)
+        SyncKeycloakUser(session.accessToken, setAccessToken)
           .then(() => {
             router.replace('/');
           })
