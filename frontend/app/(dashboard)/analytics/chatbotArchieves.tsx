@@ -8,6 +8,7 @@ interface ConversationData {
   user_input: string,
   response_time: string;
   response_text: string;
+  user_input_category: string;
 }
 
 interface Data {
@@ -40,11 +41,19 @@ function convertAndSortDataByQueryTime(data: Data): ConversationData[] {
   return conversationList;
 }
 
+function getUniqueCategories(chatHistory: ConversationData[]): string[] {
+  const uniqueCategories = new Set<string>();
+  for (const conversation of chatHistory) {
+    uniqueCategories.add(conversation.user_input_category);
+  }
+  return Array.from(uniqueCategories);
+}
+
 const Conversations: React.FC = () => {
   // State variable for storing chat history
   const [chatHistory, setChatHistory] = useState<ConversationData[]>([]);
   const [numberOfQuestions, setNumberOfQuestions] = useState<number>(0);
-
+  const [categoryList, setCategoryList] = useState<string[]>([]);
   const handleShowMore = () => {
     setNumberOfQuestions(min(numberOfQuestions + 50, chatHistory.length));
   };
@@ -59,6 +68,7 @@ const Conversations: React.FC = () => {
           const convertedData = convertAndSortDataByQueryTime(data);
           setChatHistory(convertedData);
           setNumberOfQuestions(min(50, convertedData.length));
+          setCategoryList(getUniqueCategories(convertedData));
         } catch (error) {
           console.error('Error fetching chat history:', error);
         }
@@ -66,28 +76,12 @@ const Conversations: React.FC = () => {
       getChatData();
     }
   }, [model_id, default_mode]);
-  console.log('ChatHistory: ', chatHistory);
-  // State for tracking expanded session
 
   if (!chatHistory) {
     return <div className="p-4 text-center">Loading chat history...</div>;
   }
-  const categoryList = [
-    'Category-1',
-    'Category-2',
-    'Category-3',
-    'Category-4',
-    'Category-5',
-    'Category-6',
-    'Category-7',
-    'Category-8',
-    'Category-9',
-    'Category-10',
-    'Category-11',
-    'Category-12',
-  ];
-  const [selectedCategories, setSelectedCategories] = useState(
-    Object.fromEntries(categoryList.map((category) => [category, false]))
+
+  const [selectedCategories, setSelectedCategories] = useState(Object.fromEntries(categoryList.map((category) => [category, false]))
   );
 
   // Toggle handler for category selection
@@ -104,6 +98,7 @@ const Conversations: React.FC = () => {
       .filter(([_, isSelected]) => isSelected)
       .map(([category]) => category);
   };
+
   return (
     <div className="p-4">
       <Card style={{ width: '70%', maxHeight: '65rem' }} className="pb-4">
@@ -116,16 +111,16 @@ const Conversations: React.FC = () => {
         <CardContent style={{ overflowY: 'auto', maxHeight: '45rem' }}>
           <>
             <div className="mb-2 justify-start ml-[5%] mr-[5%]">
-              <div className="space-y-4">
+              <div className="space-y-4 mb-2">
                 <div className="flex flex-wrap gap-2">
                   {categoryList.map((category, index) => (
                     <button
                       key={`${category}-${index}`}
                       onClick={() => handleCategoryToggle(category)}
-                      className={`border rounded-3xl p-1 px-4 transition-colors
+                      className={`border rounded-xl p-1 px-4 transition-colors
               ${selectedCategories[category]
                           ? 'bg-blue-900 text-white'
-                          : 'hover:bg-green-500 hover:text-white'
+                          : 'hover:bg-slate-100 hover:text-black'
                         }`}
                     >
                       {category}
@@ -149,10 +144,11 @@ const Conversations: React.FC = () => {
                     <div className="flex flex-col">
                       {/* Query Section */}
                       <div className="flex justify-center">
-                        <div className="border py-2 px-4 rounded-lg w-[90%]">
-                          <div className="text-gray-700">{conversation.query_text}</div>
+                        {(selectedCategories[conversation.user_input_category] === true || !getSelectedCategories().join(', ')) && <div className="border py-2 px-4 rounded-lg w-[90%]">
+                          <div className="text-gray-700 flex flex-wrap"> <strong>User Query: </strong>{" " + conversation.user_input}</div>
+                          <div className="text-gray-700"><strong>Reformulated Query:</strong>{" " + conversation.query_text}</div>
                           <div className="text-xs text-gray-500">{conversation.query_time}</div>
-                        </div>
+                        </div>}
                       </div>
                     </div>
                   </div>
