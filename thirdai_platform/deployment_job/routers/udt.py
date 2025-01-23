@@ -342,7 +342,7 @@ class UDTRouterTokenClassification(UDTBaseRouter):
                 )
 
             # Read file content to check size
-            contents = await file.read()
+            contents = await file.read(size=self.MAX_FILE_SIZE_BYTES + 1)
             if len(contents) > self.MAX_FILE_SIZE_BYTES:
                 return response(
                     status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
