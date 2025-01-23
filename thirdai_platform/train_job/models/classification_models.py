@@ -444,11 +444,7 @@ class DocClassificationModel(TextClassificationModel):
                 # Handle pandas Series output - convert to string properly
                 texts = []
                 for chunk in ndb_doc.chunks():
-                    # Convert Series to string if necessary
-                    chunk_text = chunk.text
-                    if hasattr(chunk_text, "iloc"):  # Check if it's a pandas Series
-                        chunk_text = chunk_text.iloc[0] if len(chunk_text) > 0 else ""
-                    texts.append(str(chunk_text))
+                    texts.append(chunk.text)
 
                 text = " ".join(texts)
 
