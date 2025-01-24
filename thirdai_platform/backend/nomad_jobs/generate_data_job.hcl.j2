@@ -10,6 +10,23 @@ job "GenerateData-{{ data_id }}" {
 
       {% if platform == "docker" %}
       driver = "docker"
+
+      vault {
+          policies = ["nomad-platform"]
+        }
+
+        template {
+        destination = "${NOMAD_SECRETS_DIR}/env.vars"
+        env         = true
+        change_mode = "restart"
+        data        = <<EOF
+{% raw %}
+{{- with secret "secrets/data/genai" }}
+GENAI_KEY="{{ .Data.data.GENAI_KEY }}"
+{{- end }}
+{% endraw %}
+EOF
+        }
       {% elif platform == "local" %}
       driver = "raw_exec"
       {% endif %}
@@ -18,7 +35,7 @@ job "GenerateData-{{ data_id }}" {
         DATA_ID = "{{ data_id }}"
         DATA_CATEGORY = "{{ data_category }}"
         LLM_PROVIDER = "{{ llm_provider }}"
-        GENAI_KEY = "{{ genai_key }}"
+        {% if platform == "docker" %}GENAI_KEY = "${GENAI_KEY}"{% else %}GENAI_KEY = "{{ genai_key }}"{% endif %}
         TASK_PROMPT = "{{ task_prompt }}"
         MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
         STORAGE_DIR = "{{ storage_dir }}"

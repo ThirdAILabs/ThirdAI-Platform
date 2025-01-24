@@ -317,7 +317,7 @@ async def restart_telemetry_jobs():
             if platform == "local"
             else get_hostname_from_url(os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"))
         ),
-        **local_args
+        **local_args,
     )
     if response.status_code != 200:
         raise Exception(f"{response.text}")

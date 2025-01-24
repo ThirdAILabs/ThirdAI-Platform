@@ -68,14 +68,18 @@ job "deployment-{{ model_id }}" {
         driver = "docker"
         kill_timeout = "15s"
 
+        vault {
+          policies = ["nomad-platform"]
+        }
+
       template {
         destination = "${NOMAD_SECRETS_DIR}/env.vars"
         env         = true
         change_mode = "restart"
         data        = <<EOF
 {% raw %}
-{{- with nomadVar "nomad/jobs" -}}
-TASK_RUNNER_TOKEN = {{ .task_runner_token }}
+{{- with secret "secrets/data/runner_token" -}}
+TASK_RUNNER_TOKEN="{{ .Data.data.task_runner_token }}"
 {{- end -}}
 {% endraw %}
 EOF
