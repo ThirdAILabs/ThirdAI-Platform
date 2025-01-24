@@ -413,7 +413,7 @@ def test_udt_token_train_with_balancing(dummy_ner_file):
     model.train()
 
     storage = model.data_storage
-    assert storage.connector.get_sample_count("ner") == 100_000
+    assert storage.samples.get_sample_count("ner") == 100_000
 
     model.find_and_save_balancing_samples()
     assert os.path.exists(
