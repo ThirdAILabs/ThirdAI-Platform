@@ -66,7 +66,7 @@ while [[ "$#" -gt 0 ]]; do
         --aws_secret_name) 
             if [[ -z "$2" || "$2" == -* ]]; then
                 echo "Error: AWS secret name cannot be empty" >&2
-                return 1;
+                exit 1
             fi
             aws_secret_name="$2"
             shift ;;     
@@ -88,23 +88,13 @@ if [ ! -f "$CONFIG_PATH" ]; then
 fi
 echo "Using config file at $CONFIG_PATH"
 
+EXTRA_VARS="config_path=$CONFIG_PATH"
+
 # Wait for user prompt to make sure that aws is configured
 if [ ! -z "$aws_secret_name" ]; then
-    while true; do
-        read -p "Is your aws configured with correct IAM role to fetch secrets (y/n): " answer
-        case $answer in
-            [Yy])
-                break
-                ;;
-            [Nn])
-                echo "First configure your AWS command-line-interface"
-                return 1
-                ;;
-            *)
-                echo "Invalid input. Please type 'yes' or 'no'."
-                ;;
-        esac
-    done
+    echo "INFO: Assuming that aws is configured with the appropriate IAM role for secret lookup"
+    sleep 5
+    EXTRA_VARS+=" aws_secret_name=$aws_secret_name"
 fi
 
 if [ "$ONBOARD_CLIENTS" -eq 1 ]; then
@@ -123,7 +113,9 @@ if [ "$ONBOARD_CLIENTS" -eq 1 ]; then
     fi
 
     echo "Using new client config file at $NEW_CLIENT_CONFIG_PATH"
+    EXTRA_VARS+=" new_client_config_path=$NEW_CLIENT_CONFIG_PATH"
 fi
+
 
 # Model path
 MODEL_FOLDER="pretrained-models/"
@@ -131,10 +123,10 @@ MODEL_FOLDER="pretrained-models/"
 # Warn if model file is not found
 if [ ! -d "$MODEL_FOLDER" ]; then
     echo "WARNING: Model file not found at $GENERATIVE_MODEL_FOLDER. The playbook will proceed without it."
+    sleep 5
+else
+    EXTRA_VARS+=" model_folder=$(realpath "$MODEL_FOLDER")"
 fi
-
-MODEL_FOLDER=$(realpath "$MODEL_FOLDER")
-
 # Search for docker_images folder with a prefix
 DOCKER_IMAGES_PATH=$(find . -type d -name "docker_images-*" | head -n 1)
 
@@ -143,22 +135,14 @@ if [ -z "$DOCKER_IMAGES_PATH" ]; then
 else
     DOCKER_IMAGES_PATH=$(realpath "$DOCKER_IMAGES_PATH")
     echo "Found docker images folder at $DOCKER_IMAGES_PATH"
+    EXTRA_VARS+=" docker_images=$(realpath "$DOCKER_IMAGES_PATH")"
 fi
 
 # Change directory to platform directory
 cd "$(dirname "$0")/platform" || exit 1
 
+echo "$EXTRA_VARS"
 # Run the appropriate playbook based on the cleanup flag
-EXTRA_VARS="config_path=$CONFIG_PATH model_folder=$MODEL_FOLDER docker_images=$DOCKER_IMAGES_PATH"
-
-if [ ! -z "$aws_secret_name" ]; then
-    EXTRA_VARS+=" aws_secret_name=$aws_secret_name"
-fi
-
-if [ "$ONBOARD_CLIENTS" -eq 1 ]; then
-    EXTRA_VARS+=" new_client_config_path=$NEW_CLIENT_CONFIG_PATH"
-fi
-
 if [ "$CLEANUP" -eq 1 ]; then
     echo "Running cleanup playbook..."
     if [ "$VERBOSE" -eq 1 ]; then
