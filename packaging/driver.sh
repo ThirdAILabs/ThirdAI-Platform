@@ -116,22 +116,25 @@ if [ "$ONBOARD_CLIENTS" -eq 1 ]; then
     EXTRA_VARS+=" new_client_config_path=$NEW_CLIENT_CONFIG_PATH"
 fi
 
-
 # Model path
 MODEL_FOLDER="pretrained-models/"
 
 # Warn if model file is not found
-if [ ! -d "$MODEL_FOLDER" ]; then
-    echo "WARNING: Model file not found at $GENERATIVE_MODEL_FOLDER. The playbook will proceed without it."
-    sleep 5
-else
-    EXTRA_VARS+=" model_folder=$(realpath "$MODEL_FOLDER")"
+if [ "$CLEANUP" -neq 1  ]; then
+    if [ ! -d "$MODEL_FOLDER" ]; then
+        echo "WARNING: Model file not found at $GENERATIVE_MODEL_FOLDER. The playbook will proceed without it."
+        sleep 5
+    else
+        EXTRA_VARS+=" model_folder=$(realpath "$MODEL_FOLDER")"
+    fi
 fi
+
 # Search for docker_images folder with a prefix
 DOCKER_IMAGES_PATH=$(find . -type d -name "docker_images-*" | head -n 1)
 
 if [ -z "$DOCKER_IMAGES_PATH" ]; then
     echo "WARNING: No docker_images folder found with prefix 'docker_images-'. The playbook will proceed without it."
+    sleep 5
 else
     DOCKER_IMAGES_PATH=$(realpath "$DOCKER_IMAGES_PATH")
     echo "Found docker images folder at $DOCKER_IMAGES_PATH"
