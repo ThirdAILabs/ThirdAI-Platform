@@ -6,9 +6,11 @@ from typing import Dict, List, Optional, Tuple
 
 from lxml import etree
 from platform_common.pii.data_types.xml.utils import (
+    convert_xpath_using_attributes,
     remove_delimiters_from_xml,
     remove_namespaces,
 )
+from platform_common.thirdai_storage.data_types import XMLElementData
 from pydantic import BaseModel
 
 
@@ -24,6 +26,7 @@ class XMLTokenInfo(BaseModel):
     def update(self, new_info: XMLTokenInfo):
         assert new_info.xpath == self.xpath
         assert new_info.attribute == self.attribute
+        assert new_info.ntokens == self.ntokens
 
         if self.index_to_label_dict is None:
             self.index_to_label_dict = new_info.index_to_label_dict
@@ -172,3 +175,26 @@ class XMLParser:
 
         process_element(self.root)
         return tokens, tags, xpath_to_token_index
+
+    def find_all_elements(self) -> List[XMLElementData]:
+        elements = []
+
+        for elem in self.root.iter():
+            raw_xpath = self.tree.getpath(elem)
+            xpath = convert_xpath_using_attributes(xml_root=self.root, xpath=raw_xpath)
+
+            entities_to_sample = elem.attrib.items()
+            if elem.text is not None and len(elem.text.strip()) > 0:
+                entities_to_sample.append((None, elem.text))
+
+            for attr, value in entities_to_sample:
+                if value.strip():
+                    n_tokens = len(value.split())
+                    elements.append(
+                        XMLElementData(
+                            xpath=xpath,
+                            attribute=attr,
+                            n_tokens=n_tokens,
+                        )
+                    )
+        return elements

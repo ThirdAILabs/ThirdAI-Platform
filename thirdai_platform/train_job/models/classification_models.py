@@ -40,7 +40,7 @@ from platform_common.thirdai_storage.data_types import (
     SampleStatus,
     TagMetadata,
 )
-from platform_common.thirdai_storage.storage import DataStorage, SQLiteConnector
+from platform_common.thirdai_storage.storage import DataStorage
 from thirdai import bolt
 from train_job.models.model import Model
 from train_job.reporter import Reporter
@@ -600,9 +600,7 @@ class TokenClassificationModel(ClassificationModel):
         data_storage_path = self.data_dir / "data_storage.db"
         self.logger.debug(f"Loading data storage from {data_storage_path}.")
         # connector will instantiate an sqlite db at the specified path if it doesn't exist
-        self.data_storage = DataStorage(
-            connector=SQLiteConnector(db_path=data_storage_path)
-        )
+        self.data_storage = DataStorage(db_path=data_storage_path)
 
     @property
     def tag_metadata(self) -> TagMetadata:
@@ -984,7 +982,7 @@ class TokenClassificationModel(ClassificationModel):
             self.logger.debug(f"Inserting {len(samples)} samples into storage.")
 
             self.data_storage.insert_samples(samples=samples)
-            num_samples_in_storage = self.data_storage.connector.get_sample_count("ner")
+            num_samples_in_storage = self.data_storage.samples.get_sample_count("ner")
 
             self.logger.info(
                 f"Number of samples in storage after insertion: {num_samples_in_storage}",

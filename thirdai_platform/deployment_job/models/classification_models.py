@@ -1,13 +1,18 @@
 from abc import abstractmethod
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from deployment_job.models.model import Model
 from deployment_job.pydantic_models.inputs import SearchResultsTextClassification
 from fastapi import HTTPException, status
 from platform_common.logging import JobLogger
 from platform_common.logging.logcodes import LogCode
-from platform_common.pii.data_types import UnstructuredText, XMLLog
+from platform_common.pii.data_types import (
+    UnstructuredText,
+    XMLLog,
+    XMLUserFeedback,
+    convert_xml_feedback_to_storage_format,
+)
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from platform_common.thirdai_storage.data_types import (
     DataSample,
@@ -21,7 +26,7 @@ from platform_common.thirdai_storage.data_types import (
     TextClassificationData,
     TokenClassificationData,
 )
-from platform_common.thirdai_storage.storage import DataStorage, SQLiteConnector
+from platform_common.thirdai_storage.storage import DataStorage
 from thirdai import bolt
 
 
@@ -84,9 +89,7 @@ class TextClassificationModel(ClassificationModel):
                     )
 
                 # Connector will instantiate an sqlite db at the specified path if it doesn't exist
-                self.data_storage = DataStorage(
-                    connector=SQLiteConnector(db_path=data_storage_path)
-                )
+                self.data_storage = DataStorage(db_path=data_storage_path)
 
                 self.data_storage.insert_metadata(
                     Metadata(
@@ -96,9 +99,7 @@ class TextClassificationModel(ClassificationModel):
                     )
                 )
             else:
-                self.data_storage = DataStorage(
-                    connector=SQLiteConnector(db_path=data_storage_path)
-                )
+                self.data_storage = DataStorage(db_path=data_storage_path)
             self.logger.info(
                 f"Loaded data storage from {data_storage_path}",
                 code=LogCode.DATA_STORAGE,
@@ -191,9 +192,7 @@ class TokenClassificationModel(ClassificationModel):
                     )
 
                 # connector will instantiate an sqlite db at the specified path if it doesn't exist
-                self.data_storage = DataStorage(
-                    connector=SQLiteConnector(db_path=data_storage_path)
-                )
+                self.data_storage = DataStorage(db_path=data_storage_path)
 
                 self.data_storage.insert_metadata(
                     Metadata(
@@ -208,9 +207,7 @@ class TokenClassificationModel(ClassificationModel):
                 )
 
             else:
-                self.data_storage = DataStorage(
-                    connector=SQLiteConnector(db_path=data_storage_path)
-                )
+                self.data_storage = DataStorage(db_path=data_storage_path)
         except Exception as e:
             self.logger.error(
                 f"Error loading data storage: {e} for the model {self.config.model_id}",
@@ -276,18 +273,28 @@ class TokenClassificationModel(ClassificationModel):
             )
             raise e
 
-    def insert_sample(self, sample: TokenClassificationData):
+    def insert_sample(self, sample: Union[TokenClassificationData, XMLUserFeedback]):
         try:
-            token_tag_sample = DataSample(
-                name="ner",
-                data=sample,
-                user_provided=True,
-                status=SampleStatus.untrained,
-            )
-            self.data_storage.insert_samples(
-                samples=[token_tag_sample], override_reservoir_limit=True
-            )
-            self.logger.debug(f"Sample inserted into data storage")
+            if isinstance(sample, TokenClassificationData):
+                token_tag_sample = DataSample(
+                    name="ner",
+                    data=sample,
+                    user_provided=True,
+                    status=SampleStatus.untrained,
+                )
+                self.data_storage.insert_samples(
+                    samples=[token_tag_sample], override_reservoir_limit=True
+                )
+                self.logger.debug(f"Sample inserted into data storage")
+            elif isinstance(sample, XMLUserFeedback):
+                xml_log, xml_feedbacks = convert_xml_feedback_to_storage_format(
+                    user_feedback=sample
+                )
+                log_id = self.data_storage.add_xml_log(xml_log)
+                self.logger.debug(f"XML log added to data storage with id {log_id}")
+                self.data_storage.store_user_xml_feedback(log_id, xml_feedbacks)
+                self.logger.debug(f"XML feedbacks stored for log {log_id}")
+
         except Exception as e:
             self.logger.error(f"Error inserting sample: {e}", code=LogCode.DATA_STORAGE)
             raise e
