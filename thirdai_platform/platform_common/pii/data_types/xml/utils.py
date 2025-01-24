@@ -52,14 +52,10 @@ def remove_namespaces(tree):
 def remove_delimiters_from_xml(tree):
     for elem in tree.iter():
         if elem.text is not None:
-            elem.text = replace_whitespace_with_space(
-                remove_special_characters(elem.text)
-            )
+            elem.text = remove_special_characters(elem.text)
 
         for attr, value in elem.attrib.items():
-            elem.attrib[attr] = replace_whitespace_with_space(
-                remove_special_characters(value)
-            )
+            elem.attrib[attr] = remove_special_characters(value)
 
 
 def convert_xpath_using_attributes(xml_root: etree.Element, xpath: str) -> str:

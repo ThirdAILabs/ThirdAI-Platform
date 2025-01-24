@@ -47,6 +47,19 @@ class XMLPrediction(BaseModel):
     location: XMLLocation
 
 
+class XMLLabelFeedback(BaseModel):
+    # charspan is relative to the start of the XML log
+    location: XPathLocation
+    charspan: CharSpan
+    label: str
+
+
+class XMLUserFeedback(BaseModel):
+    datatype: Literal["xml"]
+    xml_string: str
+    feedbacks: List[XMLLabelFeedback]
+
+
 class XMLTokenClassificationResults(BaseModel):
     data_type: Literal["xml"]
     query_text: str
