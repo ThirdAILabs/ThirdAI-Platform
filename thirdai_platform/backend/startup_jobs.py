@@ -295,16 +295,20 @@ async def restart_telemetry_jobs():
     # Creating prometheus config file
     targets = create_promfile(promfile_path)
 
+    local_args = {}
+    if platform == "local":
+        local_args.update(
+            grafana_db_url=os.getenv("GRAFANA_DB_URL"),
+            admin_username=os.getenv("ADMIN_USERNAME"),
+            admin_password=os.getenv("ADMIN_PASSWORD"),
+            admin_mail=os.getenv("ADMIN_MAIL"),
+        )
     response = submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "telemetry.hcl.j2"),
         platform=platform,
         share_dir=share_dir,
         target_count=str(len(targets)),
-        grafana_db_url=os.getenv("GRAFANA_DB_URL"),
-        admin_username=os.getenv("ADMIN_USERNAME"),
-        admin_password=os.getenv("ADMIN_PASSWORD"),
-        admin_mail=os.getenv("ADMIN_MAIL"),
         registry=os.getenv("DOCKER_REGISTRY"),
         docker_username=os.getenv("DOCKER_USERNAME"),
         docker_password=os.getenv("DOCKER_PASSWORD"),
@@ -313,9 +317,7 @@ async def restart_telemetry_jobs():
             if platform == "local"
             else get_hostname_from_url(os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT"))
         ),
-        vector_config_path=str(
-            cwd / "backend" / "nomad_jobs" / "vector-config-jobs.yaml"
-        ),
+        **local_args
     )
     if response.status_code != 200:
         raise Exception(f"{response.text}")
