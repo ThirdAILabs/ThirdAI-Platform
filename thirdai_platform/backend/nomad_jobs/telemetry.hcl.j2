@@ -241,13 +241,37 @@ EOF
 
       driver = "docker"
 
+      {% if platform == "docker" -%}
+        vault {
+          policies = ["nomad-platform"]
+        }
+
+        template {
+        destination = "${NOMAD_SECRETS_DIR}/env.vars"
+        env         = true
+        change_mode = "restart"
+        data        = <<EOF
+{% raw %}
+{{- with secret "secrets/data/platform_admin" }}
+GF_SECURITY_ADMIN_USER="{{ .Data.data.ADMIN_USERNAME }}"
+GF_SECURITY_ADMIN_EMAIL="{{ .Data.data.ADMIN_MAIL }}
+GF_SECURITY_ADMIN_PASSWORD="{{ .Data.data.ADMIN_PASSWORD }}
+{{- end }}
+{{- with secret "secrets/data/database" }}
+GF_DATABASE_URL="{{ .Data.data.GRAFANA_DB_URL }}"
+{{- end }}
+{% endraw %}
+EOF
+        }
+      {%- endif %}
+
       env {
         GF_LOG_LEVEL          = "DEBUG"
         GF_LOG_MODE           = "console"
-        GF_SECURITY_ADMIN_USER = "{{ admin_username }}"
-        GF_SECURITY_ADMIN_EMAIL = "{{ admin_mail }}"
-        GF_SECURITY_ADMIN_PASSWORD = "{{ admin_password }}"
-        GF_DATABASE_URL = "{{ grafana_db_url }}"
+        {% if platform == "docker" %}GF_DATABASE_URL = "${DATABASE_URI}"{% else %}GF_DATABASE_URL = "{{ grafana_db_url }}"{% endif %}
+        {% if platform == "docker" %}GF_SECURITY_ADMIN_USER = "${GF_SECURITY_ADMIN_USER}"{% else %}GF_SECURITY_ADMIN_USER = "{{ admin_username }}"{% endif %}
+        {% if platform == "docker" %}GF_SECURITY_ADMIN_EMAIL = "${GF_SECURITY_ADMIN_EMAIL}"{% else %}GF_SECURITY_ADMIN_EMAIL = "{{ admin_mail }}"{% endif %}
+        {% if platform == "docker" %}GF_SECURITY_ADMIN_PASSWORD = "${GF_SECURITY_ADMIN_PASSWORD}"{% else %}GF_SECURITY_ADMIN_PASSWORD = "{{ admin_password }}"{% endif %}
         GF_SERVER_ROOT_URL = "%(protocol)s://%(domain)s:%(http_port)s/grafana/"
         GF_SERVER_SERVE_FROM_SUB_PATH = "true"
         GF_SERVER_HTTP_PORT   = "${NOMAD_PORT_http}"
