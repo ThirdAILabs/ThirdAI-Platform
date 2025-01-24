@@ -1,9 +1,24 @@
 #!/bin/bash
 
+function styled_message() {
+    local message="$1"
+    local color="$2"
+
+    if [ "$color" == "31" ]; then
+        # For Error
+        echo -e "\e[1;31m====================================================\e[0m"
+        echo -e "\e[1;31m               ${message}             \e[0m"
+        echo -e "\e[1;31m====================================================\e[0m"
+    else
+        echo -e "\n\e[1;${color}m======= ${message}\e[0m\n"
+    fi
+}
+
+
 function install_ansible() {
     # Check if ansible-playbook is installed
     if ! command -v ansible-playbook &> /dev/null; then
-        echo "Ansible not found, installing..."
+        styled_message "Ansible not found, installing...", "32"
 
         # Install Ansible based on the OS
         if [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -20,20 +35,20 @@ function install_ansible() {
                 echo "Installing Ansible on Amazon Linux 2..."
                 sudo amazon-linux-extras install -y ansible2
             else
-                echo "Unsupported OS: $OSTYPE"
-                echo "Please download and install Ansible manually for your operating system."
+                styled_message "Unsupported OS: $OSTYPE", "31"
+                styled_message "Please download and install Ansible manually for your operating system.", "31"
                 exit 1
             fi
         elif [[ "$OSTYPE" == "darwin"* ]]; then
             echo "Installing Ansible on macOS..."
             brew install ansible
         else
-            echo "Unsupported OS: $OSTYPE"
-            echo "Please download and install Ansible manually for your operating system."
+            styled_message "Unsupported OS: $OSTYPE", "31"
+            styled_message "Please download and install Ansible manually for your operating system." "31"
             exit 1
         fi
     else
-        echo "Ansible is already installed"
+        styled_message "Ansible is already installed" "32"
     fi
 
     echo "Installing required Ansible Galaxy collections..."
@@ -47,10 +62,9 @@ function install_ansible() {
     fi
     ansible-galaxy collection install community.postgresql
 
-    echo "All required Ansible Galaxy collections are installed."
+    styled_message "All required Ansible Galaxy collections are installed." "32"
 }
 
-install_ansible
 
 VERBOSE=0  # Default: No verbose mode
 CLEANUP=0  # Flag for cleanup mode
@@ -65,7 +79,7 @@ while [[ "$#" -gt 0 ]]; do
         --onboard_clients) ONBOARD_CLIENTS=1 ;;  # Enable onboard_clients if --onboard_clients is passed
         --aws_secret_name) 
             if [[ -z "$2" || "$2" == -* ]]; then
-                echo "Error: AWS secret name cannot be empty" >&2
+                styled_message "Error: AWS secret name cannot be empty" "31" >&2
                 exit 1
             fi
             aws_secret_name="$2"
@@ -75,24 +89,31 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# Check if config file is provided
-if [ -z "$CONFIG_PATH" ]; then
-    echo "Usage: $0 [-v|--verbose] [--cleanup] [--aws_secret_name <secret-name>] /path/to/your/config.yml"
+
+# Check if config file is provided and conflicting arguments are not provided
+if [ -z "$CONFIG_PATH" ] || { [ "$ONBOARD_CLIENTS" -eq 1 ] && [ "$CLEANUP" -eq 1 ]; }; then
+    styled_message "Usage: $0 [-v|--verbose] [--cleanup] [--aws_secret_name <secret-name>] /path/to/your/config.yml" "31"
     exit 1
 fi
 
 # Check if config file exists
 if [ ! -f "$CONFIG_PATH" ]; then
-    echo "Config file not found at $CONFIG_PATH"
+    styled_message "Config file not found at $CONFIG_PATH" "31"
     exit 1
 fi
-echo "Using config file at $CONFIG_PATH"
+
+install_ansible
+
+styled_message "Using config file at $CONFIG_PATH" "32"
 
 EXTRA_VARS="config_path=$CONFIG_PATH"
 
-# Wait for user prompt to make sure that aws is configured
-if [ ! -z "$aws_secret_name" ]; then
-    echo "INFO: Assuming that aws is configured with the appropriate IAM role for secret lookup"
+if [ "$ONBOARD_CLIENTS" -eq 1 ] || [ "$CLEANUP" -eq 1 ]; then
+    # SKIP: No need of these credentials in case of 'ON-BOARDING CLIENTS' or 'CLEANUP'
+    :
+elif [ ! -z "$aws_secret_name" ]; then
+    # Information user aws needs to be configured
+    styled_message "INFO: Assuming that AWS is configured with the appropriate IAM role for secret lookup" "33"
     sleep 5
     EXTRA_VARS+=" aws_secret_name=$aws_secret_name"
 fi
@@ -102,17 +123,17 @@ if [ "$ONBOARD_CLIENTS" -eq 1 ]; then
 
     # Check if a valid path was provided
     if [ -z "$NEW_CLIENT_CONFIG_PATH" ]; then
-        echo "Error: No file location provided for new client configuration."
+        styled_message "Error: No file location provided for new client configuration." "31"
         exit 1
     fi
 
     # Check if config file exists
     if [ ! -f "$NEW_CLIENT_CONFIG_PATH" ]; then
-        echo "New client config file not found at $NEW_CLIENT_CONFIG_PATH"
+        styled_message "New client config file not found at $NEW_CLIENT_CONFIG_PATH" "31"
         exit 1
     fi
 
-    echo "Using new client config file at $NEW_CLIENT_CONFIG_PATH"
+    styled_message "Using new client config file at $NEW_CLIENT_CONFIG_PATH" "32"
     EXTRA_VARS+=" new_client_config_path=$NEW_CLIENT_CONFIG_PATH"
 fi
 
@@ -120,48 +141,47 @@ fi
 MODEL_FOLDER="pretrained-models/"
 
 # Warn if model file is not found
-if [ "$CLEANUP" -neq 1  ]; then
+if [ "$CLEANUP" -ne 1  ]; then
     if [ ! -d "$MODEL_FOLDER" ]; then
-        echo "WARNING: Model file not found at $GENERATIVE_MODEL_FOLDER. The playbook will proceed without it."
+        styled_message "WARNING: Model file not found at $GENERATIVE_MODEL_FOLDER. The playbook will proceed without it." "33"
         sleep 5
     else
+        # pretrained model_folder location
         EXTRA_VARS+=" model_folder=$(realpath "$MODEL_FOLDER")"
     fi
-fi
 
-# Search for docker_images folder with a prefix
-DOCKER_IMAGES_PATH=$(find . -type d -name "docker_images-*" | head -n 1)
-
-if [ -z "$DOCKER_IMAGES_PATH" ]; then
-    echo "WARNING: No docker_images folder found with prefix 'docker_images-'. The playbook will proceed without it."
-    sleep 5
-else
-    DOCKER_IMAGES_PATH=$(realpath "$DOCKER_IMAGES_PATH")
-    echo "Found docker images folder at $DOCKER_IMAGES_PATH"
-    EXTRA_VARS+=" docker_images=$(realpath "$DOCKER_IMAGES_PATH")"
+    # Search for docker_images folder with a prefix
+    DOCKER_IMAGES_PATH=$(find . -type d -name "docker_images-*" | head -n 1)
+    if [ -z "$DOCKER_IMAGES_PATH" ]; then
+        styled_message "WARNING: No docker_images folder found with prefix 'docker_images-'. The playbook will proceed without it." "33"
+        sleep 5
+    else
+        DOCKER_IMAGES_PATH=$(realpath "$DOCKER_IMAGES_PATH")
+        styled_message "Found docker images folder at $DOCKER_IMAGES_PATH" "32"
+        EXTRA_VARS+=" docker_images=$(realpath "$DOCKER_IMAGES_PATH")"
+    fi
 fi
 
 # Change directory to platform directory
 cd "$(dirname "$0")/platform" || exit 1
 
-echo "$EXTRA_VARS"
 # Run the appropriate playbook based on the cleanup flag
 if [ "$CLEANUP" -eq 1 ]; then
-    echo "Running cleanup playbook..."
+    styled_message "Running cleanup playbook..." "32"
     if [ "$VERBOSE" -eq 1 ]; then
         ansible-playbook playbooks/test_cleanup.yml --extra-vars "$EXTRA_VARS" -vvvv
     else
         ansible-playbook playbooks/test_cleanup.yml --extra-vars "$EXTRA_VARS"
     fi
 elif [ "$ONBOARD_CLIENTS" -eq 1 ]; then
-    echo "Running onboarding playbook..."
+    styled_message "Running onboarding playbook..." "32"
     if [ "$VERBOSE" -eq 1 ]; then
         ansible-playbook playbooks/onboard_clients.yml --extra-vars "$EXTRA_VARS" -vvvv
     else
         ansible-playbook playbooks/onboard_clients.yml --extra-vars "$EXTRA_VARS"
     fi
 else
-    echo "Running deployment playbook..."
+    styled_message "Running deployment playbook..." "32"
     if [ "$VERBOSE" -eq 1 ]; then
         ansible-playbook playbooks/test_deploy.yml --extra-vars "$EXTRA_VARS" -vvvv
     else
