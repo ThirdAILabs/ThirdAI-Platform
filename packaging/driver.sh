@@ -56,20 +56,28 @@ VERBOSE=0  # Default: No verbose mode
 CLEANUP=0  # Flag for cleanup mode
 ONBOARD_CLIENTS=0  # Flag for onboard_clients mode
 NEW_CLIENT_CONFIG_PATH=""   # Declare globally, default empty
+aws_secret_name=""
     
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -v|--verbose) VERBOSE=1 ;;   # Enable verbose mode if -v or --verbose is passed
         --cleanup) CLEANUP=1 ;;  # Enable cleanup mode if --cleanup is passed
         --onboard_clients) ONBOARD_CLIENTS=1 ;;  # Enable onboard_clients if --onboard_clients is passed
-        *) CONFIG_PATH=$(realpath "$1") ;;  # Treat the first argument as the config path
+        --aws_secret_name) 
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "Error: AWS secret name cannot be empty" >&2
+                return 1;
+            fi
+            aws_secret_name="$2"
+            shift ;;     
+        *) CONFIG_PATH="$1" ;;
     esac
     shift
 done
 
 # Check if config file is provided
 if [ -z "$CONFIG_PATH" ]; then
-    echo "Usage: $0 [-v|--verbose] [-b|--branch <branch_name>] [--cleanup] /path/to/your/config.yml"
+    echo "Usage: $0 [-v|--verbose] [--cleanup] [--aws_secret_name <secret-name>] /path/to/your/config.yml"
     exit 1
 fi
 
@@ -79,6 +87,25 @@ if [ ! -f "$CONFIG_PATH" ]; then
     exit 1
 fi
 echo "Using config file at $CONFIG_PATH"
+
+# Wait for user prompt to make sure that aws is configured
+if [ ! -z "$aws_secret_name" ]; then
+    while true; do
+        read -p "Is your aws configured with correct IAM role to fetch secrets (y/n): " answer
+        case $answer in
+            [Yy])
+                break
+                ;;
+            [Nn])
+                echo "First configure your AWS command-line-interface"
+                return 1
+                ;;
+            *)
+                echo "Invalid input. Please type 'yes' or 'no'."
+                ;;
+        esac
+    done
+fi
 
 if [ "$ONBOARD_CLIENTS" -eq 1 ]; then
     read -p "Enter the absolute path to the new client config file (e.g., /path/to/new_client_config.yml): " NEW_CLIENT_CONFIG_PATH
@@ -122,25 +149,35 @@ fi
 cd "$(dirname "$0")/platform" || exit 1
 
 # Run the appropriate playbook based on the cleanup flag
+EXTRA_VARS="config_path=$CONFIG_PATH model_folder=$MODEL_FOLDER docker_images=$DOCKER_IMAGES_PATH"
+
+if [ ! -z "$aws_secret_name" ]; then
+    EXTRA_VARS+=" aws_secret_name=$aws_secret_name"
+fi
+
+if [ "$ONBOARD_CLIENTS" -eq 1 ]; then
+    EXTRA_VARS+=" new_client_config_path=$NEW_CLIENT_CONFIG_PATH"
+fi
+
 if [ "$CLEANUP" -eq 1 ]; then
     echo "Running cleanup playbook..."
     if [ "$VERBOSE" -eq 1 ]; then
-        ansible-playbook playbooks/test_cleanup.yml --extra-vars "config_path=$CONFIG_PATH model_folder=$MODEL_FOLDER  docker_images=$DOCKER_IMAGES_PATH" -vvvv
+        ansible-playbook playbooks/test_cleanup.yml --extra-vars "$EXTRA_VARS" -vvvv
     else
-        ansible-playbook playbooks/test_cleanup.yml --extra-vars "config_path=$CONFIG_PATH model_folder=$MODEL_FOLDER  docker_images=$DOCKER_IMAGES_PATH"
+        ansible-playbook playbooks/test_cleanup.yml --extra-vars "$EXTRA_VARS"
     fi
 elif [ "$ONBOARD_CLIENTS" -eq 1 ]; then
     echo "Running onboarding playbook..."
     if [ "$VERBOSE" -eq 1 ]; then
-        ansible-playbook playbooks/onboard_clients.yml --extra-vars "config_path=$CONFIG_PATH new_client_config_path=$NEW_CLIENT_CONFIG_PATH model_folder=$MODEL_FOLDER  docker_images=$DOCKER_IMAGES_PATH" -vvvv
+        ansible-playbook playbooks/onboard_clients.yml --extra-vars "$EXTRA_VARS" -vvvv
     else
-        ansible-playbook playbooks/onboard_clients.yml --extra-vars "config_path=$CONFIG_PATH new_client_config_path=$NEW_CLIENT_CONFIG_PATH model_folder=$MODEL_FOLDER  docker_images=$DOCKER_IMAGES_PATH"
+        ansible-playbook playbooks/onboard_clients.yml --extra-vars "$EXTRA_VARS"
     fi
 else
     echo "Running deployment playbook..."
     if [ "$VERBOSE" -eq 1 ]; then
-        ansible-playbook playbooks/test_deploy.yml --extra-vars "config_path=$CONFIG_PATH model_folder=$MODEL_FOLDER  docker_images=$DOCKER_IMAGES_PATH" -vvvv
+        ansible-playbook playbooks/test_deploy.yml --extra-vars "$EXTRA_VARS" -vvvv
     else
-        ansible-playbook playbooks/test_deploy.yml --extra-vars "config_path=$CONFIG_PATH model_folder=$MODEL_FOLDER  docker_images=$DOCKER_IMAGES_PATH"
+        ansible-playbook playbooks/test_deploy.yml --extra-vars "$EXTRA_VARS"
     fi
 fi
