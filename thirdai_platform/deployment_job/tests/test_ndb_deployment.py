@@ -68,17 +68,19 @@ def create_ndbv2_model(tmp_dir: str, on_disk: bool):
         [ndbv2.CSV(os.path.join(doc_dir(), "articles.csv"), text_columns=["text"])]
     )
 
-    db.save(os.path.join(tmp_dir, "models", f"{MODEL_ID}", "model.ndb"))
-    db.save(
-        os.path.join(
-            tmp_dir,
-            "host_dir",
-            "models",
-            f"{MODEL_ID}",
-            f"{DEPLOYMENT_ID}",
-            "model.ndb",
-        )
+    model_path = os.path.join(tmp_dir, "models", f"{MODEL_ID}", "model.ndb")
+    deployment_path = os.path.join(
+        tmp_dir,
+        "host_dir",
+        "models",
+        f"{MODEL_ID}",
+        f"{DEPLOYMENT_ID}",
+        "model.ndb",
     )
+    if not os.path.exists(model_path):
+        db.save(model_path)
+    if not os.path.exists(deployment_path):
+        db.save(deployment_path)
 
     shutil.rmtree(random_path)
 
@@ -469,3 +471,15 @@ def test_deploy_ndb_prod_mode(tmp_dir, on_disk):
     check_log_lines(os.path.join(deployment_dir, "feedback"), 2)
     check_log_lines(os.path.join(deployment_dir, "insertions"), 1)
     check_log_lines(os.path.join(deployment_dir, "deletions"), 1)
+
+    global DEPLOYMENT_ID
+    old_deployment_id = DEPLOYMENT_ID
+    DEPLOYMENT_ID = "zyx"
+
+    config = create_config(tmp_dir=tmp_dir, autoscaling=True, on_disk=on_disk)
+    router = NDBRouter(config, None, logger)
+    old_model_path = os.path.join(
+        tmp_dir, "host_dir", "models", f"{MODEL_ID}", f"{old_deployment_id}"
+    )
+
+    assert not os.path.exists(old_model_path)

@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import fitz
 import platform_common.ndb.ndbv2_parser as ndbv2_parser
+import requests
 import thirdai.neural_db_v2.chunk_stores.constraints as ndbv2_constraints
 from deployment_job.chat import llm_providers
 from deployment_job.models.model import Model
@@ -312,8 +313,9 @@ class NDBModel(Model):
 
     def load(self, write_mode: bool = False, **kwargs) -> ndbv2.NeuralDB:
         try:
+
+            # The following two if statments are for cleaning up old models. It assumes that there can only be one deployment of a model at a time
             if self.host_model_dir.parent.exists():
-                # This logic for cleaning up of old models assumes there can only be one deployment of a model at a time
                 self.logger.info(
                     f"Cleaning up stale model copies at {self.host_model_dir.parent}"
                 )
@@ -332,6 +334,33 @@ class NDBModel(Model):
                                 self.host_model_dir.parent / deployment_id,
                                 ignore_errors=True,
                             )
+
+            if self.host_model_dir.parent.parent.exists():
+                self.logger.info(
+                    f"Cleaning up stale model copies at {self.host_model_dir.parent.parent}"
+                )
+
+                model_ids = [
+                    model.name
+                    for model in self.host_model_dir.parent.parent.iterdir()
+                    if model.is_dir()
+                ]
+                for model_id in model_ids:
+                    try:
+                        res = requests.get(
+                            "api/deploy/internal-status",
+                            params={
+                                "model_id": model_id,
+                            },
+                        )
+                        deploy_status = res.json()["data"]["deploy_status"]
+                        if deploy_status == "stopped":
+                            shutil.rmtree(
+                                self.host_model_dir.parent.parent / model_id,
+                                ignore_errors=True,
+                            )
+                    except:
+                        pass
 
             if write_mode:
                 loaded_ndb = ndbv2.NeuralDB.load(
