@@ -57,7 +57,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: '3.11'
+        python-version: '3.10'
 
     - name: Setup Python and Install Dependencies
       # We need to run the backend in sudo for the delete endpoint to work, thus
@@ -68,7 +68,7 @@ jobs:
         python -m venv ${{ github.workspace }}/venv
         source venv/bin/activate
         pip install -r headless/requirements.txt
-        sudo pip install -r thirdai_platform/requirements.txt
+        python3 -m pip install -r thirdai_platform/requirements.txt
         pip install -r thirdai_platform/requirements.txt
     
     - name: Update openssl
