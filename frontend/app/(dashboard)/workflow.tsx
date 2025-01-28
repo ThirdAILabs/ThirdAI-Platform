@@ -174,14 +174,25 @@ export function WorkFlow({
     }
   };
 
+  const [deployErrorMessage, setDeployErrorMessage] = useState<string | null>(null);
+
   const handleDeploy = async (mode: DeployMode | null = null) => {
     if (deployStatus == DeployStatus.Inactive) {
       setDeployStatus(DeployStatus.Starting);
       try {
         const autoscalingEnabled = mode === DeployMode.Production;
         await start_workflow(workflow.username, workflow.model_name, autoscalingEnabled);
-      } catch (e) {
-        console.error('Failed to start workflow.', e);
+      } catch (error: any) {
+        console.error('Failed to start workflow.', error);
+
+        // Extract error message directly from the error
+        let errorMessage = error.message || 'Failed to deploy workflow';
+
+        // Set the error message to show in modal
+        setDeployErrorMessage(errorMessage);
+
+        // Reset deploy status back to inactive
+        setDeployStatus(DeployStatus.Inactive);
       }
     }
   };
@@ -653,6 +664,27 @@ export function WorkFlow({
                     Confirm
                   </Button>
                 </div>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {deployErrorMessage && (
+          <Modal onClose={() => setDeployErrorMessage(null)}>
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <AlertCircle className="h-6 w-6 text-red-500 mr-2" />
+                <h2 className="text-xl font-semibold">Deployment Failed</h2>
+              </div>
+              <p className="text-gray-600 mb-4">{deployErrorMessage}</p>
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => setDeployErrorMessage(null)}
+                  variant="contained"
+                  size="small"
+                >
+                  Close
+                </Button>
               </div>
             </div>
           </Modal>
