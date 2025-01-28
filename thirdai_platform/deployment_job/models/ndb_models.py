@@ -318,20 +318,17 @@ class NDBModel(Model):
                     f"Cleaning up stale model copies at {self.host_model_dir.parent}"
                 )
 
-                if write_mode:
-                    shutil.rmtree(self.host_model_dir.parent, ignore_errors=True)
-                else:
-                    deployment_ids = [
-                        deployment.name
-                        for deployment in self.host_model_dir.parent.iterdir()
-                        if deployment.is_dir()
-                    ]
-                    for deployment_id in deployment_ids:
-                        if deployment_id != self.config.deployment_id:
-                            shutil.rmtree(
-                                self.host_model_dir.parent / deployment_id,
-                                ignore_errors=True,
-                            )
+                deployment_ids = [
+                    deployment.name
+                    for deployment in self.host_model_dir.parent.iterdir()
+                    if deployment.is_dir()
+                ]
+                for deployment_id in deployment_ids:
+                    if deployment_id != self.config.deployment_id:
+                        shutil.rmtree(
+                            self.host_model_dir.parent / deployment_id,
+                            ignore_errors=True,
+                        )
 
             lockfile = os.path.join(self.host_model_dir, "ndb.lock")
             lock = acquire_file_lock(lockfile)
