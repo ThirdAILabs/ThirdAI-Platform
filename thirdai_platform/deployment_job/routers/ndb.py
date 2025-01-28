@@ -897,6 +897,10 @@ class NDBRouter:
                         if current_time - last_save_time >= 300:  # 5 minutes = 300 seconds
                             self.model.save(model_id=self.config.model_id)
                             last_save_time = current_time
+                except:
+                    self.logger.error(
+                        f"Failed periodic save of dev mode NeuralDB."
+                    )
 
             task_id = self.task_queue.get()
             try:
