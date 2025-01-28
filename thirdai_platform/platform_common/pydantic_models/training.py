@@ -237,7 +237,7 @@ class TextClassificationDatagenOptions(BaseModel):
 class TokenClassificationDatagenOptions(BaseModel):
     sub_type: Literal[UDTSubType.token] = UDTSubType.token
     tags: List[LabelEntity]
-    num_sentences_to_generate: int = 1_000
+    num_sentences_to_generate: int = 1_0
     num_samples_per_tag: Optional[int] = None
 
     # example NER samples

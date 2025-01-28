@@ -11,9 +11,11 @@ import {
   getWorkflowDetails,
   deploymentBaseUrl,
   useTokenClassificationEndpoints,
+  getAllChatHistory,
 } from '@/lib/backend';
 import _ from 'lodash';
 import { Workflow, fetchWorkflows } from '@/lib/backend';
+import Conversations from './chatbotArchieves';
 
 function AnalyticsContent() {
   const [isClient, setIsClient] = useState(false);
@@ -116,6 +118,7 @@ function AnalyticsContent() {
     return (
       <>
         <UsageStats />
+        <Conversations />
         <RecentFeedbacks username={username} modelName={modelName} />
         {modelName && <UpdateButtonNDB modelName={modelName} />}
       </>

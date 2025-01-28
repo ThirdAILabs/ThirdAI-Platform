@@ -8,6 +8,7 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import VectorStore
 from licensing.verify import verify_license
+from thirdai.neural_db_v2.chunk_stores.constraints import EqualTo
 
 
 class NeuralDBV2VectorStore(VectorStore):
@@ -220,8 +221,23 @@ class NeuralDBV2VectorStore(VectorStore):
         return preprocessed_sources
 
     def similarity_search(
-        self, query: str, k: int = 10, **kwargs: Any
+        self, query: str, k: int = 10, constraints=None, **kwargs: Any
     ) -> List[Document]:
+        def convert_constraints(constraints):
+            if not constraints:
+                return None
+
+            constraint_types = {
+                "EqualTo": EqualTo,
+            }
+
+            converted = {}
+            for key, value in constraints.items():
+                constraint_class = constraint_types.get(value["constraint_type"])
+                if constraint_class:
+                    converted[key] = constraint_class(value["value"])
+            return converted
+
         """Retrieve {k} contexts with for a given query
 
         Args:
@@ -229,13 +245,18 @@ class NeuralDBV2VectorStore(VectorStore):
             k: The max number of context results to retrieve. Defaults to 10.
         """
         try:
-            references = self.db.search(query=query, top_k=k, **kwargs)
+            data = convert_constraints(constraints)
+            references = self.db.search(
+                query=query, top_k=k, constraints=data, **kwargs
+            )
             return [
                 Document(
                     page_content=chunk.keywords + " " + chunk.text,
                     metadata={
                         "document": chunk.document,
                         "metadata": chunk.metadata,
+                        "query": query,
+                        "chunk_id": chunk.chunk_id,
                         "score": score,
                     },
                 )

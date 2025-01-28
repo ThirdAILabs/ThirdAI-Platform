@@ -34,6 +34,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { CardTitle } from '@/components/ui/card';
 import { getWorkflowDetails, fetchCachedGeneration } from '@/lib/backend';
 import SidePanel from './components/SidePanel';
+import LogoLayout from '@/components/ui/LogoLayout';
 
 const Frame = styled.section<{ $opacity: string }>`
   position: absolute;
@@ -76,13 +77,13 @@ const TopRightCorner = styled.section`
   padding: 10px;
   top: 0;
   right: 0;
-  z-index: 200;
+  z-index: 100; // Lower this from 200
 `;
 
 const PdfViewerWrapper = styled.section`
   display: block;
   position: fixed;
-  z-index: 1000;
+  z-index: 2000; // Increase this from 1000
   width: 100%;
   height: 100%;
   padding: ${padding.card};
@@ -100,20 +101,6 @@ const UpvoteModalWrapper = styled.section`
   height: fit-content;
   padding: ${padding.card};
   box-sizing: border-box;
-`;
-
-const LogoContainer = styled.div`
-  position: fixed;
-  display: flex;
-  align-items: center;
-  padding: 10px;
-  z-index: 100;
-`;
-
-const WorkflowName = styled.div`
-  font-size: 18px;
-  font-weight: 500;
-  color: #333;
 `;
 
 const defaultPrompt =
@@ -563,12 +550,7 @@ function App() {
                 />
               </UpvoteModalWrapper>
             )}
-            <a href="/">
-              <LogoContainer>
-                <Logo src={LogoImg.src} alt="Logo" />
-                {workflowName && <WorkflowName>{workflowName}</WorkflowName>}
-              </LogoContainer>
-            </a>
+            <LogoLayout logoSrc={LogoImg.src} workflowName={workflowName} />
             <TopRightCorner>
               {chatEnabled && (
                 <ChatToggle

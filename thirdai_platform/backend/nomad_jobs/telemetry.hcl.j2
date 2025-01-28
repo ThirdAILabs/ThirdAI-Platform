@@ -163,6 +163,11 @@ sources:
     include:
       - "/model_bazaar/logs/*/deployment.log"
     read_from: beginning
+  chat_logs:
+    type: file
+    include:
+      - "/model_bazaar/logs/*/chat/*.log"
+    read_from: beginning
 
 transforms:
   parse_logs:
@@ -172,6 +177,7 @@ transforms:
     inputs:
       - training_logs
       - deployment_logs
+      - chat_logs
     source: |
       . = parse_json!(.message)
 

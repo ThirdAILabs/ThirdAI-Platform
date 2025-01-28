@@ -1586,11 +1586,6 @@ export function useRecentSamples({
   return { recentSamples, error, isLoading, refresh };
 }
 
-export interface TokenClassificationResult {
-  query_text: string;
-  tokens: string[];
-  predicted_tags: string[][];
-}
 export interface PredictionResponse {
   prediction_results: TokenClassificationResult;
   time_taken: number;
@@ -1932,17 +1927,29 @@ export function useSentimentClassification(workflowId: string | null) {
   };
 }
 
-export async function piiDetect(
-  query: string,
-  workflowId: string
-): Promise<TokenClassificationResult> {
+interface PIIDetectionResponse {
+  status: string;
+  message: string;
+  data: {
+    prediction_results: TokenClassificationResult;
+    time_taken: number;
+  };
+}
+
+interface TokenClassificationResult {
+  data_type: string;
+  query_text: string;
+  tokens: string[];
+  predicted_tags: string[][];
+}
+
+export async function piiDetect(query: string, workflowId: string): Promise<PIIDetectionResponse> {
   try {
-    // Corrected the key from 'query' to 'text'
     const response = await axios.post(`${deploymentBaseUrl}/${workflowId}/predict`, {
       text: query,
       top_k: 1,
     });
-    return response.data.data;
+    return response.data;
   } catch (error) {
     console.error('Error performing pii detection:', error);
     alert('Error performing pii detection: ' + error);
@@ -2437,6 +2444,25 @@ export async function fetchFeedback(username: string, modelName: string) {
   }
 }
 
+
+export async function getAllChatHistory(deploymentID: string) {
+  const accessToken = getAccessToken();
+  try {
+    const response = await axios({
+      method: 'get',
+      url: `${deploymentBaseUrl}/${deploymentID}/get_all_chat_history`,
+
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    return response.data.data;
+  } catch (error) {
+    console.error('Error getting Chat response Response:', error);
+    throw error;
+  }
+}
+
 export interface SelfHostedLLM {
   endpoint: string;
   api_key: string;
@@ -2473,3 +2499,4 @@ export const deleteSelfHostedLLM = (): Promise<LLMAPIResponse> => {
     .delete(`${deploymentBaseUrl}/api/integrations/self-hosted-llm`)
     .then((res) => res.data);
 };
+

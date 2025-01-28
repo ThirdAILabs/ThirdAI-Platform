@@ -10,6 +10,7 @@ class ActionType(str, Enum):
     upvote = "upvote"
     associate = "associate"
     implicit_upvote = "implicit_upvote"
+    chat_feedback = "chat_feedback"
 
 
 class UpvoteLog(BaseModel):
@@ -36,8 +37,16 @@ class ImplicitUpvoteLog(BaseModel):
     event_desc: str
 
 
+class ChatFeedbackLog(BaseModel):
+    action: Literal[ActionType.chat_feedback] = ActionType.chat_feedback
+
+    chunk_id: int
+    query: str
+    upvote: bool
+
+
 class FeedbackLog(BaseModel):
-    event: Union[UpvoteLog, AssociateLog, ImplicitUpvoteLog] = Field(
+    event: Union[UpvoteLog, AssociateLog, ImplicitUpvoteLog, ChatFeedbackLog] = Field(
         ..., discriminator="action"
     )
 

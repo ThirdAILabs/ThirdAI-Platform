@@ -15,8 +15,9 @@ class JobLogger(WrappedLogger):
         model_type: str,
         user_id: str,
         level: int = logging.DEBUG,
+        add_stream_handler: bool = True,
     ):
-        super().__init__(log_dir, log_prefix, service_type, level)
+        super().__init__(log_dir, log_prefix, service_type, level, add_stream_handler)
         self.model_id = model_id
         self.user_id = user_id
         self.model_type = model_type

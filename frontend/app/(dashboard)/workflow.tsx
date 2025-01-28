@@ -364,7 +364,7 @@ export function WorkFlow({
       setTimeout(() => document.body.removeChild(errorToast), 2000);
     }
   };
-
+  console.log('Workflow: ', workflow);
   return (
     <>
       <TableRow>
@@ -487,7 +487,7 @@ export function WorkFlow({
                 {workflow.type === 'enterprise-search' &&
                   (modelOwner[workflow.model_name] === user?.username || user?.global_admin) && (
                     <Link
-                      href={`/analytics?id=${encodeURIComponent(workflow.dependencies[0].model_id)}&username=${encodeURIComponent(workflow.dependencies[0].username)}&model_name=${encodeURIComponent(workflow.dependencies[0].model_name)}&old_model_id=${encodeURIComponent(workflow.dependencies[0].model_id)}`}
+                      href={`/analytics?id=${encodeURIComponent(workflow.dependencies[0].model_id)}&username=${encodeURIComponent(workflow.dependencies[0].username)}&model_name=${encodeURIComponent(workflow.dependencies[0].model_name)}&old_model_id=${encodeURIComponent(workflow.dependencies[0].model_id)}&default=${workflow.attributes.default_mode}`}
                     >
                       <DropdownMenuItem>
                         <button type="button">Usage Dashboard</button>

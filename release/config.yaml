@@ -1,5 +1,13 @@
 azure:
   branches:
+    chat-grafana:
+      pull_credentials:
+        password: xyMLa5OMB3I/z/b0iTbM5jM7w/rOJR/Kv5VkVwAxpr+ACRAKj1cP
+        username: thirdaiplatform-pull-chat-grafana
+      push_credentials:
+        password: Ow/QgpzjTC2iiRp2BDoJ25okX/AqruFKbEW68uZgmz+ACRDh/SAu
+        username: thirdaiplatform-push-chat-grafana
+      version: 0.0.1
     daily-update:
       pull_credentials:
         password: xDHBncnAPPXcsodP6AqAo8kEDxNoOR5X8r5krtaZp++ACRAwcL6j

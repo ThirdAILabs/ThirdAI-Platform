@@ -3,6 +3,9 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 from deployment_job.models.model import Model
+from deployment_job.models.udt_predict_demo import (
+    predict as overloaded_predict_for_demo,
+)
 from deployment_job.pydantic_models.inputs import SearchResultsTextClassification
 from fastapi import HTTPException, status
 from platform_common.logging import JobLogger
@@ -225,11 +228,7 @@ class TokenClassificationModel(ClassificationModel):
                 raise ValueError(
                     "Expected data type to be either 'unstructured' or 'xml'. Found: {data_type}"
                 )
-
-            model_predictions = self.model.predict(
-                log.inference_sample, top_k=1, as_unicode=True
-            )
-            result = log.process_prediction(model_predictions)
+            result = overloaded_predict_for_demo(text)
 
         except ValueError as e:
             message = f"Error processing prediction: {e}"
