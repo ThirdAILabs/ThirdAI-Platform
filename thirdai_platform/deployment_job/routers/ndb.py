@@ -887,7 +887,17 @@ class NDBRouter:
                 )
 
     def process_tasks(self):
+        last_save_time = time.time()
         while True:
+
+            if not self.config.autoscaling_enabled:
+                try:
+                    with self.task_lock:
+                        current_time = time.time()
+                        if current_time - last_save_time >= 300:  # 5 minutes = 300 seconds
+                            self.model.save(model_id=self.config.model_id)
+                            last_save_time = current_time
+
             task_id = self.task_queue.get()
             try:
                 with self.task_lock:

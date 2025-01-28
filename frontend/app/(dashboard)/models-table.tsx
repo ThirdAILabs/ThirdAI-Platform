@@ -57,7 +57,7 @@ export function ModelsTable({ searchStr, offset }: { searchStr: string; offset: 
 
   const filteredWorkflows = workflows.filter(
     (workflow) =>
-      workflow.model_name.toLowerCase().includes(searchStr.toLowerCase()) && workflow.type !== 'ndb'
+      workflow.model_name.toLowerCase().includes(searchStr.toLowerCase())
   );
   const totalWorkflows = filteredWorkflows.length;
   const displayedWorkflows = filteredWorkflows.slice(offset, offset + modelsPerPage);

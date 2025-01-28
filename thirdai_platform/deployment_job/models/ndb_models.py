@@ -333,38 +333,26 @@ class NDBModel(Model):
                                 ignore_errors=True,
                             )
 
-            if write_mode:
-                loaded_ndb = ndbv2.NeuralDB.load(
-                    self.ndb_save_path(), read_only=not write_mode
-                )
+            lockfile = os.path.join(self.host_model_dir, "ndb.lock")
+            lock = acquire_file_lock(lockfile)
+            try:
+                if not os.path.exists(self.ndb_host_save_path()):
+                    shutil.copytree(self.ndb_save_path(), self.ndb_host_save_path())
+                else:
+                    pass
+            finally:
+                release_file_lock(lock)
 
-                self.logger.info(
-                    f"Loaded NDBv2 model from {self.ndb_save_path()} read_only={not write_mode}",
-                    code=LogCode.MODEL_LOAD,
-                )
+            loaded_ndb = ndbv2.NeuralDB.load(
+                self.ndb_host_save_path(), read_only=not write_mode
+            )
 
-                return loaded_ndb
-            else:
-                lockfile = os.path.join(self.host_model_dir, "ndb.lock")
-                lock = acquire_file_lock(lockfile)
-                try:
-                    if not os.path.exists(self.ndb_host_save_path()):
-                        shutil.copytree(self.ndb_save_path(), self.ndb_host_save_path())
-                    else:
-                        pass
-                finally:
-                    release_file_lock(lock)
+            self.logger.info(
+                f"Loaded NDBv2 model from {self.ndb_host_save_path()} read_only={not write_mode}",
+                code=LogCode.MODEL_LOAD,
+            )
 
-                loaded_ndb = ndbv2.NeuralDB.load(
-                    self.ndb_host_save_path(), read_only=not write_mode
-                )
-
-                self.logger.info(
-                    f"Loaded NDBv2 model from {self.ndb_host_save_path()} read_only={not write_mode}",
-                    code=LogCode.MODEL_LOAD,
-                )
-
-                return loaded_ndb
+            return loaded_ndb
         except Exception as e:
             self.logger.error(
                 f"Failed to load NDBv2 model from {self.ndb_save_path() if write_mode else self.ndb_host_save_path()} read_only={not write_mode}",
@@ -497,6 +485,11 @@ class NDBModel(Model):
 
     def cleanup(self):
         if self.config.autoscaling_enabled:
+            del self.db
+            self.logger.info(f"Cleaning up model at {self.host_model_dir}")
+            shutil.rmtree(self.host_model_dir, ignore_errors=True)
+        else:
+            self.db.save(self.config.model_id)
             del self.db
             self.logger.info(f"Cleaning up model at {self.host_model_dir}")
             shutil.rmtree(self.host_model_dir, ignore_errors=True)
