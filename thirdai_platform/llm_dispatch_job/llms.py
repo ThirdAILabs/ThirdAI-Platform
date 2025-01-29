@@ -229,25 +229,33 @@ class OnPremLLM(LLMBase):
                         yield data["choices"][0]["delta"]["content"]
 
 
-class SelfHostedLLM(OpenAILLM):
-    def __init__(self, access_token: str):
-        # TODO(david) figure out another way for internal service to service
-        # communication that doesn't require forwarding JWT access tokens
-        self.backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
-        response = requests.get(
-            urljoin(self.backend_endpoint, "/api/integrations/self-hosted-llm"),
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-        if response.status_code != 200:
-            raise Exception("Cannot read self-hosted endpoint.")
-        data = response.json()["data"]
-        self.url = data["endpoint"]
-        super().__init__(data["api_key"])
+def get_self_hosted_endpoint(access_token: str):
+    backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
+    response = requests.get(
+        urljoin(backend_endpoint, "/api/integrations/self-hosted-llm"),
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    if response.status_code != 200:
+        raise Exception("Cannot read self-hosted endpoint.")
+    data = response.json()["data"]
 
-        if self.url is None or self.api_key is None:
-            raise Exception(
-                "Self-hosted LLM may have been deleted or not configured. Please check the admin dashboard to configure the self-hosted llm"
-            )
+    endpoint = data["endpoint"]
+    api_key = data["api_key"]
+
+    if endpoint is None or api_key is None:
+        raise Exception(
+            "Self-hosted LLM may have been deleted or not configured. Please check the admin dashboard to configure the self-hosted llm"
+        )
+
+    return endpoint, api_key
+
+
+class SelfHostedLLM(OpenAIApiLLM):
+    def __init__(self, access_token: str):
+        endpoint, api_key = get_self_hosted_endpoint(access_token=access_token)
+        super().__init__(
+            api_key=api_key, base_url=endpoint, default_model="no model specified"
+        )
 
 
 model_classes = {
