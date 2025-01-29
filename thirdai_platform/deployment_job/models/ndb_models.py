@@ -318,38 +318,53 @@ class NDBModel(Model):
                     f"Cleaning up stale model copies at {self.host_model_dir.parent}"
                 )
 
-                deployment_ids = [
-                    deployment.name
-                    for deployment in self.host_model_dir.parent.iterdir()
-                    if deployment.is_dir()
-                ]
-                for deployment_id in deployment_ids:
-                    if deployment_id != self.config.deployment_id:
-                        shutil.rmtree(
-                            self.host_model_dir.parent / deployment_id,
-                            ignore_errors=True,
-                        )
-
-            lockfile = os.path.join(self.host_model_dir, "ndb.lock")
-            lock = acquire_file_lock(lockfile)
-            try:
-                if not os.path.exists(self.ndb_host_save_path()):
-                    shutil.copytree(self.ndb_save_path(), self.ndb_host_save_path())
+                if write_mode:
+                    shutil.rmtree(self.host_model_dir.parent, ignore_errors=True)
                 else:
-                    pass
-            finally:
-                release_file_lock(lock)
+                    deployment_ids = [
+                        deployment.name
+                        for deployment in self.host_model_dir.parent.iterdir()
+                        if deployment.is_dir()
+                    ]
+                    for deployment_id in deployment_ids:
+                        if deployment_id != self.config.deployment_id:
+                            shutil.rmtree(
+                                self.host_model_dir.parent / deployment_id,
+                                ignore_errors=True,
+                            )
 
-            loaded_ndb = ndbv2.NeuralDB.load(
-                self.ndb_host_save_path(), read_only=not write_mode
-            )
+            if write_mode:
+                loaded_ndb = ndbv2.NeuralDB.load(
+                    self.ndb_save_path(), read_only=not write_mode
+                )
 
-            self.logger.info(
-                f"Loaded NDBv2 model from {self.ndb_host_save_path()} read_only={not write_mode}",
-                code=LogCode.MODEL_LOAD,
-            )
+                self.logger.info(
+                    f"Loaded NDBv2 model from {self.ndb_save_path()} read_only={not write_mode}",
+                    code=LogCode.MODEL_LOAD,
+                )
 
-            return loaded_ndb
+                return loaded_ndb
+            else:
+                lockfile = os.path.join(self.host_model_dir, "ndb.lock")
+                lock = acquire_file_lock(lockfile)
+                try:
+                    if not os.path.exists(self.ndb_host_save_path()):
+                        shutil.copytree(self.ndb_save_path(), self.ndb_host_save_path())
+                    else:
+                        pass
+                finally:
+                    release_file_lock(lock)
+
+                loaded_ndb = ndbv2.NeuralDB.load(
+                    self.ndb_host_save_path(), read_only=not write_mode
+                )
+
+                self.logger.info(
+                    f"Loaded NDBv2 model from {self.ndb_host_save_path()} read_only={not write_mode}",
+                    code=LogCode.MODEL_LOAD,
+                )
+
+                return loaded_ndb
         except Exception as e:
             self.logger.error(
                 f"Failed to load NDBv2 model from {self.ndb_save_path() if write_mode else self.ndb_host_save_path()} read_only={not write_mode}",
@@ -482,12 +497,6 @@ class NDBModel(Model):
 
     def cleanup(self):
         if self.config.autoscaling_enabled:
-            del self.db
-            self.logger.info(f"Cleaning up model at {self.host_model_dir}")
-            shutil.rmtree(self.host_model_dir, ignore_errors=True)
-        else:
-            self.logger.info(f"Saving ndb now")
-            self.save(self.config.model_id)
             del self.db
             self.logger.info(f"Cleaning up model at {self.host_model_dir}")
             shutil.rmtree(self.host_model_dir, ignore_errors=True)

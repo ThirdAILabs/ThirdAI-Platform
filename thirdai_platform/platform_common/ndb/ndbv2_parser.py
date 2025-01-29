@@ -41,25 +41,12 @@ def convert_to_ndb_doc(
                     f"Could not parse pdftitle for pdf: {resource_path}. Error: {e}"
                 )
 
-        other_options = {}
-        for other_option in [
-            "version",
-            "chunk_size",
-            "stride",
-            "ignore_header_footer",
-            "table_parsing",
-            "emphasize_section_titles",
-        ]:
-            if other_option in options:
-                other_options[other_option] = options[other_option]
-
         return ndbv2.PDF(
             resource_path,
             doc_metadata=metadata,
             display_path=display_path,
             doc_id=doc_id,
             doc_keywords=doc_keywords,
-            **other_options,
         )
     elif ext == ".docx":
         return ndbv2.DOCX(

@@ -330,7 +330,7 @@ async def deploy_single_model(
             autoscaling_enabled=("true" if autoscaling_enabled else "false"),
             autoscaler_min_count=str(autoscaler_min_count),
             autoscaler_max_count=str(autoscaler_max_count),
-            memory=max(memory, 4000),
+            memory=memory,
             python_path=get_python_path(),
             thirdai_platform_dir=thirdai_platform_dir(),
             app_dir="deployment_job",

@@ -2,7 +2,6 @@ import io
 import threading
 import traceback
 import uuid
-import time
 from pathlib import Path
 from queue import Queue
 from typing import AsyncGenerator, List, Optional
@@ -888,21 +887,7 @@ class NDBRouter:
                 )
 
     def process_tasks(self):
-        last_save_time = time.time()
         while True:
-            self.logger.info("Inserting docs")
-            if not self.config.autoscaling_enabled:
-                try:
-                    with self.task_lock:
-                        current_time = time.time()
-                        if current_time - last_save_time >= 300:  # 5 minutes = 300 seconds
-                            self.model.save(model_id=self.config.model_id)
-                            last_save_time = current_time
-                except:
-                    self.logger.error(
-                        f"Failed periodic save of dev mode NeuralDB."
-                    )
-
             task_id = self.task_queue.get()
             try:
                 with self.task_lock:

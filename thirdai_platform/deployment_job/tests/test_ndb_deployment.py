@@ -273,7 +273,7 @@ def check_async_insertion_dev_mode(client: TestClient):
         time.sleep(1)
     else:
         raise RuntimeError(
-            f"Async insertion did not complete after {num_seconds} seconds with {task_info['status']}"
+            f"Async insertion did not complete after {num_seconds} seconds"
         )
 
     res = client.get("/sources")
