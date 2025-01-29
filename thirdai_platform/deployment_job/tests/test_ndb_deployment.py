@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import shutil
 import time
@@ -6,7 +7,7 @@ import uuid
 from pathlib import Path
 from typing import List, Optional
 from unittest.mock import patch
-import math
+
 import pytest
 from deployment_job.permissions import Permissions
 from fastapi.testclient import TestClient
@@ -138,7 +139,11 @@ def get_query_result(
 
 
 def check_query(
-    client: TestClient, query: str, top_k: int, ref0_chunk_id: int, constraints: dict = {}
+    client: TestClient,
+    query: str,
+    top_k: int,
+    ref0_chunk_id: int,
+    constraints: dict = {},
 ):
     assert (
         get_query_result(client, query, top_k=top_k, constraints=constraints)[
@@ -535,14 +540,26 @@ def check_summarized_metadata(client: TestClient):
     assert data["integer_col"]["max"] == 188
 
     # Assert float col
-    assert math.isclose(data["float_col"]["min"], -198.06391226887988, rel_tol = 1e-6)
-    assert math.isclose(data["float_col"]["min"], 198.34493105274356, rel_tol = 1e-6)
+    assert math.isclose(data["float_col"]["min"], -198.06391226887988, rel_tol=1e-6)
+    assert math.isclose(data["float_col"]["min"], 198.34493105274356, rel_tol=1e-6)
 
     # Assert string col
-    assert data["string_col"]["unique_values"] == ['grape', 'honeydew', 'apple', 'lemon', 'cherry', 'banana', 'date', 'fig', 'elderberry', 'kiwi']
+    assert data["string_col"]["unique_values"] == [
+        "grape",
+        "honeydew",
+        "apple",
+        "lemon",
+        "cherry",
+        "banana",
+        "date",
+        "fig",
+        "elderberry",
+        "kiwi",
+    ]
 
     # Assert bool col
-    assert data["bool_col"]["unique_values"] = [True, False]
+    assert data["bool_col"]["unique_values"] == [True, False]
+
 
 @pytest.mark.unit
 @pytest.mark.parametrize("on_disk", [True, False])
@@ -580,7 +597,9 @@ def test_deployment_constrained_search(tmp_dir, on_disk):
         query="Velit magnam labore numquam ipsum.",
         top_k=5,
         ref0_chunk_id=7,
-        constraints={"float_col": {"InRange": {"min_value": -80.56, "max_value": -75.456}}},
+        constraints={
+            "float_col": {"InRange": {"min_value": -80.56, "max_value": -75.456}}
+        },
     )
 
     check_query(
@@ -588,5 +607,8 @@ def test_deployment_constrained_search(tmp_dir, on_disk):
         query="Velit magnam labore numquam ipsum.",
         top_k=5,
         ref0_chunk_id=85,
-        constraints={"string_col": {"AnyOf": {"values": ["lemon", "elderberry"]}}, "bool_col": {"EqualTo": {"value": True}}},
+        constraints={
+            "string_col": {"AnyOf": {"values": ["lemon", "elderberry"]}},
+            "bool_col": {"EqualTo": {"value": True}},
+        },
     )
