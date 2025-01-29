@@ -486,7 +486,8 @@ class NDBModel(Model):
             self.logger.info(f"Cleaning up model at {self.host_model_dir}")
             shutil.rmtree(self.host_model_dir, ignore_errors=True)
         else:
-            self.db.save(self.config.model_id)
+            self.logger.info(f"Saving ndb now")
+            self.save(self.config.model_id)
             del self.db
             self.logger.info(f"Cleaning up model at {self.host_model_dir}")
             shutil.rmtree(self.host_model_dir, ignore_errors=True)

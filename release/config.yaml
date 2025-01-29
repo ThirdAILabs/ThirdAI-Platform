@@ -8,6 +8,14 @@ azure:
         password: Kl0pYEl2c2iEJfK6rIo/fI3Vva1KOmhxd+cDwQtZTb+ACRDxWxvv
         username: thirdaiplatform-push-daily-update
       version: 0.0.1
+    dev-copy:
+      pull_credentials:
+        password: KBUY73w4fAc2SoosV3TgHm90umMlD++2Dl4wfz5XMt+ACRDOPzPJ
+        username: thirdaiplatform-pull-dev-copy
+      push_credentials:
+        password: q87GmYslwrpqvyAblFOb1/OVNu354guNWbrKSWWD+r+ACRAWZNon
+        username: thirdaiplatform-push-dev-copy
+      version: 0.0.2
     docker_tests:
       pull_credentials:
         password: ojqTob8LipMFHD5CUtYQqKFT4Yj0dgA42fpzKm08Uu+ACRB3D2G8
