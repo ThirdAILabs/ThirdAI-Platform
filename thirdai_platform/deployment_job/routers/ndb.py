@@ -2,6 +2,7 @@ import io
 import threading
 import traceback
 import uuid
+import time
 from pathlib import Path
 from queue import Queue
 from typing import AsyncGenerator, List, Optional
@@ -889,7 +890,7 @@ class NDBRouter:
     def process_tasks(self):
         last_save_time = time.time()
         while True:
-
+            self.logger.info("Inserting docs")
             if not self.config.autoscaling_enabled:
                 try:
                     with self.task_lock:
@@ -910,7 +911,6 @@ class NDBRouter:
                     self.tasks[task_id].status = TaskStatus.IN_PROGRESS
                     self.tasks[task_id].last_modified = now()
                 if action == TaskAction.INSERT:
-                    self.logger.info("Inserting docs")
                     documents = data["documents"]
                     inserted_docs = self.model.insert(documents=documents)
                     with self.task_lock:
