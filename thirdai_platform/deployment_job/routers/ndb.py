@@ -910,6 +910,7 @@ class NDBRouter:
                     self.tasks[task_id].status = TaskStatus.IN_PROGRESS
                     self.tasks[task_id].last_modified = now()
                 if action == TaskAction.INSERT:
+                    self.logger.info("Inserting docs")
                     documents = data["documents"]
                     inserted_docs = self.model.insert(documents=documents)
                     with self.task_lock:
