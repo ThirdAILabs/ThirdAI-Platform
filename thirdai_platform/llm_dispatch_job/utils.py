@@ -16,7 +16,7 @@ class GenerateArgs(BaseModel):
     references: List[Reference] = []
 
     key: Optional[str] = None
-    model: str = "gpt-4o-mini"
+    model: Optional[str] = None
     provider: str = "openai"
     workflow_id: Optional[str] = None
 

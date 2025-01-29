@@ -6,6 +6,7 @@ from urllib.parse import urljoin
 
 import aiohttp
 import requests
+from anthropic import AsyncAnthropic
 from fastapi import HTTPException
 from llm_dispatch_job.utils import Reference, make_prompt
 
@@ -20,22 +21,23 @@ class LLMBase(ABC):
         query: str,
         task_prompt: str,
         references: List[Reference],
-        model: str,
+        model: Optional[str],
     ) -> AsyncGenerator[str, None]:
         raise NotImplementedError("Subclasses must implement this method")
 
 
-class OpenAILLM(LLMBase):
-    def __init__(self, api_key: str):
+class OpenAIApiLLM(LLMBase):
+    def __init__(self, api_key: str, base_url: str, default_model: str):
         super().__init__(api_key)
-        self.url = "https://api.openai.com/v1/chat/completions"
+        self.url = urljoin(base_url, "chat/completions")
+        self.default_model = default_model
 
     async def stream(
         self,
         query: str,
         task_prompt: str,
         references: List[Reference],
-        model: str,
+        model: Optional[str],
     ) -> AsyncGenerator[str, None]:
         headers = {
             "Content-Type": "application/json",
@@ -45,7 +47,7 @@ class OpenAILLM(LLMBase):
         system_prompt, user_prompt = make_prompt(query, task_prompt, references)
 
         body = {
-            "model": model,
+            "model": model or self.default_model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -75,6 +77,26 @@ class OpenAILLM(LLMBase):
                                 yield content
 
 
+class OpenAILLM(OpenAIApiLLM):
+    def __init__(self, api_key: str):
+        super().__init__(
+            api_key=api_key,
+            base_url="https://api.openai.com/v1/",
+            default_model="gpt-4o-mini",
+        )
+
+
+class DeepseekLLM(OpenAIApiLLM):
+    def __init__(self, api_key: str):
+        # Per https://api-docs.deepseek.com deepseek is compatable with any sdk that
+        # uses the openai api.
+        super().__init__(
+            api_key=api_key,
+            base_url="https://api.deepseek.com/v1/",
+            default_model="deepseek-chat",
+        )
+
+
 class CohereLLM(LLMBase):
     def __init__(self, api_key: str):
         super().__init__(api_key)
@@ -85,8 +107,10 @@ class CohereLLM(LLMBase):
         query: str,
         task_prompt: str,
         references: List[Reference],
-        model: str,
+        model: Optional[str],
     ) -> AsyncGenerator[str, None]:
+        model = model or "command-r-plus"
+
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
@@ -122,6 +146,36 @@ class CohereLLM(LLMBase):
                 else:
                     error_message = await response.text()
                     raise Exception(f"Cohere API request failed: {error_message}")
+
+
+class AnthropicLLM(LLMBase):
+    def __init__(self, api_key: str):
+        super().__init__(api_key)
+        self.client = AsyncAnthropic(api_key=api_key)
+
+    async def stream(
+        self,
+        query: str,
+        task_prompt: str,
+        references: List[Reference],
+        model: Optional[str],
+    ) -> AsyncGenerator[str, None]:
+        system_prompt, user_prompt = make_prompt(query, task_prompt, references)
+
+        try:
+            async with self.client.messages.stream(
+                max_tokens=2048,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                model=model or "claude-3-5-sonnet-20241022",
+            ) as stream:
+                async for text in stream.text_stream:
+                    yield text
+
+        except Exception as e:
+            raise Exception(f"Anthropic API request failed: {e}")
 
 
 class OnPremLLM(LLMBase):
@@ -200,6 +254,8 @@ model_classes = {
     "openai": OpenAILLM,
     "cohere": CohereLLM,
     "on-prem": OnPremLLM,
+    "deepseek": DeepseekLLM,
+    "anthropic": AnthropicLLM,
 }
 
 
@@ -209,7 +265,7 @@ class LLMFactory:
         provider: str, api_key: Optional[str], access_token: Optional[str], logger
     ):
         if provider in model_classes:
-            if provider in ["openai", "cohere"] and api_key is None:
+            if provider != "on-prem" and api_key is None:
                 logger.error("No generative AI key provided")
                 raise HTTPException(
                     status_code=400, detail="No generative AI key provided"
