@@ -1,8 +1,8 @@
 """
 To run this file do:
     `locust -f stress_test_deployment.py`
-which will spin up the web UI to configure tests. 
-You can also use the --headless flag to skip the UI. 
+which will spin up the web UI to configure tests.
+You can also use the --headless flag to skip the UI.
 
 To run locust distributed on blade you can run this script with the --master flag
     `locust -f stress_test_deployment.py --master`
