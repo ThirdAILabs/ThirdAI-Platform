@@ -4,7 +4,8 @@ Defines NDB model classes for the application.
 
 import ast
 import os
-import random
+
+pass
 import shutil
 import tempfile
 import traceback
@@ -26,10 +27,7 @@ from platform_common.logging import JobLogger, LogCode
 from platform_common.ndb.utils import delete_docs_and_remove_files
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from thirdai import neural_db_v2 as ndbv2
-from thirdai.neural_db_v2.core.types import Chunk
-
-CHUNK_THRESHOLD = 200
-UNIQUE_VALUE_THRESHOLD = 0.25
+from thirdai.neural_db_v2.core.types import Chunk, MetadataType
 
 
 class NDBModel(Model):
@@ -187,48 +185,47 @@ class NDBModel(Model):
             key=lambda x: x["source"],
         )
 
-    def summarize_values(self, values):
-        return {
-            "min": min(values),
-            "max": max(values),
-            "unique_count": len(values),
-            "examples": list(values)[:10],
-        }
-
     def get_metadata(self, doc_id: str, doc_version: int):
         with self.db_lock:
             chunk_ids = self.db.chunk_store.get_doc_chunks(
                 doc_id=doc_id, before_version=doc_version + 1
             )
-            # Check if the number of chunks exceeds the threshold
-            if len(chunk_ids) > CHUNK_THRESHOLD:
-                chunk_ids = random.sample(chunk_ids, CHUNK_THRESHOLD)
-            chunks = self.db.chunk_store.get_chunks(chunk_ids)
 
-        doc_type = Path(chunks[0].document).suffix.lower() if chunks else None
-        metadata_aggregator = {}
+            if not chunk_ids:
+                raise ValueError("Invalid doc_id, doc_version")
+
+            # get the first chunk of the document to check it's type
+            chunks = self.db.chunk_store.get_chunks(chunk_ids[:1])
+
+            doc_summarized_metadata = (
+                self.db.chunk_store.document_metadata_summary.summarized_metadata[
+                    (doc_id, doc_version)
+                ]
+            )
+
+        doc_type = Path(chunks[0].document).suffix.lower()
+        result = {}
 
         if doc_type not in [".csv", ".docx", ".html", ".pdf"]:
             raise ValueError(f"{doc_type} is not supported.")
         is_pdf = doc_type == ".pdf"
 
-        for chunk in chunks:
-            if chunk.metadata:
-                for key, value in chunk.metadata.items():
-                    if is_pdf and key in {"highlight", "page", "chunk_boxes"}:
-                        continue
-                    if key not in metadata_aggregator:
-                        metadata_aggregator[key] = set()
-                    metadata_aggregator[key].add(value)
+        for metadata_key_name, summarized in doc_summarized_metadata.items():
+            if is_pdf and metadata_key_name in ["highlight", "chunk_boxes"]:
+                continue
 
-        result = {}
-        for key, values in metadata_aggregator.items():
-            if len(values) > UNIQUE_VALUE_THRESHOLD * CHUNK_THRESHOLD:
-                # Summarize high-cardinality columns
-                result[key] = self.summarize_values(values)
+            result[metadata_key_name] = {"type": summarized.metadata_type.value}
+            if summarized.metadata_type in [MetadataType.INTEGER, MetadataType.FLOAT]:
+                result[metadata_key_name].update(
+                    {
+                        "min": summarized.summary.min,
+                        "max": summarized.summary.max,
+                    }
+                )
             else:
-                # For low-cardinality columns, return as a list
-                result[key] = list(values)
+                result[metadata_key_name].update(
+                    {"unique_values": summarized.summary.unique_values}
+                )
 
         return result
 

@@ -41,10 +41,10 @@ class InRange(BaseModel):
     """
 
     constraint_type: Literal["InRange"]
-    minimum: Any
-    maximum: Any
-    inclusive_min: bool = True
-    inclusive_max: bool = True
+    min_value: Any
+    max_value: Any
+    min_inclusive: bool = True
+    max_inclusive: bool = True
 
 
 class GreaterThan(BaseModel):
@@ -53,8 +53,8 @@ class GreaterThan(BaseModel):
     """
 
     constraint_type: Literal["GreaterThan"]
-    minimum: Any
-    include_equal: bool = False
+    value: Any
+    inclusive: bool = False
 
 
 class LessThan(BaseModel):
@@ -63,8 +63,8 @@ class LessThan(BaseModel):
     """
 
     constraint_type: Literal["LessThan"]
-    maximum: Any
-    include_equal: bool = False
+    value: Any
+    inclusive: bool = False
 
 
 class Constraints(RootModel):
