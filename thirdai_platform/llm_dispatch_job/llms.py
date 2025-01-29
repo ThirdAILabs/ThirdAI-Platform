@@ -178,6 +178,11 @@ class AnthropicLLM(LLMBase):
             raise Exception(f"Anthropic API request failed: {e}")
 
 
+DEFAULT_ON_PREM_PROMPT = (
+    "given this context, answer the following as succinctly as possible, "
+)
+
+
 class OnPremLLM(LLMBase):
     def __init__(self, api_key: str = None):
         super().__init__(api_key)
@@ -193,7 +198,9 @@ class OnPremLLM(LLMBase):
         references: List[Reference],
         model: str,
     ) -> AsyncGenerator[str, None]:
-        system_prompt, user_prompt = make_prompt(query, task_prompt, references)
+        system_prompt, user_prompt = make_prompt(
+            query, task_prompt or DEFAULT_ON_PREM_PROMPT, references
+        )
 
         headers = {"Content-Type": "application/json"}
         data = {
