@@ -589,7 +589,13 @@ def test_deployment_constrained_search(tmp_dir, on_disk):
         query="Velit magnam labore numquam ipsum.",
         top_k=5,
         ref0_chunk_id=30,
-        constraints={"integer_col": {"InRange": {"min_value": -10, "max_value": 10}}},
+        constraints={
+            "integer_col": {
+                "constraint_type": "InRange",
+                "min_value": -10,
+                "max_value": 10,
+            }
+        },
     )
 
     check_query(
@@ -598,7 +604,11 @@ def test_deployment_constrained_search(tmp_dir, on_disk):
         top_k=5,
         ref0_chunk_id=7,
         constraints={
-            "float_col": {"InRange": {"min_value": -80.56, "max_value": -75.456}}
+            "float_col": {
+                "constraint_type": "InRange",
+                "min_value": -80.56,
+                "max_value": -75.456,
+            }
         },
     )
 
@@ -608,7 +618,10 @@ def test_deployment_constrained_search(tmp_dir, on_disk):
         top_k=5,
         ref0_chunk_id=85,
         constraints={
-            "string_col": {"AnyOf": {"values": ["lemon", "elderberry"]}},
-            "bool_col": {"EqualTo": {"value": True}},
+            "string_col": {
+                "constraint_type": "AnyOf",
+                "values": ["lemon", "elderberry"],
+            },
+            "bool_col": {"constraint_type": "EqualTo", "value": True},
         },
     )
