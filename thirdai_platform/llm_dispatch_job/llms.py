@@ -165,8 +165,8 @@ class AnthropicLLM(LLMBase):
         try:
             async with self.client.messages.stream(
                 max_tokens=2048,
+                system=system_prompt,
                 messages=[
-                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
                 model=model or "claude-3-5-sonnet-20241022",
