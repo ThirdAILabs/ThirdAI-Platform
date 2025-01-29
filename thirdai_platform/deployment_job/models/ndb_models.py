@@ -4,8 +4,6 @@ Defines NDB model classes for the application.
 
 import ast
 import os
-
-pass
 import shutil
 import tempfile
 import traceback
