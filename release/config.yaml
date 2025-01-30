@@ -15,7 +15,7 @@ azure:
       push_credentials:
         password: q87GmYslwrpqvyAblFOb1/OVNu354guNWbrKSWWD+r+ACRAWZNon
         username: thirdaiplatform-push-dev-copy
-      version: 0.0.2
+      version: 0.0.16
     docker_tests:
       pull_credentials:
         password: ojqTob8LipMFHD5CUtYQqKFT4Yj0dgA42fpzKm08Uu+ACRB3D2G8
@@ -86,7 +86,7 @@ azure:
       push_credentials:
         password: y/iKY+7IwCrcdd61Rp3vma3gTyYScI72TY7484cJ6c+ACRBkPJv/
         username: thirdaiplatform-push-release-test-main
-      version: 1.1.5
+      version: 1.1.7a
     test_1:
       pull_credentials:
         password: lfhxcL/qmrYP24rIH2vmRNSYV9ZlNCfxJyQI6E3kVi+ACRDjUz22

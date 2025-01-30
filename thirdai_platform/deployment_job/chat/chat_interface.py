@@ -21,7 +21,7 @@ from thirdai import neural_db_v2 as ndbv2
 class ChatInterface(ABC):
     def __init__(
         self,
-        db: Union[ndb.NeuralDB, ndbv2.NeuralDB],
+        db: Union[ndb.NeuralDB, ndbv2.NeuralDB, ndbv2.FastDB],
         chat_history_sql_uri: str,
         top_k: int = 5,
         chat_prompt: str = "Answer the user's questions based on the below context:",
@@ -31,7 +31,7 @@ class ChatInterface(ABC):
         self.chat_history_sql_uri = chat_history_sql_uri
         if isinstance(db, ndb.NeuralDB):
             vectorstore = NeuralDBVectorStore(db)
-        elif isinstance(db, ndbv2.NeuralDB):
+        elif isinstance(db, ndbv2.NeuralDB) or isinstance(db, ndbv2.FastDB):
             vectorstore = NeuralDBV2VectorStore(db)
         else:
             raise ValueError(f"Cannot support db of type {type(db)}")

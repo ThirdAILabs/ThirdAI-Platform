@@ -2,7 +2,7 @@
 Defines constraint models for Pydantic validation.
 """
 
-from typing import Any, Dict, Iterable, Union
+from typing import Any, Dict, Iterable, Union, List
 
 from pydantic import BaseModel, Field, RootModel
 from typing_extensions import Annotated, Literal
@@ -14,7 +14,7 @@ class AnyOf(BaseModel):
     """
 
     constraint_type: Literal["AnyOf"]
-    values: Iterable[Any]
+    values: List[Any]
 
 
 class EqualTo(BaseModel):

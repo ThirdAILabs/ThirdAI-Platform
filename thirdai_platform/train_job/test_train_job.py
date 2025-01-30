@@ -184,7 +184,7 @@ def test_ndbv2_train(feedback_train_file, on_disk):
         on_disk=on_disk,
     )
 
-    db = ndbv2.NeuralDB.load(db_path)
+    db = ndbv2.FastDB.load(db_path)
 
     assert len(db.documents()) == 3
 
