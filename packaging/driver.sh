@@ -112,8 +112,12 @@ if [ "$ONBOARD_CLIENTS" -eq 1 ] || [ "$CLEANUP" -eq 1 ]; then
     # SKIP: No need of these credentials in case of 'ON-BOARDING CLIENTS' or 'CLEANUP'
     :
 elif [ ! -z "$aws_secret_name" ]; then
+    if [ -f /etc/system-release ] && grep -qE "^Amazon Linux release 2(\s*\(.*\))?$" /etc/system-release; then
+        styled_message "Amazon Linux 2 doesn't support ansible with aws secret lookup feature currently." "31"
+        exit 1
+    fi
     # Information user aws needs to be configured
-    styled_message "INFO: Assuming that AWS is configured with the appropriate IAM role for secret lookup" "33"
+    styled_message "INFO: Assuming that AWS CLI is configured" "33"
     sleep 5
     EXTRA_VARS+=" aws_secret_name=$aws_secret_name"
 fi
