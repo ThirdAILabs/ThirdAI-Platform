@@ -8,20 +8,36 @@ import TypingAnimation from './TypingAnimation';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faStop } from '@fortawesome/free-solid-svg-icons';
+import { Alert, AlertTitle } from '@mui/material';
+
+interface LLMErrorProps {
+  open: boolean;
+}
+
+const LLMErrorNotification: React.FC<LLMErrorProps> = ({ open }) => {
+  if (!open) return null;
+
+  return (
+    <Alert severity="error" className="fixed top-4 right-4 shadow-lg z-[2000] w-96">
+      <AlertTitle>LLM Generation Failed</AlertTitle>
+      Please notify admin to reconfigure this app's LLM endpoint.
+    </Alert>
+  );
+};
 
 interface GeneratedAnswerProps {
   answer: string;
-  regenerateAndBypassCache?: () => void; // Function to trigger regeneration of the original query
+  regenerateAndBypassCache?: () => void;
   queryInfo?: {
     cachedQuery: string;
     userQuery: string;
     isDifferent: boolean;
-  } | null; // Accept null as a possible type
+  } | null;
   cacheEnabled: boolean;
-  setCacheEnabled: (enabled: boolean) => void; // Update to accept a boolean argument
-  abortController: AbortController | null; // Add abortController, which can be null
-  setAbortController: (controller: AbortController | null) => void; // Function to set abortController
-  setAnswer: (answer: string) => void; // Function to update the answer
+  setCacheEnabled: (enabled: boolean) => void;
+  abortController: AbortController | null;
+  setAbortController: (controller: AbortController | null) => void;
+  setAnswer: (answer: string) => void;
 }
 
 // Styled component for the button
@@ -88,10 +104,20 @@ export default function GeneratedAnswer({
   setAnswer,
 }: GeneratedAnswerProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showError, setShowError] = useState(false);
 
   useEffect(() => {
     setIsGenerating(!!abortController);
   }, [abortController]);
+
+  useEffect(() => {
+    // Check if the answer is just whitespace
+    if (answer.trim() === '' && !isGenerating) {
+      setShowError(true);
+    } else {
+      setShowError(false);
+    }
+  }, [answer, isGenerating]);
 
   const handleAbort = () => {
     if (abortController) {
@@ -104,6 +130,8 @@ export default function GeneratedAnswer({
 
   return (
     <Container>
+      <LLMErrorNotification open={showError} />
+
       <Header>
         Generated Answer
         <Spacer $width="10px" />

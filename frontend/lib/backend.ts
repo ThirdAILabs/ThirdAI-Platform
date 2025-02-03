@@ -2473,3 +2473,24 @@ export const deleteSelfHostedLLM = (): Promise<LLMAPIResponse> => {
     .delete(`${deploymentBaseUrl}/api/integrations/self-hosted-llm`)
     .then((res) => res.data);
 };
+
+interface App {
+  id: string;
+  name: string;
+}
+
+export async function getAppsUsingLLM(): Promise<App[]> {
+  try {
+    const workflows = await fetchWorkflows();
+    const appsUsingLLM = workflows.filter(
+      (workflow) => workflow.attributes?.llm_provider === 'self-host'
+    );
+
+    return appsUsingLLM.map((workflow) => ({
+      id: workflow.model_id,
+      name: workflow.model_name,
+    }));
+  } catch (error) {
+    throw new Error('Failed to check apps using LLM endpoint');
+  }
+}

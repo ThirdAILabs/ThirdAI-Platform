@@ -12,10 +12,24 @@ import {
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { getSelfHostedLLM, addSelfHostedLLM, deleteSelfHostedLLM } from '@/lib/backend';
+import {
+  getSelfHostedLLM,
+  addSelfHostedLLM,
+  deleteSelfHostedLLM,
+  getAppsUsingLLM,
+} from '@/lib/backend';
 import type { SelfHostedLLM } from '@/lib/backend';
+
+interface App {
+  id: string;
+  name: string;
+}
 
 export default function SelfHostLLMComponent() {
   const [endpoint, setEndpoint] = useState<SelfHostedLLM | null>(null);
@@ -26,6 +40,9 @@ export default function SelfHostLLMComponent() {
     endpoint: '',
     api_key: '',
   });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [appsUsingLLM, setAppsUsingLLM] = useState<App[]>([]);
+  const [checkingApps, setCheckingApps] = useState(false);
 
   useEffect(() => {
     fetchEndpoint();
@@ -34,13 +51,36 @@ export default function SelfHostLLMComponent() {
   const fetchEndpoint = async (): Promise<void> => {
     try {
       const response = await getSelfHostedLLM();
-      console.log('response', response);
       if (response.data?.endpoint && response.data?.api_key) {
-        console.log('response data valid', response.data);
         setEndpoint(response.data);
       }
     } catch (error) {
       setError('Failed to fetch endpoint');
+    }
+  };
+
+  const handleDeleteClick = async () => {
+    setCheckingApps(true);
+    try {
+      const apps = await getAppsUsingLLM();
+      console.log('Apps using this LLM endpoint:', apps);
+      setAppsUsingLLM(apps);
+      setDeleteDialogOpen(true);
+    } catch (error) {
+      setError('Failed to check apps using this endpoint');
+    } finally {
+      setCheckingApps(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      await deleteSelfHostedLLM();
+      setSuccess('Endpoint deleted successfully');
+      setEndpoint(null);
+      setDeleteDialogOpen(false);
+    } catch (error: any) {
+      setError(error.response?.data?.detail || 'Failed to delete endpoint');
     }
   };
 
@@ -64,16 +104,6 @@ export default function SelfHostLLMComponent() {
       setError(error.response?.data?.detail || 'Failed to add endpoint');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDelete = async (): Promise<void> => {
-    try {
-      await deleteSelfHostedLLM();
-      setSuccess('Endpoint deleted successfully');
-      setEndpoint(null);
-    } catch (error: any) {
-      setError(error.response?.data?.detail || 'Failed to delete endpoint');
     }
   };
 
@@ -162,16 +192,50 @@ export default function SelfHostLLMComponent() {
                 <IconButton
                   edge="end"
                   aria-label="delete"
-                  onClick={handleDelete}
+                  onClick={handleDeleteClick}
+                  disabled={checkingApps}
                   sx={{ color: 'error.main' }}
                 >
-                  <DeleteIcon />
+                  {checkingApps ? <CircularProgress size={24} /> : <DeleteIcon />}
                 </IconButton>
               </ListItemSecondaryAction>
             </ListItem>
           </List>
         </Paper>
       )}
+
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Delete LLM Endpoint</DialogTitle>
+        <DialogContent>
+          {appsUsingLLM.length > 0 ? (
+            <>
+              <Typography variant="body1" sx={{ mb: 2 }}>
+                The following apps are currently using this endpoint:
+              </Typography>
+              <List>
+                {appsUsingLLM.map((app) => (
+                  <ListItem key={app.id}>
+                    <ListItemText primary={app.name} />
+                  </ListItem>
+                ))}
+              </List>
+              <Typography variant="body2" color="error">
+                Deleting this endpoint will affect these applications.
+              </Typography>
+            </>
+          ) : (
+            <Typography variant="body1">
+              Are you sure you want to delete this endpoint?
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleConfirmDelete} color="error">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
