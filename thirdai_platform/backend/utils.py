@@ -703,9 +703,8 @@ def copy_data_storage(old_model: schema.Model, new_model: schema.Model):
 def remove_unused_samples(model: schema.Model):
     # remove unused samples from the old storage and rollback metadata to be in a consistent state
     storage_dir = Path(model_bazaar_path()) / "data" / str(model.id)
-    data_storage = storage.DataStorage(
-        connector=storage.SQLiteConnector(db_path=storage_dir / "data_storage.db")
-    )
+    data_storage = storage.DataStorage(db_path=storage_dir / "data_storage.db")
+
     data_storage.remove_untrained_samples("ner")
     data_storage.rollback_metadata("tags_and_status")
 

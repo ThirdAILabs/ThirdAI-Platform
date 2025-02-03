@@ -1,6 +1,7 @@
 pass
 import os
 import time
+from typing import Union
 
 pass
 from dataclasses import dataclass
@@ -28,6 +29,7 @@ from platform_common.ndb.ndbv1_parser import convert_to_ndb_file
 from platform_common.pii.data_types import (
     UnstructuredTokenClassificationResults,
     XMLTokenClassificationResults,
+    XMLUserFeedback,
 )
 from platform_common.pydantic_models.deployment import DeploymentConfig, UDTSubType
 from platform_common.thirdai_storage.data_types import (
@@ -457,7 +459,7 @@ class UDTRouterTokenClassification(UDTBaseRouter):
 
     def insert_sample(
         self,
-        sample: TokenClassificationData,
+        sample: Union[TokenClassificationData, XMLUserFeedback],
         token=Depends(Permissions.verify_permission("write")),
     ):
         """

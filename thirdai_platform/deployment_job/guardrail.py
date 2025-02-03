@@ -115,6 +115,8 @@ class Guardrail:
                 for entity, tag in zip(entities, tags)
             ]
 
+            self.logger.debug(f"Redacted PII: {entities}", code=LogCode.GUARDRAILS)
+
             return " ".join(entities)
         except Exception as e:
             message = f"Error redacting PII: {e}"
