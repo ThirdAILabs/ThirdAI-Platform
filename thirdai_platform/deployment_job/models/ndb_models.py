@@ -195,17 +195,17 @@ class NDBModel(Model):
             # get the first chunk of the document to check it's type
             chunks = self.db.chunk_store.get_chunks(chunk_ids[:1])
 
+            doc_type = Path(chunks[0].document).suffix.lower()
+            if doc_type not in [".csv", ".docx", ".html", ".pdf"]:
+                raise ValueError(f"{doc_type} is not supported.")
+        
             doc_summarized_metadata = (
                 self.db.chunk_store.document_metadata_summary.summarized_metadata[
                     (doc_id, doc_version)
                 ]
             )
 
-        doc_type = Path(chunks[0].document).suffix.lower()
         result = {}
-
-        if doc_type not in [".csv", ".docx", ".html", ".pdf"]:
-            raise ValueError(f"{doc_type} is not supported.")
         is_pdf = doc_type == ".pdf"
 
         for metadata_key_name, summarized in doc_summarized_metadata.items():
