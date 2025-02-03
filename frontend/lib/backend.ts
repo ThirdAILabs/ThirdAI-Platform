@@ -2003,7 +2003,7 @@ interface ReportStatus {
 }
 
 export function useKnowledgeExtractionEndpoints(workflowId: string | null) {
-  const accessToken = useAccessToken();
+  const accessToken = getAccessToken();
   const deploymentUrl = workflowId ? `${deploymentBaseUrl}/${workflowId}` : undefined;
 
   const listReports = async (): Promise<ReportStatus['data']> => {
