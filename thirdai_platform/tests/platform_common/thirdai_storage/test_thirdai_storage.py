@@ -1,6 +1,10 @@
 from uuid import uuid4
 
 import pytest
+from platform_common.pii.data_types import (
+    XMLUserFeedback,
+    convert_xml_feedback_to_storage_format,
+)
 from platform_common.thirdai_storage.data_types import (
     DataSample,
     LabelEntity,
@@ -10,20 +14,18 @@ from platform_common.thirdai_storage.data_types import (
     SampleStatus,
     TagMetadata,
     TokenClassificationData,
+    XMLElementData,
+    XMLFeedbackData,
 )
-from platform_common.thirdai_storage.storage import DataStorage, SQLiteConnector
+from platform_common.thirdai_storage.schemas import XMLElement, XMLLog
+from platform_common.thirdai_storage.storage import DataStorage
 
 pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture
-def sqlite_connector():
-    return SQLiteConnector(db_path=":memory:")
-
-
-@pytest.fixture
-def data_storage(sqlite_connector):
-    return DataStorage(connector=sqlite_connector)
+def data_storage():
+    return DataStorage(db_path=":memory:")
 
 
 def sample_data():
@@ -147,3 +149,164 @@ def test_remove_untrained_samples(data_storage):
         "ner", num_samples=5, user_provided=True
     )
     assert len(remaining_samples) == 0, "Untrained samples should be removed"
+
+
+def test_xml_basic_insertion(data_storage):
+    xml_query = """<Employee>
+  <Email Name = "work email">
+          shubh@thirdai.com
+  </Email>
+</Employee>"""
+    log, feedbacks = convert_xml_feedback_to_storage_format(
+        XMLUserFeedback(datatype="xml", xml_string=xml_query, feedbacks=[])
+    )
+
+    assert len(log.elements) == 2, "Expected 2 elements in the log"
+    assert len(feedbacks) == 0, "Expected 0 feedbacks"
+    assert log.elements[0] == XMLElementData(
+        xpath="/Employee/Email[@Name='work email']", attribute="Name", n_tokens=2
+    )
+    assert log.elements[1] == XMLElementData(
+        xpath="/Employee/Email[@Name='work email']", attribute=None, n_tokens=1
+    )
+
+    log_id = data_storage.add_xml_log(log)
+
+    inserted_log = data_storage.get_xml_log_by_id(log_id)
+
+    assert inserted_log.xml_string == log.xml_string
+    assert len(inserted_log.elements) == 2
+
+    assert inserted_log.elements[0] == log.elements[0]
+    assert inserted_log.elements[1] == log.elements[1]
+
+
+def test_xml_basic_feedback(data_storage):
+    xml_query = """<Employee>
+  <Email Name = "email">
+          shubh@thirdai.com
+  </Email>
+  <Phone Type = "work">
+          123-456-7890
+  </Phone>
+</Employee>"""
+
+    # Create initial XML log with elements but no feedback
+    log, feedbacks = convert_xml_feedback_to_storage_format(
+        XMLUserFeedback(datatype="xml", xml_string=xml_query, feedbacks=[])
+    )
+
+    assert len(log.elements) == 4  # 2 elements with attributes, 2 without
+    log_id = data_storage.add_xml_log(log)
+
+    # Create feedback for email
+    feedback_items = [
+        XMLFeedbackData(
+            element=XMLElementData(
+                xpath="/Employee/Email[@Name='email']",
+                attribute=None,
+                n_tokens=1,
+            ),
+            token_start=0,
+            token_end=1,
+            label="EMAIL",
+        )
+    ]
+
+    data_storage.store_user_xml_feedback(log_id, feedback_items)
+
+    # Verify storage
+    session = data_storage.xml.Session()
+    inserted_log = session.query(XMLLog).get(log_id)
+    assert len(inserted_log.feedback) == 1
+    assert inserted_log.feedback[0].element.xpath == "/Employee/Email[@Name='email']"
+    assert inserted_log.feedback[0].label == "EMAIL"
+
+
+def test_xml_element_reuse(data_storage):
+    xml1 = """<Employee>
+  <Email Name = "email">
+          shubh@thirdai.com
+  </Email>
+</Employee>"""
+
+    xml2 = """<Employee>
+  <Email Name = "email">
+          david@thirdai.com
+  </Email>
+  <Phone>
+          123-456-7890
+  </Phone>
+</Employee>"""
+
+    log1, _ = convert_xml_feedback_to_storage_format(
+        XMLUserFeedback(datatype="xml", xml_string=xml1, feedbacks=[])
+    )
+    data_storage.add_xml_log(log1)
+
+    log2, _ = convert_xml_feedback_to_storage_format(
+        XMLUserFeedback(datatype="xml", xml_string=xml2, feedbacks=[])
+    )
+    data_storage.add_xml_log(log2)
+
+    # log1 and log2 have overlapping element /Employee/Email[@Name='email']
+    # with attr email and /Employee/Email[@Name='email'] with attr None
+    session = data_storage.xml.Session()
+    element_count = session.query(XMLElement).count()
+    assert element_count == 3
+
+
+def test_xml_feedback_conflict(data_storage):
+    xml_query = """<Employee>
+  <Worker type = "name">
+          jonathan burger
+  </Worker>
+</Employee>"""
+
+    log, _ = convert_xml_feedback_to_storage_format(
+        XMLUserFeedback(datatype="xml", xml_string=xml_query, feedbacks=[])
+    )
+    log_id = data_storage.add_xml_log(log)
+
+    feedback_items = [
+        XMLFeedbackData(
+            element=XMLElementData(
+                xpath="/Employee/Worker[@type='name']",
+                attribute=None,
+                n_tokens=2,
+            ),
+            token_start=0,
+            token_end=2,
+            label="NAME",
+            user_provided=True,
+        ),
+        XMLFeedbackData(
+            element=XMLElementData(
+                xpath="/Employee/Worker[@type='name']",
+                attribute=None,
+                n_tokens=1,
+            ),
+            token_start=0,
+            token_end=1,
+            label="DATA_TYPE",
+            user_provided=True,
+        ),
+    ]
+    data_storage.store_user_xml_feedback(log_id, feedback_items)
+
+    conflicting_feedback = XMLFeedbackData(
+        element=XMLElementData(
+            xpath="/Employee/Worker[@type='name']",
+            attribute=None,
+            n_tokens=2,
+        ),
+        token_start=1,
+        token_end=2,
+        label="NOT_NAME",
+        user_provided=True,
+    )
+
+    conflicts = data_storage.find_conflicting_xml_feedback(conflicting_feedback)
+    assert len(conflicts) == 1
+    assert conflicts[0].element.xpath == "/Employee/Worker[@type='name']"
+    assert conflicts[0].label == "NAME"
