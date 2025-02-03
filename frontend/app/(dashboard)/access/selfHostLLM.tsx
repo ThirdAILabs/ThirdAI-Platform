@@ -225,7 +225,7 @@ export default function SelfHostLLMComponent() {
             </>
           ) : (
             <Typography variant="body1">
-              No apps are currently using this endpoint. Are you sure you want to delete it?
+              Are you sure you want to delete this endpoint?
             </Typography>
           )}
         </DialogContent>
