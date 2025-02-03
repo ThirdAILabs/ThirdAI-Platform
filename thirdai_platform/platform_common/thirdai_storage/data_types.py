@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import ClassVar, Dict, List, Union
+from typing import ClassVar, Dict, List, Optional, Union
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -189,3 +189,24 @@ class Metadata(BaseModel):
     def rollback(self):
         self.data.rollback()
         self.status = MetadataStatus.unchanged
+
+
+class XMLElementData(SerializableBaseModel):
+    xpath: str
+    attribute: Optional[str]
+    n_tokens: int
+
+
+class XMLLogData(SerializableBaseModel):
+    xml_string: str
+    elements: List[XMLElementData]
+
+
+class XMLFeedbackData(SerializableBaseModel):
+    id: Optional[int] = None
+    element: XMLElementData
+    token_start: int
+    token_end: int
+    label: str
+    status: SampleStatus = SampleStatus.untrained
+    user_provided: bool = True

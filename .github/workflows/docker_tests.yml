@@ -175,13 +175,29 @@ jobs:
           cd thirdai_platform
           pip install -r requirements.txt
 
-      - name: Revert Back to original alembic version
+      - name: Install PostgreSQL client
+        if: always()
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Reset Database
         if: always()
         env:
           DATABASE_URI: ${{ secrets.DATABASE_URI }}
         run: |
           cd thirdai_platform
-          alembic downgrade ${{ steps.version.outputs.alembic_version }}
+          # Get current version
+          CURRENT_VERSION=$(alembic current)
+          if [ $? -eq 0 ] && [ ! -z "$CURRENT_VERSION" ]; then
+            # Try downgrade if we have a current version
+            alembic downgrade base || {
+              # If downgrade fails, drop and recreate schema
+              psql "$DATABASE_URI" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+            }
+          else
+            # If no version or error, drop and recreate schema
+            psql "$DATABASE_URI" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+          fi
 
       - name: Read Nomad ACL Token
         if: always()
