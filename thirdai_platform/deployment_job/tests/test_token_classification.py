@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 from unittest.mock import patch
 
+import pandas as pd
 import pytest
 from deployment_job.permissions import Permissions
 from deployment_job.routers.udt import UDTRouterTokenClassification
@@ -162,3 +163,152 @@ def test_deployment_token_classification_xml(tmp_dir):
             },
         }
     ]
+
+
+@pytest.fixture
+def sample_test_file(tmp_dir):
+    """Create a sample test CSV file for evaluation"""
+    test_data = pd.DataFrame(
+        {
+            "source": [
+                "My email is test@example.com",
+                "Contact us at info@company.com",
+            ],
+            "target": ["O O O EMAIL", "O O O EMAIL"],
+        }
+    )
+
+    file_path = Path(tmp_dir) / "test_data.csv"
+    test_data.to_csv(file_path, index=False)
+    return str(file_path)
+
+
+@pytest.mark.unit
+@patch.object(Permissions, "verify_permission", mock_verify_permission)
+@patch.object(Permissions, "check_permission", mock_check_permission)
+@patch.object(Permissions, "_deployment_permissions", mock_deployment_permissions)
+def test_evaluate_endpoint_success(tmp_dir, sample_test_file):
+    """Test successful evaluation with valid test file"""
+    config = create_config(tmp_dir)
+    router = UDTRouterTokenClassification(config, None, logger)
+    client = TestClient(router.router)
+
+    # Create file upload
+    with open(sample_test_file, "rb") as f:
+        files = {"file": ("test_data.csv", f, "text/csv")}
+        response = client.post("/evaluate", files=files)
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+
+    # Check response structure
+    assert "metrics" in data
+    assert "examples" in data
+    assert all(
+        k in data["examples"]
+        for k in ["true_positives", "false_positives", "false_negatives"]
+    )
+
+    # Check metrics for EMAIL tag
+    email_metrics = data["metrics"].get("EMAIL", {})
+    assert all(k in email_metrics for k in ["precision", "recall", "fmeasure"])
+
+
+@pytest.mark.unit
+@patch.object(Permissions, "verify_permission", mock_verify_permission)
+@patch.object(Permissions, "check_permission", mock_check_permission)
+@patch.object(Permissions, "_deployment_permissions", mock_deployment_permissions)
+def test_evaluate_endpoint_invalid_file(tmp_dir):
+    """Test evaluation with invalid file format"""
+    config = create_config(tmp_dir)
+    router = UDTRouterTokenClassification(config, None, logger)
+    client = TestClient(router.router)
+
+    # Create invalid file
+    invalid_file_path = Path(tmp_dir) / "invalid.txt"
+    invalid_file_path.write_text("invalid data")
+
+    with open(invalid_file_path, "rb") as f:
+        files = {"file": ("invalid.txt", f, "text/plain")}
+        response = client.post("/evaluate", files=files)
+
+    assert (
+        response.status_code == 400
+    )  # Bad Request is more appropriate for invalid file type
+    assert "Invalid file format" in response.json()["message"]  # Verify error message
+
+
+@pytest.mark.unit
+@patch.object(Permissions, "verify_permission", mock_verify_permission)
+@patch.object(Permissions, "check_permission", mock_check_permission)
+@patch.object(Permissions, "_deployment_permissions", mock_deployment_permissions)
+def test_evaluate_endpoint_empty_file(tmp_dir):
+    """Test evaluation with empty CSV file"""
+    config = create_config(tmp_dir)
+    router = UDTRouterTokenClassification(config, None, logger)
+    client = TestClient(router.router)
+
+    # Create empty CSV file
+    empty_file_path = Path(tmp_dir) / "empty.csv"
+    pd.DataFrame(columns=["source", "target"]).to_csv(empty_file_path, index=False)
+
+    with open(empty_file_path, "rb") as f:
+        files = {"file": ("empty.csv", f, "text/csv")}
+        response = client.post("/evaluate", files=files)
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert "metrics" in data
+    assert "examples" in data
+
+
+@pytest.fixture
+def large_test_file(tmp_dir):
+    """Create a test CSV file that exceeds the size limit (1MB)"""
+    # Create a large string that will make the file exceed 1MB
+    # Increased the multiplier to ensure we go over 1MB
+    large_text = "This is a very long email " + "x" * 100000 + " test@example.com"
+
+    # Create enough rows to exceed 1MB
+    test_data = pd.DataFrame(
+        {
+            "source": [large_text] * 20,  # Multiple rows of large text
+            "target": ["O O O O EMAIL"] * 20,  # Corresponding labels
+        }
+    )
+
+    file_path = Path(tmp_dir) / "large_test_data.csv"
+    test_data.to_csv(file_path, index=False)
+
+    # Verify the file is actually larger than 1MB
+    assert (
+        file_path.stat().st_size > UDTRouterTokenClassification.MAX_FILE_SIZE_BYTES
+    ), f"File size {file_path.stat().st_size} bytes is not greater than {UDTRouterTokenClassification.MAX_FILE_SIZE_BYTES} bytes"
+
+    return str(file_path)
+
+
+@pytest.mark.unit
+@patch.object(Permissions, "verify_permission", mock_verify_permission)
+@patch.object(Permissions, "check_permission", mock_check_permission)
+@patch.object(Permissions, "_deployment_permissions", mock_deployment_permissions)
+def test_evaluate_endpoint_file_too_large(tmp_dir, large_test_file):
+    """Test evaluation with a file that exceeds the size limit"""
+    config = create_config(tmp_dir)
+    router = UDTRouterTokenClassification(config, None, logger)
+    client = TestClient(router.router)
+
+    with open(large_test_file, "rb") as f:
+        files = {"file": ("large_test_data.csv", f, "text/csv")}
+        response = client.post("/evaluate", files=files)
+
+    assert response.status_code == 413  # HTTP 413 Request Entity Too Large
+    assert "File size exceeds 1MB limit" in response.json()["message"]
+
+    # Verify the error message format matches our API response structure
+    error_response = response.json()
+    assert "status" in error_response
+    assert "message" in error_response
+    assert (
+        error_response["status"] == "failed"
+    )  # Changed from "error" to "failed" to match API response

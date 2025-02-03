@@ -1,5 +1,6 @@
 import json
-import math
+
+pass
 import os
 import random
 import shutil
@@ -7,7 +8,8 @@ import tempfile
 import time
 import typing
 from abc import abstractmethod
-from collections import defaultdict
+
+pass
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from logging import Logger
@@ -22,6 +24,7 @@ from platform_common.file_handler import (
     get_local_file_infos,
 )
 from platform_common.logging import LogCode
+from platform_common.metrics import calculate_ner_metrics
 from platform_common.pii.udt_common_patterns import find_common_pattern
 from platform_common.pydantic_models.training import (
     FileInfo,
@@ -823,96 +826,18 @@ class TokenClassificationModel(ClassificationModel):
             self.cleanup_temp_dirs()
 
     def per_tag_metrics(self, model, test_files: List[str], samples_to_collect: int):
-        true_positives = defaultdict(int)
-        false_positives = defaultdict(int)
-        false_negatives = defaultdict(int)
-
-        true_positive_samples = defaultdict(list)
-        false_positive_samples = defaultdict(list)
-        false_negative_samples = defaultdict(list)
-
         source_col, target_col = model.source_target_columns()
 
-        for file in test_files:
-            df = pd.read_csv(file)
-            for row in df.itertuples():
-                source = getattr(row, source_col)
-                target = getattr(row, target_col)
+        # Combine data from all test files
+        dfs = [pd.read_csv(file) for file in test_files]
+        combined_df = pd.concat(dfs, ignore_index=True)
 
-                preds = model.predict({source_col: source}, top_k=1)
-                predictions = " ".join(p[0][0] for p in preds)
-                labels = target.split()
-                for i, (pred, label) in enumerate(zip(preds, labels)):
-                    tag = pred[0][0]
-                    if tag == label:
-                        true_positives[label] += 1
-                        if len(true_positive_samples[label]) < samples_to_collect:
-                            true_positive_samples[label].append(
-                                {
-                                    "source": source,
-                                    "target": target,
-                                    "predictions": predictions,
-                                    "index": i,
-                                }
-                            )
-                    else:
-                        false_positives[tag] += 1
-                        if len(false_positive_samples[tag]) < samples_to_collect:
-                            false_positive_samples[tag].append(
-                                {
-                                    "source": source,
-                                    "target": target,
-                                    "predictions": predictions,
-                                    "index": i,
-                                }
-                            )
-                        false_negatives[label] += 1
-                        if len(false_negative_samples[label]) < samples_to_collect:
-                            false_negative_samples[label].append(
-                                {
-                                    "source": source,
-                                    "target": target,
-                                    "predictions": predictions,
-                                    "index": i,
-                                }
-                            )
-
-        metric_summary = {}
-        for tag in model.list_ner_tags():
-            if tag == "O":
-                continue
-
-            tp = true_positives[tag]
-
-            if tp + false_positives[tag] == 0:
-                precision = float("nan")
-            else:
-                precision = tp / (tp + false_positives[tag])
-
-            if tp + false_negatives[tag] == 0:
-                recall = float("nan")
-            else:
-                recall = tp / (tp + false_negatives[tag])
-
-            if precision + recall == 0:
-                fmeasure = float("nan")
-            else:
-                fmeasure = 2 * precision * recall / (precision + recall)
-
-            metric_summary[tag] = {
-                "precision": "NaN" if math.isnan(precision) else round(precision, 3),
-                "recall": "NaN" if math.isnan(recall) else round(recall, 3),
-                "fmeasure": "NaN" if math.isnan(fmeasure) else round(fmeasure, 3),
-            }
-
-        def remove_null_tag(samples: Dict[str, Any]) -> Dict[str, Any]:
-            return {k: v for k, v in samples.items() if k != "O"}
-
-        return PerTagMetrics(
-            metrics=metric_summary,
-            true_positives=remove_null_tag(true_positive_samples),
-            false_positives=remove_null_tag(false_positive_samples),
-            false_negatives=remove_null_tag(false_negative_samples),
+        return calculate_ner_metrics(
+            model=model,
+            test_data=combined_df,
+            source_col=source_col,
+            target_col=target_col,
+            samples_to_collect=samples_to_collect,
         )
 
     def save_train_report(

@@ -1,7 +1,13 @@
+pass
 import os
 import time
 from typing import Union
 
+pass
+from dataclasses import dataclass
+from typing import Any, Dict, List
+
+import pandas as pd
 from deployment_job.models.classification_models import (
     ClassificationModel,
     TextClassificationModel,
@@ -18,6 +24,7 @@ from fastapi import APIRouter, Depends, Query, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from platform_common.dependencies import is_on_low_disk
 from platform_common.logging import JobLogger, LogCode
+from platform_common.metrics import calculate_ner_metrics
 from platform_common.ndb.ndbv1_parser import convert_to_ndb_file
 from platform_common.pii.data_types import (
     UnstructuredTokenClassificationResults,
@@ -262,7 +269,19 @@ class UDTRouterTextClassification(UDTBaseRouter):
         )
 
 
+@dataclass
+class PerTagMetrics:
+    metrics: Dict[str, Dict[str, float]]
+
+    true_positives: List[Dict[str, Any]]
+    false_positives: List[Dict[str, Any]]
+    false_negatives: List[Dict[str, Any]]
+
+
 class UDTRouterTokenClassification(UDTBaseRouter):
+    MAX_FILE_SIZE_MB = 1
+    MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024  # 1MB in bytes
+
     def __init__(self, config: DeploymentConfig, reporter: Reporter, logger: JobLogger):
         super().__init__(config, reporter, logger)
         # The following routes are only applicable for token classification models
@@ -279,6 +298,113 @@ class UDTRouterTokenClassification(UDTBaseRouter):
             "/get_recent_samples", self.get_recent_samples, methods=["GET"]
         )
         self.router.add_api_route("/predict", self.predict, methods=["POST"])
+        self.router.add_api_route("/evaluate", self.evaluate, methods=["POST"])
+
+    def evaluate_model(
+        self, model, test_file: str, samples_to_collect: int = 5
+    ) -> PerTagMetrics:
+        """
+        Evaluates the model performance using the provided test file.
+
+        Args:
+            model: The NER model to evaluate
+            test_file: Path to the test CSV file
+            samples_to_collect: Number of example samples to collect for each metric
+
+        Returns:
+            PerTagMetrics containing precision, recall, F1 scores and example samples
+        """
+        source_col, target_col = model.source_target_columns()
+        df = pd.read_csv(test_file)
+
+        return calculate_ner_metrics(
+            model=model,
+            test_data=df,
+            source_col=source_col,
+            target_col=target_col,
+            samples_to_collect=samples_to_collect,
+        )
+
+    async def evaluate(
+        self,
+        file: UploadFile,
+        samples_to_collect: int = 5,
+        token=Depends(Permissions.verify_permission("read")),
+    ):
+        """
+        Evaluates the NER model performance using a provided test file.
+        Includes file size validation.
+        """
+        try:
+            # Validate file format
+            if not file.filename.endswith(".csv"):
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="Invalid file format. Only CSV files are supported.",
+                )
+
+            # Read file content to check size
+            contents = await file.read(size=self.MAX_FILE_SIZE_BYTES + 1)
+            if len(contents) > self.MAX_FILE_SIZE_BYTES:
+                return response(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    message=f"File size exceeds {self.MAX_FILE_SIZE_MB}MB limit. Please upload a smaller file.",
+                )
+
+            # Save uploaded file temporarily
+            destination_path = self.model.data_dir / file.filename
+            with open(destination_path, "wb") as f:
+                f.write(contents)
+
+            try:
+                # Try to read as CSV to validate format
+                pd.read_csv(destination_path)
+            except Exception as e:
+                destination_path.unlink()  # Clean up file
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message=f"Invalid CSV format: {str(e)}",
+                )
+
+            self.logger.info(
+                f"Starting evaluation on file: {file.filename}",
+                code=LogCode.MODEL_TRAIN,
+            )
+
+            # Evaluate the model
+            evaluation_results = self.evaluate_model(
+                model=self.model.model,
+                test_file=str(destination_path),
+                samples_to_collect=samples_to_collect,
+            )
+
+            # Clean up the temporary file
+            destination_path.unlink()
+
+            return response(
+                status_code=status.HTTP_200_OK,
+                message="Evaluation completed successfully",
+                data={
+                    "metrics": evaluation_results.metrics,
+                    "examples": {
+                        "true_positives": evaluation_results.true_positives,
+                        "false_positives": evaluation_results.false_positives,
+                        "false_negatives": evaluation_results.false_negatives,
+                    },
+                },
+            )
+
+        except Exception as e:
+            self.logger.error(
+                f"Error during model evaluation: {str(e)}",
+                code=LogCode.MODEL_TRAIN,
+            )
+            if "destination_path" in locals() and destination_path.exists():
+                destination_path.unlink()
+            return response(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"Error during evaluation: {str(e)}",
+            )
 
     @staticmethod
     def get_model(config: DeploymentConfig, logger: JobLogger) -> ClassificationModel:

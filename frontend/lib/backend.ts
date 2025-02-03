@@ -1601,6 +1601,81 @@ export interface InsertSamplePayload {
   tags: string[];
 }
 
+// Interfaces for evaluation response
+export interface EvaluationMetrics {
+  [labelName: string]: MetricValues;
+}
+
+export interface EvaluationExamples {
+  true_positives: LabelExamples;
+  false_positives: LabelExamples;
+  false_negatives: LabelExamples;
+}
+
+export interface EvaluationData {
+  metrics: EvaluationMetrics;
+  examples: EvaluationExamples;
+}
+
+export interface EvaluationResponse {
+  status: string;
+  message: string;
+  data: EvaluationData;
+}
+
+export async function evaluateModel(
+  deploymentUrl: string,
+  file: File,
+  samplesToCollect: number = 5
+): Promise<EvaluationData> {
+  axios.defaults.headers.common.Authorization = `Bearer ${getAccessToken()}`;
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const response = await axios.post(`${deploymentUrl}/evaluate`, formData, {
+      params: { samples_to_collect: samplesToCollect },
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data.data;
+  } catch (error) {
+    console.error('Error evaluating model:', error);
+    alert('Error evaluating model: ' + error);
+    throw new Error('Failed to evaluate model');
+  }
+}
+
+// Constants
+const MAX_FILE_SIZE_MB = 1;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024; // 1MB in bytes
+
+// Type for validation result
+interface FileValidationResult {
+  isValid: boolean;
+  error?: string;
+}
+
+export function validateEvalFile(file: File): FileValidationResult {
+  if (!file) {
+    return { isValid: false, error: 'Please select a CSV file first' };
+  }
+
+  if (!file.name.endsWith('.csv')) {
+    return { isValid: false, error: 'Only CSV files are supported' };
+  }
+
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    return {
+      isValid: false,
+      error: `File size exceeds ${MAX_FILE_SIZE_MB}MB limit. Please upload a smaller file.`,
+    };
+  }
+
+  return { isValid: true };
+}
+
 export function useTokenClassificationEndpoints() {
   const accessToken = useAccessToken();
   const params = useParams();
