@@ -820,9 +820,7 @@ def retrain_udt(
         remove_unused_samples(base_model)
 
     storage_dir = Path(model_bazaar_path()) / "data" / str(model.id)
-    data_storage = storage.DataStorage(
-        connector=storage.SQLiteConnector(db_path=storage_dir / "data_storage.db")
-    )
+    data_storage = storage.DataStorage(db_path=storage_dir / "data_storage.db")
 
     tags = tags_in_storage(data_storage)
     token_classification_samples = retrieve_token_classification_samples_for_generation(

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import pandas as pd
+import platform_common.ndb.ndbv2_parser as ndbv2_parser
 import thirdai
 from platform_common.file_handler import (
     expand_cloud_buckets_and_directories,
@@ -23,6 +24,8 @@ from platform_common.file_handler import (
 from platform_common.logging import LogCode
 from platform_common.pii.udt_common_patterns import find_common_pattern
 from platform_common.pydantic_models.training import (
+    FileInfo,
+    FileLocation,
     TextClassificationOptions,
     TokenClassificationOptions,
     TrainConfig,
@@ -37,7 +40,7 @@ from platform_common.thirdai_storage.data_types import (
     SampleStatus,
     TagMetadata,
 )
-from platform_common.thirdai_storage.storage import DataStorage, SQLiteConnector
+from platform_common.thirdai_storage.storage import DataStorage
 from thirdai import bolt
 from train_job.models.model import Model
 from train_job.reporter import Reporter
@@ -337,7 +340,7 @@ class TextClassificationModel(ClassificationModel):
 
 import csv
 
-import PyPDF2
+pass
 from platform_common.file_handler import FileInfo
 
 
@@ -409,31 +412,56 @@ class DocClassificationModel(TextClassificationModel):
 
         processed_docs = []
         categories = set()
+        doc_save_dir = os.path.join(temp_dir, "doc_artifacts")
+        os.makedirs(doc_save_dir, exist_ok=True)
 
         for file_info in files:
             try:
-                file_path = file_info.path
+                # Check for unsupported cloud storage files
+                if file_info.location in {
+                    FileLocation.s3,
+                    FileLocation.azure,
+                    FileLocation.gcp,
+                }:
+                    self.logger.warning(
+                        f"Cloud storage files not supported for classification: {file_info.path}"
+                    )
+                    continue
+
                 # Extract category from parent directory name
-                category = os.path.basename(os.path.dirname(file_path))
+                category = os.path.basename(os.path.dirname(file_info.path))
                 categories.add(category)
 
-                # Read PDF file using PyPDF2
-                with open(file_path, "rb") as f:  # Note: 'rb' for binary reading
-                    pdf_reader = PyPDF2.PdfReader(f)
-                    text = ""
-                    for page in pdf_reader.pages:
-                        text += page.extract_text() + " "
+                # Use existing document parsing infrastructure
+                ndb_doc = ndbv2_parser.parse_doc(
+                    doc=file_info, doc_save_dir=doc_save_dir, tmp_dir=temp_dir
+                )
 
-                    # Truncate if needed
-                    word_limit = getattr(self.txt_cls_vars, "word_limit", 1000)
-                    words = text.split()[:word_limit]
-                    truncated_text = " ".join(words)
+                if not ndb_doc:
+                    self.logger.warning(f"Could not parse document: {file_info.path}")
+                    continue
+
+                # Handle pandas Series output - convert to string properly
+                texts = []
+                for chunk in ndb_doc.chunks():
+                    texts.extend(chunk.text)
+
+                text = " ".join(texts)
+
+                # Truncate if needed
+                word_limit = getattr(self.txt_cls_vars, "word_limit", 1000)
+                words = text.split()[:word_limit]
+                truncated_text = " ".join(words)
 
                 processed_docs.append({"text": truncated_text, "label": category})
+
             except Exception as e:
                 file_path_str = getattr(file_info, "path", "unknown file")
                 self.logger.error(f"Error processing file {file_path_str}: {str(e)}")
                 continue
+
+        if not processed_docs:
+            raise ValueError("No documents were successfully processed")
 
         # Create CSV file
         csv_path = os.path.join(temp_dir, "classification.csv")
@@ -572,9 +600,7 @@ class TokenClassificationModel(ClassificationModel):
         data_storage_path = self.data_dir / "data_storage.db"
         self.logger.debug(f"Loading data storage from {data_storage_path}.")
         # connector will instantiate an sqlite db at the specified path if it doesn't exist
-        self.data_storage = DataStorage(
-            connector=SQLiteConnector(db_path=data_storage_path)
-        )
+        self.data_storage = DataStorage(db_path=data_storage_path)
 
     @property
     def tag_metadata(self) -> TagMetadata:
@@ -956,7 +982,7 @@ class TokenClassificationModel(ClassificationModel):
             self.logger.debug(f"Inserting {len(samples)} samples into storage.")
 
             self.data_storage.insert_samples(samples=samples)
-            num_samples_in_storage = self.data_storage.connector.get_sample_count("ner")
+            num_samples_in_storage = self.data_storage.samples.get_sample_count("ner")
 
             self.logger.info(
                 f"Number of samples in storage after insertion: {num_samples_in_storage}",
