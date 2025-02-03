@@ -198,7 +198,7 @@ class NDBModel(Model):
             doc_type = Path(chunks[0].document).suffix.lower()
             if doc_type not in [".csv", ".docx", ".html", ".pdf"]:
                 raise ValueError(f"{doc_type} is not supported.")
-        
+
             doc_summarized_metadata = (
                 self.db.chunk_store.document_metadata_summary.summarized_metadata[
                     (doc_id, doc_version)
