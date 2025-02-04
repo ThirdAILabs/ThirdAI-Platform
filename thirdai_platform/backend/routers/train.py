@@ -494,6 +494,15 @@ def nlp_datagen(
             model_bazaar_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
             print("model_bazaar_endpoint", model_bazaar_endpoint)
 
+            if not model_bazaar_endpoint:
+                model_bazaar_endpoint = (
+                    "http://localhost:8000"
+                )
+
+            # Ensure the endpoint has a scheme
+            if not model_bazaar_endpoint.startswith(("http://", "https://")):
+                model_bazaar_endpoint = f"http://{model_bazaar_endpoint}"
+
             endpoint = urljoin(
                 model_bazaar_endpoint, "/api/integrations/self-hosted-llm"
             )
