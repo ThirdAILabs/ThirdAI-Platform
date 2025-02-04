@@ -2,6 +2,7 @@ FROM node:20-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
+RUN corepack prepare pnpm@10.0.0 --activate
 WORKDIR /app
 
 FROM base AS prod-deps
@@ -13,4 +14,4 @@ FROM base
 COPY --from=prod-deps /app/node_modules /app/node_modules
 COPY . .
 
-CMD [ "sh", "-c", "pnpm run build && pnpm start" ]
+CMD [ "sh", "-c", "corepack prepare pnpm@10.0.0 --activate && pnpm run build && pnpm start" ]
