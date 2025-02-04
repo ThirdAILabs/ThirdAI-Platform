@@ -74,7 +74,7 @@ async def start_on_prem_generate_job(
     if not share_dir:
         raise ValueError("SHARE_DIR variable is not set.")
     cwd = Path(os.getcwd())
-    mount_dir = os.path.join(model_bazaar_path(), "pretrained-models/genai")
+    mount_dir = os.path.join(model_bazaar_path(), "gen-ai-models")
     model_path = os.path.join(mount_dir, model_name)
     if not os.path.exists(model_path):
         raise ValueError(f"Cannot find model at location: {model_path}.")
@@ -88,7 +88,7 @@ async def start_on_prem_generate_job(
     return submit_nomad_job(
         nomad_endpoint=nomad_endpoint,
         filepath=str(cwd / "backend" / "nomad_jobs" / "on_prem_generation_job.hcl.j2"),
-        mount_dir=os.path.join(share_dir, "pretrained-models/genai"),
+        mount_dir=os.path.join(share_dir, "gen-ai-models"),
         initial_allocations=1,
         min_allocations=1,
         max_allocations=5,

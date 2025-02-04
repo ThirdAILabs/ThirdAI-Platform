@@ -22,13 +22,19 @@ RUN python3 -m pip install -U langchain-community
 
 COPY . /app
 
-# Disable outbound telemetry for the Unstructured library
+# The following block downloads pretrained HuggingFace models to our cache,
+# so they are not downloaded during runtime
+ENV HF_HOME=/app/.cache
+RUN mkdir -p /app/.cache
+COPY download_pretrained_transformers.py /app/
+RUN python3 download_pretrained_transformers.py
+
+# The following line disables telemetry for the Unstructured library
 ENV SCARF_NO_ANALYTICS=true
 
-# Disable outbound telemetry for the HuggingFace library
+# The following line disables telemetry for the HuggingFace library
 ENV HF_HUB_DISABLE_TELEMETRY=1
 
-# Download nltk models
 RUN python3 -m nltk.downloader -d /usr/share/nltk_data stopwords punkt_tab
 
 # Use build args instead of env variables to pass in these variables at build time
