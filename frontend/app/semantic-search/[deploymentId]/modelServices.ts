@@ -39,9 +39,19 @@ export interface PdfInfo {
   highlighted: Chunk;
 }
 
-export interface ChatMessage {
-  sender: string;
+interface Reference {
+  chunk_id: number;
+  query: string;
+  sourceURL: string;
+  sourceName: string;
   content: string;
+  metadata: any;
+}
+
+export interface ChatMessage {
+  sender: 'human' | 'AI';
+  content: string;
+  references?: Reference[]; // Add references to the message type
 }
 
 export interface ChatResponse {
@@ -380,6 +390,8 @@ export class ModelService {
   }
 
   getPdfInfo(reference: ReferenceInfo): Promise<PdfInfo> {
+    console.log('called getPdfInfo');
+
     const blobUrl = new URL(this.url + '/pdf-blob');
     blobUrl.searchParams.append('source', reference.sourceURL.toString());
     const blobPromise = fetch(blobUrl, { headers: this.authHeader() })
@@ -446,6 +458,7 @@ export class ModelService {
   }
 
   openHighlightedPDF(reference: ReferenceInfo) {
+    console.log('called openHighlightedPDF');
     const url = new URL(this.url + '/highlighted-pdf');
     url.searchParams.append('reference_id', reference.id.toString());
     fetch(url, { headers: this.authHeader() })
@@ -751,7 +764,13 @@ export class ModelService {
           });
         }
       })
-      .then((response) => response['data']['chat_history'] as ChatMessage[])
+      .then((response) => {
+        const chatHistory = response['data']['chat_history'] as ChatMessage[];
+        return chatHistory.map((message) => ({
+          ...message,
+          references: message.references || [], // Ensure references is always an array
+        }));
+      })
       .catch((e) => {
         console.error('Error fetching chat history:', e);
         alert('Error fetching chat history: ' + e);
@@ -762,6 +781,7 @@ export class ModelService {
   async chat(
     textInput: string,
     provider: string,
+    constraints: Record<string, { constraint_type: string; value: string }>,
     onNextWord: (str: string) => void,
     onComplete?: (finalResponse: string) => void,
     signal?: AbortSignal
@@ -773,6 +793,7 @@ export class ModelService {
           session_id: this.sessionId,
           user_input: textInput,
           provider: provider,
+          constraints: constraints,
         }),
         headers: {
           'Content-type': 'application/json; charset=UTF-8',
@@ -876,6 +897,30 @@ export class ModelService {
       console.error(e);
       alert(e);
       throw new Error('Failed to record feedback: ' + e);
+    }
+  }
+
+  async recordGeneratedResponseFeedback(feedback: boolean): Promise<any> {
+    try {
+      const response = await fetch(this.url + '/chat-feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.authHeader(),
+        },
+        body: JSON.stringify({ upvote: feedback }),
+      });
+
+      if (response.ok) {
+        return response.json();
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Unknown error occurred');
+      }
+    } catch (e) {
+      console.error(e);
+      alert(e);
+      throw new Error('Failed to record generated response feedback: ' + e);
     }
   }
 }

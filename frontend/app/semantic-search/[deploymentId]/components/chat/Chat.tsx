@@ -3,12 +3,44 @@ import ReactMarkdown from 'react-markdown';
 import styled from 'styled-components';
 import { borderRadius, color, duration, fontSizes, padding } from '../../stylingConstants';
 import { ModelServiceContext } from '../../Context';
-import { ChatMessage, ModelService } from '../../modelServices';
+import { ChatMessage, ModelService, ReferenceInfo, PdfInfo } from '../../modelServices';
+import { Chunk } from '../pdf_viewer/interfaces';
+import PdfViewer from '../pdf_viewer/PdfViewer';
 import TypingAnimation from '../TypingAnimation';
 import { piiDetect, useSentimentClassification } from '@/lib/backend'; // Import for sentiment classification
 // Import FontAwesomeIcon and faPause
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faStop } from '@fortawesome/free-solid-svg-icons';
+import { ThumbsUp, ThumbsDown } from 'lucide-react';
+
+const PdfViewerWrapper = styled.section`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  width: 100%;
+  height: 100%;
+  padding: ${padding.card};
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.95);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
+
+const ChatContainer = styled.section`
+  position: fixed;
+  width: 60%;
+  left: 10%;
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  z-index: 100;
+  height: 100%;
+  font-family: Helvetica, Arial, sans-serif;
+`;
 
 // Styled component for the pause button
 const PauseButton = styled.button`
@@ -35,19 +67,6 @@ const ChatBarContainer = styled.div`
   align-items: center;
   width: 100%; // Ensure it takes the full width
   margin: 10px 0 50px 0%; // Adjust margins as needed
-`;
-
-// Styled components for chat UI
-const ChatContainer = styled.section`
-  position: fixed;
-  width: 60%;
-  left: 10%;
-  display: flex;
-  flex-direction: column;
-  justify-content: end;
-  z-index: 100;
-  height: 100%;
-  font-family: Helvetica, Arial, sans-serif;
 `;
 
 const ChatBoxContainer = styled.section`
@@ -114,7 +133,7 @@ const Placeholder = styled.section`
 const labels = [
   {
     id: 1,
-    name: 'PHONENUMBER',
+    name: 'BRAND',
     color: 'blue',
     amount: '217,323',
     checked: true,
@@ -123,101 +142,246 @@ const labels = [
   },
   {
     id: 2,
-    name: 'SSN',
+    name: 'MODEL_NUMBER',
     color: 'orange',
     amount: '8,979',
     checked: true,
     description:
       'The format of a US Social Security Number (SSN) is XXX-XX-XXXX, where "X" represents a digit from 0 to 9. It consists of three parts: area, group, and serial numbers.',
   },
-  {
-    id: 3,
-    name: 'CREDITCARDNUMBER',
-    color: 'red',
-    amount: '13,272',
-    checked: true,
-    description:
-      'A US credit card number is a 16-digit number typically formatted as XXXX XXXX XXXX XXXX, where "X" represents a digit from 0 to 9. It includes the Issuer Identifier, account number, and a check digit.',
-  },
-  {
-    id: 4,
-    name: 'LOCATION',
-    color: 'green',
-    amount: '2,576,904',
-    checked: true,
-    description: `A US address format includes the recipient's name, street address (number and name), city, state abbreviation, and ZIP code, for example: John Doe 123 Main St Springfield, IL 62701`,
-  },
-  {
-    id: 5,
-    name: 'NAME',
-    color: 'purple',
-    amount: '1,758,131',
-    checked: true,
-    description: `An English name format typically consists of a first name, middle name(s), and last name (surname), for example: John Michael Smith. Titles and suffixes, like Mr. or Jr., may also be included.`,
-  },
 ];
 
 // ChatBox component to display human/AI message with sentiment
-function ChatBox({
-  message,
-  transformedMessage,
-  sentiment,
-}: {
-  message: ChatMessage;
-  transformedMessage?: string[][];
-  sentiment?: string;
-}) {
-  const sentimentColor = (sentiment: string) => {
-    switch (sentiment) {
-      case 'positive': // Positive sentiment
-        return 'green';
-      case 'neutral': // Neutral sentiment
-        return 'orange';
-      case 'negative': // Negative sentiment
-        return 'red';
-      default:
-        return '#888'; // Default gray for unknown sentiment
+const sentimentColor = (sentiment: string) => {
+  switch (sentiment) {
+    case 'positive':
+      return 'green';
+    case 'neutral':
+      return 'orange';
+    case 'negative':
+      return 'red';
+    default:
+      return '#888';
+  }
+};
+
+interface VoteButtonProps {
+  onClick: (e: React.MouseEvent) => void;
+  icon: React.ElementType;
+  active?: boolean;
+}
+
+const VoteButton: React.FC<VoteButtonProps> = ({ onClick, icon: Icon, active = false }) => (
+  <button
+    onClick={onClick}
+    className={`p-2 rounded-full transition-colors flex items-center justify-center w-8 h-8 ${
+      active ? 'bg-[#3B52DD] text-white' : 'text-gray-500 hover:bg-gray-100'
+    }`}
+  >
+    <Icon size={16} />
+  </button>
+);
+
+interface Reference {
+  chunk_id: number;
+  query: string;
+  sourceURL: string;
+  sourceName: string;
+  content: string;
+  metadata: any;
+}
+
+interface ReferenceItemProps {
+  reference: Reference;
+  query: string;
+  onVote: (refId: number, content: string, voteType: 'up' | 'down') => void;
+  onReferenceClick: (reference: Reference) => void;
+}
+
+const ReferenceItem: React.FC<ReferenceItemProps> = ({
+  reference,
+  query,
+  onVote,
+  onReferenceClick,
+}) => {
+  const [activeVote, setActiveVote] = useState<'up' | 'down' | null>(null);
+
+  const handleVote = (voteType: 'up' | 'down') => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (activeVote !== voteType) {
+      setActiveVote(voteType);
+      onVote(reference.chunk_id, reference.content, voteType);
     }
   };
 
   return (
+    <div className="bg-gray-50 rounded-lg p-3 relative">
+      <div className="flex justify-between items-start">
+        <button
+          onClick={() => onReferenceClick(reference)}
+          className="text-blue-600 hover:text-blue-800 font-medium mb-1 transition-colors"
+        >
+          {reference.sourceName}
+        </button>
+        <div className="flex items-center gap-1">
+          <VoteButton onClick={handleVote('up')} icon={ThumbsUp} active={activeVote === 'up'} />
+          <VoteButton
+            onClick={handleVote('down')}
+            icon={ThumbsDown}
+            active={activeVote === 'down'}
+          />
+        </div>
+      </div>
+      <div className="text-gray-700 text-sm mt-1">
+        {reference.content.length > 150
+          ? `${reference.content.substring(0, 150)}...`
+          : reference.content}
+      </div>
+    </div>
+  );
+};
+
+function ChatBox({
+  message,
+  transformedMessage,
+  sentiment,
+  context,
+  modelService,
+  onOpenPdf,
+  showFeedback,
+  showReferences = true,
+}: {
+  message: ChatMessage;
+  transformedMessage?: string[][];
+  sentiment?: string;
+  context?: Reference[];
+  modelService: ModelService | null;
+  onOpenPdf: (pdfInfo: PdfInfo) => void;
+  showFeedback: boolean;
+  showReferences?: boolean;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const references = context || message.references || [];
+
+  const handleReferenceClick = async (chunkInfo: any) => {
+    if (!modelService) return;
+
+    const ref: ReferenceInfo = {
+      id: chunkInfo.chunk_id,
+      sourceURL: chunkInfo.sourceURL,
+      sourceName: chunkInfo.sourceName,
+      content: chunkInfo.content,
+      metadata: chunkInfo.metadata,
+    };
+
+    try {
+      if (!ref.sourceURL.toLowerCase().endsWith('.pdf')) {
+        modelService.openReferenceSource(ref);
+        return;
+      }
+
+      const pdfInfo = await modelService.getPdfInfo(ref);
+      onOpenPdf(pdfInfo);
+    } catch (error) {
+      console.error('Failed to open reference:', error);
+      alert('Failed to open reference. Please try again.');
+    }
+  };
+
+  const handleUpvote = () => {
+    modelService?.recordGeneratedResponseFeedback(true);
+  };
+  const handleDownvote = () => {
+    modelService?.recordGeneratedResponseFeedback(false);
+  };
+
+  // Check if this is the welcome message
+  const isWelcomeMessage =
+    message.sender === 'AI' && message.content.startsWith("Welcome! I'm here to assist you");
+
+  return (
     <ChatBoxContainer>
       <ChatBoxSender>{message.sender === 'human' ? '👋 You' : '🤖 AI'}</ChatBoxSender>
-      <ChatBoxContent style={{ display: 'flex', alignItems: 'center' }}>
-        <div style={{ flexGrow: 1 }}>
-          {
-            transformedMessage && transformedMessage.length > 0 ? (
-              transformedMessage.map(([sentence, tag], index) => {
-                const label = labels.find((label) => label.name === tag);
-                return (
-                  <span
-                    key={index}
-                    style={{
-                      color: label?.checked ? label.color : 'inherit',
-                    }}
-                  >
-                    {sentence} {label?.checked && `(${tag}) `}
-                  </span>
-                );
-              })
-            ) : (
-              <ReactMarkdown>{message.content}</ReactMarkdown>
-            ) // Render without PII highlighting if no transformation is available
-          }
+      <ChatBoxContent>
+        <div>
+          {transformedMessage && transformedMessage.length > 0 ? (
+            transformedMessage.map(([sentence, tag], index) => {
+              const label = labels.find((label) => label.name === tag);
+              return (
+                <span key={index} style={{ color: label?.checked ? label.color : 'inherit' }}>
+                  {sentence} {label?.checked && `(${tag}) `}
+                </span>
+              );
+            })
+          ) : (
+            <ReactMarkdown>{message.content}</ReactMarkdown>
+          )}
+          {showFeedback && message.sender === 'AI' && !isWelcomeMessage && (
+            <div className="flex mt-4 justify-center">
+              <div className="flex items-center justify-center space-x-4 px-4 bg-gray-50 border rounded-xl w-fit">
+                <p className="text-sm font-medium text-gray-700">Was this helpful?</p>
+                <button
+                  onClick={handleUpvote}
+                  className="flex items-center justify-center w-8 h-8 text-gray-800 rounded-full hover:bg-gray-200 focus:bg-blue-700"
+                >
+                  <ThumbsUp className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleDownvote}
+                  className="flex items-center justify-center w-8 h-8 text-gray-800 rounded-full hover:bg-gray-200 focus:bg-blue-700"
+                >
+                  <ThumbsDown className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+          {message.sender === 'human' && sentiment && (
+            <span
+              style={{
+                fontSize: '0.85rem',
+                marginLeft: '8px',
+                color: sentimentColor(sentiment),
+                whiteSpace: 'nowrap',
+              }}
+            >
+              [sentiment: {sentiment}]
+            </span>
+          )}
         </div>
 
-        {/* Display sentiment text for human messages */}
-        {message.sender === 'human' && sentiment && (
-          <span
-            style={{
-              fontSize: '0.85rem',
-              marginLeft: '8px',
-              color: sentimentColor(sentiment), // Apply color based on sentiment
-              whiteSpace: 'nowrap',
-            }}
-          >
-            [sentiment: {sentiment}] {/* Directly displaying the sentiment label */}
-          </span>
+        {showReferences && references.length > 0 && message.sender === 'AI' && (
+          <div className="mt-2">
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="flex items-center text-sm text-gray-600 hover:text-gray-800"
+            >
+              <span
+                className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
+              >
+                ▶
+              </span>
+              <span className="ml-1 font-medium">References ({references.length})</span>
+            </button>
+            {isExpanded && (
+              <div className="space-y-2 mt-2">
+                {references.map((ref, i) => (
+                  <ReferenceItem
+                    key={i}
+                    reference={ref}
+                    query={ref.query}
+                    onVote={(refId, content, voteType) => {
+                      if (voteType === 'up') {
+                        modelService?.upvote('null', ref.query, refId, content);
+                      } else {
+                        modelService?.downvote('null', ref.query, refId, content);
+                      }
+                    }}
+                    onReferenceClick={handleReferenceClick}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </ChatBoxContent>
     </ChatBoxContainer>
@@ -228,6 +392,14 @@ function ChatBox({
 function AILoadingChatBox() {
   return <TypingAnimation />;
 }
+
+export interface SearchConstraint {
+  constraint_type: 'EqualTo';
+  value: string;
+}
+
+// Using Record directly instead of a custom interface
+type SearchConstraints = Record<string, SearchConstraint>;
 
 export default function Chat({
   piiWorkflowId, // Workflow ID for pii detection
@@ -245,16 +417,30 @@ export default function Chat({
   const [textInput, setTextInput] = useState('');
   const [transformedMessages, setTransformedMessages] = useState<Record<number, string[][]>>({});
   const [aiLoading, setAiLoading] = useState(false);
+  const [persistentConstraints, setPersistentConstraints] = useState<SearchConstraints>({});
   const scrollableAreaRef = useRef<HTMLElement | null>(null);
+  const responseBuffer = useRef<string>('');
+  const contextReceived = useRef<boolean>(false);
+  const [contextData, setContextData] = useState<Record<number, any>>({});
+  const contextBuffer = useRef<string>('');
+  const isCollectingContext = useRef<boolean>(false);
 
   useEffect(() => {
     if (modelService && provider) {
-      // Set the chat settings based on the provider
       modelService
         .setChat(provider)
         .then(() => {
-          // After setting chat settings, fetch chat history
-          modelService.getChatHistory(provider).then(setChatHistory);
+          modelService.getChatHistory(provider).then((history) => {
+            setChatHistory(history);
+            // Also set up the context data from the saved references
+            const contextDataFromHistory: Record<number, Reference[]> = {};
+            history.forEach((message, index) => {
+              if (message.references?.length) {
+                contextDataFromHistory[index] = message.references;
+              }
+            });
+            setContextData(contextDataFromHistory);
+          });
         })
         .catch((e) => {
           console.error('Failed to update chat settings:', e);
@@ -269,10 +455,14 @@ export default function Chat({
 
     return piiDetect(messageContent, piiWorkflowId)
       .then((result) => {
-        const { tokens, predicted_tags } = result;
+        const { tokens, predicted_tags } = result.data.prediction_results;
+
         let transformed: string[][] = [];
         let currentSentence = '';
         let currentTag = '';
+
+        console.log('tokens', tokens);
+        console.log('predicted_tags', predicted_tags);
 
         for (let i = 0; i < tokens.length; i++) {
           const word = tokens[i];
@@ -354,95 +544,199 @@ export default function Chat({
       setAbortController(controller);
 
       const lastTextInput = textInput;
-      const lastChatHistory = chatHistory;
       const currentIndex = chatHistory.length;
+      const aiIndex = chatHistory.length + 1;
 
-      setAiLoading(true);
-      setChatHistory((history) => [...history, { sender: 'human', content: lastTextInput }]);
+      // Clear input and set loading state
       setTextInput('');
+      setAiLoading(true);
 
-      // Trigger sentiment classification if classifier exists
+      // Add human message
+      const humanMessage: ChatMessage = {
+        sender: 'human',
+        content: lastTextInput,
+      };
+      const newHistory = [...chatHistory, humanMessage];
+      setChatHistory(newHistory);
+
+      // Handle sentiment classification
       if (sentimentWorkflowId) {
         classifySentiment(lastTextInput, currentIndex);
       }
 
-      // Perform PII detection on the human's message
-      if (piiWorkflowId) {
-        const humanTransformed = await performPIIDetection(lastTextInput);
-        setTransformedMessages((prev) => ({
-          ...prev,
-          [currentIndex]: humanTransformed,
-        }));
-      }
+      // Reset buffers and state
+      responseBuffer.current = '';
+      contextReceived.current = false;
+      isCollectingContext.current = false;
+      contextBuffer.current = '';
 
       try {
-        let aiResponse = '';
-        const aiIndex = chatHistory.length + 1;
+        // Handle PII detection
+        if (piiWorkflowId) {
+          const humanTransformed = await performPIIDetection(lastTextInput);
+          setTransformedMessages((prev) => ({
+            ...prev,
+            [currentIndex]: humanTransformed,
+          }));
+        }
 
+        // Process constraints
+        const detectedPII = await performPIIDetection(lastTextInput);
+        const newConstraints: SearchConstraints = {};
+        detectedPII.forEach(([text, tag]) => {
+          if (tag === 'BRAND' || tag === 'MODEL_NUMBER') {
+            newConstraints[tag] = {
+              constraint_type: 'EqualTo',
+              value: text.trim(),
+            };
+          }
+        });
+
+        if (Object.keys(newConstraints).length > 0) {
+          setPersistentConstraints(newConstraints);
+        }
+
+        // Initialize AI message in chat history
+        setChatHistory((prev) => [...prev, { sender: 'AI', content: '' }]);
+
+        // Start chat with streaming
         await modelService?.chat(
           lastTextInput,
           provider,
-          (newWord: string) => {
-            aiResponse += newWord;
-            setChatHistory((history) => {
-              const newHistory = [...history];
-              if (newHistory[newHistory.length - 1].sender === 'AI') {
-                newHistory[newHistory.length - 1].content = aiResponse;
-              } else {
-                newHistory.push({ sender: 'AI', content: aiResponse });
+          Object.keys(newConstraints).length > 0 ? newConstraints : persistentConstraints,
+          (newData: string) => {
+            if (newData.startsWith('context:') || isCollectingContext.current) {
+              // Handle context streaming
+              try {
+                if (newData.startsWith('context:')) {
+                  isCollectingContext.current = true;
+                  contextBuffer.current = newData.substring(9);
+                } else {
+                  contextBuffer.current += newData;
+                }
+
+                try {
+                  const contextJson = JSON.parse(contextBuffer.current);
+                  setContextData((prev) => ({
+                    ...prev,
+                    [aiIndex]: contextJson,
+                  }));
+                  isCollectingContext.current = false;
+                  contextBuffer.current = '';
+                } catch {
+                  // Continue collecting context if JSON is incomplete
+                  return;
+                }
+              } catch (e) {
+                console.error('Error handling context:', e);
               }
-              return newHistory;
-            });
-          },
-          async (finalResponse: string) => {
-            if (piiWorkflowId) {
-              const aiTransformed = await performPIIDetection(finalResponse);
-              setTransformedMessages((prev) => ({
-                ...prev,
-                [aiIndex]: aiTransformed,
-              }));
+            } else if (!isCollectingContext.current) {
+              // Handle message streaming
+              responseBuffer.current += newData;
+
+              // Update chat history with new content
+              setChatHistory((prev) => {
+                const updatedHistory = [...prev];
+                const lastMessage = updatedHistory[updatedHistory.length - 1];
+
+                if (lastMessage?.sender === 'AI') {
+                  return [
+                    ...updatedHistory.slice(0, -1),
+                    { ...lastMessage, content: responseBuffer.current },
+                  ];
+                }
+                return updatedHistory;
+              });
             }
+          },
+          () => {
+            // Final callback - ensure message persists
+            const finalContent = responseBuffer.current;
+
+            setChatHistory((prev) => {
+              const updatedHistory = [...prev];
+              const lastMessage = updatedHistory[updatedHistory.length - 1];
+
+              if (lastMessage?.sender === 'AI') {
+                return [...updatedHistory.slice(0, -1), { ...lastMessage, content: finalContent }];
+              }
+              // If no AI message exists, add it
+              return [...updatedHistory, { sender: 'AI', content: finalContent }];
+            });
+
+            // Reset state
             setAiLoading(false);
             setAbortController(null);
+            responseBuffer.current = finalContent; // Keep the content in buffer
+            contextBuffer.current = '';
+            isCollectingContext.current = false;
           },
           controller.signal
         );
       } catch (error) {
-        // Type guard for Error objects
-        if (error instanceof Error) {
-          if (error.name === 'AbortError') {
-            console.log('Chat was aborted');
-            // Don't reset the chat history or text input for aborted requests
-          } else {
-            console.error('Error in chat:', error);
-            alert('Failed to send chat. Please try again.');
-            setChatHistory(lastChatHistory);
-            setTextInput(lastTextInput);
+        console.error('Chat error:', error);
+        // Handle error state
+        setChatHistory((prev) => {
+          const updatedHistory = [...prev];
+          const lastMessage = updatedHistory[updatedHistory.length - 1];
+
+          if (lastMessage?.sender === 'AI') {
+            return [
+              ...updatedHistory.slice(0, -1),
+              {
+                ...lastMessage,
+                content: responseBuffer.current || 'An error occurred during the response.',
+              },
+            ];
           }
-        } else {
-          console.error('An unknown error occurred:', error);
-          alert('Failed to send chat. Please try again.');
-          setChatHistory(lastChatHistory);
-          setTextInput(lastTextInput);
-        }
-      } finally {
+          return updatedHistory;
+        });
+
         setAiLoading(false);
         setAbortController(null);
       }
     }
   };
 
+  const [pdfInfo, setPdfInfo] = useState<PdfInfo | null>(null);
+  const [selectedPdfChunk, setSelectedPdfChunk] = useState<Chunk | null>(null);
+
+  const handleOpenPdf = (info: PdfInfo) => {
+    setPdfInfo(info);
+    setSelectedPdfChunk(info.highlighted);
+  };
+
   return (
     <ChatContainer>
+      {pdfInfo && (
+        <PdfViewerWrapper>
+          <PdfViewer
+            name={pdfInfo.filename}
+            src={pdfInfo.source}
+            chunks={pdfInfo.docChunks}
+            initialChunk={pdfInfo.highlighted}
+            onSelect={setSelectedPdfChunk}
+            onClose={() => {
+              setSelectedPdfChunk(null);
+              setPdfInfo(null);
+            }}
+          />
+        </PdfViewerWrapper>
+      )}
       <ScrollableArea ref={scrollableAreaRef}>
         {chatHistory && chatHistory.length ? (
           <AllChatBoxes>
             {chatHistory.map((message, i) => (
               <ChatBox
                 key={i}
+                modelService={modelService}
                 message={message}
-                transformedMessage={piiWorkflowId ? transformedMessages[i] : undefined} // Pass PII-transformed message for human and AI
-                sentiment={sentiments[i]} // Pass sentiment for human message
+                transformedMessage={piiWorkflowId ? transformedMessages[i] : undefined}
+                sentiment={sentiments[i]}
+                context={contextData[i]}
+                onOpenPdf={handleOpenPdf}
+                showFeedback={!aiLoading}
+                showReferences={i < chatHistory.length - 1 || !aiLoading} // Show references for all messages except the last one during generation
               />
             ))}
             {aiLoading && (
@@ -452,7 +746,16 @@ export default function Chat({
             )}
           </AllChatBoxes>
         ) : (
-          <Placeholder> Ask anything to start chatting! </Placeholder>
+          <ChatBox
+            message={{
+              sender: 'AI',
+              content:
+                "Welcome! I'm here to assist you with any questions or issues related to air-conditioners.\n\nFeel free to share the BRAND and MODEL_NUMBER of your air-conditioner if you have it handy. Don't worry if you don't. Just tell me what you need, and I'll do my best to answer!",
+            }}
+            modelService={modelService}
+            onOpenPdf={handleOpenPdf}
+            showFeedback={!aiLoading}
+          />
         )}
       </ScrollableArea>
       <ChatBarContainer>

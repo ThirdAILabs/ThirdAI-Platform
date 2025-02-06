@@ -102,6 +102,12 @@ class ImplicitFeedbackInput(BaseModel):
     reference_rank: Optional[int] = Field(None, ge=0)
 
 
+class ChatFeedbackInput(BaseModel):
+    # query_text: str
+    # reference_id: int = Field(..., ge=0)
+    upvote: bool
+
+
 class SearchResultsNDB(BaseModel):
     """
     Represents the search results including the query and references.
@@ -194,6 +200,7 @@ class ChatInput(BaseModel):
     user_input: str
     session_id: Optional[str] = None
     provider: str = "openai"
+    constraints: Optional[Dict[str, Dict[str, str]]] = None
 
 
 class ChatHistoryInput(BaseModel):

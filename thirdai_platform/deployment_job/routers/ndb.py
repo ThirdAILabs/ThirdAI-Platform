@@ -1,18 +1,26 @@
 import io
+import json
+import os
 import threading
+import time
 import traceback
 import uuid
+from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 from queue import Queue
 from typing import AsyncGenerator, List, Optional
+from urllib.parse import urljoin
 
 import fitz
 import jwt
+import requests
 import thirdai
 from deployment_job.models.ndb_models import NDBModel
 from deployment_job.permissions import Permissions
 from deployment_job.pydantic_models.inputs import (
     AssociateInput,
+    ChatFeedbackInput,
     ChatHistoryInput,
     ChatInput,
     ChatSettings,
@@ -44,6 +52,7 @@ from platform_common.logging.job_loggers import JobLogger
 from platform_common.pydantic_models.deployment import DeploymentConfig
 from platform_common.pydantic_models.feedback_logs import (
     AssociateLog,
+    ChatFeedbackLog,
     DeleteLog,
     FeedbackLog,
     ImplicitUpvoteLog,
@@ -58,8 +67,16 @@ ndb_query_metric = Summary("ndb_query", "NDB Queries")
 ndb_upvote_metric = Summary("ndb_upvote", "NDB upvotes")
 ndb_associate_metric = Summary("ndb_associate", "NDB associations")
 ndb_implicit_feedback_metric = Summary("ndb_implicit_feedback", "NDB implicit feedback")
+ndb_chat_upvote_metric = Counter("ndb_chat_upvote_metric", "NDB chat upvote")
+ndb_chat_upvote_metric.inc()        # satisfaction score = (chat_upvote / (chat_upvote + chat_downvote)). To avoid divide-by-zero error, incrementing chat_upvote by 1
+ndb_chat_same_question = Counter("ndb_chat_same_question", "Metric for same question being asked in the chat")
+ndb_chat_downvote_metric = Counter("ndb_chat_downvote_metric", "NDB chat downvote")
 ndb_insert_metric = Summary("ndb_insert", "NDB insertions")
 ndb_delete_metric = Summary("ndb_delete", "NDB deletions")
+chat_query = Summary("chat_query", "Query metric of chat interface")
+chat_response_time = Summary(
+    "chat_response_time", "Response time metric of chat interface"
+)
 
 TOPK_SELECTIONS_TO_TRACK = 5
 ndb_top_k_selections = [
@@ -75,6 +92,15 @@ class NDBRouter:
         self.config = config
         self.reporter = reporter
         self.logger = logger
+        self.chat_logger = JobLogger(
+            log_dir=Path(config.model_bazaar_dir) / "logs" / config.model_id / "chat",
+            log_prefix=os.getenv("NOMAD_ALLOC_ID"),
+            service_type="chat",
+            model_id=config.model_id,
+            model_type=config.model_options.model_type,
+            user_id=config.user_id,
+            add_stream_handler=False,
+        )
 
         self.model: NDBModel = NDBRouter.get_model(config, logger)
 
@@ -98,12 +124,21 @@ class NDBRouter:
             "/implicit-feedback", self.implicit_feedback, methods=["POST"]
         )
         self.router.add_api_route(
+            "/chat-feedback", self.chat_feedback, methods=["POST"]
+        )
+        self.router.add_api_route(
+            "/chat-same-question", self.chat_same_question, methods=["GET"]
+        )
+        self.router.add_api_route(
             "/update-chat-settings", self.update_chat_settings, methods=["POST"]
         )
         self.router.add_api_route(
             "/get-chat-history", self.get_chat_history, methods=["POST"]
         )
         self.router.add_api_route("/chat", self.chat, methods=["POST"])
+        self.router.add_api_route(
+            "/get_all_chat_history", self.fetch_all_session_chat, methods=["GET"]
+        )
         self.router.add_api_route("/sources", self.get_sources, methods=["GET"])
         self.router.add_api_route(
             "/save",
@@ -560,6 +595,39 @@ class NDBRouter:
             message="Implicit feedback logged successfully.",
         )
 
+    def chat_same_question(
+        self,
+        token: str = Depends(Permissions.verify_permission("read")),
+    ):
+        ndb_chat_same_question.inc()
+        return response(
+            status_code=status.HTTP_200_OK,
+            message = "Logged successfully"
+        )
+
+    def chat_feedback(
+        self,
+        feedback: ChatFeedbackInput,
+        token: str = Depends(Permissions.verify_permission("read")),
+    ):
+        # self.feedback_logger.log(
+        #     ChatFeedbackLog(
+        #         chunk_id=feedback.reference_id,
+        #         query=feedback.query_text,
+        #         upvote=feedback.upvote,
+        #     )
+        # )
+
+        if feedback.upvote:
+            ndb_chat_upvote_metric.inc()
+        else:
+            ndb_chat_downvote_metric.inc()
+
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Implicit feedback logged successfully.",
+        )
+
     def update_chat_settings(
         self,
         settings: ChatSettings,
@@ -596,6 +664,7 @@ class NDBRouter:
         else:
             session_id = input.session_id
 
+        # Get chat history with references
         chat_history = {"chat_history": chat.get_chat_history(session_id)}
 
         return response(
@@ -604,6 +673,7 @@ class NDBRouter:
             data=chat_history,
         )
 
+    @chat_query.time()
     def chat(
         self,
         input: ChatInput,
@@ -627,12 +697,93 @@ class NDBRouter:
                 )
         else:
             session_id = input.session_id
+        
+        # get the query category
+        user_input_category = chat.categorize_query(user_input = input.user_input)
 
         async def generate_response() -> AsyncGenerator[str, None]:
-            async for chunk in chat.stream_chat(input.user_input, session_id):
+            start_time = time.time()
+            conversation_response = ""
+            async for chunk in chat.stream_chat(
+                input.user_input,
+                session_id,
+                constraints=input.constraints,
+                document_path_prefix=Path(self.config.model_bazaar_dir)
+                / "models"
+                / self.config.model_id
+                / "model.ndb"
+                / "documents",
+            ):
                 yield chunk
+                if not chunk.startswith("context: "):
+                    conversation_response += chunk
+                else:
+                    reformulated_query = json.loads(chunk.split('context: ', 1)[1])[0]['query']
+            end_time = time.time()
+            chat_response_time.observe(end_time - start_time)
+
+            self.chat_logger.info(
+                msg="chat query/reply",
+                session_id=session_id,
+                query_time=datetime.fromtimestamp(start_time).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
+                response_time=datetime.fromtimestamp(end_time).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
+                query_text=reformulated_query,
+                user_input = input.user_input,
+                response_text=conversation_response,
+                user_input_category = user_input_category
+            )
 
         return StreamingResponse(generate_response(), media_type="text/plain")
+
+    def fetch_all_session_chat(
+        self,
+        token=Depends(Permissions.verify_permission("read")),
+    ):
+        # Fetch logs from victorialogs
+        chat_response = requests.get(
+            url=urljoin(
+                self.config.model_bazaar_endpoint, "victorialogs/select/logsql/query"
+            ),
+            params={
+                "query": f'service_type: "chat" AND model_id: "{self.config.model_id}"'
+            },
+        )
+        if chat_response.status_code != 200:
+            return response(
+                status_code=chat_response.status_code, message=chat_response.text
+            )
+
+        chat_history = defaultdict(list)
+        json_lines = chat_response.text.strip().split("\n")
+        for line in json_lines:
+            data = json.loads(line)
+            chat_history[data["session_id"]].append(
+                {
+                    "user_input": data["user_input"],       # un-reformulated query
+                    "user_input_category": data["user_input_category"],
+                    "query_time": data["query_time"],
+                    "query_text": data["query_text"],       # reformulated query
+                    "response_time": data["response_time"],
+                    "response_text": data["response_text"],
+                }
+            )
+
+        # sort based on query time
+        for session_id in chat_history.keys():
+            chat_history[session_id] = sorted(
+                chat_history[session_id],
+                key=lambda x: datetime.strptime(x["query_time"], "%Y-%m-%d %H:%M:%S"),
+            )
+
+        return response(
+            status_code=status.HTTP_200_OK,
+            message="Successfully retrieved the chat logs",
+            data=jsonable_encoder(chat_history),
+        )
 
     def get_sources(self, token=Depends(Permissions.verify_permission("read"))):
         """

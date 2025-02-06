@@ -29,17 +29,17 @@ export default function usageStatsUDT() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <iframe
               src={`${panelUrl}&panelId=4&from=now-6h&to=now&t=${Date.now()}`}
-              width="425"
+              width="100%"
               height="300"
             ></iframe>
             <iframe
               src={`${panelUrl}&panelId=3&from=now-6h&to=now&t=${Date.now()}`}
-              width="425"
+              width="100%"
               height="300"
             ></iframe>
             <iframe
               src={`${panelUrl}&panelId=1&from=now-6h&to=now&t=${Date.now()}`}
-              width="425"
+              width="100%"
               height="300"
             ></iframe>
           </div>

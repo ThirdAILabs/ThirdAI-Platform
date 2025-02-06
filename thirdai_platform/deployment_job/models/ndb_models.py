@@ -455,6 +455,7 @@ class NDBModel(Model):
                     chat_history_sql_uri=chat_history_sql_uri,
                     key=key,
                     base_url=self.config.model_bazaar_endpoint,
+                    query_categories = kwargs.get('query_categories', []),
                     **kwargs,
                 )
 

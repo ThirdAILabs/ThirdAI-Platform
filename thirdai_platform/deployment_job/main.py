@@ -109,10 +109,11 @@ async def log_requests(request: Request, call_next):
         audit_logger.info(json.dumps(audit_log))
 
     response = await call_next(request)
-
-    logger.debug(
-        f"Request: {request.method}; URl: {request.url} - {response.status_code}",
-    )
+    # Don't log the prometheus client metric request
+    if request.url.path.strip("/") != "metrics":
+        logger.debug(
+            f"Request: {request.method}; URl: {request.url} - {response.status_code}",
+        )
 
     return response
 
