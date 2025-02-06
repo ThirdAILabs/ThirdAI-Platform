@@ -488,39 +488,42 @@ def nlp_datagen(
         return response(status_code=status.HTTP_400_BAD_REQUEST, message=str(error))
 
     # Add validation for self-hosted LLM
+    llm_config = None
     if datagen_options.llm_provider == "self_hosted":
-        # Verify self-hosted LLM is configured
         try:
             model_bazaar_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
             print("model_bazaar_endpoint", model_bazaar_endpoint)
 
             if not model_bazaar_endpoint:
-                model_bazaar_endpoint = (
-                    "http://localhost:8000"
-                )
+                model_bazaar_endpoint = "http://localhost:8000"
 
-            # Ensure the endpoint has a scheme
             if not model_bazaar_endpoint.startswith(("http://", "https://")):
                 model_bazaar_endpoint = f"http://{model_bazaar_endpoint}"
 
-            endpoint = urljoin(
-                model_bazaar_endpoint, "/api/integrations/self-hosted-llm"
-            )
+            endpoint = urljoin(model_bazaar_endpoint, "/api/integrations/self-hosted-llm")
             logging.info(f"Checking self-hosted LLM at endpoint: {endpoint}")
 
-            llm_check_response = requests.get(
+            llm_response = requests.get(
                 endpoint,
                 headers={"Authorization": f"Bearer {token}"},
             )
 
-            logging.info(f"LLM check response status: {llm_check_response.status_code}")
-            logging.info(f"LLM check response body: {llm_check_response.text}")
+            logging.info(f"LLM check response status: {llm_response.status_code}")
+            logging.info(f"LLM check response body: {llm_response.text}")
 
-            if llm_check_response.status_code != 200:
+            if llm_response.status_code != 200:
                 return response(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    message=f"Self-hosted LLM not accessible. Status: {llm_check_response.status_code}, Response: {llm_check_response.text}",
+                    message=f"Self-hosted LLM not accessible. Status: {llm_response.status_code}, Response: {llm_response.text}",
                 )
+
+            llm_config = llm_response.json()["data"]
+            if not llm_config.get("endpoint") or not llm_config.get("api_key"):
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="Self-hosted LLM configuration is incomplete",
+                )
+
         except Exception as e:
             logging.error(f"Error verifying self-hosted LLM: {str(e)}")
             return response(
@@ -597,7 +600,7 @@ def nlp_datagen(
             license_key=license_info["boltLicenseKey"],
             options=datagen_options,
             job_options=datagen_job_options,
-            access_token=token,
+            llm_config=llm_config
         )
 
     except Exception as err:

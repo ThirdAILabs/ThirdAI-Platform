@@ -125,29 +125,21 @@ import logging
 class SelfHostedLLM(LLMBase):
     def __init__(
         self,
-        access_token: str,
         response_file: Optional[Path] = None,
         record_usage_at: Optional[Path] = None,
     ):
         super().__init__(response_file, record_usage_at)
-
-        # Get the endpoint configuration from the backend
-        self.backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
-        response = requests.get(
-            urljoin(self.backend_endpoint, "/api/integrations/self-hosted-llm"),
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-        if response.status_code != 200:
-            raise Exception("Cannot read self-hosted endpoint.")
-
-        data = response.json()["data"]
-        self.url = data["endpoint"]  # This should be the full OpenAI-compatible URL
-        self.api_key = data["api_key"]
+        
+        self.url = os.getenv("SELF_HOSTED_LLM_ENDPOINT")
+        self.api_key = os.getenv("SELF_HOSTED_LLM_API_KEY")
 
         if self.url is None or self.api_key is None:
             raise Exception(
-                "Self-hosted LLM may have been deleted or not configured. Please check the admin dashboard to configure the self-hosted llm"
+                "Self-hosted LLM configuration not found in environment variables. "
+                "Please check if SELF_HOSTED_LLM_ENDPOINT and SELF_HOSTED_LLM_API_KEY "
+                "are properly set."
             )
+        
         self.logger = logging.getLogger(__name__)
 
     def completion(self, prompt: str, system_prompt: Optional[str] = None, **kwargs):
@@ -190,25 +182,14 @@ llm_classes = {
 }
 
 
-def verify_llm_access(llm_provider: str, access_token: str):
+def verify_llm_access(llm_provider: str, api_key: str):
     try:
         if llm_provider == "openai":
-            client = OpenAI(api_key=access_token)
+            client = OpenAI(api_key=api_key)
             client.models.list()
         elif llm_provider == "cohere":
-            client = cohere.Client(api_key=access_token)
+            client = cohere.Client(api_key=api_key)
             client.models.list()
-        elif llm_provider == "self_hosted":
-            # Get configuration from backend
-            backend_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
-            response = requests.get(
-                urljoin(backend_endpoint, "/api/integrations/self-hosted-llm"),
-                headers={"Authorization": f"Bearer {access_token}"},
-            )
-            response.raise_for_status()
-            data = response.json()["data"]
-            if not data["endpoint"] or not data["api_key"]:
-                return False
         else:
             raise ValueError(f"Invalid LLM provider: {llm_provider}")
     except Exception as e:

@@ -23,6 +23,11 @@ job "GenerateData-{{ data_id }}" {
         MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
         STORAGE_DIR = "{{ storage_dir }}"
 
+        {% if llm_provider == "self_hosted" and llm_config %}
+        SELF_HOSTED_LLM_ENDPOINT = "{{ llm_config.endpoint }}"
+        SELF_HOSTED_LLM_API_KEY = "{{ llm_config.api_key }}"
+        {% endif %}
+
         {%- for key, value in extra_options.items() %}
         {{ key | upper }} = "{{ value }}"
         {%- endfor %}

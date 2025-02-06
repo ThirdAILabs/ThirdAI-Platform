@@ -105,7 +105,6 @@ class GeneralVariables(EnvLoader):
     secret_token: str
     llm_provider: LLMProvider = LLMProvider.openai
     test_size: float = 0.05
-    access_token: Optional[str] = None
 
 
 class EntityStatus(str, Enum):

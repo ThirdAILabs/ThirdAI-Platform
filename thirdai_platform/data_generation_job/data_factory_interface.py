@@ -25,7 +25,6 @@ class DataFactory(ABC):
         # Initialize LLM based on provider type
         if self.general_variables.llm_provider == "self_hosted":
             self.llm_model = llm_classes["self_hosted"](
-                access_token=self.general_variables.access_token,
                 response_file=self.save_dir / "llm_responses.txt",
                 record_usage_at=self.save_dir / "llm_usage.json",
             )
