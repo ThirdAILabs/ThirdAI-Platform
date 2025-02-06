@@ -54,12 +54,15 @@ const Conversations: React.FC = () => {
   const [chatHistory, setChatHistory] = useState<ConversationData[]>([]);
   const [numberOfQuestions, setNumberOfQuestions] = useState<number>(0);
   const [categoryList, setCategoryList] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<Record<string, boolean>>({});
+
   const handleShowMore = () => {
     setNumberOfQuestions(min(numberOfQuestions + 50, chatHistory.length));
   };
 
   // Extract parameters from the URL
   const { model_id, default_mode } = getUrlParams();
+
   useEffect(() => {
     if (default_mode === 'chat' && model_id !== null) {
       const getChatData = async () => {
@@ -68,7 +71,9 @@ const Conversations: React.FC = () => {
           const convertedData = convertAndSortDataByQueryTime(data);
           setChatHistory(convertedData);
           setNumberOfQuestions(min(50, convertedData.length));
-          setCategoryList(getUniqueCategories(convertedData));
+          const categories = getUniqueCategories(convertedData);
+          setCategoryList(categories);
+          setSelectedCategories(Object.fromEntries(categories.map((category) => [category, false])));
         } catch (error) {
           console.error('Error fetching chat history:', error);
         }
@@ -76,13 +81,6 @@ const Conversations: React.FC = () => {
       getChatData();
     }
   }, [model_id, default_mode]);
-
-  if (!chatHistory) {
-    return <div className="p-4 text-center">Loading chat history...</div>;
-  }
-
-  const [selectedCategories, setSelectedCategories] = useState(Object.fromEntries(categoryList.map((category) => [category, false]))
-  );
 
   // Toggle handler for category selection
   const handleCategoryToggle = (category: string) => {
@@ -99,6 +97,10 @@ const Conversations: React.FC = () => {
       .map(([category]) => category);
   };
 
+  if (!chatHistory) {
+    return <div className="p-4 text-center">Loading chat history...</div>;
+  }
+  
   return (
     <div className="p-4">
       <Card style={{ width: '70%', maxHeight: '65rem' }} className="pb-4">
