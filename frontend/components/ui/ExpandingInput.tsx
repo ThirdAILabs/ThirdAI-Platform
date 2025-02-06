@@ -5,9 +5,14 @@ import { Paperclip, Send } from 'lucide-react';
 interface EnhancedInputProps {
   onSubmit: (text: string) => void;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onInputChange: (event: ChangeEvent<HTMLInputElement>) => void;
 }
 
-const ExpandingInput: React.FC<EnhancedInputProps> = ({ onSubmit, onFileChange }) => {
+const ExpandingInput: React.FC<EnhancedInputProps> = ({
+  onSubmit,
+  onFileChange,
+  onInputChange,
+}) => {
   const [inputText, setInputText] = useState<string>('');
   const [showTooltip, setShowTooltip] = useState<boolean>(false);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -29,6 +34,8 @@ const ExpandingInput: React.FC<EnhancedInputProps> = ({ onSubmit, onFileChange }
 
   const handleTextChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setInputText(e.target.value);
+    // Invoke onInputChange callback for the text area changes
+    onInputChange(e as unknown as ChangeEvent<HTMLInputElement>); // Casting as a workaround
   };
 
   const handleSubmit = () => {

@@ -1,6 +1,11 @@
 FROM node:20-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+
+# Install necessary tools for building native modules
+RUN apt-get update && apt-get install -y python3 python3-pip python3-distutils build-essential \
+    && ln -s /usr/bin/python3 /usr/bin/python
+
 RUN corepack enable
 WORKDIR /app
 
