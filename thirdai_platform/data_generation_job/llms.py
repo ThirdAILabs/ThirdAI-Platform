@@ -3,7 +3,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from threading import Lock
 from typing import Optional
-from urllib.parse import urljoin
+
+pass
 
 import cohere
 import requests
@@ -129,7 +130,7 @@ class SelfHostedLLM(LLMBase):
         record_usage_at: Optional[Path] = None,
     ):
         super().__init__(response_file, record_usage_at)
-        
+
         self.url = os.getenv("SELF_HOSTED_LLM_ENDPOINT")
         self.api_key = os.getenv("SELF_HOSTED_LLM_API_KEY")
 
@@ -139,7 +140,7 @@ class SelfHostedLLM(LLMBase):
                 "Please check if SELF_HOSTED_LLM_ENDPOINT and SELF_HOSTED_LLM_API_KEY "
                 "are properly set."
             )
-        
+
         self.logger = logging.getLogger(__name__)
 
     def completion(self, prompt: str, system_prompt: Optional[str] = None, **kwargs):

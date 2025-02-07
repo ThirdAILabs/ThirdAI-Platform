@@ -1385,8 +1385,8 @@ export function trainTokenClassifier(
   // Create the datagen_options object with all required fields
   const datagenOptions = {
     task_prompt: modelGoal,
-    llm_provider: llmProvider,  // Add the llm_provider at the root level
-    datagen_options: tokenClassifierDatagenForm(modelGoal, categories)
+    llm_provider: llmProvider, // Add the llm_provider at the root level
+    datagen_options: tokenClassifierDatagenForm(modelGoal, categories),
   };
 
   const formData = new FormData();

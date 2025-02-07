@@ -261,7 +261,12 @@ const NERQuestions = ({
     setIsLoading(true);
 
     try {
-      const modelResponse = await trainTokenClassifier(modelName, modelGoal, categories, llmProvider);
+      const modelResponse = await trainTokenClassifier(
+        modelName,
+        modelGoal,
+        categories,
+        llmProvider
+      );
       const modelId = modelResponse.data.model_id;
 
       if (onCreateModel) {

@@ -181,7 +181,7 @@ def generate_token_data(
     llm_provider: LLMProvider,
     datagen_options: TokenClassificationGenerateArgs,
     job_options: JobOptions,
-    llm_config: Optional[dict] = None, 
+    llm_config: Optional[dict] = None,
 ):
     try:
         extra_options = JobOptions.model_validate(job_options).model_dump()

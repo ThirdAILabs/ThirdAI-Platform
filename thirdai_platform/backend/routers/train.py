@@ -7,10 +7,12 @@ import shutil
 import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
-from urllib.parse import urljoin
+
+pass
 
 import pandas as pd
-import requests
+
+pass
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
 from backend.datagen import generate_data_for_train_job
@@ -37,16 +39,7 @@ from backend.utils import (
 from data_generation_job.llms import verify_llm_access
 from database import schema
 from database.session import get_session
-from fastapi import (
-    APIRouter,
-    Depends,
-    File,
-    Form,
-    Header,
-    HTTPException,
-    UploadFile,
-    status,
-)
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from platform_common.dependencies import is_on_low_disk
 from platform_common.file_handler import download_local_files
 
@@ -424,6 +417,7 @@ def retrain_ndb(
         },
     )
 
+
 @train_router.post(
     "/nlp-datagen", dependencies=[Depends(is_on_low_disk(threshold=0.75))]
 )
@@ -488,7 +482,7 @@ def nlp_datagen(
                 .filter_by(type=schema.IntegrationType.self_hosted)
                 .first()
             )
-            
+
             if not self_hosted_integration:
                 return response(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -578,7 +572,7 @@ def nlp_datagen(
             license_key=license_info["boltLicenseKey"],
             options=datagen_options,
             job_options=datagen_job_options,
-            llm_config=llm_config
+            llm_config=llm_config,
         )
 
     except Exception as err:
