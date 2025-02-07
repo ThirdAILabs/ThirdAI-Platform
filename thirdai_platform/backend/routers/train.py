@@ -424,13 +424,6 @@ def retrain_ndb(
         },
     )
 
-
-def extract_token(authorization: Optional[str] = Header(None)) -> Optional[str]:
-    if authorization and authorization.startswith("Bearer "):
-        return authorization[len("Bearer ") :]
-    return None
-
-
 @train_router.post(
     "/nlp-datagen", dependencies=[Depends(is_on_low_disk(threshold=0.75))]
 )
@@ -442,7 +435,6 @@ def nlp_datagen(
     train_job_options: str = Form(default="{}"),
     session: Session = Depends(get_session),
     authenticated_user: AuthenticatedUser = Depends(verify_access_token),
-    token: Optional[str] = Depends(extract_token),  # Get access token here
 ):
     user: schema.User = authenticated_user.user
     try:
@@ -491,33 +483,19 @@ def nlp_datagen(
     llm_config = None
     if datagen_options.llm_provider == "self_hosted":
         try:
-            model_bazaar_endpoint = os.getenv("MODEL_BAZAAR_ENDPOINT")
-            print("model_bazaar_endpoint", model_bazaar_endpoint)
-
-            if not model_bazaar_endpoint:
-                model_bazaar_endpoint = "http://localhost:8000"
-
-            if not model_bazaar_endpoint.startswith(("http://", "https://")):
-                model_bazaar_endpoint = f"http://{model_bazaar_endpoint}"
-
-            endpoint = urljoin(model_bazaar_endpoint, "/api/integrations/self-hosted-llm")
-            logging.info(f"Checking self-hosted LLM at endpoint: {endpoint}")
-
-            llm_response = requests.get(
-                endpoint,
-                headers={"Authorization": f"Bearer {token}"},
+            self_hosted_integration = (
+                session.query(schema.Integrations)
+                .filter_by(type=schema.IntegrationType.self_hosted)
+                .first()
             )
-
-            logging.info(f"LLM check response status: {llm_response.status_code}")
-            logging.info(f"LLM check response body: {llm_response.text}")
-
-            if llm_response.status_code != 200:
+            
+            if not self_hosted_integration:
                 return response(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    message=f"Self-hosted LLM not accessible. Status: {llm_response.status_code}, Response: {llm_response.text}",
+                    message="Self-hosted LLM integration not found",
                 )
 
-            llm_config = llm_response.json()["data"]
+            llm_config = self_hosted_integration.data
             if not llm_config.get("endpoint") or not llm_config.get("api_key"):
                 return response(
                     status_code=status.HTTP_400_BAD_REQUEST,
