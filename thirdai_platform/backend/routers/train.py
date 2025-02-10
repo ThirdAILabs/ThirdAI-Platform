@@ -8,11 +8,7 @@ import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
-pass
-
 import pandas as pd
-
-pass
 from auth.jwt import AuthenticatedUser, verify_access_token
 from backend.auth_dependencies import verify_model_read_access
 from backend.datagen import generate_data_for_train_job

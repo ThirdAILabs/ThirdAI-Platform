@@ -1,13 +1,10 @@
-import os
+pass
 from abc import ABC, abstractmethod
 from pathlib import Path
 from threading import Lock
 from typing import Optional
 
-pass
-
 import cohere
-import requests
 from openai import OpenAI
 from platform_common.utils import save_dict
 
@@ -34,11 +31,15 @@ class OpenAILLM(LLMBase):
     def __init__(
         self,
         api_key: str,
+        base_url: Optional[str] = None,
         response_file: Optional[Path] = None,
         record_usage_at: Optional[Path] = None,
     ):
         super().__init__(response_file, record_usage_at)
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,  # This will be None for regular OpenAI and set for self-hosted
+        )
 
     def completion(
         self,
@@ -57,7 +58,7 @@ class OpenAILLM(LLMBase):
         response = self.client.chat.completions.create(
             model=model_name,
             messages=messages,
-            temperature=temperature,  # TODO (anyone): Choose the temp based on a random distribution
+            temperature=temperature,
         )
 
         res = response.choices[0].message.content
@@ -70,7 +71,6 @@ class OpenAILLM(LLMBase):
                     fp.write(f"\nUsage: \n{current_usage}\n")
                     fp.write("=" * 100 + "\n\n")
 
-        # updating the llm usage
         if self.usage_file:
             with self.lock:
                 if model_name not in self.usage:
@@ -120,66 +120,10 @@ class CohereLLM(LLMBase):
         return response.text
 
 
-import logging
-
-
-class SelfHostedLLM(LLMBase):
-    def __init__(
-        self,
-        response_file: Optional[Path] = None,
-        record_usage_at: Optional[Path] = None,
-    ):
-        super().__init__(response_file, record_usage_at)
-
-        self.url = os.getenv("SELF_HOSTED_LLM_ENDPOINT")
-        self.api_key = os.getenv("SELF_HOSTED_LLM_API_KEY")
-
-        if self.url is None or self.api_key is None:
-            raise Exception(
-                "Self-hosted LLM configuration not found in environment variables. "
-                "Please check if SELF_HOSTED_LLM_ENDPOINT and SELF_HOSTED_LLM_API_KEY "
-                "are properly set."
-            )
-
-        self.logger = logging.getLogger(__name__)
-
-    def completion(self, prompt: str, system_prompt: Optional[str] = None, **kwargs):
-        try:
-            response = requests.post(
-                self.url,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "gpt-4o-mini",  # Added model parameter
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": system_prompt or "You are a helpful assistant.",
-                        },
-                        {"role": "user", "content": prompt},
-                    ],
-                },
-            )
-
-            self.logger.debug(f"Response status code: {response.status_code}")
-            if not response.ok:
-                self.logger.error(f"Response content: {response.text}")
-            response.raise_for_status()
-
-            response_json = response.json()
-            return response_json["choices"][0]["message"]["content"]
-
-        except Exception as e:
-            self.logger.error(f"Unexpected error during completion: {str(e)}")
-            raise
-
-
 llm_classes = {
     "openai": OpenAILLM,
     "cohere": CohereLLM,
-    "self_hosted": SelfHostedLLM,
+    "self_hosted": OpenAILLM,
 }
 
 
