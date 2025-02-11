@@ -552,7 +552,7 @@ def test_deployment_constrained_search(tmp_dir, on_disk):
         tmp_dir=tmp_dir,
         autoscaling=True,
         on_disk=on_disk,
-        doc_path=os.path.join(doc_dir, "metadata_doc.csv"),
+        doc_path=os.path.join(doc_dir(), "metadata_doc.csv"),
         text_columns=["text"],
         keyword_columns=["keywords"],
     )
