@@ -158,7 +158,7 @@ def check_query(
 def check_upvote_dev_mode(client: TestClient):
     random_query = "some random nonsense with no relevance to any article"
     # Here 78 is just a random chunk that we are upvoting for this query
-    assert get_query_result(client, random_query) != 78
+    assert get_query_result(client, random_query, top_k=5)["references"][0]["id"] != 78
 
     res = client.post(
         "/upvote",
@@ -174,13 +174,13 @@ def check_upvote_dev_mode(client: TestClient):
     )
     assert res.status_code == 200
 
-    assert get_query_result(client, random_query) == 78
+    assert get_query_result(client, random_query, top_k=5)["references"][0]["id"] == 78
 
 
 def check_associate_dev_mode(client: TestClient):
     # This query corresponds to row/chunk 16 in articles.csv
     query = "premier league teams in england"
-    assert get_query_result(client, query) != 16
+    assert get_query_result(client, query, top_k=5)["references"][0]["id"] != 16
 
     res = client.post(
         "/associate",
@@ -192,7 +192,7 @@ def check_associate_dev_mode(client: TestClient):
     )
     assert res.status_code == 200
 
-    assert get_query_result(client, query) == 16
+    assert get_query_result(client, query, top_k=5)["references"][0]["id"] == 16
 
 
 def check_insertion_dev_mode(client: TestClient):
@@ -369,7 +369,9 @@ def test_deploy_ndb_dev_mode(tmp_dir):
 
 def check_upvote_prod_mode(client: TestClient):
     random_query = "some random nonsense with no relevance to any article"
-    original_result = get_query_result(client, random_query)
+    original_result = get_query_result(client, random_query, top_k=5)["references"][0][
+        "id"
+    ]
 
     # Here 78 is just a random chunk that we are upvoting for this query
     res = client.post(
@@ -386,12 +388,15 @@ def check_upvote_prod_mode(client: TestClient):
     )
     assert res.status_code == 202
 
-    assert get_query_result(client, random_query) == original_result
+    assert (
+        get_query_result(client, random_query, top_k=5)["references"][0]["id"]
+        == original_result
+    )
 
 
 def check_associate_prod_mode(client: TestClient):
     query = "premier league teams in england"
-    orignal_result = get_query_result(client, query)
+    orignal_result = get_query_result(client, query, top_k=5)["references"][0]["id"]
 
     res = client.post(
         "/associate",
@@ -403,7 +408,10 @@ def check_associate_prod_mode(client: TestClient):
     )
     assert res.status_code == 202
 
-    assert get_query_result(client, query) == orignal_result
+    assert (
+        get_query_result(client, query, top_k=5)["references"][0]["id"]
+        == orignal_result
+    )
 
 
 def check_insertion_prod_mode(client: TestClient):
