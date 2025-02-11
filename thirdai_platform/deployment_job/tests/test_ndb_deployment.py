@@ -124,7 +124,9 @@ def create_config(
         host_dir=os.path.join(tmp_dir, "host_dir"),
         license_key=license_info["boltLicenseKey"],
         autoscaling_enabled=autoscaling,
-        model_options=NDBDeploymentOptions(),
+        model_options=NDBDeploymentOptions(
+            llm_provider="openai", genai_key="random_key"
+        ),
     )
 
 
@@ -505,7 +507,6 @@ def check_summarized_metadata(client: TestClient):
     assert res.status_code == 200
     assert len(res.json()["data"]) == 1
     assert res.json()["data"][0]["source"].endswith("metadata_doc.csv")
-
     met_res = client.get(
         "/get-metadata",
         params={
@@ -515,7 +516,6 @@ def check_summarized_metadata(client: TestClient):
     )
 
     data = met_res.json()["data"]
-    # Assert integer col
     assert data["integer_col"]["min"] == -200
     assert data["integer_col"]["max"] == 188
 

@@ -213,11 +213,20 @@ class NDBModel(Model):
                 continue
 
             result[metadata_key_name] = {"type": summarized.metadata_type.value}
-            if summarized.metadata_type in [MetadataType.INTEGER, MetadataType.FLOAT]:
+            if summarized.metadata_type == MetadataType.FLOAT:
+                # This conversion is necessary because these values are returned by json encoding but
+                # In pandas chunk store summarized.summary.min (or max) is of type numpy.int64/float64 which is not jsonable.
                 result[metadata_key_name].update(
                     {
-                        "min": summarized.summary.min,
-                        "max": summarized.summary.max,
+                        "min": float(summarized.summary.min),
+                        "max": float(summarized.summary.max),
+                    }
+                )
+            elif summarized.metadata_type == MetadataType.INTEGER:
+                result[metadata_key_name].update(
+                    {
+                        "min": int(summarized.summary.min),
+                        "max": int(summarized.summary.max),
                     }
                 )
             else:
