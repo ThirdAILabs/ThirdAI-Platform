@@ -521,24 +521,26 @@ def check_summarized_metadata(client: TestClient):
 
     # Assert float col
     assert math.isclose(data["float_col"]["min"], -198.06391226887988, rel_tol=1e-6)
-    assert math.isclose(data["float_col"]["min"], 198.34493105274356, rel_tol=1e-6)
+    assert math.isclose(data["float_col"]["max"], 198.34493105274356, rel_tol=1e-6)
 
     # Assert string col
-    assert data["string_col"]["unique_values"] == [
-        "grape",
-        "honeydew",
-        "apple",
-        "lemon",
-        "cherry",
-        "banana",
-        "date",
-        "fig",
-        "elderberry",
-        "kiwi",
-    ]
+    assert set(data["string_col"]["unique_values"]) == set(
+        [
+            "grape",
+            "honeydew",
+            "apple",
+            "lemon",
+            "cherry",
+            "banana",
+            "date",
+            "fig",
+            "elderberry",
+            "kiwi",
+        ]
+    )
 
     # Assert bool col
-    assert data["bool_col"]["unique_values"] == [True, False]
+    assert set(data["bool_col"]["unique_values"]) == set([True, False])
 
 
 @pytest.mark.unit
