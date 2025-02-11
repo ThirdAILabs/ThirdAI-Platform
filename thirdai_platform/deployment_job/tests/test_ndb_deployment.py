@@ -347,7 +347,7 @@ def test_deploy_ndb_dev_mode(tmp_dir):
         tmp_dir=tmp_dir,
         autoscaling=False,
         on_disk=True,
-        doc_path=os.path.join(doc_dir, "articles.csv"),
+        doc_path=os.path.join(doc_dir(), "articles.csv"),
         text_columns=["text"],
     )
 
@@ -473,7 +473,7 @@ def test_deploy_ndb_prod_mode(tmp_dir, on_disk):
         tmp_dir=tmp_dir,
         autoscaling=True,
         on_disk=on_disk,
-        doc_path=os.path.join(doc_dir, "articles.csv"),
+        doc_path=os.path.join(doc_dir(), "articles.csv"),
         text_columns=["text"],
     )
 
