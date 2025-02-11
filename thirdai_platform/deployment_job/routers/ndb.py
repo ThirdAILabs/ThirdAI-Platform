@@ -846,7 +846,6 @@ class NDBRouter:
     ):
 
         metadata = self.model.get_metadata(doc_id=source_id, doc_version=int(version))
-
         return response(
             status_code=status.HTTP_200_OK,
             message="Successfully got metadata.",
