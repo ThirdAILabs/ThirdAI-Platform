@@ -1,3 +1,4 @@
+import os
 import random
 from abc import ABC, abstractmethod
 from logging import Logger
@@ -18,12 +19,36 @@ class DataFactory(ABC):
     def __init__(self, logger: Logger):
         self.general_variables: GeneralVariables = GeneralVariables.load_from_env()
         self.logger = logger
+
+        # Initialize save_dir first
         self.save_dir = Path(self.general_variables.storage_dir)
-        self.llm_model = llm_classes.get(self.general_variables.llm_provider.value)(
-            api_key=self.general_variables.genai_key,
-            response_file=self.save_dir / "response.txt",
-            record_usage_at=self.save_dir / "llm_usage.json",
+
+        # Initialize LLM - treat self_hosted as openai with a different base_url
+        provider = (
+            "openai"
+            if self.general_variables.llm_provider == "self_hosted"
+            else self.general_variables.llm_provider
         )
+        llm_class = llm_classes[provider]
+
+        llm_args = {
+            "api_key": self.general_variables.genai_key,
+            "response_file": self.save_dir / "response.txt",
+            "record_usage_at": self.save_dir / "llm_usage.json",
+        }
+
+        # Add base_url for self-hosted setup
+        if self.general_variables.llm_provider == "self_hosted":
+            base_url = os.getenv("BASE_URL")
+            if base_url:
+                # Ensure the base_url has a protocol
+                if not base_url.startswith(("http://", "https://")):
+                    base_url = (
+                        f"http://{base_url}"  # Default to http if no protocol specified
+                    )
+                llm_args["base_url"] = base_url
+
+        self.llm_model = llm_class(**llm_args)
 
         self.train_dir = self.save_dir / "train"
         self.test_dir = self.save_dir / "test"

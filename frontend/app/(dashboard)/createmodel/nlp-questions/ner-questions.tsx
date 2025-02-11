@@ -29,12 +29,15 @@ import { CardDescription } from '@/components/ui/card';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CSVUpload from './ner-questions-upload-file/CSVUpload';
+import { Select, MenuItem } from '@mui/material';
 
 const CREATION_METHODS = {
   // PRETRAINED: 'pretrained',
   UPLOAD_DATA: 'upload-data',
   SYNTHETIC: 'synthetic',
 };
+
+type LLMProvider = 'openai' | 'self_hosted';
 
 type Example = {
   text: string;
@@ -244,6 +247,7 @@ const NERQuestions = ({
   };
 
   const [isLoading, setIsLoading] = useState(false);
+  const [llmProvider, setLLMProvider] = useState<LLMProvider>('openai');
 
   const handleCreateNERModel = async () => {
     if (!modelName) {
@@ -257,10 +261,14 @@ const NERQuestions = ({
     setIsLoading(true);
 
     try {
-      const modelResponse = await trainTokenClassifier(modelName, modelGoal, categories);
+      const modelResponse = await trainTokenClassifier(
+        modelName,
+        modelGoal,
+        categories,
+        llmProvider
+      );
       const modelId = modelResponse.data.model_id;
 
-      // This is called from RAG
       if (onCreateModel) {
         onCreateModel(modelId);
       }
@@ -564,6 +572,18 @@ const NERQuestions = ({
               {renderTaggedSentence(pair)}
             </div>
           ))}
+        </div>
+
+        <div className="mt-5 mb-5">
+          <h3 className="mb-2 text-lg font-semibold">LLM Provider</h3>
+          <Select
+            value={llmProvider}
+            onChange={(e) => setLLMProvider(e.target.value as LLMProvider)}
+            className="w-full"
+          >
+            <MenuItem value="openai">OpenAI</MenuItem>
+            <MenuItem value="self_hosted">Self-hosted LLM</MenuItem>
+          </Select>
         </div>
 
         <div className="flex gap-3 mt-5">

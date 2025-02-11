@@ -20,6 +20,7 @@ class DataCategory(str, Enum):
 class LLMProvider(str, Enum):
     openai = "openai"
     cohere = "cohere"
+    self_hosted = "self_hosted"
 
 
 class EnvLoader:

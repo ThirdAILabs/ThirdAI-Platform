@@ -65,6 +65,7 @@ def generate_data_for_train_job(
     license_key: str,
     options: DatagenOptions,
     job_options: JobOptions,
+    llm_config: Optional[dict] = None,
 ):
     options_dict = options.datagen_options.model_dump()
     del options_dict["sub_type"]
@@ -87,6 +88,7 @@ def generate_data_for_train_job(
             llm_provider=options.llm_provider,
             datagen_options=TokenClassificationGenerateArgs(**options_dict),
             job_options=job_options,
+            llm_config=llm_config,
         )
 
 
@@ -179,6 +181,7 @@ def generate_token_data(
     llm_provider: LLMProvider,
     datagen_options: TokenClassificationGenerateArgs,
     job_options: JobOptions,
+    llm_config: Optional[dict] = None,
 ):
     try:
         extra_options = JobOptions.model_validate(job_options).model_dump()
@@ -223,6 +226,7 @@ def generate_token_data(
             share_dir=os.getenv("SHARE_DIR", None),
             genai_key=genai_key,
             license_key=license_key,
+            llm_config=llm_config,
             extra_options=extra_options,
             python_path=get_python_path(),
         )

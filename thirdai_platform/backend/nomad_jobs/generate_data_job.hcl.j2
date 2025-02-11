@@ -22,6 +22,7 @@ job "GenerateData-{{ data_id }}" {
         TASK_PROMPT = "{{ task_prompt }}"
         MODEL_BAZAAR_ENDPOINT = "{{ model_bazaar_endpoint }}"
         STORAGE_DIR = "{{ storage_dir }}"
+        BASE_URL = "{{ base_url }}"  # Just pass base_url
 
         {%- for key, value in extra_options.items() %}
         {{ key | upper }} = "{{ value }}"

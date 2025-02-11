@@ -469,6 +469,36 @@ def nlp_datagen(
     except Exception as error:
         return response(status_code=status.HTTP_400_BAD_REQUEST, message=str(error))
 
+    # Add validation for self-hosted LLM
+    llm_config = None
+    if datagen_options.llm_provider == "self_hosted":
+        try:
+            self_hosted_integration = (
+                session.query(schema.Integrations)
+                .filter_by(type=schema.IntegrationType.self_hosted)
+                .first()
+            )
+
+            if not self_hosted_integration:
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="Self-hosted LLM integration not found",
+                )
+
+            llm_config = self_hosted_integration.data
+            if not llm_config.get("endpoint") or not llm_config.get("api_key"):
+                return response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="Self-hosted LLM configuration is incomplete",
+                )
+
+        except Exception as e:
+            logging.error(f"Error verifying self-hosted LLM: {str(e)}")
+            return response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message=f"Failed to verify self-hosted LLM configuration: {str(e)}",
+            )
+
     if datagen_options.datagen_options.sub_type == UDTSubType.text:
         placeholder_udt_options = TextClassificationOptions(
             text_column="", label_column="", n_target_classes=0
@@ -538,6 +568,7 @@ def nlp_datagen(
             license_key=license_info["boltLicenseKey"],
             options=datagen_options,
             job_options=datagen_job_options,
+            llm_config=llm_config,
         )
 
     except Exception as err:

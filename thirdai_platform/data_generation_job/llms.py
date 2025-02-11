@@ -1,3 +1,4 @@
+pass
 from abc import ABC, abstractmethod
 from pathlib import Path
 from threading import Lock
@@ -30,11 +31,15 @@ class OpenAILLM(LLMBase):
     def __init__(
         self,
         api_key: str,
+        base_url: Optional[str] = None,
         response_file: Optional[Path] = None,
         record_usage_at: Optional[Path] = None,
     ):
         super().__init__(response_file, record_usage_at)
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,  # This will be None for regular OpenAI and set for self-hosted
+        )
 
     def completion(
         self,
@@ -53,7 +58,7 @@ class OpenAILLM(LLMBase):
         response = self.client.chat.completions.create(
             model=model_name,
             messages=messages,
-            temperature=temperature,  # TODO (anyone): Choose the temp based on a random distribution
+            temperature=temperature,
         )
 
         res = response.choices[0].message.content
@@ -66,7 +71,6 @@ class OpenAILLM(LLMBase):
                     fp.write(f"\nUsage: \n{current_usage}\n")
                     fp.write("=" * 100 + "\n\n")
 
-        # updating the llm usage
         if self.usage_file:
             with self.lock:
                 if model_name not in self.usage:
@@ -119,6 +123,7 @@ class CohereLLM(LLMBase):
 llm_classes = {
     "openai": OpenAILLM,
     "cohere": CohereLLM,
+    "self_hosted": OpenAILLM,
 }
 
 
