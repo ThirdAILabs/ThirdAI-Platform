@@ -35,7 +35,7 @@ def create_realm(keycloak_admin, realm_name: str):
         # - Minimum length: 8 characters
         # - Maximum length: 12 characters (Note: Check if your Keycloak version supports max length)
         # - At least one digit, one lowercase, one uppercase, and one special character.
-        "passwordPolicy": "length(min=8) and length(max=12) and digits(1) and lowerCase(1) and upperCase(1) and specialChars(1)",
+        "passwordPolicy": "length(8) and digits(1) and lowerCase(1) and upperCase(1) and specialChars(1)",
         # Enable brute force detection to limit login attempts and mitigate password brute-forcing.
         "bruteForceProtected": True,
         "maxFailureWaitSeconds": 900,

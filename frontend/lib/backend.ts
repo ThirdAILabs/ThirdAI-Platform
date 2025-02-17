@@ -1275,13 +1275,11 @@ export function SyncKeycloakUser(
         access_token: accessToken,
       })
       .then((res) => {
-        console.debug('Response from keycloak-user-sync:', res);
 
         const accessToken = res.data.data.access_token;
         const username = res.data.data.user.username;
 
         if (accessToken) {
-          console.debug('Access token received from backend:', accessToken);
           // Store accessToken into local storage, replacing any existing one.
           localStorage.setItem('accessToken', accessToken);
           setAccessToken(accessToken);
