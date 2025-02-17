@@ -11,6 +11,7 @@ thirdai[neural_db_v2]>=0.9.27
 aiohttp
 alembic
 apscheduler
+anthropic
 Authlib
 azure-identity
 azure-mgmt-containerservice
