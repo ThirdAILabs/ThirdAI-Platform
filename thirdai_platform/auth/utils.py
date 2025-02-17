@@ -44,6 +44,17 @@ def create_realm(keycloak_admin, realm_name: str):
         "quickLoginCheckMilliSeconds": 1000,
         "maxDeltaTimeSeconds": 43200,
         "failureFactor": 30,
+        "smtpServer": {
+            "host": "smtp.sendgrid.net",
+            "port": "587",
+            "from": "platform@thirdai.com",  # Must match a verified SendGrid sender or domain
+            "replyTo": "platform@thirdai.com",  # Optional but recommended
+            "ssl": "false",  # "true" if you use port 465 with SSL
+            "starttls": "true",  # "true" for STARTTLS (recommended on port 587)
+            "auth": "true",
+            "user": "apikey",  # Per SendGrid docs, the username is literally "apikey"
+            "password": "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",
+        },
     }
 
     if "custom-theme" in theme_names:
@@ -54,7 +65,7 @@ def create_realm(keycloak_admin, realm_name: str):
         # Assuming 'thirdai_realm' is defined elsewhere in your code.
         payload["displayName"] = thirdai_realm
         payload["displayNameHtml"] = (
-            "<div class='kc-logo-text'><span>Keycloak</span></div>"
+            "<div class='kc-logo-text'><span>ThirdAI Platform</span></div>"
         )
 
     current_realms = [
