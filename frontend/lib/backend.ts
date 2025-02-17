@@ -1275,7 +1275,6 @@ export function SyncKeycloakUser(
         access_token: accessToken,
       })
       .then((res) => {
-
         const accessToken = res.data.data.access_token;
         const username = res.data.data.user.username;
 
