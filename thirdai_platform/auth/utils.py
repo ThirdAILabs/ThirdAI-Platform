@@ -30,6 +30,7 @@ def create_realm(keycloak_admin, realm_name: str):
         "defaultRoles": ["user"],  # Default roles for users in this realm.
         "registrationAllowed": True,  # Allow user self-registration.
         "resetPasswordAllowed": True,  # Allow users to reset their password.
+        "verifyEmail": True,  # Require email verification for new users.
         "accessTokenLifespan": 1500,  # Access token lifespan (in seconds).
         # Enforce strong password requirements:
         # - Minimum length: 8 characters
