@@ -12,7 +12,7 @@ from backend.mailer import mailer
 from backend.utils import hash_password
 from database import schema
 from database.session import get_session
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
@@ -20,6 +20,10 @@ from platform_common.utils import get_section, response
 from pydantic import BaseModel
 from sqlalchemy import exists
 from sqlalchemy.orm import Session, selectinload
+
+from auth.cookie_signer import sign_role_payload
+import os
+
 
 user_router = APIRouter()
 basic_security = HTTPBasic()
@@ -626,7 +630,6 @@ def get_user_info(
         .filter(schema.User.id == authenticated_user.user.id)
         .first()
     )
-
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
@@ -646,6 +649,15 @@ def get_user_info(
             for user_team in user.teams
         ],
     }
+
+    role_payload = {
+        "global_admin": user.global_admin,
+        "teams": user_info["teams"],
+    }
+
+    role_signature = sign_role_payload(role_payload)
+
+    user_info["role_signature"] = role_signature
 
     return response(
         status_code=status.HTTP_200_OK,

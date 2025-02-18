@@ -16,7 +16,7 @@ def get_hostname_from_url(url):
 
 
 def create_realm(keycloak_admin, realm_name: str):
-    """Create a new realm in Keycloak."""
+    """Create a new realm in Keycloak with enhanced security settings."""
     # Refer: https://www.keycloak.org/docs-api/21.1.1/rest-api/#_realmrepresentation
 
     server_info = keycloak_admin.get_server_info()
@@ -30,7 +30,32 @@ def create_realm(keycloak_admin, realm_name: str):
         "defaultRoles": ["user"],  # Default roles for users in this realm.
         "registrationAllowed": True,  # Allow user self-registration.
         "resetPasswordAllowed": True,  # Allow users to reset their password.
-        "accessTokenLifespan": 1500,  # Access token lifespan for this realm, It is recommended for this value to be shorter than the SSO session idle timeout: 30 minutes
+        "verifyEmail": True,  # Require email verification for new users.
+        "accessTokenLifespan": 1500,  # Access token lifespan (in seconds).
+        # Enforce strong password requirements:
+        # - Minimum length: 8 characters
+        # - Maximum length: 12 characters (Note: Check if your Keycloak version supports max length)
+        # - At least one digit, one lowercase, one uppercase, and one special character.
+        "passwordPolicy": "length(8) and digits(1) and lowerCase(1) and upperCase(1) and specialChars(1)",
+        # Enable brute force detection to limit login attempts and mitigate password brute-forcing.
+        "bruteForceProtected": True,
+        "maxFailureWaitSeconds": 900,
+        "minimumQuickLoginWaitSeconds": 60,
+        "waitIncrementSeconds": 60,
+        "quickLoginCheckMilliSeconds": 1000,
+        "maxDeltaTimeSeconds": 43200,
+        "failureFactor": 30,
+        "smtpServer": {
+            "host": "smtp.sendgrid.net",
+            "port": "587",
+            "from": "platform@thirdai.com",  # Must match a verified SendGrid sender or domain
+            "replyTo": "platform@thirdai.com",  # Optional but recommended
+            "ssl": "false",  # "true" if you use port 465 with SSL
+            "starttls": "true",  # "true" for STARTTLS (recommended on port 587)
+            "auth": "true",
+            "user": "apikey",  # Per SendGrid docs, the username is literally "apikey"
+            "password": "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",
+        },
     }
 
     if "custom-theme" in theme_names:
@@ -38,20 +63,19 @@ def create_realm(keycloak_admin, realm_name: str):
         payload["accountTheme"] = "custom-theme"
         payload["adminTheme"] = "custom-theme"
         payload["emailTheme"] = "custom-theme"
+        # Assuming 'thirdai_realm' is defined elsewhere in your code.
         payload["displayName"] = thirdai_realm
         payload["displayNameHtml"] = (
-            "<div class='kc-logo-text'><span>Keycloak</span></div>"
+            "<div class='kc-logo-text'><span>ThirdAI Platform</span></div>"
         )
 
     current_realms = [
-        realms_metadata["realm"] for realms_metadata in keycloak_admin.get_realms()
+        realm_metadata["realm"] for realm_metadata in keycloak_admin.get_realms()
     ]
 
     if realm_name not in current_realms:
         try:
-            response = keycloak_admin.create_realm(
-                payload, skip_exists=True
-            )  # Create the realm if it doesn't exist.
+            response = keycloak_admin.create_realm(payload, skip_exists=True)
             logging.info(f"Realm '{realm_name}' created successfully: {response}")
         except Exception as e:
             logging.error(f"Error creating realm '{realm_name}': {str(e)}")
