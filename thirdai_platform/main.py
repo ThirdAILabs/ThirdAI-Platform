@@ -9,6 +9,7 @@ from platform_common.utils import model_bazaar_path
 
 load_dotenv()
 import json
+import os
 
 import fastapi
 import uvicorn
@@ -37,9 +38,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = fastapi.FastAPI()
 
+PUBLIC_MODEL_BAZAAR_ENDPOINT = os.getenv("PUBLIC_MODEL_BAZAAR_ENDPOINT")
+PRIVATE_MODEL_BAZAAR_ENDPOINT = os.getenv("PRIVATE_MODEL_BAZAAR_ENDPOINT")
+
+ALLOWED_ORIGINS = [PUBLIC_MODEL_BAZAAR_ENDPOINT, PRIVATE_MODEL_BAZAAR_ENDPOINT]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
