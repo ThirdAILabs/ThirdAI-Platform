@@ -6,6 +6,9 @@ import _ from 'lodash';
 import { useParams } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 
+import { verifyRoleSignature } from './cryptoUtils';
+
+
 export const thirdaiPlatformBaseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 export const deploymentBaseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -1263,7 +1266,6 @@ export function SyncKeycloakUser(
   accessToken: string,
   setAccessToken: (token: string) => void
 ): Promise<any> {
-  console.debug('Sync keycloak user in platform with access token', accessToken);
 
   return new Promise((resolve, reject) => {
     console.debug('Sending request to /api/user/keycloak-user-sync with payload:', {
@@ -2347,23 +2349,42 @@ export interface User {
   email: string;
   global_admin: boolean;
   teams: Team[];
+  role_signature: string;
 }
 
-export async function accessTokenUser(accessToken: string | null) {
+
+export async function accessTokenUser(accessToken: string | null): Promise<User | null> {
   if (accessToken === null) {
     return null;
   }
 
-  // Set the default authorization header for axios
   axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
   try {
     const response = await axios.get(`${thirdaiPlatformBaseUrl}/api/user/info`);
-    return response.data.data as User;
+    const userInfo = response.data.data as User;
+
+    const expectedPayload = {
+      global_admin: userInfo.global_admin,
+      teams: userInfo.teams,
+    };
+
+    // Await the asynchronous verification.
+    const isValid = await verifyRoleSignature(expectedPayload, userInfo.role_signature);
+    if (!isValid) {
+      console.error("Role signature verification failed");
+      alert("Authorization failed. Please try again.");
+      return null;
+    }
+    
+
+    return userInfo;
   } catch (error) {
+    console.error("Error fetching access token user:", error);
     return null;
   }
 }
+
 
 export async function fetchAutoCompleteQueries(modelId: string, query: string) {
   const accessToken = getAccessToken();
