@@ -59,8 +59,10 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
+    - name: Ensure sudo uses python 3.11
+      run: |
+        sudo ln -sf $(which python3.11) /usr/local/bin/python
+        sudo ln -sf $(which pip3.11) /usr/local/bin/pip
 
     - name: Setup Python and Install Dependencies
       # We need to run the backend in sudo for the delete endpoint to work, thus
