@@ -139,6 +139,10 @@ export function WorkFlow({
         window.open(`${prefix}/${workflow.model_id}`, '_blank');
         break;
       }
+      case 'knowledge-extraction': {
+        window.open(`/knowledge-extraction/${workflow.model_id}`, '_blank');
+        break;
+      }
       default:
         throw new Error(`Invalid workflow type ${workflow.type}`);
         break;
@@ -411,8 +415,7 @@ export function WorkFlow({
             variant="contained"
             style={{ width: '100px' }}
             disabled={
-              (deployStatus !== DeployStatus.Active && deployStatus !== DeployStatus.Inactive) ||
-              (deployStatus === DeployStatus.Active && workflow.type === 'knowledge-extraction')
+              deployStatus !== DeployStatus.Active && deployStatus !== DeployStatus.Inactive
             }
           >
             {getButtonValue(deployStatus)}

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import EnterpriseSearchQuestions from './rag-questions/enterprise-search-questions';
 import ChatbotQuestions from './rag-questions/chatbot-questions';
 import NLPQuestions from './nlp-questions/nlp-questions';
+import KnowledgeExtractionQuestions from './knowledge-extraction/knowledge-extraction-questions';
 import { fetchWorkflows, Workflow } from '@/lib/backend';
 import { Typography, Box, Divider, Select, MenuItem, FormControl } from '@mui/material';
 
@@ -23,6 +24,11 @@ const USE_CASES = [
     name: 'NLP / Text Analytics',
     value: 'nlp-text-analytics',
     description: 'Extract insights, classify content, and analyze unstructured text data at scale',
+  },
+  {
+    name: 'Knowledge Extraction',
+    value: 'knowledge-extraction',
+    description: 'Extract structured answers to specific questions from your document collection',
   },
 ];
 
@@ -115,6 +121,9 @@ export default function ChooseProblem() {
           {modelType === 'nlp-text-analytics' && <NLPQuestions workflowNames={workflowNames} />}
           {modelType === 'enterprise-search' && (
             <EnterpriseSearchQuestions models={privateModels} workflowNames={workflowNames} />
+          )}
+          {modelType === 'knowledge-extraction' && (
+            <KnowledgeExtractionQuestions workflowNames={workflowNames} />
           )}
         </Box>
       )}
