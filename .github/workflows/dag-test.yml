@@ -59,6 +59,9 @@ jobs:
       with:
         python-version: '3.11'
 
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+
     - name: Setup Python and Install Dependencies
       # We need to run the backend in sudo for the delete endpoint to work, thus
       # we need to install the requirements for the backend job in sudo. However,
