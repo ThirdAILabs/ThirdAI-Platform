@@ -63,7 +63,34 @@ class NDBModel(Model):
     def doc_save_path(self):
         return os.path.join(self.ndb_save_path(), "documents")
 
+    def sources(self) -> List[Dict[str, str]]:
+        """
+        Get information about all documents stored in the database.
+        
+        Returns:
+            List[Dict[str, str]]: A list of dictionaries containing information about each document.
+                Each dictionary has keys: 'source', 'source_id', and 'version'.
+        """
+        docs = self.db.documents()
+        return [
+            {
+                "source": self.full_source_path(doc["document"]),
+                "source_id": doc["doc_id"],
+                "version": doc["doc_version"],
+            }
+            for doc in docs
+        ]
+
     def full_source_path(self, document: str) -> str:
+        """
+        Get the full file path for a document.
+        
+        Args:
+            document (str): The document filename.
+            
+        Returns:
+            str: The full path to the document.
+        """
         return os.path.join(self.doc_save_path(), document)
 
     def chunk_to_pydantic_ref(self, chunk: Chunk, score: float) -> inputs.Reference:
