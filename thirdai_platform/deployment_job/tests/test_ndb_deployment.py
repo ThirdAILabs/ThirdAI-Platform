@@ -1,9 +1,11 @@
 import json
+import math
 import os
 import shutil
 import time
 import uuid
 from pathlib import Path
+from typing import List, Optional
 from unittest.mock import patch
 
 import pytest
@@ -51,7 +53,13 @@ def tmp_dir():
     shutil.rmtree(path)
 
 
-def create_ndbv2_model(tmp_dir: str, on_disk: bool):
+def create_ndbv2_model(
+    tmp_dir: str,
+    on_disk: bool,
+    doc_path: str,
+    text_columns: Optional[List[str]] = None,
+    keyword_columns: Optional[List[str]] = None,
+):
     verify_license.verify_and_activate(THIRDAI_LICENSE)
 
     random_path = f"{uuid.uuid4()}.ndb"
@@ -65,7 +73,11 @@ def create_ndbv2_model(tmp_dir: str, on_disk: bool):
         )
 
     db.insert(
-        [ndbv2.CSV(os.path.join(doc_dir(), "articles.csv"), text_columns=["text"])]
+        [
+            ndbv2.CSV(
+                doc_path, text_columns=text_columns, keyword_columns=keyword_columns
+            )
+        ]
     )
 
     db.save(os.path.join(tmp_dir, "models", f"{MODEL_ID}", "model.ndb"))
@@ -91,8 +103,15 @@ def mock_check_permission(token: str, permission_type: str = "read"):
     return True
 
 
-def create_config(tmp_dir: str, autoscaling: bool, on_disk: bool):
-    create_ndbv2_model(tmp_dir, on_disk)
+def create_config(
+    tmp_dir: str,
+    autoscaling: bool,
+    on_disk: bool,
+    doc_path: str,
+    text_columns: Optional[List[str]] = None,
+    keyword_columns: Optional[List[str]] = None,
+):
+    create_ndbv2_model(tmp_dir, on_disk, doc_path, text_columns, keyword_columns)
 
     license_info = verify_license.verify_license(THIRDAI_LICENSE)
 
@@ -105,25 +124,41 @@ def create_config(tmp_dir: str, autoscaling: bool, on_disk: bool):
         host_dir=os.path.join(tmp_dir, "host_dir"),
         license_key=license_info["boltLicenseKey"],
         autoscaling_enabled=autoscaling,
-        model_options=NDBDeploymentOptions(),
+        model_options=NDBDeploymentOptions(
+            llm_provider="openai", genai_key="random_key"
+        ),
     )
 
 
-def get_query_result(client: TestClient, query: str):
-    res = client.post("/search", json={"query": query})
+def get_query_result(
+    client: TestClient, query: str, top_k: int, constraints: dict = {}
+):
+    res = client.post(
+        "/search", json={"query": query, "top_k": top_k, "constraints": constraints}
+    )
     assert res.status_code == 200
-    return res.json()["data"]["references"][0]["id"]
+    return res.json()["data"]
 
 
-def check_query(client: TestClient):
-    # This query corresponds to row/chunk 27 in articles.csv
-    assert get_query_result(client, "manufacturing faster chips") == 27
+def check_query(
+    client: TestClient,
+    query: str,
+    top_k: int,
+    ref0_chunk_id: int,
+    constraints: dict = {},
+):
+    assert (
+        get_query_result(client, query, top_k=top_k, constraints=constraints)[
+            "references"
+        ][0]["id"]
+        == ref0_chunk_id
+    )
 
 
 def check_upvote_dev_mode(client: TestClient):
     random_query = "some random nonsense with no relevance to any article"
     # Here 78 is just a random chunk that we are upvoting for this query
-    assert get_query_result(client, random_query) != 78
+    assert get_query_result(client, random_query, top_k=5)["references"][0]["id"] != 78
 
     res = client.post(
         "/upvote",
@@ -139,13 +174,13 @@ def check_upvote_dev_mode(client: TestClient):
     )
     assert res.status_code == 200
 
-    assert get_query_result(client, random_query) == 78
+    assert get_query_result(client, random_query, top_k=5)["references"][0]["id"] == 78
 
 
 def check_associate_dev_mode(client: TestClient):
     # This query corresponds to row/chunk 16 in articles.csv
     query = "premier league teams in england"
-    assert get_query_result(client, query) != 16
+    assert get_query_result(client, query, top_k=5)["references"][0]["id"] != 16
 
     res = client.post(
         "/associate",
@@ -157,26 +192,7 @@ def check_associate_dev_mode(client: TestClient):
     )
     assert res.status_code == 200
 
-    assert get_query_result(client, query) == 16
-
-
-def check_metadata(client: TestClient):
-    res = client.get("/sources")
-    assert res.status_code == 200
-    assert len(res.json()["data"]) == 1
-    assert res.json()["data"][0]["source"].endswith("articles.csv")
-
-    met_res = client.get(
-        "/get-metadata",
-        params={
-            "source_id": res.json()["data"][0]["source_id"],
-            "version": res.json()["data"][0]["version"],
-        },
-    )
-
-    assert met_res.json()["data"]["id"]["min"] == 0
-    assert met_res.json()["data"]["id"]["max"] == 99
-    assert met_res.json()["data"]["id"]["unique_count"] == 100
+    assert get_query_result(client, query, top_k=5)["references"][0]["id"] == 16
 
 
 def check_insertion_dev_mode(client: TestClient):
@@ -329,15 +345,22 @@ def check_async_deletion_dev_mode(client: TestClient):
 def test_deploy_ndb_dev_mode(tmp_dir):
     from deployment_job.routers.ndb import NDBRouter
 
-    config = create_config(tmp_dir=tmp_dir, autoscaling=False, on_disk=True)
+    config = create_config(
+        tmp_dir=tmp_dir,
+        autoscaling=False,
+        on_disk=True,
+        doc_path=os.path.join(doc_dir(), "articles.csv"),
+        text_columns=["text"],
+    )
 
     router = NDBRouter(config, None, logger)
     client = TestClient(router.router)
 
-    check_query(client)
+    check_query(
+        client, query="manufacturing faster chips", top_k=5, ref0_chunk_id=27
+    )  # This query corresponds to row/chunk 27 in articles.csv
     check_upvote_dev_mode(client)
     check_associate_dev_mode(client)
-    check_metadata(client)
     check_insertion_dev_mode(client)
     check_deletion_dev_mode(client)
     check_async_insertion_dev_mode(client)
@@ -346,7 +369,9 @@ def test_deploy_ndb_dev_mode(tmp_dir):
 
 def check_upvote_prod_mode(client: TestClient):
     random_query = "some random nonsense with no relevance to any article"
-    original_result = get_query_result(client, random_query)
+    original_result = get_query_result(client, random_query, top_k=5)["references"][0][
+        "id"
+    ]
 
     # Here 78 is just a random chunk that we are upvoting for this query
     res = client.post(
@@ -363,12 +388,15 @@ def check_upvote_prod_mode(client: TestClient):
     )
     assert res.status_code == 202
 
-    assert get_query_result(client, random_query) == original_result
+    assert (
+        get_query_result(client, random_query, top_k=5)["references"][0]["id"]
+        == original_result
+    )
 
 
 def check_associate_prod_mode(client: TestClient):
     query = "premier league teams in england"
-    orignal_result = get_query_result(client, query)
+    orignal_result = get_query_result(client, query, top_k=5)["references"][0]["id"]
 
     res = client.post(
         "/associate",
@@ -380,7 +408,10 @@ def check_associate_prod_mode(client: TestClient):
     )
     assert res.status_code == 202
 
-    assert get_query_result(client, query) == orignal_result
+    assert (
+        get_query_result(client, query, top_k=5)["references"][0]["id"]
+        == orignal_result
+    )
 
 
 def check_insertion_prod_mode(client: TestClient):
@@ -448,7 +479,13 @@ def check_log_lines(logdir, expected_lines):
 def test_deploy_ndb_prod_mode(tmp_dir, on_disk):
     from deployment_job.routers.ndb import NDBRouter
 
-    config = create_config(tmp_dir=tmp_dir, autoscaling=True, on_disk=on_disk)
+    config = create_config(
+        tmp_dir=tmp_dir,
+        autoscaling=True,
+        on_disk=on_disk,
+        doc_path=os.path.join(doc_dir(), "articles.csv"),
+        text_columns=["text"],
+    )
 
     router = NDBRouter(config, None, logger)
     client = TestClient(router.router)
@@ -460,7 +497,9 @@ def test_deploy_ndb_prod_mode(tmp_dir, on_disk):
     check_log_lines(os.path.join(deployment_dir, "insertions"), 0)
     check_log_lines(os.path.join(deployment_dir, "deletions"), 0)
 
-    check_query(client)
+    check_query(
+        client, query="manufacturing faster chips", top_k=5, ref0_chunk_id=27
+    )  # This query corresponds to row/chunk 27 in articles.csv
     check_upvote_prod_mode(client)
     check_associate_prod_mode(client)
     check_insertion_prod_mode(client)
@@ -469,3 +508,110 @@ def test_deploy_ndb_prod_mode(tmp_dir, on_disk):
     check_log_lines(os.path.join(deployment_dir, "feedback"), 2)
     check_log_lines(os.path.join(deployment_dir, "insertions"), 1)
     check_log_lines(os.path.join(deployment_dir, "deletions"), 1)
+
+
+def check_summarized_metadata(client: TestClient):
+    res = client.get("/sources")
+    assert res.status_code == 200
+    assert len(res.json()["data"]) == 1
+    assert res.json()["data"][0]["source"].endswith("metadata_doc.csv")
+    met_res = client.get(
+        "/get-metadata",
+        params={
+            "source_id": res.json()["data"][0]["source_id"],
+            "version": res.json()["data"][0]["version"],
+        },
+    )
+
+    data = met_res.json()["data"]
+    assert data["integer_col"]["min"] == -200
+    assert data["integer_col"]["max"] == 188
+
+    # Assert float col
+    assert math.isclose(data["float_col"]["min"], -198.06391226887988, rel_tol=1e-6)
+    assert math.isclose(data["float_col"]["max"], 198.34493105274356, rel_tol=1e-6)
+
+    # Assert string col
+    assert set(data["string_col"]["unique_values"]) == set(
+        [
+            "grape",
+            "honeydew",
+            "apple",
+            "lemon",
+            "cherry",
+            "banana",
+            "date",
+            "fig",
+            "elderberry",
+            "kiwi",
+        ]
+    )
+
+    # Assert bool col
+    assert set(data["bool_col"]["unique_values"]) == set([True, False])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("on_disk", [True, False])
+@patch.object(Permissions, "verify_permission", mock_verify_permission)
+@patch.object(Permissions, "check_permission", mock_check_permission)
+def test_deployment_constrained_search(tmp_dir, on_disk):
+    from deployment_job.routers.ndb import NDBRouter
+
+    config = create_config(
+        tmp_dir=tmp_dir,
+        autoscaling=True,
+        on_disk=on_disk,
+        doc_path=os.path.join(doc_dir(), "metadata_doc.csv"),
+        text_columns=["text"],
+        keyword_columns=["keywords"],
+    )
+
+    router = NDBRouter(config, None, logger)
+    client = TestClient(router.router)
+
+    # Get the summarized metadata
+    check_summarized_metadata(client)
+
+    # check the results of the constrained search
+    check_query(
+        client,
+        query="Velit magnam labore numquam ipsum.",
+        top_k=5,
+        ref0_chunk_id=30,
+        constraints={
+            "integer_col": {
+                "constraint_type": "InRange",
+                "min_value": -10,
+                "max_value": 10,
+            }
+        },
+    )
+
+    check_query(
+        client,
+        query="Velit magnam labore numquam ipsum.",
+        top_k=5,
+        ref0_chunk_id=7,
+        constraints={
+            "float_col": {
+                "constraint_type": "InRange",
+                "min_value": -80.56,
+                "max_value": -75.456,
+            }
+        },
+    )
+
+    check_query(
+        client,
+        query="Velit magnam labore numquam ipsum.",
+        top_k=5,
+        ref0_chunk_id=85,
+        constraints={
+            "string_col": {
+                "constraint_type": "AnyOf",
+                "values": ["lemon", "elderberry"],
+            },
+            "bool_col": {"constraint_type": "EqualTo", "value": True},
+        },
+    )
