@@ -73,6 +73,7 @@ export function WorkFlow({
   const { user } = useContext(UserContext);
   const [deployStatus, setDeployStatus] = useState<DeployStatus>(DeployStatus.None);
   const [deployType, setDeployType] = useState<string>('');
+  const [deploymentName, setDeploymentName] = useState<string>('');
   const [modelOwner, setModelOwner] = useState<{ [key: string]: string }>({});
   const [selectedMode, setSelectedMode] = useState<DeployMode>(DeployMode.Dev);
   const [showDeploymentModal, setShowDeploymentModal] = useState(false);
@@ -179,7 +180,7 @@ export function WorkFlow({
       setDeployStatus(DeployStatus.Starting);
       try {
         const autoscalingEnabled = mode === DeployMode.Production;
-        await start_workflow(workflow.username, workflow.model_name, autoscalingEnabled);
+        await start_workflow(workflow.username, workflow.model_name, autoscalingEnabled, deploymentName);
       } catch (e) {
         console.error('Failed to start workflow.', e);
       }
@@ -643,7 +644,18 @@ export function WorkFlow({
                     <span className="text-sm">Prod</span>
                   </div>
                 </RadioGroup>
-                <div className="mt-2 flex justify-center">
+                <div className="mt-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Deployment Name
+                  </label>
+                  <input
+                    type="text"
+                    value={deploymentName}
+                    onChange={(e) => setDeploymentName(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  />
+                </div>
+                <div className="mt-4 flex justify-center">
                   <Button
                     onClick={handleModeSelection}
                     variant="contained"

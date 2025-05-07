@@ -44,6 +44,7 @@ engine = create_engine(
     pool_size=20,  # Number of connections to maintain in the pool for efficient connection reuse.
     max_overflow=30,  # Additional connections allowed beyond the pool size for handling spikes in load.
     pool_timeout=30,  # Maximum time (in seconds) to wait for a connection before timing out.
+    pool_pre_ping=True
 )
 
 Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)

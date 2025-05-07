@@ -1109,7 +1109,8 @@ interface StartWorkflowResponse {
 export function start_workflow(
   username: string,
   model_name: string,
-  autoscalingEnabled: boolean
+  autoscalingEnabled: boolean,
+  deploymentName: string
 ): Promise<StartWorkflowResponse> {
   const accessToken = getAccessToken();
 
@@ -1118,6 +1119,7 @@ export function start_workflow(
   const params = new URLSearchParams({
     model_identifier: createModelIdentifier(username, model_name),
     autoscaling_enabled: autoscalingEnabled.toString(), // Convert boolean to string for URL param
+    deployment_name: deploymentName
   });
 
   return new Promise((resolve, reject) => {
