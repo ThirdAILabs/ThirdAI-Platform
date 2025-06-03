@@ -69,7 +69,8 @@ class NeuralDBV2(Model):
         else:
             self.logger.info("Creating new NDBv2 model", code=LogCode.MODEL_INIT)
             if self.on_disk:
-                self.db = ndbv2.FastDB(save_path=self.ndb_save_path(), splade=splade)
+                word_k_gram = self.config.model_options.word_k_gram
+                self.db = ndbv2.FastDB(save_path=self.ndb_save_path(), splade=splade, word_k_gram=word_k_gram)
             else:
                 # For the in memory model we create the chunk store in memory
                 # but the retriever is still on disk. The reason for this is

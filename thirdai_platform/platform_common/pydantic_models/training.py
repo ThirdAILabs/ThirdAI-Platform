@@ -122,6 +122,7 @@ class NDBOptions(BaseModel):
 
     on_disk: bool = True
     advanced_search: bool = False
+    word_k_gram: Optional[int] = Field(default=None, ge=1)
 
     class Config:
         protected_namespaces = ()
