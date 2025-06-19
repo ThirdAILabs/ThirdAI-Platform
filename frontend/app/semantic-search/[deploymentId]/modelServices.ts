@@ -1,6 +1,7 @@
 import { Box, Chunk, DocChunks } from './components/pdf_viewer/interfaces';
 import { temporaryCacheToken } from '@/lib/backend';
 import _ from 'lodash';
+import { Task } from './components/Tasks';
 
 export const deploymentBaseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -877,5 +878,22 @@ export class ModelService {
       alert(e);
       throw new Error('Failed to record feedback: ' + e);
     }
+  }
+
+  public async getTasks(): Promise<Record<string, Task>> {
+    const response = await fetch(this.url + '/tasks', {
+      method: 'GET',
+      headers: {
+        'Content-type': 'application/json; charset=UTF-8',
+        ...this.authHeader(),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch tasks');
+    }
+
+    const data = await response.json();
+    return data.data.tasks || {};
   }
 }
