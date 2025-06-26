@@ -155,13 +155,13 @@ sources:
   training_logs:
     type: file
     include:
-      - "/model_bazaar/logs/*/train.log"
+      - "/model_bazaar/logs/*/train.log*"
     read_from: beginning
 
   deployment_logs:
     type: file
     include:
-      - "/model_bazaar/logs/*/deployment.log"
+      - "/model_bazaar/logs/*/deployment.log*"
     read_from: beginning
 
 transforms:
