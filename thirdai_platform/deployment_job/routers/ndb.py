@@ -23,6 +23,7 @@ from deployment_job.pydantic_models.inputs import (
     SaveModel,
     UpvoteInput,
 )
+import traceback
 from deployment_job.reporter import Reporter
 from deployment_job.update_logger import UpdateLogger
 from deployment_job.utils import Task, TaskAction, TaskStatus, now, validate_name
@@ -305,8 +306,9 @@ class NDBRouter:
                     data=inserted_docs,
                 )
             except Exception as e:
+
                 self.logger.error(
-                    f"Error inserting documents: {e}", code=LogCode.MODEL_INSERT
+                    f"Error inserting documents: {traceback.format_exc()}", code=LogCode.MODEL_INSERT
                 )
                 return response(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

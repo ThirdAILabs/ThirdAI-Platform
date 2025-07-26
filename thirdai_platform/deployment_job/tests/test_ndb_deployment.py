@@ -65,7 +65,7 @@ def create_ndbv2_model(
     random_path = f"{uuid.uuid4()}.ndb"
 
     if on_disk:
-        db = ndbv2.NeuralDB(save_path=random_path)
+        db = ndbv2.FastDB(save_path=random_path)
     else:
         db = ndbv2.NeuralDB(
             chunk_store=PandasChunkStore(),

@@ -1,9 +1,11 @@
-import React, { useCallback, useContext, useRef, useState, useEffect } from 'react';
+/** @jsxImportSource @emotion/react */
+import React, { useCallback, useContext, useRef, useState, useEffect, ChangeEvent, KeyboardEvent } from 'react';
 import { Button } from '@mui/material';
 import styled from 'styled-components';
 import { borderRadius, color, duration, fontSizes, padding } from '../stylingConstants';
 import { Spacer } from './Layout';
 import { ModelService, Source } from '../modelServices';
+import { Task } from './Tasks';
 import { ModelServiceContext } from '../Context';
 import Sources from './Sources';
 import useClickOutside from './hooks/useClickOutside';
@@ -16,6 +18,7 @@ import { TextField } from '@mui/material';
 import { DropdownMenu, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { fetchAutoCompleteQueries } from '@/lib/backend';
 import { debounce } from 'lodash';
+import Tasks from './Tasks';
 
 const Container = styled.section`
   box-shadow: 0 10px 10px 4px muted;
@@ -89,6 +92,7 @@ interface ModelDescriptionProps {
   onClickViewDocuments: () => void;
   sources: Source[];
   setSources: (sources: Source[]) => void;
+  tasks: Record<string, Task>;
   ifGenerationOn: boolean;
 }
 
@@ -102,14 +106,24 @@ function ModelDescription(props: ModelDescriptionProps) {
     <Description>
       {props.ifGenerationOn && `Generating answers from your documents`}
       <Spacer $width="7px" />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="contained" className="h-8 gap-1" onClick={props.onClickViewDocuments}>
-            View Documents
-          </Button>
-        </DropdownMenuTrigger>
-        <Sources sources={props.sources} setSources={props.setSources} visible />
-      </DropdownMenu>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="contained" className="h-8 gap-1" onClick={props.onClickViewDocuments}>
+              View Documents
+            </Button>
+          </DropdownMenuTrigger>
+          <Sources sources={props.sources} setSources={props.setSources} visible />
+        </DropdownMenu>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="contained" className="h-8 gap-1">
+              View Tasks
+            </Button>
+          </DropdownMenuTrigger>
+          <Tasks tasks={props.tasks} />
+        </DropdownMenu>
+      </div>
     </Description>
   );
 }
@@ -159,7 +173,7 @@ export default function SearchBar({
   setPrompt,
   ifGenerationOn,
   cacheEnabled,
-
+  
   abortController,
   setAbortController,
   setAnswer,
@@ -173,8 +187,15 @@ export default function SearchBar({
 }: SearchBarProps) {
   const modelService = useContext<ModelService | null>(ModelServiceContext);
   const [showSources, setShowSources] = useState(false);
+  const [tasks, setTasks] = useState<Record<string, Task>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [modelName, setModelName] = useState('');
+
+  useEffect(() => {
+    if (modelService) {
+      modelService.getTasks().then(setTasks).catch(console.error);
+    }
+  }, [modelService]);
 
   const sourcesRef = useRef<HTMLElement>(null);
   const handleClickOutside = useCallback(() => {
@@ -296,7 +317,7 @@ export default function SearchBar({
             ref={textAreaRef}
             className="text-m w-full resize-none rounded-md border px-3 py-2"
             value={query}
-            onChange={(e) => {
+            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
               setQuery(e.target.value);
               adjustHeight();
             }}
@@ -307,7 +328,7 @@ export default function SearchBar({
               overflowY: 'auto',
               lineHeight: '24px',
             }}
-            onKeyDown={(e) => {
+            onKeyDown={(e: KeyboardEvent<HTMLTextAreaElement>) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleSubmit();
@@ -356,9 +377,10 @@ export default function SearchBar({
       <Spacer $height="5px" />
       {!showSuggestionBar && (
         <ModelDescription
-          onClickViewDocuments={() => setShowSources((val) => !val)}
+          onClickViewDocuments={() => setShowSources((val: boolean) => !val)}
           sources={sources}
           setSources={setSources}
+          tasks={tasks}
           ifGenerationOn={ifGenerationOn}
         />
       )}
@@ -386,7 +408,7 @@ export default function SearchBar({
                 type="text"
                 placeholder="Enter model name"
                 value={modelName}
-                onChange={(e) => setModelName(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setModelName(e.target.value)}
               />
               {error && <ErrorMessage>{error}</ErrorMessage>}
               <ButtonGroup>

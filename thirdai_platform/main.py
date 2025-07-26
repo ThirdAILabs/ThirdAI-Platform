@@ -50,7 +50,9 @@ log_dir: Path = Path(model_bazaar_path()) / "logs"
 setup_logger(log_dir=log_dir, log_prefix="platform_backend")
 
 logger = logging.getLogger("platform-backend")
-audit_logger = setup_logger(log_dir=log_dir, log_prefix="audit", configure_root=False)
+audit_logger = setup_logger(
+    log_dir=log_dir, log_prefix="audit", configure_root=False, rotate=False
+)
 
 app.include_router(user, prefix="/api/user", tags=["user"])
 app.include_router(train, prefix="/api/train", tags=["train"])

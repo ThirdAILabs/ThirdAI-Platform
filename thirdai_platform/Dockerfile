@@ -20,6 +20,9 @@ RUN pip install -r /app/requirements.txt
 RUN python3 -m pip install thirdai[neural_db_v2]>=0.9.21
 RUN python3 -m pip install -U langchain-community
 
+COPY ./thirdai-0.9.33-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl /app/
+RUN python3 -m pip install thirdai-0.9.33-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl --force-reinstall
+
 COPY . /app
 
 # Disable outbound telemetry for the Unstructured library

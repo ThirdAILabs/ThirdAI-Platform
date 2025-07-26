@@ -1,11 +1,16 @@
 import logging
+import logging.handlers
 from pathlib import Path
 
 from colorlog import ColoredFormatter
 
 
 def setup_logger(
-    log_dir: Path, log_prefix: str, level=logging.INFO, configure_root: bool = True
+    log_dir: Path,
+    log_prefix: str,
+    level=logging.INFO,
+    configure_root: bool = True,
+    rotate: bool = True,
 ):
     log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -32,7 +37,12 @@ def setup_logger(
     )
 
     # File handler setup
-    file_handler = logging.FileHandler(logger_file_path, mode="a+")
+    if rotate:
+        file_handler = logging.handlers.RotatingFileHandler(
+            logger_file_path, mode="a+", maxBytes=10**7, backupCount=10
+        )
+    else:
+        file_handler = logging.FileHandler(logger_file_path, mode="a+")
     file_handler.setFormatter(file_formatter)
 
     # Console handler setup

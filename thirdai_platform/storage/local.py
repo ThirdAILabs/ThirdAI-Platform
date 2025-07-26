@@ -123,6 +123,16 @@ class LocalStorage(StorageInterface):
 
                 os.remove(chunk_path)
 
+        if compressed:
+            extract_dir = os.path.join(
+                self.root, f"models/{model_id}/model.{model_type}"
+            )
+            try:
+                shutil.unpack_archive(filename=filepath, extract_dir=extract_dir)
+            except Exception as e:
+                raise Exception(f"Failed unpacking zipfile during upload commit: {e}")
+            os.remove(filepath)
+
     def prepare_download(
         self, model_id: str, model_type: str = "ndb", compressed: bool = True
     ):
@@ -141,13 +151,17 @@ class LocalStorage(StorageInterface):
         file_path = os.path.join(self.root, f"models/{model_id}/model.{extension}")
 
         if compressed:
-            if not os.path.exists(file_path):
-                uncompressed_path = os.path.join(
-                    self.root, f"models/{model_id}/model.{model_type}"
-                )
-                if not os.path.exists(uncompressed_path):
-                    raise ValueError("Failure to find saved model.")
+            uncompressed_path = os.path.join(
+                self.root, f"models/{model_id}/model.{model_type}"
+            )
+            if not os.path.exists(uncompressed_path):
+                raise ValueError("Failure to find saved model.")
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            try:
                 shutil.make_archive(uncompressed_path, "zip", uncompressed_path)
+            except Exception as e:
+                raise Exception(f"Failed to create a zipfile for download: {e}")
         else:
             if not os.path.exists(file_path):
                 raise ValueError("Failure to find saved model.")

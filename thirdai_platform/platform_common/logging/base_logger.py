@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime
+import logging.handlers
 from pathlib import Path
 from typing import Dict, List, Union
 
@@ -90,7 +91,9 @@ class WrappedLogger:
         # clear any existing handlers
         logger.handlers = []
 
-        file_handler = logging.FileHandler(logger_file_path, mode="a+")
+        file_handler = logging.handlers.RotatingFileHandler(
+            logger_file_path, mode="a+", maxBytes=10**7, backupCount=10
+        )
         file_handler.setFormatter(JSONFormatter())
 
         console_formatter = ColoredFormatter(

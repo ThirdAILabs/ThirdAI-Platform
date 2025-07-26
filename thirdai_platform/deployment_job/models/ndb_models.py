@@ -10,11 +10,12 @@ import traceback
 import uuid
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import fitz
 import platform_common.ndb.ndbv2_parser as ndbv2_parser
 import thirdai.neural_db_v2.chunk_stores.constraints as ndbv2_constraints
+from thirdai import search
 from deployment_job.chat import llm_providers
 from deployment_job.models.model import Model
 from deployment_job.pydantic_models import inputs
@@ -36,6 +37,11 @@ class NDBModel(Model):
         write_mode: bool = False,
     ):
         super().__init__(config=config, logger=logger)
+
+        if os.path.exists(os.path.join(self.ndb_save_path(), "chunk_store")):
+            self.ndb_class = ndbv2.NeuralDB
+        else:
+            self.ndb_class = ndbv2.FastDB
 
         self.db_lock = Lock()
         self.db = self.load(write_mode=write_mode)
@@ -81,12 +87,24 @@ class NDBModel(Model):
         rerank: bool,
         **kwargs: Any,
     ) -> inputs.SearchResultsNDB:
-        constraints = {
-            key: getattr(ndbv2_constraints, constraint["constraint_type"])(
-                **{k: v for k, v in constraint.items() if k != "constraint_type"}
-            )
-            for key, constraint in constraints.items()
-        }
+
+        if self.ndb_class == ndbv2.NeuralDB:
+            constraint_class = ndbv2_constraints
+            constraints = {
+                key: getattr(constraint_class, constraint["constraint_type"])(
+                    **{k: v for k, v in constraint.items() if k != "constraint_type"}
+                )
+                for key, constraint in constraints.items()
+            }
+        else:
+            constraint_class = search
+            constraints = {
+                key: getattr(constraint_class, constraint["constraint_type"])(
+                    *[v for k, v in constraint.items() if k != "constraint_type"]
+                )
+                for key, constraint in constraints.items()
+            }
+        
 
         if self.config.autoscaling_enabled:
             results = self.db.search(
@@ -120,20 +138,28 @@ class NDBModel(Model):
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
 
         with self.db_lock:
-            self.db.insert(ndb_docs)
-
             upsert_doc_ids = [
                 doc.source_id
                 for doc in documents
                 if doc.source_id and doc.options.get("upsert", False)
             ]
+            doc_id_to_source = {doc.doc_id: doc.document for doc in self.db.documents() if doc.doc_id in upsert_doc_ids}
 
-            delete_docs_and_remove_files(
-                db=self.db,
-                doc_ids=upsert_doc_ids,
-                full_documents_path=self.doc_save_path(),
-                keep_latest_version=True,
-            )
+            self.db.insert(ndb_docs)
+
+            for doc_id in doc_id_to_source:
+                try:
+                    self.db.delete_doc(
+                        doc_id, keep_latest_version=True
+                    )
+                    full_file_path = os.path.dirname(os.path.join(self.doc_save_path(), doc_id_to_source[doc_id]))
+                    if os.path.exists(full_file_path):
+                        shutil.rmtree(full_file_path)
+                except Exception as e:
+                    self.logger.warning(
+                        f"Failed to delete previous version of document {doc_id}: {e}",
+                        code=LogCode.INSERT,
+                    )
 
         return [
             {
@@ -174,9 +200,9 @@ class NDBModel(Model):
         return sorted(
             [
                 {
-                    "source": self.full_source_path(doc["document"]),
-                    "source_id": doc["doc_id"],
-                    "version": doc["doc_version"],
+                    "source": doc.document,
+                    "source_id": doc.doc_id,
+                    "version": doc.doc_version,
                 }
                 for doc in docs
             ],
@@ -314,7 +340,8 @@ class NDBModel(Model):
             "boxes": bboxes,
         }
 
-    def load(self, write_mode: bool = False, **kwargs) -> ndbv2.NeuralDB:
+    def load(self, write_mode: bool = False, **kwargs) -> Union[ndbv2.NeuralDB, ndbv2.FastDB]:
+
         try:
             if self.host_model_dir.parent.exists():
                 # This logic for cleaning up of old models assumes there can only be one deployment of a model at a time
@@ -338,9 +365,14 @@ class NDBModel(Model):
                             )
 
             if write_mode:
-                loaded_ndb = ndbv2.NeuralDB.load(
-                    self.ndb_save_path(), read_only=not write_mode
-                )
+                if self.ndb_class == ndbv2.NeuralDB:
+                    loaded_ndb = self.ndb_class.load(
+                        self.ndb_save_path(), read_only=not write_mode
+                    )
+                else:
+                    loaded_ndb = self.ndb_class.load(
+                        self.ndb_save_path()
+                    )
 
                 self.logger.info(
                     f"Loaded NDBv2 model from {self.ndb_save_path()} read_only={not write_mode}",
@@ -359,9 +391,14 @@ class NDBModel(Model):
                 finally:
                     release_file_lock(lock)
 
-                loaded_ndb = ndbv2.NeuralDB.load(
-                    self.ndb_host_save_path(), read_only=not write_mode
-                )
+                if self.ndb_class == ndbv2.NeuralDB:
+                    loaded_ndb = self.ndb_class.load(
+                        self.ndb_host_save_path(), read_only=not write_mode
+                    )
+                else:
+                    loaded_ndb = self.ndb_class.load(
+                        self.ndb_host_save_path()
+                    )
 
                 self.logger.info(
                     f"Loaded NDBv2 model from {self.ndb_host_save_path()} read_only={not write_mode}",

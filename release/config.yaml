@@ -8,6 +8,22 @@ azure:
         password: Kl0pYEl2c2iEJfK6rIo/fI3Vva1KOmhxd+cDwQtZTb+ACRDxWxvv
         username: thirdaiplatform-push-daily-update
       version: 0.0.1
+    deploymentname:
+      pull_credentials:
+        password: cHqDNPS6gdAAMvs8oUvRG3BByDl85AVW/AHdDvmrJK+ACRALQuaa
+        username: thirdaiplatform-pull-deploymentname
+      push_credentials:
+        password: lWOfMzKhnAc1hfRvFJa89NGiHl0TstKMrlSQd2novE+ACRA4SSWw
+        username: thirdaiplatform-push-deploymentname
+      version: 0.0.3
+    dev-copy:
+      pull_credentials:
+        password: KBUY73w4fAc2SoosV3TgHm90umMlD++2Dl4wfz5XMt+ACRDOPzPJ
+        username: thirdaiplatform-pull-dev-copy
+      push_credentials:
+        password: q87GmYslwrpqvyAblFOb1/OVNu354guNWbrKSWWD+r+ACRAWZNon
+        username: thirdaiplatform-push-dev-copy
+      version: 0.0.16
     docker_tests:
       pull_credentials:
         password: ojqTob8LipMFHD5CUtYQqKFT4Yj0dgA42fpzKm08Uu+ACRB3D2G8
@@ -78,7 +94,7 @@ azure:
       push_credentials:
         password: y/iKY+7IwCrcdd61Rp3vma3gTyYScI72TY7484cJ6c+ACRBkPJv/
         username: thirdaiplatform-push-release-test-main
-      version: 0.0.57
+      version: 1.1.13a
     test_1:
       pull_credentials:
         password: lfhxcL/qmrYP24rIH2vmRNSYV9ZlNCfxJyQI6E3kVi+ACRDjUz22

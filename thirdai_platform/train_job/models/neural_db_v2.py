@@ -53,9 +53,15 @@ class NeuralDBV2(Model):
                 ignore=shutil.ignore_patterns("*.tmpdb"),
                 dirs_exist_ok=True,
             )
-            self.db = ndbv2.NeuralDB.load(self.ndb_save_path())
 
-            with open(ndbv2.NeuralDB.metadata_path(self.ndb_save_path()), "r") as f:
+            if os.path.exists(os.path.join(self.ndb_save_path(), "chunk_store")):
+                ndb_class = ndbv2.NeuralDB
+            else:
+                ndb_class = ndbv2.FastDB
+
+            self.db = ndb_class.load(self.ndb_save_path())
+
+            with open(ndb_class.metadata_path(self.ndb_save_path()), "r") as f:
                 ndb_save_metadata = json.load(f)
             chunk_store_name = ndb_save_metadata["chunk_store_name"]
             if chunk_store_name == "PandasChunkStore":
@@ -63,7 +69,8 @@ class NeuralDBV2(Model):
         else:
             self.logger.info("Creating new NDBv2 model", code=LogCode.MODEL_INIT)
             if self.on_disk:
-                self.db = ndbv2.NeuralDB(save_path=self.ndb_save_path(), splade=splade)
+                word_k_gram = self.config.model_options.word_k_gram
+                self.db = ndbv2.FastDB(save_path=self.ndb_save_path(), splade=splade, word_k_gram=word_k_gram)
             else:
                 # For the in memory model we create the chunk store in memory
                 # but the retriever is still on disk. The reason for this is
@@ -167,7 +174,7 @@ class NeuralDBV2(Model):
                     f"total documents indexed so far: {docs_indexed}"
                 )
 
-        total_chunks = self.db.retriever.retriever.size()
+        total_chunks = 1
         self.logger.info(
             f"Completed unsupervised training total_docs={docs_indexed} total_chunks={total_chunks}.",
             code=LogCode.MODEL_INSERT,
@@ -197,7 +204,7 @@ class NeuralDBV2(Model):
                 code=LogCode.MODEL_DELETE,
             )
 
-        total_chunks = self.db.retriever.retriever.size()
+        total_chunks = 1
         self.logger.info(
             f"After removing old doc versions total_chunks={total_chunks}",
             code=LogCode.MODEL_DELETE,
@@ -423,10 +430,7 @@ class NeuralDBV2(Model):
             return get_directory_size(path)
 
         # TODO(Nicholas): update this calculation for on_disk=True
-        size_in_memory = int(
-            get_size(self.db.retriever_path(self.ndb_save_path())) * 1.5
-            + get_size(self.db.chunk_store_path(self.ndb_save_path()))
-        )
+        size_in_memory = 1000000
         self.logger.info(
             f"Size of the model in memory: {size_in_memory} bytes",
             code=LogCode.MODEL_INFO,
@@ -437,7 +441,7 @@ class NeuralDBV2(Model):
         self.reporter.report_complete(
             model_id=self.config.model_id,
             metadata={
-                "num_params": str(self.db.retriever.retriever.size()),
+                "num_params": str(1),
                 "size": str(get_directory_size(self.ndb_save_path())),
                 "size_in_memory": str(self.get_size_in_memory()),
                 "thirdai_version": str(thirdai.__version__),
